@@ -6,7 +6,7 @@ using ModelingToolkit, OrdinaryDiffEq
 D = Differential(t)
 
 continuous_events = [ # This time we have a vector of pairs
-    [t ~ 10] => [c ~ 10, d ~ 10]; [t ~ 11] => [d ~ 3]
+    [t ~ 10] => [c ~ 10, d ~ 10]; [t ~ 11, t ~ 12] => [d ~ 3]
 ]
 # write rules either as events or as functions 
 
