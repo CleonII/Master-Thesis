@@ -5,7 +5,7 @@ using PyCall
 
 libsbml = pyimport("libsbml")
 reader = libsbml.SBMLReader()
-document = reader[:readSBML]("./b3.xml")
+document = reader[:readSBML]("./b4.xml")
 model = document[:getModel]() # Get the model
 
 function splitByComma(stringToSplit)::Vector{SubString{String}}
@@ -33,132 +33,190 @@ function splitByComma(stringToSplit)::Vector{SubString{String}}
     parts = parts[1:numParts]
 end
 
-function goToBottom(condition)
-    if cmp("and", condition[1:3]) == 0
+function goToBottomEvent(condition, variable, valActiv, valInactive, eventDict)
+    if "and" == condition[1:3]
         strippedCondition = condition[5:end-1]
         parts = splitByComma(strippedCondition)
-        expression = ""
-        for (index, part) in enumerate(parts)
-            expr = goToBottom(part)
-            if index == 1
-                expression = expr
-            else
-                expression = expression * " && " * expr
-            end
+        for part in parts
+            goToBottomEvent(part, variable, valActiv, valInactive, eventDict)
         end
-    elseif cmp("or", condition[1:2]) == 0
+    elseif "or" == condition[1:2]
         strippedCondition = condition[4:end-1]
         parts = splitByComma(strippedCondition)
-        expression = ""
-        for (index, part) in enumerate(parts)
-            expr = goToBottom(part)
-            if index == 1
-                expression = expr
-            else
-                expression = expression * " || " * expr
-            end
+        for part in parts
+            goToBottomEvent(part, variable, valActiv, valInactive, eventDict)
         end
-    elseif cmp("geq", condition[1:3]) == 0
-        strippedCondition = condition[5:end-1]
-        parts = splitByComma(strippedCondition)
-        if cmp(parts[1], "time") == 0
-            expression = "t >= " * parts[2]
+    elseif "geq" == condition[1:3] || "gt" == condition[1:2]
+        if "geq" == condition[1:3]
+            strippedCondition = condition[5:end-1]
         else
-            expression = parts[1] * " >= " * parts[2]
+            strippedCondition = condition[4:end-1]
         end
-    elseif cmp("gt", condition[1:2]) == 0
-        strippedCondition = condition[4:end-1]
         parts = splitByComma(strippedCondition)
-        if cmp(parts[1], "time") == 0
-            expression = "t > " * parts[2]
+        if parts[1] == "time"
+            trigger = "[t ~ " * parts[2] * "]"
+            event = "[" * variable * " ~ " * valActive * "]"
         else
-            expression = parts[1] * " > " * parts[2]
+            trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
+            event = "[" * variable * " ~ " * valActive * "]"
         end
-    elseif cmp("leq", condition[1:3]) == 0
-        strippedCondition = condition[5:end-1]
-        parts = splitByComma(strippedCondition)
-        if cmp(parts[1], "time") == 0
-            expression = "t <= " * parts[2]
+        eventDict[trigger] = event
+    elseif "leq" == condition[1:3] || "lt" == condition[1:2]
+        if "leq" == condition[1:3]
+            strippedCondition = condition[5:end-1]
         else
-            expression = parts[1] * " <= " * parts[2]
+            strippedCondition = condition[4:end-1]
         end
-    elseif cmp("lt", condition[1:2]) == 0
-        strippedCondition = condition[4:end-1]
         parts = splitByComma(strippedCondition)
-        if cmp(parts[1], "time") == 0
-            expression = "t < " * parts[2]
+        if parts[1] == "time"
+            trigger = "[t ~ " * parts[2] * "]"
+            event = "[" * variable * " ~ " * valInactive * "]"
         else
-            expression = parts[1] * " < " * parts[2]
+            trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
+            event = "[" * variable * " ~ " * valInactive * "]"
+        end
+        if ~(trigger in keys(eventDict))
+            eventDict[trigger] = event
         end
     end
-    return expression
+    nothing
 end
 
 function piecewiseToEvent(piecewiseString, variable)
     piecewiseString = piecewiseString[11:end-1]
-    arguments = splitByComma(piecewiseString)
-    values = arguments[1:2:end]
-    conditions = arguments[2:2:end]
+    eventDict = Dict()
+    args = splitByComma(piecewiseString)
+    vals = args[1:2:end]
+    conds = args[2:2:end]
 
-    pieces = ""
-    for (index, condition) in enumerate(conditions)
-        expression = goToBottom(condition)
-        if index == 1
-            piece = "if " * expression * "\n" * variable * " = " * values[index] 
-            pieces = piece
-        else
-            piece = "elseif " * expression * "\n" * variable * " = " * values[index] 
-            pieces = pieces * "\n" * piece
+    if length(conds) == 1
+        condition = conds[1]
+        valActive = vals[1]
+        valInactive = vals[2]
+        goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
+    else
+        for (cIndex, condition) in enumerate(conds)
+            valActive = vals[cIndex]
+            valInactive = vals[end]
+            goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
         end
     end
-    piece = "else\n" * variable * " = " * values[end] * "\nend"
-    pieces = pieces * "\n" * piece
 
+    eventString = ""
+    for (trigger, event) in eventDict
+        if length(eventString) == 0
+            eventString = trigger * " => " * event
+        else
+            eventString = eventString * ", " * trigger * " => " * event
+        end
+    end
+    return eventString
 end
 
 function rewritePiecewise(piecewiseString, variable)
     piecewiseString = piecewiseString[11:end-1]
-    arguments = splitByComma(piecewiseString)
-    values = arguments[1:2:end]
-    conditions = arguments[2:2:end]
+    args = splitByComma(piecewiseString)
+    vals = args[1:2:end]
+    conds = args[2:2:end]
 
     pieces = ""
-    for (index, condition) in enumerate(conditions)
+    for (index, condition) in enumerate(conds)
         expression = goToBottom(condition)
         if index == 1
-            piece = "if " * expression * "\n" * variable * " = " * values[index] 
+            piece = "if " * expression * "\n" * variable * " = " * vals[index] 
             pieces = piece
         else
-            piece = "elseif " * expression * "\n" * variable * " = " * values[index] 
+            piece = "elseif " * expression * "\n" * variable * " = " * vals[index] 
             pieces = pieces * "\n" * piece
         end
     end
-    piece = "else\n" * variable * " = " * values[end] * "\nend"
+    piece = "else\n" * variable * " = " * vals[end] * "\nend"
     pieces = pieces * "\n" * piece
 
 end
 
 function asTrigger(triggerFormula)
-    if cmp("geq", triggerFormula[1:3]) == 0
+    activates = false
+    if "geq" == triggerFormula[1:3]
+        activates = true
         strippedFormula = triggerFormula[5:end-1]
-    elseif cmp("gt", triggerFormula[1:2]) == 0
+    elseif "gt" == triggerFormula[1:2]
+        activates = true
         strippedFormula = triggerFormula[4:end-1]
-    elseif cmp("leq", triggerFormula[1:3]) == 0
+    elseif "leq" == triggerFormula[1:3]
+        activates = false
         strippedFormula = triggerFormula[5:end-1]
-    elseif cmp("lt", triggerFormula[1:2]) == 0
+    elseif "lt" == triggerFormula[1:2]
+        activates = false
         strippedFormula = triggerFormula[4:end-1]
     end
     parts = splitByComma(strippedFormula)
-    if cmp(parts[1], "time") == 0
+    if parts[1] == "time"
         expression = "[t ~ " * parts[2] * "]"
     else
         expression = "[" * parts[1] * " ~ " * parts[2] * "]"
     end
-    return expression
+    return [expression, activates]
+end
+
+function getArguments(functionAsString, funcNameArgFormula)
+    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' '], keepempty = false)
+    existingFunctions = keys(funcNameArgFormula)
+    includesFunction = false
+    arguments = Dict()
+    for part in parts
+        if isdigit(part[1])
+            nothing
+        else
+            if part in existingFunctions
+                includesFunction = true
+                funcArgs = funcNameArgFormula[part][1]
+                funcArgs = split(funcArgs, [',', ' '], keepempty = false)
+                for arg in funcArgs
+                    if (arg in values(arguments)) == false
+                        arguments[length(arguments)+1] = arg
+                    end
+                end
+            else
+                if (part in values(arguments)) == false
+                    arguments[length(arguments)+1] = part
+                end
+            end
+        end
+    end
+    argumentString = arguments[1]
+    for i = 2:length(arguments)
+        argumentString = argumentString * ", " * arguments[i]
+    end
+    return [argumentString, includesFunction]
+end
+
+function rewriteFunctionOfFunction(functionAsString, funcNameArgFormula)
+    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' '], keepempty = false)
+    existingFunctions = keys(funcNameArgFormula)
+    newFunctionString = functionAsString
+    for part in parts
+        if isdigit(part[1])
+            nothing
+        else
+            if part in existingFunctions
+                funcArgs = funcNameArgFormula[part][1]
+                funcDef = part * "(" * funcArgs * ")"
+                newFunctionString = replace(newFunctionString, part => funcDef)
+            end
+        end
+    end
+    return newFunctionString
 end
 
 function writeODEModelToFile()
-    numFunctions = 0
+    funcNameArgFormula = Dict()
+
+    ### Define extra functions
+    funcName = "pow"
+    funcArg = "a, b"
+    funcFormula = "a^b"
+    funcNameArgFormula[funcName] = [funcArg, funcFormula]
 
     ### Define variables
     defineVariables = "@variables t"
@@ -234,6 +292,7 @@ function writeODEModelToFile()
         StrippedMathAsString = mathAsString[expressionStart:expressionStop]
         functionFormula = lstrip(split(StrippedMathAsString, ',')[end])
         functionAsString = functionName * args * " = " * functionFormula
+        funcNameArgFormula[functionName] = [args[2:end-1], functionAsString]
         if fIndex == 1
             stringOfFunctions = functionAsString
             stringOfFunctionDefinitions = functionName * args
@@ -249,7 +308,7 @@ function writeODEModelToFile()
         eventName = event[:getName]()
         trigger = event[:getTrigger]()
         triggerMath = trigger[:getMath]()
-        triggerFormula = asTrigger(libsbml[:formulaToString](triggerMath))
+        triggerFormula, activates = asTrigger(libsbml[:formulaToString](triggerMath))
         eventAsString = ""
         for (eaIndex, eventAssignment) in enumerate(event[:getListOfEventAssignments]())
             variableName = eventAssignment[:getVariable]()
@@ -271,22 +330,32 @@ function writeODEModelToFile()
     end
 
     ### Define rules
-    println(modelFile, "")
-    println(modelFile, "### Rules ###")
     for rule in model[:getListOfRules]()
         ruleType = rule[:getElementName]() # type
         if ruleType == "assignmentRule"
             ruleVariable = rule[:getVariable]() # variable
             ruleFormula = rule[:getFormula]() # need to add piecewise function (and others)
             if occursin("piecewise", ruleFormula)
-                ruleFormulaAsString = rewritePiecewise(ruleFormula, ruleVariable)
+                println(ruleFormula)
+                # adds rule as event
+                localEventString = piecewiseToEvent(ruleFormula, ruleVariable)
+                if length(stringOfEvents) == 0
+                    stringOfEvents = localEventString
+                else
+                    stringOfEvents = stringOfEvents * ", " * localEventString
+                end
             else
-                ruleFormulaAsString = ruleVariable * " = " * ruleFormula
+                # adds rule as function
+                println(ruleFormula)
+                arguments, includesFunction = getArguments(ruleFormula, funcNameArgFormula)
+                if includesFunction
+                    ruleFormula = rewriteFunctionOfFunction(ruleFormula, funcNameArgFormula)
+                end
+                funcNameArgFormula[ruleVariable] = [arguments, ruleFormula]
             end
-            println(modelFile, ruleFormulaAsString)
-        elseif cmp(ruleType, "algebraicRule") == 0
+        elseif ruleType == "algebraicRule"
             # TODO
-        elseif cmp(ruleType, "rateRule") == 0
+        elseif ruleType == "rateRule"
             # TODO
         end
     end
@@ -365,7 +434,8 @@ function writeODEModelToFile()
     println(modelFile, stringOfEvents)
     println(modelFile, "]")
 
-
+    println(modelFile, "")
+    println(modelFile, "### Rules ###")
 
 
 
