@@ -5,7 +5,7 @@ using PyCall
 
 libsbml = pyimport("libsbml")
 reader = libsbml.SBMLReader()
-document = reader[:readSBML]("./b4.xml")
+document = reader[:readSBML]("./b1.xml")
 model = document[:getModel]() # Get the model
 
 function splitByComma(stringToSplit)::Vector{SubString{String}}
@@ -24,7 +24,6 @@ function splitByComma(stringToSplit)::Vector{SubString{String}}
             endPart = i-1
             numParts += 1
             parts[numParts] = stringToSplit[startPart:endPart]
-            i += 2
             startPart = i
         end
     end
@@ -33,18 +32,18 @@ function splitByComma(stringToSplit)::Vector{SubString{String}}
     parts = parts[1:numParts]
 end
 
-function goToBottomEvent(condition, variable, valActiv, valInactive, eventDict)
+function goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
     if "and" == condition[1:3]
         strippedCondition = condition[5:end-1]
         parts = splitByComma(strippedCondition)
         for part in parts
-            goToBottomEvent(part, variable, valActiv, valInactive, eventDict)
+            goToBottomEvent(part, variable, valActive, valInactive, eventDict)
         end
     elseif "or" == condition[1:2]
         strippedCondition = condition[4:end-1]
         parts = splitByComma(strippedCondition)
         for part in parts
-            goToBottomEvent(part, variable, valActiv, valInactive, eventDict)
+            goToBottomEvent(part, variable, valActive, valInactive, eventDict)
         end
     elseif "geq" == condition[1:3] || "gt" == condition[1:2]
         if "geq" == condition[1:3]
@@ -89,17 +88,10 @@ function piecewiseToEvent(piecewiseString, variable)
     vals = args[1:2:end]
     conds = args[2:2:end]
 
-    if length(conds) == 1
-        condition = conds[1]
-        valActive = vals[1]
-        valInactive = vals[2]
+    for (cIndex, condition) in enumerate(conds)
+        valActive = vals[cIndex]
+        valInactive = vals[end]
         goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
-    else
-        for (cIndex, condition) in enumerate(conds)
-            valActive = vals[cIndex]
-            valInactive = vals[end]
-            goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
-        end
     end
 
     eventString = ""
@@ -184,15 +176,19 @@ function getArguments(functionAsString, funcNameArgFormula)
             end
         end
     end
-    argumentString = arguments[1]
-    for i = 2:length(arguments)
-        argumentString = argumentString * ", " * arguments[i]
+    if length(arguments) > 0
+        argumentString = arguments[1]
+        for i = 2:length(arguments)
+            argumentString = argumentString * ", " * arguments[i]
+        end
+    else
+        argumentString = ""
     end
     return [argumentString, includesFunction]
 end
 
 function rewriteFunctionOfFunction(functionAsString, funcNameArgFormula)
-    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' '], keepempty = false)
+    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' ', ','], keepempty = false)
     existingFunctions = keys(funcNameArgFormula)
     newFunctionString = functionAsString
     for part in parts
@@ -209,30 +205,71 @@ function rewriteFunctionOfFunction(functionAsString, funcNameArgFormula)
     return newFunctionString
 end
 
+function removePowFunctions(functionAsString)
+    newFunctionAsString = functionAsString
+    inParenthesis = 0
+    started = 0
+    startIndex = 1
+    endIndex = 1
+    i = 1
+    while i <= length(functionAsString)
+        if started == 0
+            next = findnext("pow(", functionAsString, i)
+            if next === nothing
+                break
+            end
+            startIndex = next[1]
+            i = startIndex + 4
+            started = 1
+            inParenthesis = 1
+        else 
+            if functionAsString[i] == '('
+                inParenthesis += 1
+            elseif functionAsString[i] == ')'
+                inParenthesis -= 1
+            end
+            if inParenthesis == 0
+                endIndex = i
+                powFunction = functionAsString[startIndex:endIndex]
+                powArguments = powFunction[5:end-1]
+                parts = split(powArguments, ", ", keepempty = false)
+                newPowFunction = "(" * parts[1] * ")^(" * parts[2] * ")"
+                newFunctionAsString = replace(newFunctionAsString, powFunction => newPowFunction, count = 1)
+                startIndex = i
+                started = 0
+            end
+            i += 1
+        end
+    end
+    return newFunctionAsString
+end
+
 function writeODEModelToFile()
     funcNameArgFormula = Dict()
 
     ### Define extra functions
-    funcName = "pow"
-    funcArg = "a, b"
-    funcFormula = "a^b"
-    funcNameArgFormula[funcName] = [funcArg, funcFormula]
 
-    ### Define variables
+    ### Define variables and read initial value
+    variableDict = Dict()
     defineVariables = "@variables t"
     for spec in model[:getListOfSpecies]()
+        variableDict[spec[:getId]()] = spec[:getInitialAmount]() == 0 ? string(spec[:getInitialConcentration]()) : string(spec[:getInitialAmount]())
         defineVariables = defineVariables * " " * spec[:getId]()
     end
     
-    ### Define parameters
+    ### Define parameters and read true parameter values
+    parameterDict = Dict()
     defineParameters = "@parameters"
     for par in model[:getListOfParameters]()
+        parameterDict[par[:getId]()] = string(par[:getValue]())
         defineParameters = defineParameters * " " * par[:getId]()
     end
 
-    ### Define constants
+    ### Define constants and read constants values
+    constantsDict = Dict()
     defineConstants = "@parameters"
     for comp in model[:getListOfCompartments]()
+        constantsDict[comp[:getId]()] = string(comp[:getSize]())
         defineConstants = defineConstants * " " * comp[:getId]()
     end
 
@@ -291,8 +328,9 @@ function writeODEModelToFile()
         expressionStop = findlast(')', mathAsString)-1
         StrippedMathAsString = mathAsString[expressionStart:expressionStop]
         functionFormula = lstrip(split(StrippedMathAsString, ',')[end])
+        functionFormula = removePowFunctions(functionFormula)
         functionAsString = functionName * args * " = " * functionFormula
-        funcNameArgFormula[functionName] = [args[2:end-1], functionAsString]
+        funcNameArgFormula[functionName] = [args[2:end-1], functionFormula]
         if fIndex == 1
             stringOfFunctions = functionAsString
             stringOfFunctionDefinitions = functionName * args
@@ -336,7 +374,6 @@ function writeODEModelToFile()
             ruleVariable = rule[:getVariable]() # variable
             ruleFormula = rule[:getFormula]() # need to add piecewise function (and others)
             if occursin("piecewise", ruleFormula)
-                println(ruleFormula)
                 # adds rule as event
                 localEventString = piecewiseToEvent(ruleFormula, ruleVariable)
                 if length(stringOfEvents) == 0
@@ -346,12 +383,22 @@ function writeODEModelToFile()
                 end
             else
                 # adds rule as function
-                println(ruleFormula)
                 arguments, includesFunction = getArguments(ruleFormula, funcNameArgFormula)
-                if includesFunction
-                    ruleFormula = rewriteFunctionOfFunction(ruleFormula, funcNameArgFormula)
+                if arguments == ""
+                    parameterDict[ruleVariable] = ruleFormula
+                else
+                    ruleFormula = removePowFunctions(ruleFormula)
+                    if includesFunction
+                        ruleFormula = rewriteFunctionOfFunction(ruleFormula, funcNameArgFormula)
+                    end
+                    funcNameArgFormula[ruleVariable] = [arguments, ruleFormula]
+                    if ruleVariable in keys(variableDict)
+                        variableDict = delete!(variableDict, ruleVariable)
+                    end
+                    if ruleVariable in keys(parameterDict)
+                        parameterDict = delete!(parameterDict, ruleVariable)
+                    end
                 end
-                funcNameArgFormula[ruleVariable] = [arguments, ruleFormula]
             end
         elseif ruleType == "algebraicRule"
             # TODO
@@ -360,17 +407,22 @@ function writeODEModelToFile()
         end
     end
 
-    println(modelFile, "")
-    println(modelFile, "### Derivatives ###")
+    ### Defining derivatives
     dus = Dict()
-    for (index, spec) in enumerate(model[:getListOfSpecies]())
-        dus[spec[:getId]()] = "du[" * string(index) * "] = "
+    for spec in model[:getListOfSpecies]()
+        dus[spec[:getId]()] = "D(" * spec[:getId]() * ") ~ "
     end
 
     reactions = [(r, r[:getKineticLaw]()[:getFormula]()) for r in model[:getListOfReactions]()]
     for (reac, formula) in reactions
         products = [(p[:species], p[:getStoichiometry]()) for p in reac[:getListOfProducts]()]
         reactants = [(r[:species], r[:getStoichiometry]()) for r in reac[:getListOfReactants]()]
+        if occursin("max(", formula)
+            println(formula)
+            println("")
+        end
+        formula = removePowFunctions(formula)
+        #formula = rewriteFunctionOfFunction(formula, funcNameArgFormula)
         for (rName, rStoich) in reactants
             dus[rName] = dus[rName] * "-" * string(rStoich) * " * (" * formula * ")"
         end
@@ -379,9 +431,6 @@ function writeODEModelToFile()
         end
     end
 
-    for spec in model[:getListOfSpecies]()
-        println(modelFile, dus[spec[:getId]()])
-    end
 
     ### Writing to file 
     modelFile = open("./testMTK.jl", "w")
@@ -390,20 +439,27 @@ function writeODEModelToFile()
     println(modelFile, "# Number of species: " * string(length(model[:getListOfSpecies]())))
 
     println(modelFile, "")
-    println(modelFile, "### Extra functions")
-    println(modelFile, "pow(a,b) = a^b")
-    println(modelFile, "@register pow(a,b)")
-
-    println(modelFile, "")
     println(modelFile, "### Define independent and dependent variables")
+    defineVariables = "@variables t"
+    for key in keys(variableDict)
+        defineVariables = defineVariables * " " * key
+    end
     println(modelFile, defineVariables)
     
     println(modelFile, "")
     println(modelFile, "### Define parameters")
+    defineParameters = "@parameters"
+    for key in keys(parameterDict)
+        defineParameters = defineParameters * " " * key
+    end
     println(modelFile, defineParameters)
 
     println(modelFile, "")
     println(modelFile, "### Define constants")
+    defineConstants = "@parameters"
+    for key in keys(constantsDict)
+        defineConstants = defineConstants * " " * key
+    end
     println(modelFile, defineConstants)
 
     println(modelFile, "")
@@ -411,40 +467,80 @@ function writeODEModelToFile()
     println(modelFile, "D = Differential(t)")
 
     println(modelFile, "")
-    println(modelFile, "### True parameter values ###")
-    println(modelFile, trueParameterValueString)
-    println(modelFile, trueConstantsValueString)
-
-    println(modelFile, "")
-    println(modelFile, "### Initial species concentrations ###")
-    println(modelFile, initialSpeciesValuesString)
+    println(modelFile, "### Events ###")
+    if length(stringOfEvents) > 0
+        println(modelFile, "continuous_events = [")
+        println(modelFile, stringOfEvents)
+        println(modelFile, "]")
+    end
 
     println(modelFile, "")
     println(modelFile, "### Function definitions ###")
-    fParts = split(stringOfFunctions, " # ")
-    fdParts = split(stringOfFunctionDefinitions, " # ")
-    for (functionAsString, functionDefinition) in zip(fParts, fdParts)
-        println(modelFile, functionAsString)
-        println(modelFile, "@register " * functionDefinition)
+    if length(funcNameArgFormula) > 0
+        for (funcName, (funcArg, funcFormula)) in funcNameArgFormula
+            functionAsString = funcName * "(" * funcArg * ") = " * funcFormula 
+            functionDefinition = funcName * "(" * funcArg * ")"
+            println(modelFile, functionAsString)
+            println(modelFile, "@register " * functionDefinition)
+        end
     end
     
+    
     println(modelFile, "")
-    println(modelFile, "### Events ###")
-    println(modelFile, "continuous_events = [")
-    println(modelFile, stringOfEvents)
+    println(modelFile, "### Derivatives ###")
+    println(modelFile, "eqs = [")
+    for (sIndex, key) in enumerate(keys(dus))
+        if sIndex == 1
+            print(modelFile, dus[key])
+        else
+            print(modelFile, ",\n" * dus[key])
+        end
+    end
     println(modelFile, "]")
 
     println(modelFile, "")
-    println(modelFile, "### Rules ###")
-
-
+    if length(stringOfEvents) > 0
+        println(modelFile, "@named sys = ODESystem(eqs, t, continuous_events = continuous_events)")
+    else
+        println(modelFile, "@named sys = ODESystem(eqs)")
+    end
 
     println(modelFile, "")
-    println(modelFile, "@named sys = ODESystem(eqs)")
+    println(modelFile, "### Initial species concentrations ###")
+    println(modelFile, "initialSpeciesValues = [")
+    for (index, (key, value)) in enumerate(variableDict)
+        if index == 1
+            assignString = key * " => " * value
+        else
+            assignString = ",\n" * key * " => " * value
+        end
+        print(modelFile, assignString)
+    end
+    println(modelFile, "]")
 
     println(modelFile, "")
-    println(modelFile, "nothing")
-    println(modelFile, "end")
+    println(modelFile, "### True parameter values ###")
+    println(modelFile, "trueParameterValues = [")
+    for (index, (key, value)) in enumerate(parameterDict)
+        if index == 1
+            assignString = key * " => " * value
+        else
+            assignString = ",\n" * key * " => " * value
+        end
+        print(modelFile, assignString)
+    end
+    println(modelFile, "]")
+    println(modelFile, "")
+    println(modelFile, "trueConstantsValues = [")
+    for (index, (key, value)) in enumerate(constantsDict)
+        if index == 1
+            assignString = key * " => " * value
+        else
+            assignString = ",\n" * key * " => " * value
+        end
+        print(modelFile, assignString)
+    end
+    println(modelFile, "]")
     
     close(modelFile)
 
