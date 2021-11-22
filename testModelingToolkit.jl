@@ -40,7 +40,7 @@ p  = [σ => 28.0,
 
 tspan = (0.0,100.0)
 prob = ODEProblem(sys,u0,tspan,p,jac=true)
-sol = solve(prob,Tsit5())
+sol = @time solve(prob,Tsit5())
 using Plots; plot(sol,vars=(x,y))
 tUse = (sol.t .> 8) .== (sol.t .< 12)
 plot(sol.t[tUse], sol[4,tUse])
