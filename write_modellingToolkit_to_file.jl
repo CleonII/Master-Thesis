@@ -5,7 +5,7 @@ using PyCall
 
 libsbml = pyimport("libsbml")
 reader = libsbml.SBMLReader()
-modelName = "model_Beer_MolBioSystems2014"
+modelName = "model_Bertozzi_PNAS2020"
 document = reader[:readSBML]("./SBML/Benchmark/" * modelName * ".xml")
 model = document[:getModel]() # Get the model
 
@@ -62,18 +62,27 @@ function replaceTime(timeString)
     return newTimeString
 end
 
-function goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
+function goToBottomEvent(condition, variable, valActive, valInactive, eventDict, dicts)
+    # if valActive or valInactive is a parameter or constant, add it to the dummyVariable to keep defined
+    for val in (valActive, valInactive)
+        if val in keys(dicts["parameters"])
+            dicts["dummyVariable"][val] = dicts["parameters"][val]
+        elseif val in keys(dicts["constants"])
+            dicts["dummyVariable"][val] = dicts["constants"][val]
+        end
+    end
+    
     if "and" == condition[1:3]
         strippedCondition = condition[5:end-1]
         parts = splitByComma(strippedCondition)
         for part in parts
-            goToBottomEvent(part, variable, valActive, valInactive, eventDict)
+            goToBottomEvent(part, variable, valActive, valInactive, eventDict, dicts)
         end
     elseif "or" == condition[1:2]
         strippedCondition = condition[4:end-1]
         parts = splitByComma(strippedCondition)
         for part in parts
-            goToBottomEvent(part, variable, valActive, valInactive, eventDict)
+            goToBottomEvent(part, variable, valActive, valInactive, eventDict, dicts)
         end
     elseif "geq" == condition[1:3] || "gt" == condition[1:2]
         if "geq" == condition[1:3]
@@ -81,6 +90,16 @@ function goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
         else
             strippedCondition = condition[4:end-1]
         end
+        # if the trigger or event contains parameters or constant, add them to the dummyVariable to keep defined
+        args = split(getArguments(strippedCondition, Dict())[1], ", ")
+        for arg in args
+            if arg in keys(dicts["parameters"])
+                dicts["dummyVariable"][arg] = dicts["parameters"][arg]
+            elseif arg in keys(dicts["constants"])
+                dicts["dummyVariable"][arg] = dicts["constants"][arg]
+            end
+        end
+
         parts = splitByComma(strippedCondition)
         if occursin("time", parts[1])
             parts[1] = replaceTime(parts[1])
@@ -95,6 +114,16 @@ function goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
         else
             strippedCondition = condition[4:end-1]
         end
+        # if the trigger or event contains parameters or constant, add them to the dummyVariable to keep defined
+        args = split(getArguments(strippedCondition, Dict())[1], ", ")
+        for arg in args
+            if arg in keys(dicts["parameters"])
+                dicts["dummyVariable"][arg] = dicts["parameters"][arg]
+            elseif arg in keys(dicts["constants"])
+                dicts["dummyVariable"][arg] = dicts["constants"][arg]
+            end
+        end
+
         parts = splitByComma(strippedCondition)
         if occursin("time", parts[1])
             parts[1] = replaceTime(parts[1])
@@ -109,8 +138,18 @@ function goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
     nothing
 end
 
-function piecewiseToEvent(piecewiseString, variable)
+function piecewiseToEvent(piecewiseString, variable, dicts)
     piecewiseString = piecewiseString[11:end-1]
+
+    # if the variable in the event is set as a parameter or constant, set it as a variable and delete the previous form
+    if variable in keys(dicts["parameters"])
+        dicts["variableParameters"][variable] = dicts["parameters"][variable]
+        delete!(dicts["parameters"], variable)
+    elseif variable in keys(dicts["constants"])
+        dicts["variableParameters"][variable] = dicts["constants"][variable]
+        delete!(dicts["constants"], variable)
+    end
+
     eventDict = Dict()
     args = splitByComma(piecewiseString)
     vals = args[1:2:end]
@@ -119,7 +158,7 @@ function piecewiseToEvent(piecewiseString, variable)
     for (cIndex, condition) in enumerate(conds)
         valActive = vals[cIndex]
         valInactive = vals[end]
-        goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
+        goToBottomEvent(condition, variable, valActive, valInactive, eventDict, dicts)
     end
 
     eventString = ""
@@ -444,24 +483,37 @@ function rewriteDerivatives(derivativeAsString, funcNameArgFormula)
 end
 
 function writeODEModelToFile()
+    dicts = Dict()
+    variableDict = Dict()
+    dicts["variables"] = variableDict
+    parameterDict = Dict()
+    dicts["parameters"] = parameterDict
+    constantsDict = Dict()
+    dicts["constants"] = constantsDict
+    variableParameterDict = Dict()
+    dicts["variableParameters"] = variableParameterDict
+    dummyVariableDict = Dict()
+    dicts["dummyVariable"] = dummyVariableDict
+    
     funcNameArgFormula = Dict()
+    dicts["functions"] = funcNameArgFormula
+    dus = Dict()
+    dicts["derivatives"] = dus
+    
 
     ### Define extra functions
 
     ### Define variables and read initial value
-    variableDict = Dict()
     for spec in model[:getListOfSpecies]()
         variableDict[spec[:getId]()] = spec[:getInitialAmount]() == 0 ? string(spec[:getInitialConcentration]()) : string(spec[:getInitialAmount]())
     end
     
     ### Define parameters and read true parameter values
-    parameterDict = Dict()
     for par in model[:getListOfParameters]()
         parameterDict[par[:getId]()] = string(par[:getValue]())
     end
 
     ### Define constants and read constants values
-    constantsDict = Dict()
     for comp in model[:getListOfCompartments]()
         constantsDict[comp[:getId]()] = string(comp[:getSize]())
     end
@@ -518,6 +570,15 @@ function writeODEModelToFile()
         trigger = event[:getTrigger]()
         triggerMath = trigger[:getMath]()
         triggerFormula, activates = asTrigger(libsbml[:formulaToString](triggerMath))
+        # if the trigger contains parameters or constants, add them to the dummy variables
+        triggerArgs = split(getArguments(triggerFormula[2:end-1], Dict())[1], ", ")
+        for triggerArg in triggerArgs
+            if triggerArg in keys(dicts["parameters"])
+                dicts["dummyVariable"][triggerArg] = dicts["parameters"][triggerArg]
+            elseif arg in keys(dicts["constants"])
+                dicts["dummyVariable"][triggerArg] = dicts["constants"][triggerArg]
+            end
+        end
         eventAsString = ""
         for (eaIndex, eventAssignment) in enumerate(event[:getListOfEventAssignments]())
             variableName = eventAssignment[:getVariable]()
@@ -527,6 +588,23 @@ function writeODEModelToFile()
                 eventAsString = "[" * variableName * " ~ " * eventMathAsString
             else
                 eventAsString = eventAsString * ", " * variableName * " ~ " * eventMathAsString
+            end
+            # if the variable in the event is not set as a variable, make it so and remove it as a parameter or constant
+            if variableName in keys(parameterDict)
+                variableParameterDict[lhsArg] = parameterDict[lhsArg]
+                delete!(parameterDict, lhsArg)
+            elseif variableName in keys(constantsDict)
+                variableParameterDict[lhsArg] = constantsDict[lhsArg]
+                delete!(constantsDict, lhsArg)
+            end
+            # if the event math contains parameters or constants, add them to the dummy variable so that they stay defined 
+            eventMathArgs = split(getArguments(eventMathAsString, funcNameArgFormula)[1], ", ")
+            for eventMathArg in eventMathArgs
+                if eventMathArg in keys(parameterDict)
+                    dummyVariableDict[eventMathArg] = parameterDict[eventMathArg]
+                elseif eventMathArg in keys(constantsDict)
+                    dummyVariableDict[eventMathArg] = constantsDict[eventMathArg]
+                end
             end
         end
         eventAsString = eventAsString * "]"
@@ -546,7 +624,7 @@ function writeODEModelToFile()
             ruleFormula = rule[:getFormula]() # need to add piecewise function (and others)
             if occursin("piecewise", ruleFormula)
                 # adds rule as event
-                localEventString = piecewiseToEvent(ruleFormula, ruleVariable)
+                localEventString = piecewiseToEvent(ruleFormula, ruleVariable, dicts)
                 if length(stringOfEvents) == 0
                     stringOfEvents = localEventString
                 else
@@ -579,7 +657,6 @@ function writeODEModelToFile()
     end
 
     ### Defining derivatives
-    dus = Dict()
     for spec in model[:getListOfSpecies]()
         dus[spec[:getId]()] = "D(" * spec[:getId]() * ") ~ "
     end
@@ -613,6 +690,23 @@ function writeODEModelToFile()
         defineVariables = defineVariables * " " * key * "(t)"
     end
     println(modelFile, defineVariables)
+
+    println(modelFile, "")
+    println(modelFile, "### Define variable parameters")
+    if length(variableParameterDict) > 0
+        defineVariableParameters = "@variables"
+        for key in keys(variableParameterDict)
+            defineVariableParameters = defineVariableParameters * " " * key * "(t)"
+        end
+        println(modelFile, defineVariableParameters)
+    end
+    
+    println(modelFile, "")
+    println(modelFile, "### Define dummy variable")
+    if length(dummyVariableDict) > 0
+        defineDummyVariables = "@variables dummyVariable(t)"
+        println(modelFile, defineDummyVariables)
+    end
     
     println(modelFile, "")
     println(modelFile, "### Define parameters")
@@ -653,7 +747,6 @@ function writeODEModelToFile()
         end
     end
     
-    
     println(modelFile, "")
     println(modelFile, "### Derivatives ###")
     println(modelFile, "eqs = [")
@@ -664,6 +757,17 @@ function writeODEModelToFile()
             print(modelFile, ",\n" * dus[key])
         end
     end
+    for key in keys(variableParameterDict)
+        print(modelFile, ",\nD(" * key * ") ~ 0")
+    end
+    if length(dummyVariableDict) > 0
+        dummyVariableDerivative = ",\nD(dummyVariable) ~ "
+        for key in keys(dummyVariableDict)
+            dummyVariableDerivative = dummyVariableDerivative * "+" * key
+        end
+        println(modelFile, dummyVariableDerivative)
+    end
+    
     println(modelFile, "]")
 
     println(modelFile, "")
@@ -682,6 +786,14 @@ function writeODEModelToFile()
         else
             assignString = ",\n" * key * " => " * value
         end
+        print(modelFile, assignString)
+    end
+    for (key, value) in variableParameterDict
+        assignString = ",\n" * key * " => " * value
+        print(modelFile, assignString)
+    end
+    if length(dummyVariableDict) > 0
+        assignString = ",\ndummyVariable => 0.0"
         print(modelFile, assignString)
     end
     println(modelFile, "]")
