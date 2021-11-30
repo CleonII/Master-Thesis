@@ -5,7 +5,8 @@ using PyCall
 
 libsbml = pyimport("libsbml")
 reader = libsbml.SBMLReader()
-document = reader[:readSBML]("./b1.xml")
+modelName = "model_Beer_MolBioSystems2014"
+document = reader[:readSBML]("./SBML/Benchmark/" * modelName * ".xml")
 model = document[:getModel]() # Get the model
 
 function splitByComma(stringToSplit)::Vector{SubString{String}}
@@ -24,12 +25,41 @@ function splitByComma(stringToSplit)::Vector{SubString{String}}
             endPart = i-1
             numParts += 1
             parts[numParts] = stringToSplit[startPart:endPart]
-            startPart = i
+            startPart = i+2
         end
     end
     numParts += 1
     parts[numParts] = stringToSplit[startPart:end]
     parts = parts[1:numParts]
+end
+
+function replaceTime(timeString)
+    if timeString == "time"
+        return "t"
+    end
+    newTimeString = timeString
+    i = 1
+    while i < length(timeString)
+        indices = findnext("time", timeString, i)
+        if indices === nothing
+            break
+        end
+        if indices[1] == 1
+            if timeString[indices[end]+1] == ' '
+                newTimeString = replace(newTimeString, "time " => "t ", count = 1)
+            end
+        elseif indices[end] == length(timeString)
+            if timeString[indices[1]-1] == ' '
+                newTimeString = replace(newTimeString, " time" => " t", count = 1)
+            end
+        else
+            if timeString[indices[1]-1] == ' ' && timeString[indices[end]+1] == ' '
+                newTimeString = replace(newTimeString, " time " => " t ", count = 1)
+            end
+        end
+        i = indices[end]
+    end
+    return newTimeString
 end
 
 function goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
@@ -52,13 +82,12 @@ function goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
             strippedCondition = condition[4:end-1]
         end
         parts = splitByComma(strippedCondition)
-        if parts[1] == "time"
-            trigger = "[t ~ " * parts[2] * "]"
-            event = "[" * variable * " ~ " * valActive * "]"
-        else
-            trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
-            event = "[" * variable * " ~ " * valActive * "]"
+        if occursin("time", parts[1])
+            parts[1] = replaceTime(parts[1])
         end
+        trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
+        event = "[" * variable * " ~ " * valActive * "]"
+
         eventDict[trigger] = event
     elseif "leq" == condition[1:3] || "lt" == condition[1:2]
         if "leq" == condition[1:3]
@@ -67,13 +96,12 @@ function goToBottomEvent(condition, variable, valActive, valInactive, eventDict)
             strippedCondition = condition[4:end-1]
         end
         parts = splitByComma(strippedCondition)
-        if parts[1] == "time"
-            trigger = "[t ~ " * parts[2] * "]"
-            event = "[" * variable * " ~ " * valInactive * "]"
-        else
-            trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
-            event = "[" * variable * " ~ " * valInactive * "]"
+        if occursin("time", parts[1])
+            parts[1] = replaceTime(parts[1])
         end
+        trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
+        event = "[" * variable * " ~ " * valInactive * "]"
+
         if ~(trigger in keys(eventDict))
             eventDict[trigger] = event
         end
@@ -105,26 +133,65 @@ function piecewiseToEvent(piecewiseString, variable)
     return eventString
 end
 
-function rewritePiecewise(piecewiseString, variable)
-    piecewiseString = piecewiseString[11:end-1]
-    args = splitByComma(piecewiseString)
-    vals = args[1:2:end]
-    conds = args[2:2:end]
-
-    pieces = ""
-    for (index, condition) in enumerate(conds)
-        expression = goToBottom(condition)
-        if index == 1
-            piece = "if " * expression * "\n" * variable * " = " * vals[index] 
-            pieces = piece
-        else
-            piece = "elseif " * expression * "\n" * variable * " = " * vals[index] 
-            pieces = pieces * "\n" * piece
-        end
+function goToBottomDerivative(condition, valActive, valInactive)
+    if valInactive == ""
+        event = valActive
+    else
+        event = "(" * valActive * " - " * valInactive * ")"
     end
-    piece = "else\n" * variable * " = " * vals[end] * "\nend"
-    pieces = pieces * "\n" * piece
+    if "and" == condition[1:3]
+        strippedCondition = condition[5:end-1]
+        parts = splitByComma(strippedCondition)
+        combinedTrigger = ""
+        for part in parts
+            trigger,  = goToBottomDerivative(part, valActive, valInactive)
+            combinedTrigger = combinedTrigger * " * " * trigger
+        end
+    elseif "or" == condition[1:2]
+        strippedCondition = condition[4:end-1]
+        parts = splitByComma(strippedCondition)
+        combinedTrigger = ""
+        for (pIndex, part) in enumerate(parts)
+            trigger,  = goToBottomDerivative(part, valActive, valInactive)
+            if pIndex == 1
+                combinedTrigger = "(" * trigger
+            else
+                combinedTrigger = combinedTrigger * " + " * trigger
+            end
+            combinedTrigger = combinedTrigger * ")"
+        end
+    elseif "geq" == condition[1:3] || "gt" == condition[1:2]
+        if "geq" == condition[1:3]
+            strippedCondition = condition[5:end-1]
+            operator = " >= "
+        else
+            strippedCondition = condition[4:end-1]
+            operator = " > "
+        end
+        parts = splitByComma(strippedCondition)
+        if occursin("time", parts[1])
+            parts[1] = replaceTime(parts[1])
+        end
 
+        trigger = "(" * parts[1] * operator * parts[2] * ")"
+
+    elseif "leq" == condition[1:3] || "lt" == condition[1:2]
+        if "leq" == condition[1:3]
+            strippedCondition = condition[5:end-1]
+            operator = " <= "
+        else
+            strippedCondition = condition[4:end-1]
+            operator = " < " 
+        end
+        parts = splitByComma(strippedCondition)
+        if occursin("time", parts[1])
+            parts[1] = replaceTime(parts[1])
+        end
+
+        trigger = "(" * parts[1] * operator * parts[2] * ")"
+
+    end
+    return trigger, event
 end
 
 function asTrigger(triggerFormula)
@@ -143,16 +210,15 @@ function asTrigger(triggerFormula)
         strippedFormula = triggerFormula[4:end-1]
     end
     parts = splitByComma(strippedFormula)
-    if parts[1] == "time"
-        expression = "[t ~ " * parts[2] * "]"
-    else
-        expression = "[" * parts[1] * " ~ " * parts[2] * "]"
+    if occursin("time", parts[1])
+        parts[1] = replaceTime(parts[1])
     end
+    expression = "[" * parts[1] * " ~ " * parts[2] * "]"
     return [expression, activates]
 end
 
 function getArguments(functionAsString, funcNameArgFormula)
-    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' '], keepempty = false)
+    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' ', '~', ','], keepempty = false)
     existingFunctions = keys(funcNameArgFormula)
     includesFunction = false
     arguments = Dict()
@@ -244,6 +310,139 @@ function removePowFunctions(functionAsString)
     return newFunctionAsString
 end
 
+function rewriteMaxFunctions(functionAsString)
+    newFunctionAsString = functionAsString
+    inParenthesis = 0
+    started = 0
+    startIndex = 1
+    endIndex = 1
+    i = 1
+    while i <= length(functionAsString)
+        if started == 0
+            next = findnext("max(", functionAsString, i)
+            if next === nothing
+                break
+            end
+            startIndex = next[1]
+            i = startIndex + 4
+            started = 1
+            inParenthesis = 1
+        else 
+            if functionAsString[i] == '('
+                inParenthesis += 1
+            elseif functionAsString[i] == ')'
+                inParenthesis -= 1
+            end
+            if inParenthesis == 0
+                endIndex = i
+                powFunction = functionAsString[startIndex:endIndex]
+                powArguments = powFunction[5:end-1]
+                parts = split(powArguments, ", ", keepempty = false)
+                newPowFunction = "0.5*(" * parts[1] * " + " * parts[2] * " + abs(" * parts[1] * " - " * parts[2] * "))"
+                newFunctionAsString = replace(newFunctionAsString, powFunction => newPowFunction, count = 1)
+                startIndex = i
+                started = 0
+            end
+            i += 1
+        end
+    end
+    return newFunctionAsString
+end
+
+function rewritePiecewiseInDerivative(functionAsString)
+    newFunctionAsString = functionAsString
+    inParenthesis = 0
+    started = 0
+    startIndex = 1
+    endIndex = 1
+    i = 1
+    while i <= length(functionAsString)
+        if started == 0
+            next = findnext("piecewise(", functionAsString, i)
+            if next === nothing
+                break
+            end
+            startIndex = next[1]
+            i = startIndex + 10
+            started = 1
+            inParenthesis = 1
+        else 
+            if functionAsString[i] == '('
+                inParenthesis += 1
+            elseif functionAsString[i] == ')'
+                inParenthesis -= 1
+            end
+            if inParenthesis == 0
+                endIndex = i
+                piecewiseFunction = functionAsString[startIndex:endIndex]
+                piecewiseString = piecewiseFunction[11:end-1]
+                args = splitByComma(piecewiseString)
+                vals = args[1:2:end]
+                conds = args[2:2:end]
+
+                if length(vals) > length(conds)
+                    expression = vals[end]
+                else
+                    expression = ""
+                end
+                for (cIndex, condition) in enumerate(conds)
+                    valActive = vals[cIndex]
+                    if length(vals) > length(conds)
+                        valInactive = vals[end]
+                    else
+                        valInactive = ""
+                    end
+                    trigger, event = goToBottomDerivative(condition, valActive, valInactive)
+                    if expression == ""
+                        expression = trigger * " * " * event
+                    else
+                        expression = expression * " + " * trigger * " * " * event
+                    end
+                end
+
+                newFunctionAsString = replace(newFunctionAsString, piecewiseFunction => expression, count = 1)
+                startIndex = i
+                started = 0
+            end
+            i += 1
+        end
+    end
+    return newFunctionAsString
+end
+
+function insertFunctionDefinitions(functionAsString, funcNameArgFormula)
+    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' ', ','], keepempty = false)
+    existingFunctions = keys(funcNameArgFormula)
+    newFunctionString = functionAsString
+    for part in parts
+        if isdigit(part[1])
+            nothing
+        else
+            if part in existingFunctions
+                funcArgs = funcNameArgFormula[part][1]
+                funcDef = part * "(" * funcArgs * ")"
+                newFunctionString = replace(newFunctionString, part => funcDef)
+            end
+        end
+    end
+    return newFunctionString
+end
+
+function rewriteDerivatives(derivativeAsString, funcNameArgFormula)
+    newDerivativeAsString = derivativeAsString
+    if occursin("pow(", newDerivativeAsString)
+        newDerivativeAsString = removePowFunctions(newDerivativeAsString)
+    end
+    if occursin("max(", newDerivativeAsString)
+        newDerivativeAsString = rewriteMaxFunctions(newDerivativeAsString)
+    end
+    if occursin("piecewise(", newDerivativeAsString)
+        newDerivativeAsString = rewritePiecewiseInDerivative(newDerivativeAsString)
+    end
+    newDerivativeAsString = insertFunctionDefinitions(newDerivativeAsString, funcNameArgFormula)
+    return newDerivativeAsString
+end
+
 function writeODEModelToFile()
     funcNameArgFormula = Dict()
 
@@ -251,64 +450,44 @@ function writeODEModelToFile()
 
     ### Define variables and read initial value
     variableDict = Dict()
-    defineVariables = "@variables t"
     for spec in model[:getListOfSpecies]()
         variableDict[spec[:getId]()] = spec[:getInitialAmount]() == 0 ? string(spec[:getInitialConcentration]()) : string(spec[:getInitialAmount]())
-        defineVariables = defineVariables * " " * spec[:getId]()
     end
     
     ### Define parameters and read true parameter values
     parameterDict = Dict()
-    defineParameters = "@parameters"
     for par in model[:getListOfParameters]()
         parameterDict[par[:getId]()] = string(par[:getValue]())
-        defineParameters = defineParameters * " " * par[:getId]()
     end
 
     ### Define constants and read constants values
     constantsDict = Dict()
-    defineConstants = "@parameters"
     for comp in model[:getListOfCompartments]()
         constantsDict[comp[:getId]()] = string(comp[:getSize]())
-        defineConstants = defineConstants * " " * comp[:getId]()
     end
 
-    ### Read true parameter values
-    trueParameterValues = ""
-    for (pIndex, par) in enumerate(model[:getListOfParameters]())
-        if pIndex == 1
-            trueParameterValues = "[" * string(par[:getValue]())
+    ### Implement Initial assignments 
+    for initAssign in model[:getListOfInitialAssignments]()
+        assignName = initAssign[:getId]()
+        if assignName in keys(variableDict)
+            assignMath = initAssign[:getMath]()
+            assignFormula = libsbml[:formulaToString](assignMath)
+            variableDict[assignName] = assignFormula
+        elseif assignName in keys(parameterDict)
+            assignMath = initAssign[:getMath]()
+            assignFormula = libsbml[:formulaToString](assignMath)
+            parameterDict[assignName] = assignFormula
+        elseif assignName in keys(constantsDict)
+            assignMath = initAssign[:getMath]()
+            assignFormula = libsbml[:formulaToString](assignMath)
+            constantsDict[assignName] = assignFormula
         else
-            trueParameterValues = trueParameterValues * ", " * string(par[:getValue]())
+            println("Error: could not find assigned variable/parameter")
         end
+        
     end
-    trueParameterValueString = "trueParameterValues = " * trueParameterValues * "]"
-
-    ### Read constants values
-    trueConstantsValues = ""
-    for (cIndex, comp) in enumerate(model[:getListOfCompartments]())
-        if cIndex == 1
-            trueConstantsValues = "[" * string(comp[:getSize]())
-        else
-            trueConstantsValues = trueConstantsValues * ", " * string(comp[:getSize]())
-        end
-    end
-    trueConstantsValueString = "trueConstantsValues = " * trueConstantsValues * "]"
-
-    ### Read initial values for species
-    initialSpeciesValue = ""
-    for (sIndex, spec) in enumerate(model[:getListOfSpecies]())
-        if sIndex == 1
-            initialSpeciesValue = spec[:getInitialAmount]() == 0 ? "[" * string(spec[:getInitialConcentration]()) : "[" * string(spec[:getInitialAmount]())
-        else
-            initialSpeciesValue = spec[:getInitialAmount]() == 0 ? initialSpeciesValue * ", " * string(spec[:getInitialConcentration]()) : initialSpeciesValue * ", " * string(spec[:getInitialAmount]())
-        end
-    end
-    initialSpeciesValuesString = "initialSpeciesValue = " * initialSpeciesValue * "]"
 
     ### Define functions
-    stringOfFunctions = ""
-    stringOfFunctionDefinitions = ""
     for (fIndex, functionDefinition) in enumerate(model[:getListOfFunctionDefinitions]())
         math = functionDefinition[:getMath]()
         functionName = functionDefinition[:getId]()
@@ -329,15 +508,7 @@ function writeODEModelToFile()
         StrippedMathAsString = mathAsString[expressionStart:expressionStop]
         functionFormula = lstrip(split(StrippedMathAsString, ',')[end])
         functionFormula = removePowFunctions(functionFormula)
-        functionAsString = functionName * args * " = " * functionFormula
         funcNameArgFormula[functionName] = [args[2:end-1], functionFormula]
-        if fIndex == 1
-            stringOfFunctions = functionAsString
-            stringOfFunctionDefinitions = functionName * args
-        else
-            stringOfFunctions = stringOfFunctions * " # " * functionAsString
-            stringOfFunctionDefinitions = stringOfFunctionDefinitions * " # " * functionName * args
-        end
     end
 
     ### Define events
@@ -417,12 +588,7 @@ function writeODEModelToFile()
     for (reac, formula) in reactions
         products = [(p[:species], p[:getStoichiometry]()) for p in reac[:getListOfProducts]()]
         reactants = [(r[:species], r[:getStoichiometry]()) for r in reac[:getListOfReactants]()]
-        if occursin("max(", formula)
-            println(formula)
-            println("")
-        end
-        formula = removePowFunctions(formula)
-        #formula = rewriteFunctionOfFunction(formula, funcNameArgFormula)
+        formula = rewriteDerivatives(formula, funcNameArgFormula)
         for (rName, rStoich) in reactants
             dus[rName] = dus[rName] * "-" * string(rStoich) * " * (" * formula * ")"
         end
@@ -433,7 +599,9 @@ function writeODEModelToFile()
 
 
     ### Writing to file 
-    modelFile = open("./testMTK.jl", "w")
+    modelFile = open("./RewrittenModels/" * modelName * ".jl", "w")
+
+    println(modelFile, "# Model name: " * modelName)
 
     println(modelFile, "# Number of parameters: " * string(length(model[:getListOfParameters]())))
     println(modelFile, "# Number of species: " * string(length(model[:getListOfSpecies]())))
@@ -442,7 +610,7 @@ function writeODEModelToFile()
     println(modelFile, "### Define independent and dependent variables")
     defineVariables = "@variables t"
     for key in keys(variableDict)
-        defineVariables = defineVariables * " " * key
+        defineVariables = defineVariables * " " * key * "(t)"
     end
     println(modelFile, defineVariables)
     
