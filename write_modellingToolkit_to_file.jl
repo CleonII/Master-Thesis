@@ -5,13 +5,14 @@ using PyCall
 
 libsbml = pyimport("libsbml")
 reader = libsbml.SBMLReader()
-modelName = "model_Crauste_CellSystems2017"
+modelName = "model_Fujita_SciSignal2010"
 document = reader[:readSBML]("./SBML/Benchmark/" * modelName * ".xml")
 model = document[:getModel]() # Get the model
 
-# Splits strings by comma (,), but only if the comma is not inside a function / parenthesis.
-function splitByComma(stringToSplit)::Vector{SubString{String}}
-    parts = Vector{SubString{String}}(undef, trunc(Int, length(stringToSplit)))
+
+# Splits strings by a given delimiter, but only if the delimiter is not inside a function / parenthesis.
+function splitBetween(stringToSplit, delimiter)
+    parts = Vector{SubString{String}}(undef, length(stringToSplit))
     numParts = 0
     inParenthesis = 0
     startPart = 1
@@ -22,189 +23,37 @@ function splitByComma(stringToSplit)::Vector{SubString{String}}
         elseif stringToSplit[i] == ')'
             inParenthesis -= 1
         end
-        if stringToSplit[i] == ',' && inParenthesis == 0
+        if stringToSplit[i] == delimiter && inParenthesis == 0
             endPart = i-1
             numParts += 1
             parts[numParts] = stringToSplit[startPart:endPart]
-            startPart = i+2
+            parts[numParts] = strip(parts[numParts])
+            startPart = i+1
         end
     end
     numParts += 1
     parts[numParts] = stringToSplit[startPart:end]
+    parts[numParts] = strip(parts[numParts])
     parts = parts[1:numParts]
 end
 
-# replaces the word "time" in functions with "t". 
-# Makes sure not to change for example "time1" or "shift_time"
-function replaceTime(timeString)
-    if timeString == "time"
-        return "t"
-    end
-    newTimeString = timeString
-    i = 1
-    while i < length(newTimeString)
-        indices = findnext("time", newTimeString, i)
-        if indices === nothing
+function findEndOffunction(functionAsString, iStart)
+    inParenthesis = 1
+    i = iStart
+    endIndex = i
+    while i <= length(functionAsString)
+        if functionAsString[i] == '('
+            inParenthesis += 1
+        elseif functionAsString[i] == ')'
+            inParenthesis -= 1
+        end
+        if inParenthesis == 0
+            endIndex = i
             break
         end
-        if indices[1] == 1
-            if newTimeString[indices[end]+1] in [' ', ')']
-                newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
-            end
-        elseif indices[end] == length(newTimeString)
-            if newTimeString[indices[1]-1] in [' ', '(']
-                newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
-            end
-        else
-            if newTimeString[indices[1]-1] in [' ', '('] && newTimeString[indices[end]+1] in [' ', ')']
-                newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
-            end
-        end
-        i = indices[1] + 1
+        i += 1
     end
-    return newTimeString
-end
-
-# Goes through a condition for an event written for SBML and creates the appropriate events in ModelingToolkit.
-# May call itself to handle more complicated events.
-# Makes sure there are no doublett events. 
-# Also adds constants and parameters used to a dummy variable so that ModelingToolkit does not think they are unused.
-function goToBottomEvent(condition, variable, valActive, valInactive, eventDict, dicts)   
-    if "and" == condition[1:3]
-        strippedCondition = condition[5:end-1]
-        parts = splitByComma(strippedCondition)
-        for part in parts
-            goToBottomEvent(part, variable, valActive, valInactive, eventDict, dicts)
-        end
-    elseif "or" == condition[1:2]
-        strippedCondition = condition[4:end-1]
-        parts = splitByComma(strippedCondition)
-        for part in parts
-            goToBottomEvent(part, variable, valActive, valInactive, eventDict, dicts)
-        end
-    elseif "geq" == condition[1:3] || "gt" == condition[1:2]
-        if "geq" == condition[1:3]
-            strippedCondition = condition[5:end-1]
-        else
-            strippedCondition = condition[4:end-1]
-        end
-        # if the trigger or event contains parameters or constant, add them to the dummyVariable to keep defined
-        args = split(getArguments(strippedCondition), ", ")
-        for arg in args
-            if arg in keys(dicts["parameters"])
-                dicts["dummyVariable"][arg] = dicts["parameters"][arg]
-            elseif arg in keys(dicts["constants"])
-                dicts["dummyVariable"][arg] = dicts["constants"][arg]
-            end
-        end
-
-        parts = splitByComma(strippedCondition)
-        if occursin("time", parts[1])
-            parts[1] = replaceTime(parts[1])
-        end
-        trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
-        event = "[" * variable * " ~ " * valActive * "]"
-
-        eventDict[trigger] = event
-    elseif "leq" == condition[1:3] || "lt" == condition[1:2]
-        if "leq" == condition[1:3]
-            strippedCondition = condition[5:end-1]
-        else
-            strippedCondition = condition[4:end-1]
-        end
-        # if the trigger or event contains parameters or constant, add them to the dummyVariable to keep defined
-        args = split(getArguments(strippedCondition), ", ")
-        for arg in args
-            if arg in keys(dicts["parameters"])
-                dicts["dummyVariable"][arg] = dicts["parameters"][arg]
-            elseif arg in keys(dicts["constants"])
-                dicts["dummyVariable"][arg] = dicts["constants"][arg]
-            end
-        end
-
-        parts = splitByComma(strippedCondition)
-        if occursin("time", parts[1])
-            parts[1] = replaceTime(parts[1])
-        end
-        trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
-        event = "[" * variable * " ~ " * valInactive * "]"
-
-        if ~(trigger in keys(eventDict))
-            eventDict[trigger] = event
-        end
-    end
-    nothing
-end
-
-# Handles piecewise functions that are to be redefined as events. 
-# will add the variable affected by the event as a variable in ModelingToolkit if it is not already.
-# Calls goToBottomEvent to create the actual events and then combines them.
-function piecewiseToEvent(piecewiseString, variable, dicts)
-    piecewiseString = piecewiseString[11:end-1]
-
-    # if the variable in the event is set as a parameter or constant, set it as a variable and delete the previous form
-    if variable in keys(dicts["parameters"])
-        dicts["variableParameters"][variable] = dicts["parameters"][variable]
-        delete!(dicts["parameters"], variable)
-    elseif variable in keys(dicts["constants"])
-        dicts["variableParameters"][variable] = dicts["constants"][variable]
-        delete!(dicts["constants"], variable)
-    end
-
-    eventDict = Dict()
-    args = splitByComma(piecewiseString)
-    vals = args[1:2:end]
-    conds = args[2:2:end]
-
-    # if any values are a/a set of parameter(s) or constant(s), add it/them to the dummyVariable to keep defined, also insert function definitions as needed
-    for (vIndex, val) in enumerate(vals)
-        valArgs = getArguments(val, dicts["functions"])
-        if valArgs[2]
-            vals[vIndex] = rewriteFunctionOfFunction(val, dicts["functions"])
-        end
-        for valArg in split(valArgs[1], ", ")
-            if valArg in keys(dicts["parameters"])
-                dicts["dummyVariable"][valArg] = dicts["parameters"][valArg]
-            elseif valArg in keys(dicts["constants"])
-                dicts["dummyVariable"][valArg] = dicts["constants"][valArg]
-            end
-        end
-    end    
-
-    for (cIndex, condition) in enumerate(conds)
-        valActive = vals[cIndex]
-        valInactive = vals[end]
-        goToBottomEvent(condition, variable, valActive, valInactive, eventDict, dicts)
-    end
-
-    eventString = ""
-    for (trigger, event) in eventDict
-        if length(eventString) == 0
-            eventString = trigger * " => " * event
-        else
-            eventString = eventString * ", " * trigger * " => " * event
-        end
-    end
-    return eventString
-end
-
-# Rewrites triggers in events to propper form for ModelingToolkit
-function asTrigger(triggerFormula)
-    if "geq" == triggerFormula[1:3]
-        strippedFormula = triggerFormula[5:end-1]
-    elseif "gt" == triggerFormula[1:2]
-        strippedFormula = triggerFormula[4:end-1]
-    elseif "leq" == triggerFormula[1:3]
-        strippedFormula = triggerFormula[5:end-1]
-    elseif "lt" == triggerFormula[1:2]
-        strippedFormula = triggerFormula[4:end-1]
-    end
-    parts = splitByComma(strippedFormula)
-    if occursin("time", parts[1])
-        parts[1] = replaceTime(parts[1])
-    end
-    expression = "[" * parts[1] * " ~ " * parts[2] * "]"
-    return expression
+    return endIndex
 end
 
 # Extracts the argument from a function.
@@ -269,6 +118,179 @@ function getArguments(functionAsString, dictionary::Dict)
     return [argumentString, includesFunction]
 end
 
+# replaces the word "time" in functions with "t". 
+# Makes sure not to change for example "time1" or "shift_time"
+function replaceTime(timeString)
+    if timeString == "time"
+        return "t"
+    end
+    newTimeString = timeString
+    i = 1
+    while i < length(newTimeString)
+        indices = findnext("time", newTimeString, i)
+        if indices === nothing
+            break
+        end
+        if indices[1] == 1
+            if newTimeString[indices[end]+1] in [' ', ')']
+                newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
+            end
+        elseif indices[end] == length(newTimeString)
+            if newTimeString[indices[1]-1] in [' ', '(', '-', '+']
+                newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
+            end
+        else
+            if newTimeString[indices[1]-1] in [' ', '(', '-', '+'] && newTimeString[indices[end]+1] in [' ', ')']
+                newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
+            end
+        end
+        i = indices[1] + 1
+    end
+    return newTimeString
+end
+
+# Goes through a condition for an event written for SBML and creates the appropriate events in ModelingToolkit.
+# May call itself to handle more complicated events.
+# Makes sure there are no doublett events. 
+# Also adds constants and parameters used to a dummy variable so that ModelingToolkit does not think they are unused.
+function goToBottomEvent(condition, variable, valActive, valInactive, eventDict, dicts)   
+    if "and" == condition[1:3]
+        strippedCondition = condition[5:end-1]
+        parts = splitBetween(strippedCondition, ',')
+        for part in parts
+            goToBottomEvent(part, variable, valActive, valInactive, eventDict, dicts)
+        end
+    elseif "or" == condition[1:2]
+        strippedCondition = condition[4:end-1]
+        parts = splitBetween(strippedCondition, ',')
+        for part in parts
+            goToBottomEvent(part, variable, valActive, valInactive, eventDict, dicts)
+        end
+    elseif "geq" == condition[1:3] || "gt" == condition[1:2]
+        if "geq" == condition[1:3]
+            strippedCondition = condition[5:end-1]
+        else
+            strippedCondition = condition[4:end-1]
+        end
+        # if the trigger or event contains parameters or constant, add them to the dummyVariable to keep defined
+        args = split(getArguments(strippedCondition), ", ")
+        for arg in args
+            if arg in keys(dicts["parameters"])
+                dicts["dummyVariable"][arg] = dicts["parameters"][arg]
+            elseif arg in keys(dicts["constants"])
+                dicts["dummyVariable"][arg] = dicts["constants"][arg]
+            end
+        end
+
+        parts = splitBetween(strippedCondition, ',')
+        if occursin("time", parts[1])
+            parts[1] = replaceTime(parts[1])
+        end
+        trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
+        event = "[" * variable * " ~ " * valActive * "]"
+
+        eventDict[trigger] = event
+    elseif "leq" == condition[1:3] || "lt" == condition[1:2]
+        if "leq" == condition[1:3]
+            strippedCondition = condition[5:end-1]
+        else
+            strippedCondition = condition[4:end-1]
+        end
+        # if the trigger or event contains parameters or constant, add them to the dummyVariable to keep defined
+        args = split(getArguments(strippedCondition), ", ")
+        for arg in args
+            if arg in keys(dicts["parameters"])
+                dicts["dummyVariable"][arg] = dicts["parameters"][arg]
+            elseif arg in keys(dicts["constants"])
+                dicts["dummyVariable"][arg] = dicts["constants"][arg]
+            end
+        end
+
+        parts = splitBetween(strippedCondition, ',')
+        if occursin("time", parts[1])
+            parts[1] = replaceTime(parts[1])
+        end
+        trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
+        event = "[" * variable * " ~ " * valInactive * "]"
+
+        if ~(trigger in keys(eventDict))
+            eventDict[trigger] = event
+        end
+    end
+    nothing
+end
+
+# Handles piecewise functions that are to be redefined as events. 
+# will add the variable affected by the event as a variable in ModelingToolkit if it is not already.
+# Calls goToBottomEvent to create the actual events and then combines them.
+function piecewiseToEvent(piecewiseString, variable, dicts)
+    piecewiseString = piecewiseString[11:end-1]
+
+    # if the variable in the event is set as a parameter or constant, set it as a variable and delete the previous form
+    if variable in keys(dicts["parameters"])
+        dicts["variableParameters"][variable] = dicts["parameters"][variable]
+        delete!(dicts["parameters"], variable)
+    elseif variable in keys(dicts["constants"])
+        dicts["variableParameters"][variable] = dicts["constants"][variable]
+        delete!(dicts["constants"], variable)
+    end
+
+    eventDict = Dict()
+    args = splitBetween(piecewiseString, ',')
+    vals = args[1:2:end]
+    conds = args[2:2:end]
+
+    # if any values are a/a set of parameter(s) or constant(s), add it/them to the dummyVariable to keep defined, also insert function definitions as needed
+    for (vIndex, val) in enumerate(vals)
+        valArgs = getArguments(val, dicts["functions"])
+        if valArgs[2]
+            vals[vIndex] = rewriteFunctionOfFunction(val, dicts["functions"])
+        end
+        for valArg in split(valArgs[1], ", ")
+            if valArg in keys(dicts["parameters"])
+                dicts["dummyVariable"][valArg] = dicts["parameters"][valArg]
+            elseif valArg in keys(dicts["constants"])
+                dicts["dummyVariable"][valArg] = dicts["constants"][valArg]
+            end
+        end
+    end    
+
+    for (cIndex, condition) in enumerate(conds)
+        valActive = vals[cIndex]
+        valInactive = vals[end]
+        goToBottomEvent(condition, variable, valActive, valInactive, eventDict, dicts)
+    end
+
+    eventString = ""
+    for (trigger, event) in eventDict
+        if length(eventString) == 0
+            eventString = trigger * " => " * event
+        else
+            eventString = eventString * ", " * trigger * " => " * event
+        end
+    end
+    return eventString
+end
+
+# Rewrites triggers in events to propper form for ModelingToolkit
+function asTrigger(triggerFormula)
+    if "geq" == triggerFormula[1:3]
+        strippedFormula = triggerFormula[5:end-1]
+    elseif "gt" == triggerFormula[1:2]
+        strippedFormula = triggerFormula[4:end-1]
+    elseif "leq" == triggerFormula[1:3]
+        strippedFormula = triggerFormula[5:end-1]
+    elseif "lt" == triggerFormula[1:2]
+        strippedFormula = triggerFormula[4:end-1]
+    end
+    parts = splitBetween(strippedFormula, ',')
+    if occursin("time", parts[1])
+        parts[1] = replaceTime(parts[1])
+    end
+    expression = "[" * parts[1] * " ~ " * parts[2] * "]"
+    return expression
+end
+
 # Rewrites functions including variables that have been defined as functions in funcNameArgFormula.
 # Replaces the names of the variables with the new function definitions.
 # Makes sure not to replace variables with simmilar names.
@@ -318,74 +340,56 @@ function insertModelDefineFunctions(functionsAsString, modelFuncNameArgFormula)
         if possibleModelFunction in keys(modelFuncNameArgFormula)
             modelFuncArguments, modelFuncFormula = modelFuncNameArgFormula[possibleModelFunction]
             modelFuncArguments = split(modelFuncArguments, ", ")
-            inParenthesis = 0
-            started = 0
-            startIndex = 1
-            endIndex = 1
             i = 1
-            while i <= length(functionsAsString)
-                if started == 0
-                    next = findnext(possibleModelFunction*"(", functionsAsString, i)
-                    if next === nothing
-                        break
-                    end
-                    startIndex = next[1]
-                    i = startIndex + length(possibleModelFunction) + 1 
-                    started = 1
-                    inParenthesis = 1
-                else 
-                    if functionsAsString[i] == '('
-                        inParenthesis += 1
-                    elseif functionsAsString[i] == ')'
-                        inParenthesis -= 1
-                    end
-                    if inParenthesis == 0
-                        endIndex = i
-                        modelFunction = functionsAsString[startIndex:endIndex]
-                        argumentString = modelFunction[length(possibleModelFunction)+2:end-1]
-                        arguments = split(argumentString, ", ", keepempty = false)
-                        newFunction = modelFuncFormula
-                        for (aIndex, arg) in enumerate(arguments)
-                            j = 1
-                            while j < length(newFunction)
-                                indices = findnext(modelFuncArguments[aIndex], newFunction, j)
-                                if indices === nothing
-                                    break
-                                end
-                                if indices[1] == 1
-                                    if newFunction[indices[end]+1] in [' ', '(']
-                                        if occursin(" ", arg)
-                                            newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                                        else
-                                            newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                                        end
-                                    end
-                                elseif indices[end] == length(newFunction)
-                                    if newFunction[indices[1]-1] in [' ', ')']
-                                        if occursin(" ", arg)
-                                            newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                                        else
-                                            newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                                        end
-                                    end
+            while i <= length(newFunctionsAsString)
+                next = findnext(possibleModelFunction*"(", newFunctionsAsString, i)
+                if next === nothing
+                    break
+                end
+                startIndex = next[1]
+                iStart = next[end] + 1
+                endIndex = findEndOffunction(newFunctionsAsString, iStart)
+                modelFunction = newFunctionsAsString[startIndex:endIndex]
+                argumentString = modelFunction[length(possibleModelFunction)+2:end-1]
+                arguments = split(argumentString, ", ", keepempty = false)
+                newFunction = modelFuncFormula
+                for (aIndex, arg) in enumerate(arguments)
+                    j = 1
+                    while j < length(newFunction)
+                        indices = findnext(modelFuncArguments[aIndex], newFunction, j)
+                        if indices === nothing
+                            break
+                        end
+                        if indices[1] == 1
+                            if newFunction[indices[end]+1] in [' ', '(']
+                                if occursin(" ", arg)
+                                    newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
                                 else
-                                    if newFunction[indices[1]-1] in [' ', ')'] && newFunction[indices[end]+1] in [' ', '(']
-                                        if occursin(" ", arg)
-                                            newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                                        else
-                                            newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                                        end
-                                    end
+                                    newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
                                 end
-                                j = indices[end] + 1
+                            end
+                        elseif indices[end] == length(newFunction)
+                            if newFunction[indices[1]-1] in [' ', ')']
+                                if occursin(" ", arg)
+                                    newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
+                                else
+                                    newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
+                                end
+                            end
+                        else
+                            if newFunction[indices[1]-1] in [' ', ')'] && newFunction[indices[end]+1] in [' ', '(']
+                                if occursin(" ", arg)
+                                    newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
+                                else
+                                    newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
+                                end
                             end
                         end
-                        newFunctionsAsString = newFunctionsAsString[1:startIndex-1] * "(" * newFunction * ")" * newFunctionsAsString[startIndex + length(modelFunction):end]
-                        startIndex = i
-                        started = 0
+                        j = indices[end] + 1
                     end
-                    i += 1
                 end
+                newFunctionsAsString = newFunctionsAsString[1:startIndex-1] * "(" * newFunction * ")" * newFunctionsAsString[startIndex + length(modelFunction):end]
+                i = startIndex + 1
             end
         end
     end
@@ -395,39 +399,21 @@ end
 # Rewrites pow(a,b) into a^b, which Julia can handle
 function removePowFunctions(functionAsString)
     newFunctionAsString = functionAsString
-    inParenthesis = 0
-    started = 0
-    startIndex = 1
-    endIndex = 1
     i = 1
-    while i <= length(functionAsString)
-        if started == 0
-            next = findnext("pow(", functionAsString, i)
-            if next === nothing
-                break
-            end
-            startIndex = next[1]
-            i = startIndex + 4
-            started = 1
-            inParenthesis = 1
-        else 
-            if functionAsString[i] == '('
-                inParenthesis += 1
-            elseif functionAsString[i] == ')'
-                inParenthesis -= 1
-            end
-            if inParenthesis == 0
-                endIndex = i
-                powFunction = functionAsString[startIndex:endIndex]
-                powArguments = powFunction[5:end-1]
-                parts = split(powArguments, ", ", keepempty = false)
-                newPowFunction = "(" * parts[1] * ")^(" * parts[2] * ")"
-                newFunctionAsString = replace(newFunctionAsString, powFunction => newPowFunction, count = 1)
-                startIndex = i
-                started = 0
-            end
-            i += 1
+    while i <= length(newFunctionAsString)
+        next = findnext("pow(", newFunctionAsString, i)
+        if next === nothing
+            break
         end
+        startIndex = next[1]
+        iStart = next[end] + 1
+        endIndex = findEndOffunction(newFunctionAsString, iStart)
+        powFunction = newFunctionAsString[startIndex:endIndex]
+        powArguments = powFunction[5:end-1]
+        parts = splitBetween(powArguments, ',')
+        newPowFunction = "(" * parts[1] * ")^(" * parts[2] * ")"
+        newFunctionAsString = replace(newFunctionAsString, powFunction => newPowFunction, count = 1)
+        i = startIndex + 1
     end
     return newFunctionAsString
 end
@@ -443,7 +429,7 @@ function goToBottomDerivative(condition, valActive, valInactive)
     end
     if "and" == condition[1:3]
         strippedCondition = condition[5:end-1]
-        parts = splitByComma(strippedCondition)
+        parts = splitBetween(strippedCondition, ',')
         combinedTrigger = ""
         for part in parts
             trigger,  = goToBottomDerivative(part, valActive, valInactive)
@@ -451,7 +437,7 @@ function goToBottomDerivative(condition, valActive, valInactive)
         end
     elseif "or" == condition[1:2]
         strippedCondition = condition[4:end-1]
-        parts = splitByComma(strippedCondition)
+        parts = splitBetween(strippedCondition, ',')
         combinedTrigger = ""
         for (pIndex, part) in enumerate(parts)
             trigger,  = goToBottomDerivative(part, valActive, valInactive)
@@ -470,7 +456,7 @@ function goToBottomDerivative(condition, valActive, valInactive)
             strippedCondition = condition[4:end-1]
             operator = " > "
         end
-        parts = splitByComma(strippedCondition)
+        parts = splitBetween(strippedCondition, ',')
         if occursin("time", parts[1])
             parts[1] = replaceTime(parts[1])
         end
@@ -485,7 +471,7 @@ function goToBottomDerivative(condition, valActive, valInactive)
             strippedCondition = condition[4:end-1]
             operator = " < " 
         end
-        parts = splitByComma(strippedCondition)
+        parts = splitBetween(strippedCondition, ',')
         if occursin("time", parts[1])
             parts[1] = replaceTime(parts[1])
         end
@@ -500,61 +486,42 @@ end
 # Calls goToBottomDerivative to handle each condition. 
 function rewritePiecewiseInDerivative(functionAsString)
     newFunctionAsString = functionAsString
-    inParenthesis = 0
-    started = 0
-    startIndex = 1
-    endIndex = 1
     i = 1
     while i <= length(functionAsString)
-        if started == 0
-            next = findnext("piecewise(", functionAsString, i)
-            if next === nothing
-                break
-            end
-            startIndex = next[1]
-            i = startIndex + 10
-            started = 1
-            inParenthesis = 1
-        else 
-            if functionAsString[i] == '('
-                inParenthesis += 1
-            elseif functionAsString[i] == ')'
-                inParenthesis -= 1
-            end
-            if inParenthesis == 0
-                endIndex = i
-                piecewiseFunction = functionAsString[startIndex:endIndex]
-                piecewiseString = piecewiseFunction[11:end-1]
-                args = splitByComma(piecewiseString)
-                vals = args[1:2:end]
-                conds = args[2:2:end]
-
-                if length(vals) > length(conds)
-                    expression = vals[end]
-                else
-                    expression = ""
-                end
-                for (cIndex, condition) in enumerate(conds)
-                    valActive = vals[cIndex]
-                    if length(vals) > length(conds)
-                        valInactive = vals[end]
-                    else
-                        valInactive = ""
-                    end
-                    trigger, event = goToBottomDerivative(condition, valActive, valInactive)
-                    if expression == ""
-                        expression = trigger * " * " * event
-                    else
-                        expression = "(" * expression * " + " * trigger * " * " * event * ")"
-                    end
-                end
-
-                newFunctionAsString = replace(newFunctionAsString, piecewiseFunction => expression, count = 1)
-                startIndex = i
-                started = 0
-            end
-            i += 1
+        next = findnext("piecewise(", functionAsString, i)
+        if next === nothing
+            break
         end
+        startIndex = next[1]
+        iStart = next[end] + 1
+        endIndex = findEndOffunction(functionAsString, iStart)
+        piecewiseFunction = functionAsString[startIndex:endIndex]
+        piecewiseString = piecewiseFunction[11:end-1]
+        args = splitBetween(piecewiseString, ',')
+        vals = args[1:2:end]
+        conds = args[2:2:end]
+        
+        if length(vals) > length(conds)
+            expression = vals[end]
+        else
+            expression = ""
+        end
+        for (cIndex, condition) in enumerate(conds)
+            valActive = vals[cIndex]
+            if length(vals) > length(conds)
+                valInactive = vals[end]
+            else
+                valInactive = ""
+            end
+            trigger, event = goToBottomDerivative(condition, valActive, valInactive)
+            if expression == ""
+                expression = trigger * " * " * event
+            else
+                expression = "(" * expression * " + " * trigger * " * " * event * ")"
+            end
+        end
+        newFunctionAsString = replace(newFunctionAsString, piecewiseFunction => expression, count = 1)
+        i = endIndex + 1
     end
     return newFunctionAsString
 end
@@ -730,9 +697,11 @@ function writeODEModelToFile()
         ruleType = rule[:getElementName]() # type
         if ruleType == "assignmentRule"
             ruleVariable = rule[:getVariable]() # variable
-            ruleFormula = rule[:getFormula]() # need to add piecewise function (and others)
-            if occursin("piecewise", ruleFormula)
-                if ruleFormula[1:9] == "piecewise" && findnext("piecewise", ruleFormula, 2) === nothing
+            ruleFormula = rule[:getFormula]() 
+            ruleFormula = replaceTime(ruleFormula) # fix more generall
+            if occursin("piecewise(", ruleFormula)
+                next = findfirst("piecewise(", ruleFormula)
+                if next[1] == 1 && findEndOffunction(ruleFormula, next[end]+1) == length(ruleFormula)
                     # adds rule as event
                     localEventString = piecewiseToEvent(ruleFormula, ruleVariable, dicts)
                     if length(stringOfEvents) == 0
@@ -757,7 +726,6 @@ function writeODEModelToFile()
                         parameterDict = delete!(parameterDict, ruleVariable)
                     end
                 end
-                
             else
                 # adds rule as function
                 arguments, includesFunction = getArguments(ruleFormula, funcNameArgFormula)
@@ -790,6 +758,7 @@ function writeODEModelToFile()
         assignName = initAssign[:getId]()
         assignMath = initAssign[:getMath]()
         assignFormula = libsbml[:formulaToString](assignMath)
+        assignFormula = rewriteDerivatives(assignFormula, dicts)
         _, inFunction = getArguments(assignFormula, funcNameArgFormula)
         if inFunction
             assignFormula = rewriteFunctionOfFunction(assignFormula, funcNameArgFormula)
