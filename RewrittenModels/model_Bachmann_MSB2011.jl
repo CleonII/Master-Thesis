@@ -1,8 +1,13 @@
+# Model name: model_Bachmann_MSB2011
 # Number of parameters: 37
 # Number of species: 25
 
 ### Define independent and dependent variables
 @variables t p1EpoRpJAK2(t) pSTAT5(t) EpoRJAK2_CIS(t) SOCS3nRNA4(t) SOCS3RNA(t) SHP1(t) STAT5(t) EpoRJAK2(t) CISnRNA1(t) SOCS3nRNA1(t) SOCS3nRNA2(t) CISnRNA3(t) CISnRNA4(t) SOCS3(t) CISnRNA5(t) SOCS3nRNA5(t) SOCS3nRNA3(t) SHP1Act(t) npSTAT5(t) p12EpoRpJAK2(t) p2EpoRpJAK2(t) CIS(t) EpoRpJAK2(t) CISnRNA2(t) CISRNA(t)
+
+### Define variable parameters
+
+### Define dummy variable
 
 ### Define parameters
 @parameters STAT5Exp STAT5Imp init_SOCS3_multiplier EpoRCISRemove STAT5ActEpoR SHP1ActEpoR JAK2EpoRDeaSHP1 CISTurn SOCS3Turn init_EpoRJAK2_CIS SOCS3Inh ActD init_CIS_multiplier CISRNAEqc JAK2ActEpo Epo SOCS3oe CISInh SHP1Dea SOCS3EqcOE CISRNADelay init_SHP1 CISEqcOE EpoRActJAK2 SOCS3RNAEqc CISEqc SHP1ProOE SOCS3RNADelay init_STAT5 CISoe CISRNATurn init_SHP1_multiplier init_EpoRJAK2 EpoRCISInh STAT5ActJAK2 SOCS3RNATurn SOCS3Eqc
@@ -13,9 +18,9 @@
 ### Define an operator for the differentiation w.r.t. time
 D = Differential(t)
 
-### Events ###
-
 ### Function definitions ###
+
+### Events ###
 
 ### Derivatives ###
 eqs = [
