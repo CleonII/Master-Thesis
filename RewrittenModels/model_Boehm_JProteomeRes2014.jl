@@ -19,21 +19,21 @@
 D = Differential(t)
 
 ### Function definitions ###
-BaF3_Epo(exp, Epo_degradation_BaF3, t) = 1.25e-7 * exp(-1 * Epo_degradation_BaF3 * t)
-@register BaF3_Epo(exp, Epo_degradation_BaF3, t)
+BaF3_Epo(Epo_degradation_BaF3, t) = 1.25e-7 * exp(-1 * Epo_degradation_BaF3 * t)
+@register BaF3_Epo(Epo_degradation_BaF3, t)
 
 ### Events ###
 
 ### Derivatives ###
 eqs = [
-D(STAT5A) ~ -2.0 * (cyt * BaF3_Epo(exp, Epo_degradation_BaF3, t) * (STAT5A)^(2) * k_phos)-1.0 * (cyt * BaF3_Epo(exp, Epo_degradation_BaF3, t) * STAT5A * STAT5B * k_phos)+2.0 * (nuc * k_exp_homo * nucpApA)+1.0 * (nuc * k_exp_hetero * nucpApB),
-D(pApA) ~ +1.0 * (cyt * BaF3_Epo(exp, Epo_degradation_BaF3, t) * (STAT5A)^(2) * k_phos)-1.0 * (cyt * k_imp_homo * pApA),
+D(STAT5A) ~ -2.0 * (cyt * BaF3_Epo(Epo_degradation_BaF3, t) * (STAT5A)^(2) * k_phos)-1.0 * (cyt * BaF3_Epo(Epo_degradation_BaF3, t) * STAT5A * STAT5B * k_phos)+2.0 * (nuc * k_exp_homo * nucpApA)+1.0 * (nuc * k_exp_hetero * nucpApB),
+D(pApA) ~ +1.0 * (cyt * BaF3_Epo(Epo_degradation_BaF3, t) * (STAT5A)^(2) * k_phos)-1.0 * (cyt * k_imp_homo * pApA),
 D(nucpApB) ~ +1.0 * (cyt * k_imp_hetero * pApB)-1.0 * (nuc * k_exp_hetero * nucpApB),
 D(nucpBpB) ~ +1.0 * (cyt * k_imp_homo * pBpB)-1.0 * (nuc * k_exp_homo * nucpBpB),
-D(STAT5B) ~ -1.0 * (cyt * BaF3_Epo(exp, Epo_degradation_BaF3, t) * STAT5A * STAT5B * k_phos)-2.0 * (cyt * BaF3_Epo(exp, Epo_degradation_BaF3, t) * (STAT5B)^(2) * k_phos)+1.0 * (nuc * k_exp_hetero * nucpApB)+2.0 * (nuc * k_exp_homo * nucpBpB),
-D(pApB) ~ +1.0 * (cyt * BaF3_Epo(exp, Epo_degradation_BaF3, t) * STAT5A * STAT5B * k_phos)-1.0 * (cyt * k_imp_hetero * pApB),
+D(STAT5B) ~ -1.0 * (cyt * BaF3_Epo(Epo_degradation_BaF3, t) * STAT5A * STAT5B * k_phos)-2.0 * (cyt * BaF3_Epo(Epo_degradation_BaF3, t) * (STAT5B)^(2) * k_phos)+1.0 * (nuc * k_exp_hetero * nucpApB)+2.0 * (nuc * k_exp_homo * nucpBpB),
+D(pApB) ~ +1.0 * (cyt * BaF3_Epo(Epo_degradation_BaF3, t) * STAT5A * STAT5B * k_phos)-1.0 * (cyt * k_imp_hetero * pApB),
 D(nucpApA) ~ +1.0 * (cyt * k_imp_homo * pApA)-1.0 * (nuc * k_exp_homo * nucpApA),
-D(pBpB) ~ +1.0 * (cyt * BaF3_Epo(exp, Epo_degradation_BaF3, t) * (STAT5B)^(2) * k_phos)-1.0 * (cyt * k_imp_homo * pBpB)]
+D(pBpB) ~ +1.0 * (cyt * BaF3_Epo(Epo_degradation_BaF3, t) * (STAT5B)^(2) * k_phos)-1.0 * (cyt * k_imp_homo * pBpB)]
 
 @named sys = ODESystem(eqs)
 
