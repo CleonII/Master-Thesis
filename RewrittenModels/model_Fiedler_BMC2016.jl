@@ -19,18 +19,18 @@
 D = Differential(t)
 
 ### Function definitions ###
-k1max(k10, k11, exp, t, tau2, tau1) = k10 - k11 * exp(-t / tau2) * (exp(-t / tau1) - 1)
-@register k1max(k10, k11, exp, t, tau2, tau1)
+k1max(k10, k11, t, tau2, tau1) = k10 - k11 * exp(-t / tau2) * (exp(-t / tau1) - 1)
+@register k1max(k10, k11, t, tau2, tau1)
 
 ### Events ###
 
 ### Derivatives ###
 eqs = [
-D(RAF) ~ -1.0 * (cyt * (K_1 * RAF * k1max(k10, k11, exp, t, tau2, tau1) / (K_1 + pERK)))+1.0 * (cyt * k2 * pRAF),
+D(RAF) ~ -1.0 * (cyt * (K_1 * RAF * k1max(k10, k11, t, tau2, tau1) / (K_1 + pERK)))+1.0 * (cyt * k2 * pRAF),
 D(MEK) ~ -1.0 * (cyt * (K_2 * MEK * k3 * pRAF / (K_2 + Sorafenib)))+1.0 * (cyt * k4 * pMEK),
 D(pMEK) ~ +1.0 * (cyt * (K_2 * MEK * k3 * pRAF / (K_2 + Sorafenib)))-1.0 * (cyt * k4 * pMEK),
 D(pERK) ~ +1.0 * (cyt * (ERK * K_3 * k5 * pMEK / (K_3 + UO126)))-1.0 * (cyt * k6 * pERK),
-D(pRAF) ~ +1.0 * (cyt * (K_1 * RAF * k1max(k10, k11, exp, t, tau2, tau1) / (K_1 + pERK)))-1.0 * (cyt * k2 * pRAF),
+D(pRAF) ~ +1.0 * (cyt * (K_1 * RAF * k1max(k10, k11, t, tau2, tau1) / (K_1 + pERK)))-1.0 * (cyt * k2 * pRAF),
 D(ERK) ~ -1.0 * (cyt * (ERK * K_3 * k5 * pMEK / (K_3 + UO126)))+1.0 * (cyt * k6 * pERK)]
 
 @named sys = ODESystem(eqs)
