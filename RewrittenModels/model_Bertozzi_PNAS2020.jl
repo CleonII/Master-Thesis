@@ -31,8 +31,8 @@ Ro_NY_ld(Ro_NY) = 0.5 * Ro_NY
 @register Ro_NY_ld(Ro_NY)
 gamma(Trigger_NY, gamma_NY, gamma_CA) = Trigger_NY * gamma_NY + (1 - Trigger_NY) * gamma_CA
 @register gamma(Trigger_NY, gamma_NY, gamma_CA)
-Parameterised_time(time, gamma_CA) = time * gamma_CA
-@register Parameterised_time(time, gamma_CA)
+Parameterised_time(t, gamma_CA) = t * gamma_CA
+@register Parameterised_time(t, gamma_CA)
 
 ### Events ###
 continuous_events = [
