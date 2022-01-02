@@ -11,7 +11,7 @@ using PyCall
 
 libsbml = pyimport("libsbml")
 reader = libsbml.SBMLReader()
-document = reader[:readSBML]("Master-Thesis/reactionsystem_02.xml")
+document = reader[:readSBML]("./b3.xml")
 model = document[:getModel]() # Get the model
 species = [(s[:getName](), s[:getInitialConcentration](), s[:getCompartment]()) for s in model[:getListOfSpecies]()] # Use getName to extract the species names from getListOfSpecies, return an array.
 reactions = [(r[:getName](), r[:getKineticLaw]()[:getFormula]()) for r in model[:getListOfReactions]()] # Get the names of all reactions in the SBML file. 
@@ -22,7 +22,7 @@ println(model[:getReaction](0)[:getKineticLaw]()[:getFormula]()) # Get a string 
 println(model[:getReaction](0)[:getListOfReactants]()[1][:getStoichiometry]())
 
 
-
+# Function definitions
 
 fd = model[:getListOfFunctionDefinitions]()[1]
 math = fd[:getMath]()
@@ -39,12 +39,32 @@ if math[:getNumChildren]() > 1
 end
 fd[:getArgument](0)[:getName]()
 
-libsbml[:formulaToString](math) # Important
+tmp = libsbml[:formulaToString](math) # Important
+tmp2 = split(split(tmp, '(')[2], ')')[1]
+func = lstrip(split(tmp2, ',')[end])
+args = tmp2[1:(end-length(func)-2)]
+funcName = fd[:getId]()
+funcName * "(" * args * ") = " * func
 
 
-functionDefinitions = [(f[:getName](), f[:getMetaId](), f[:getSBOTerm](), f[:toXMLNode](), f[:getTypeCode](), f[:getMath]()) for f in model[:getListOfFunctionDefinitions]()]
-tmp = [(f[:getAnnotation](), f[:getCVTerms]()) for f in model[:getListOfFunctionDefinitions]()]
-funcMath = [(f[:getName](), f[:getMath]()) for f in model[:getListOfFunctionDefinitions]()]
+# rules
+rule = model[:getListOfRules]()[7]
+rule[:getElementName]() # type
+rule[:getVariable]() # variable
+rule[:getFormula]() # need to add piecewise function (and others)
+
+
+# events
+event = model[:getListOfEvents]()[1]
+event[:getElementName]()
+event[:getName]()
+trigger = event[:getTrigger]()
+triggerMath = trigger[:getMath]()
+triggerFormula = libsbml[:formulaToString](triggerMath)
+elements = event[:getListOfAllElements]()
+elements = event[:getListOfEventAssignments]()
+elements[1]
+
 
 reac = model[:getReaction](0)
 reac[:getCompartment]()
@@ -58,7 +78,5 @@ reactants = [r[:species] for r in reac[:getListOfReactants]()]
 
 model[:getListOfAllElements]() 
 
-compartments = [comp[:getName]() for comp in model[:getListOfCompartments]()]
-constraints = [con[:getName]() for con in model[:getListOfConstraints]()]
-rules = [rule[:getName]() for rule in model[:getListOfRules]()]
-units = [u[:getName]() for u in model[:getListOfUnitDefinitions]()]
+constraints = [con[:getId]() for con in model[:getListOfConstraints]()]
+units = [u[:getId]() for u in model[:getListOfUnitDefinitions]()]
