@@ -1,3 +1,5 @@
 
 Pipeline_SBMLImporter/JuliaModels/*
 load_model_with_python.jl
+RewrittenModels/model_Lucarelli_CellSystems2018.jl
+simple_code.jl
