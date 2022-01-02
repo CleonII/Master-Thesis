@@ -5,7 +5,7 @@ using PyCall
 
 libsbml = pyimport("libsbml")
 reader = libsbml.SBMLReader()
-modelName = "model_Fujita_SciSignal2010"
+modelName = "model_Okuonghae_ChaosSolitonsFractals2020"
 document = reader[:readSBML]("./SBML/Benchmark/" * modelName * ".xml")
 model = document[:getModel]() # Get the model
 
@@ -37,6 +37,7 @@ function splitBetween(stringToSplit, delimiter)
     parts = parts[1:numParts]
 end
 
+# Finds the ending parenthesis of an argument and returns its position. 
 function findEndOffunction(functionAsString, iStart)
     inParenthesis = 1
     i = iStart
@@ -60,14 +61,14 @@ end
 # If a dictionary (with functions) is supplied, will also check if there are nested functions and will 
 # include the arguments of these nested functions as arguments of the first function.
 # The returned string will only contain unique arguments.
-function getArguments(functionAsString)
+function getArguments(functionAsString, baseFunctions::Dict)
     parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' ', '~', '>', '<', '=', ','], keepempty = false)
     arguments = Dict()
     for part in parts
         if isdigit(part[1])
             nothing
         else
-            if (part in values(arguments)) == false
+            if (part in values(arguments)) == false && ~(part in keys(baseFunctions))
                 arguments[length(arguments)+1] = part
             end
         end
@@ -82,7 +83,7 @@ function getArguments(functionAsString)
     end
     return argumentString
 end
-function getArguments(functionAsString, dictionary::Dict)
+function getArguments(functionAsString, dictionary::Dict, baseFunctions::Dict)
     parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' ', '~', '>', '<', '=', ','], keepempty = false)
     existingFunctions = keys(dictionary)
     includesFunction = false
@@ -101,7 +102,7 @@ function getArguments(functionAsString, dictionary::Dict)
                     end
                 end
             else
-                if (part in values(arguments)) == false
+                if (part in values(arguments)) == false && ~(part in keys(baseFunctions))
                     arguments[length(arguments)+1] = part
                 end
             end
@@ -140,7 +141,7 @@ function replaceTime(timeString)
                 newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
             end
         else
-            if newTimeString[indices[1]-1] in [' ', '(', '-', '+'] && newTimeString[indices[end]+1] in [' ', ')']
+            if newTimeString[indices[1]-1] in [' ', '(', '-', '+'] && newTimeString[indices[end]+1] in [' ', ')', ',']
                 newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
             end
         end
@@ -153,18 +154,18 @@ end
 # May call itself to handle more complicated events.
 # Makes sure there are no doublett events. 
 # Also adds constants and parameters used to a dummy variable so that ModelingToolkit does not think they are unused.
-function goToBottomEvent(condition, variable, valActive, valInactive, eventDict, dicts)   
+function goToBottomPiecewiseToEvent(condition, variable, valActive, valInactive, eventDict, dicts)   
     if "and" == condition[1:3]
         strippedCondition = condition[5:end-1]
         parts = splitBetween(strippedCondition, ',')
         for part in parts
-            goToBottomEvent(part, variable, valActive, valInactive, eventDict, dicts)
+            goToBottomPiecewiseToEvent(part, variable, valActive, valInactive, eventDict, dicts)
         end
     elseif "or" == condition[1:2]
         strippedCondition = condition[4:end-1]
         parts = splitBetween(strippedCondition, ',')
         for part in parts
-            goToBottomEvent(part, variable, valActive, valInactive, eventDict, dicts)
+            goToBottomPiecewiseToEvent(part, variable, valActive, valInactive, eventDict, dicts)
         end
     elseif "geq" == condition[1:3] || "gt" == condition[1:2]
         if "geq" == condition[1:3]
@@ -173,7 +174,7 @@ function goToBottomEvent(condition, variable, valActive, valInactive, eventDict,
             strippedCondition = condition[4:end-1]
         end
         # if the trigger or event contains parameters or constant, add them to the dummyVariable to keep defined
-        args = split(getArguments(strippedCondition), ", ")
+        args = split(getArguments(strippedCondition, dicts["baseFunctions"]), ", ")
         for arg in args
             if arg in keys(dicts["parameters"])
                 dicts["dummyVariable"][arg] = dicts["parameters"][arg]
@@ -197,7 +198,7 @@ function goToBottomEvent(condition, variable, valActive, valInactive, eventDict,
             strippedCondition = condition[4:end-1]
         end
         # if the trigger or event contains parameters or constant, add them to the dummyVariable to keep defined
-        args = split(getArguments(strippedCondition), ", ")
+        args = split(getArguments(strippedCondition, dicts["baseFunctions"]), ", ")
         for arg in args
             if arg in keys(dicts["parameters"])
                 dicts["dummyVariable"][arg] = dicts["parameters"][arg]
@@ -222,8 +223,8 @@ end
 
 # Handles piecewise functions that are to be redefined as events. 
 # will add the variable affected by the event as a variable in ModelingToolkit if it is not already.
-# Calls goToBottomEvent to create the actual events and then combines them.
-function piecewiseToEvent(piecewiseString, variable, dicts)
+# Calls goToBottomPiecewiseToEvent to create the actual events and then combines them.
+function rewritePiecewiseToEvent(piecewiseString, variable, dicts)
     piecewiseString = piecewiseString[11:end-1]
 
     # if the variable in the event is set as a parameter or constant, set it as a variable and delete the previous form
@@ -242,7 +243,7 @@ function piecewiseToEvent(piecewiseString, variable, dicts)
 
     # if any values are a/a set of parameter(s) or constant(s), add it/them to the dummyVariable to keep defined, also insert function definitions as needed
     for (vIndex, val) in enumerate(vals)
-        valArgs = getArguments(val, dicts["functions"])
+        valArgs = getArguments(val, dicts["functions"], dicts["baseFunctions"])
         if valArgs[2]
             vals[vIndex] = rewriteFunctionOfFunction(val, dicts["functions"])
         end
@@ -258,7 +259,7 @@ function piecewiseToEvent(piecewiseString, variable, dicts)
     for (cIndex, condition) in enumerate(conds)
         valActive = vals[cIndex]
         valInactive = vals[end]
-        goToBottomEvent(condition, variable, valActive, valInactive, eventDict, dicts)
+        goToBottomPiecewiseToEvent(condition, variable, valActive, valInactive, eventDict, dicts)
     end
 
     eventString = ""
@@ -301,6 +302,7 @@ function rewriteFunctionOfFunction(functionAsString, funcNameArgFormula)
     for part in parts
         if part in existingFunctions
             funcArgs = "(" * funcNameArgFormula[part][1] * ")"
+            funcFormula = "(" * funcNameArgFormula[part][2] * ")"
             i = 1
             while i < length(newFunctionString)
                 indices = findnext(part, newFunctionString, i)
@@ -309,17 +311,17 @@ function rewriteFunctionOfFunction(functionAsString, funcNameArgFormula)
                 end
                 if indices[1] == 1
                     if newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[end]] * funcArgs * newFunctionString[indices[end]+1:end]
+                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
                         break
                     end
                 elseif indices[end] == length(newFunctionString)
                     if newFunctionString[indices[1]-1] in [' ', '(']
-                        newFunctionString = newFunctionString[1:indices[end]] * funcArgs * newFunctionString[indices[end]+1:end]
+                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
                         break
                     end
                 else
                     if newFunctionString[indices[1]-1] in [' ', '('] && newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[end]] * funcArgs * newFunctionString[indices[end]+1:end]
+                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
                         break
                     end
                 end
@@ -333,9 +335,9 @@ end
 # Differs from rewriteFunctionOfFunction in that it checks if the function is defined by the model.
 # Will substitute the function definition for the formula given by the model with the arguments 
 # given to the function used instead of the general arguments
-function insertModelDefineFunctions(functionsAsString, modelFuncNameArgFormula)
+function insertModelDefineFunctions(functionsAsString, modelFuncNameArgFormula, baseFunctions)
     newFunctionsAsString = functionsAsString
-    possibleModelFunctions = split(getArguments(functionsAsString), ", ")
+    possibleModelFunctions = split(getArguments(functionsAsString, baseFunctions), ", ")
     for possibleModelFunction in possibleModelFunctions 
         if possibleModelFunction in keys(modelFuncNameArgFormula)
             modelFuncArguments, modelFuncFormula = modelFuncNameArgFormula[possibleModelFunction]
@@ -355,13 +357,13 @@ function insertModelDefineFunctions(functionsAsString, modelFuncNameArgFormula)
                 newFunction = modelFuncFormula
                 for (aIndex, arg) in enumerate(arguments)
                     j = 1
-                    while j < length(newFunction)
+                    while j <= length(newFunction)
                         indices = findnext(modelFuncArguments[aIndex], newFunction, j)
                         if indices === nothing
                             break
                         end
                         if indices[1] == 1
-                            if newFunction[indices[end]+1] in [' ', '(']
+                            if newFunction[indices[end]+1] in [' ', ')']
                                 if occursin(" ", arg)
                                     newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
                                 else
@@ -369,7 +371,7 @@ function insertModelDefineFunctions(functionsAsString, modelFuncNameArgFormula)
                                 end
                             end
                         elseif indices[end] == length(newFunction)
-                            if newFunction[indices[1]-1] in [' ', ')']
+                            if newFunction[indices[1]-1] in [' ', '(']
                                 if occursin(" ", arg)
                                     newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
                                 else
@@ -377,7 +379,7 @@ function insertModelDefineFunctions(functionsAsString, modelFuncNameArgFormula)
                                 end
                             end
                         else
-                            if newFunction[indices[1]-1] in [' ', ')'] && newFunction[indices[end]+1] in [' ', '(']
+                            if newFunction[indices[1]-1] in [' ', '('] && newFunction[indices[end]+1] in [' ', ')']
                                 if occursin(" ", arg)
                                     newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
                                 else
@@ -420,27 +422,32 @@ end
 
 # Handles conditions of piecewise functions in derivatives and rewrites them into a propper format.
 # may call itself to handle more complicated functions.
-# returns both a trigger and an event to be combined in rewritePiecewiseInDerivative
-function goToBottomDerivative(condition, valActive, valInactive)
+# returns both a trigger and an event to be combined in rewritePiecewiseToFunction
+function goToBottomPiecewiseToFunction(condition, valActive, valInactive)
     if valInactive == ""
         event = valActive
     else
-        event = "(" * valActive * " - " * valInactive * ")"
+        event = "((" * valActive * ") - (" * valInactive * "))"
     end
     if "and" == condition[1:3]
         strippedCondition = condition[5:end-1]
         parts = splitBetween(strippedCondition, ',')
         combinedTrigger = ""
         for part in parts
-            trigger,  = goToBottomDerivative(part, valActive, valInactive)
-            combinedTrigger = combinedTrigger * " * " * trigger
+            trigger,  = goToBottomPiecewiseToFunction(part, valActive, valInactive)
+            if combinedTrigger == ""
+                combinedTrigger = trigger
+            else
+                combinedTrigger = combinedTrigger * " * " * trigger
+            end
+            trigger = combinedTrigger
         end
     elseif "or" == condition[1:2]
         strippedCondition = condition[4:end-1]
         parts = splitBetween(strippedCondition, ',')
         combinedTrigger = ""
         for (pIndex, part) in enumerate(parts)
-            trigger,  = goToBottomDerivative(part, valActive, valInactive)
+            trigger,  = goToBottomPiecewiseToFunction(part, valActive, valInactive)
             if pIndex == 1
                 combinedTrigger = "(" * trigger
             else
@@ -448,6 +455,7 @@ function goToBottomDerivative(condition, valActive, valInactive)
             end
             combinedTrigger = combinedTrigger * ")"
         end
+        trigger = combinedTrigger
     elseif "geq" == condition[1:3] || "gt" == condition[1:2]
         if "geq" == condition[1:3]
             strippedCondition = condition[5:end-1]
@@ -483,19 +491,19 @@ function goToBottomDerivative(condition, valActive, valInactive)
 end
 
 # Handel piecewise functions in derivatives and rewrites them into a propper format.
-# Calls goToBottomDerivative to handle each condition. 
-function rewritePiecewiseInDerivative(functionAsString)
+# Calls goToBottomPiecewiseToFunction to handle each condition. 
+function rewritePiecewiseToFunction(functionAsString)
     newFunctionAsString = functionAsString
     i = 1
-    while i <= length(functionAsString)
-        next = findnext("piecewise(", functionAsString, i)
+    while i <= length(newFunctionAsString)
+        next = findnext("piecewise(", newFunctionAsString, i)
         if next === nothing
             break
         end
         startIndex = next[1]
         iStart = next[end] + 1
-        endIndex = findEndOffunction(functionAsString, iStart)
-        piecewiseFunction = functionAsString[startIndex:endIndex]
+        endIndex = findEndOffunction(newFunctionAsString, iStart)
+        piecewiseFunction = newFunctionAsString[startIndex:endIndex]
         piecewiseString = piecewiseFunction[11:end-1]
         args = splitBetween(piecewiseString, ',')
         vals = args[1:2:end]
@@ -513,7 +521,7 @@ function rewritePiecewiseInDerivative(functionAsString)
             else
                 valInactive = ""
             end
-            trigger, event = goToBottomDerivative(condition, valActive, valInactive)
+            trigger, event = goToBottomPiecewiseToFunction(condition, valActive, valInactive)
             if expression == ""
                 expression = trigger * " * " * event
             else
@@ -521,7 +529,7 @@ function rewritePiecewiseInDerivative(functionAsString)
             end
         end
         newFunctionAsString = replace(newFunctionAsString, piecewiseFunction => expression, count = 1)
-        i = endIndex + 1
+        i = startIndex + 1
     end
     return newFunctionAsString
 end
@@ -533,7 +541,7 @@ function insertFunctionDefinitions(functionAsString, funcNameArgFormula)
     newFunctionString = functionAsString
     for part in parts
         if part in existingFunctions
-            funcArgs = "(" * funcNameArgFormula[part][1] * ")"
+            funcFormula = "(" * funcNameArgFormula[part][2] * ")"
             i = 1
             while i < length(newFunctionString)
                 indices = findnext(part, newFunctionString, i)
@@ -542,15 +550,15 @@ function insertFunctionDefinitions(functionAsString, funcNameArgFormula)
                 end
                 if indices[1] == 1
                     if newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[end]] * funcArgs * newFunctionString[indices[end]+1:end]
+                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
                     end
                 elseif indices[end] == length(newFunctionString)
-                    if newFunctionString[indices[1]-1] in [' ', '(']
-                        newFunctionString = newFunctionString[1:indices[end]] * funcArgs * newFunctionString[indices[end]+1:end]
+                    if newFunctionString[indices[1]-1] in [' ', '(', '-', '+']
+                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
                     end
                 else
-                    if newFunctionString[indices[1]-1] in [' ', '('] && newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[end]] * funcArgs * newFunctionString[indices[end]+1:end]
+                    if newFunctionString[indices[1]-1] in [' ', '(', '-', '+'] && newFunctionString[indices[end]+1] in [' ', ')']
+                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
                     end
                 end
                 i = indices[1] + 1
@@ -560,15 +568,15 @@ function insertFunctionDefinitions(functionAsString, funcNameArgFormula)
     return newFunctionString
 end
 
-# Rewrites derivatives using insertModelDefineFunctions, removePowFunctions, rewritePiecewiseInDerivative and insertFunctionDefinitions
+# Rewrites derivatives using insertModelDefineFunctions, removePowFunctions, rewritePiecewiseToFunction and insertFunctionDefinitions
 function rewriteDerivatives(derivativeAsString, dicts)
     newDerivativeAsString = derivativeAsString
-    newDerivativeAsString = insertModelDefineFunctions(newDerivativeAsString, dicts["modelFunctions"])
+    newDerivativeAsString = insertModelDefineFunctions(newDerivativeAsString, dicts["modelFunctions"], dicts["baseFunctions"])
     if occursin("pow(", newDerivativeAsString)
         newDerivativeAsString = removePowFunctions(newDerivativeAsString)
     end
     if occursin("piecewise(", newDerivativeAsString)
-        newDerivativeAsString = rewritePiecewiseInDerivative(newDerivativeAsString)
+        newDerivativeAsString = rewritePiecewiseToFunction(newDerivativeAsString)
     end
     newDerivativeAsString = insertFunctionDefinitions(newDerivativeAsString, dicts["functions"])
     return newDerivativeAsString
@@ -596,13 +604,27 @@ function writeODEModelToFile()
     dicts["functions"] = funcNameArgFormula
     dus = Dict()
     dicts["derivatives"] = dus
-    
+
+    baseFunctions = Dict()
+    dicts["baseFunctions"] = baseFunctions
+    baseFunctions["exp"] = ""
+    baseFunctions["log"] = ""
+    baseFunctions["log2"] = ""
+    baseFunctions["log10"] = ""
+    baseFunctions["sin"] = ""
+    baseFunctions["cos"] = ""
+    baseFunctions["tan"] = ""
+    baseFunctions["pi"] = ""
 
     ### Define extra functions
 
     ### Define variables and read initial value
     for spec in model[:getListOfSpecies]()
         variableDict[spec[:getId]()] = spec[:getInitialAmount]() == 0 ? string(spec[:getInitialConcentration]()) : string(spec[:getInitialAmount]())
+    end
+    ### Defining derivatives
+    for spec in model[:getListOfSpecies]()
+        dus[spec[:getId]()] = "D(" * spec[:getId]() * ") ~ "
     end
     
     ### Define parameters and read true parameter values
@@ -615,8 +637,8 @@ function writeODEModelToFile()
         constantsDict[comp[:getId]()] = string(comp[:getSize]())
     end
 
-    ### Define functions
-    for (fIndex, functionDefinition) in enumerate(model[:getListOfFunctionDefinitions]())
+    ### Read functions defined by the model
+    for functionDefinition in model[:getListOfFunctionDefinitions]()
         math = functionDefinition[:getMath]()
         functionName = functionDefinition[:getId]()
         args = "("
@@ -647,40 +669,43 @@ function writeODEModelToFile()
         triggerMath = trigger[:getMath]()
         triggerFormula = asTrigger(libsbml[:formulaToString](triggerMath))
         # if the trigger contains parameters or constants, add them to the dummy variables
-        triggerArgs = split(getArguments(triggerFormula[2:end-1]), ", ")
+        triggerArgs = split(getArguments(triggerFormula[2:end-1], baseFunctions), ", ")
         for triggerArg in triggerArgs
             if triggerArg in keys(dicts["parameters"])
                 dicts["dummyVariable"][triggerArg] = dicts["parameters"][triggerArg]
-            elseif arg in keys(dicts["constants"])
+            elseif triggerArg in keys(dicts["constants"])
                 dicts["dummyVariable"][triggerArg] = dicts["constants"][triggerArg]
             end
         end
         eventAsString = ""
         for (eaIndex, eventAssignment) in enumerate(event[:getListOfEventAssignments]())
             variableName = eventAssignment[:getVariable]()
-            eventMath = eventAssignment[:getMath]()
-            eventMathAsString = libsbml[:formulaToString](eventMath)
-            if eaIndex == 1
-                eventAsString = "[" * variableName * " ~ " * eventMathAsString
-            else
-                eventAsString = eventAsString * ", " * variableName * " ~ " * eventMathAsString
-            end
             # if the variable in the event is not set as a variable, make it so and remove it as a parameter or constant
             if variableName in keys(parameterDict)
-                variableParameterDict[lhsArg] = parameterDict[lhsArg]
-                delete!(parameterDict, lhsArg)
+                variableParameterDict[variableName] = parameterDict[variableName]
+                delete!(parameterDict, variableName)
             elseif variableName in keys(constantsDict)
-                variableParameterDict[lhsArg] = constantsDict[lhsArg]
-                delete!(constantsDict, lhsArg)
+                variableParameterDict[variableName] = constantsDict[variableName]
+                delete!(constantsDict, variableName)
             end
+
+            eventMath = eventAssignment[:getMath]()
+            eventMathAsString = libsbml[:formulaToString](eventMath)
             # if the event math contains parameters or constants, add them to the dummy variable so that they stay defined 
-            eventMathArgs = split(getArguments(eventMathAsString, funcNameArgFormula)[1], ", ")
+            eventMathArgs = split(getArguments(eventMathAsString, baseFunctions), ", ")
             for eventMathArg in eventMathArgs
                 if eventMathArg in keys(parameterDict)
                     dummyVariableDict[eventMathArg] = parameterDict[eventMathArg]
                 elseif eventMathArg in keys(constantsDict)
                     dummyVariableDict[eventMathArg] = constantsDict[eventMathArg]
                 end
+            end
+
+            # Add the event 
+            if eaIndex == 1
+                eventAsString = "[" * variableName * " ~ " * eventMathAsString
+            else
+                eventAsString = eventAsString * ", " * variableName * " ~ " * eventMathAsString
             end
         end
         eventAsString = eventAsString * "]"
@@ -695,15 +720,16 @@ function writeODEModelToFile()
     ### Define rules
     for rule in model[:getListOfRules]()
         ruleType = rule[:getElementName]() # type
-        if ruleType == "assignmentRule"
+        if ruleType == "assignmentRule" # TODO: fix for functions with too many arguments
             ruleVariable = rule[:getVariable]() # variable
             ruleFormula = rule[:getFormula]() 
-            ruleFormula = replaceTime(ruleFormula) # fix more generall
+            ruleFormula = replaceTime(ruleFormula) 
+            ruleFormula = removePowFunctions(ruleFormula)
             if occursin("piecewise(", ruleFormula)
                 next = findfirst("piecewise(", ruleFormula)
-                if next[1] == 1 && findEndOffunction(ruleFormula, next[end]+1) == length(ruleFormula)
+                if next[1] == 1 && findEndOffunction(ruleFormula, next[end]+1) == length(ruleFormula) && findnext("piecewise(", ruleFormula, 2) === nothing
                     # adds rule as event
-                    localEventString = piecewiseToEvent(ruleFormula, ruleVariable, dicts)
+                    localEventString = rewritePiecewiseToEvent(ruleFormula, ruleVariable, dicts)
                     if length(stringOfEvents) == 0
                         stringOfEvents = localEventString
                     else
@@ -711,10 +737,8 @@ function writeODEModelToFile()
                     end
                 else
                     # adds rule as function
-                    ruleFormula = rewritePiecewiseInDerivative(ruleFormula)
-                    ruleFormula = replaceTime(ruleFormula)
-                    arguments, includesFunction = getArguments(ruleFormula, funcNameArgFormula)
-                    ruleFormula = removePowFunctions(ruleFormula)
+                    ruleFormula = rewritePiecewiseToFunction(ruleFormula)
+                    arguments, includesFunction = getArguments(ruleFormula, funcNameArgFormula, baseFunctions)
                     if includesFunction
                         ruleFormula = rewriteFunctionOfFunction(ruleFormula, funcNameArgFormula)
                     end
@@ -728,11 +752,10 @@ function writeODEModelToFile()
                 end
             else
                 # adds rule as function
-                arguments, includesFunction = getArguments(ruleFormula, funcNameArgFormula)
+                arguments, includesFunction = getArguments(ruleFormula, funcNameArgFormula, baseFunctions)
                 if arguments == ""
                     parameterDict[ruleVariable] = ruleFormula
                 else
-                    ruleFormula = removePowFunctions(ruleFormula)
                     if includesFunction
                         ruleFormula = rewriteFunctionOfFunction(ruleFormula, funcNameArgFormula)
                     end
@@ -747,8 +770,50 @@ function writeODEModelToFile()
             end
         elseif ruleType == "algebraicRule"
             # TODO
+            println("Has algebraicRule!")
         elseif ruleType == "rateRule"
-            # TODO
+            ruleVariable = rule[:getVariable]() # variable
+            ruleFormula = rule[:getFormula]() 
+            ruleFormula = replaceTime(ruleFormula) 
+            ruleFormula = removePowFunctions(ruleFormula)
+            if occursin("piecewise(", ruleFormula)
+                # set as derivative
+                ruleFormula = rewritePiecewiseToFunction(ruleFormula)
+                arguments, includesFunction = getArguments(ruleFormula, funcNameArgFormula, baseFunctions)
+                if includesFunction
+                    ruleFormula = rewriteFunctionOfFunction(ruleFormula, funcNameArgFormula)
+                end
+            else
+                # set as derivative
+                arguments, includesFunction = getArguments(ruleFormula, funcNameArgFormula, baseFunctions)
+                if arguments == ""
+
+                else
+                    if includesFunction
+                        ruleFormula = rewriteFunctionOfFunction(ruleFormula, funcNameArgFormula)
+                    end
+                end
+            end
+            if ruleVariable in keys(variableDict)
+                dus[ruleVariable] = "D(" * ruleVariable * ") ~ " * ruleFormula
+            elseif ruleVariable in keys(variableParameterDict)
+                variableDict[ruleVariable] = variableParameterDict[ruleVariable]
+                delete!(variableParameterDict, ruleVariable)
+                dus[ruleVariable] = "D(" * ruleVariable * ") ~ " * ruleFormula
+            else
+                if ruleVariable in keys(parameterDict)
+                    variableDict[ruleVariable] = parameterDict[ruleVariable]
+                    delete!(parameterDict, ruleVariable)
+                    dus[ruleVariable] = "D(" * ruleVariable * ") ~ " * ruleFormula
+                elseif ruleVariable in keys(constantsDict)
+                    variableDict[ruleVariable] = constantsDict[ruleVariable]
+                    delete!(constantsDict, ruleVariable)
+                    dus[ruleVariable] = "D(" * ruleVariable * ") ~ " * ruleFormula
+                else
+                    variableDict[ruleVariable] = "0"
+                    dus[ruleVariable] = "D(" * ruleVariable * ") ~ " * ruleFormula
+                end
+            end
         end
     end
 
@@ -759,12 +824,10 @@ function writeODEModelToFile()
         assignMath = initAssign[:getMath]()
         assignFormula = libsbml[:formulaToString](assignMath)
         assignFormula = rewriteDerivatives(assignFormula, dicts)
-        _, inFunction = getArguments(assignFormula, funcNameArgFormula)
-        if inFunction
-            assignFormula = rewriteFunctionOfFunction(assignFormula, funcNameArgFormula)
-        end
         if assignName in keys(variableDict)
             variableDict[assignName] = assignFormula
+        elseif assignName in keys(variableParameterDict)
+            variableParameterDict[assignName] = assignFormula
         elseif assignName in keys(parameterDict)
             parameterDict[assignName] = assignFormula
         elseif assignName in keys(constantsDict)
@@ -772,11 +835,6 @@ function writeODEModelToFile()
         else
             println("Error: could not find assigned variable/parameter")
         end
-    end
-
-    ### Defining derivatives
-    for spec in model[:getListOfSpecies]()
-        dus[spec[:getId]()] = "D(" * spec[:getId]() * ") ~ "
     end
 
     reactions = [(r, r[:getKineticLaw]()[:getFormula]()) for r in model[:getListOfReactions]()]
@@ -847,17 +905,6 @@ function writeODEModelToFile()
     println(modelFile, "D = Differential(t)")
 
     println(modelFile, "")
-    println(modelFile, "### Function definitions ###")
-    if length(funcNameArgFormula) > 0
-        for (funcName, (funcArg, funcFormula)) in funcNameArgFormula
-            functionAsString = funcName * "(" * funcArg * ") = " * funcFormula 
-            functionDefinition = funcName * "(" * funcArg * ")"
-            println(modelFile, functionAsString)
-            println(modelFile, "@register " * functionDefinition)
-        end
-    end
-
-    println(modelFile, "")
     println(modelFile, "### Events ###")
     if length(stringOfEvents) > 0
         println(modelFile, "continuous_events = [")
@@ -868,7 +915,7 @@ function writeODEModelToFile()
     println(modelFile, "")
     println(modelFile, "### Derivatives ###")
     println(modelFile, "eqs = [")
-    for (sIndex, key) in enumerate(keys(dus))
+    for (sIndex, key) in enumerate(keys(variableDict))
         if sIndex == 1
             print(modelFile, dus[key])
         else
