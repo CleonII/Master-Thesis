@@ -1,6 +1,16 @@
 
+SBML/*
+RewrittenModels/*
 Pipeline_SBMLImporter/JuliaModels/*
-load_model_with_python.jl
-RewrittenModels/model_Lucarelli_CellSystems2018.jl
-simple_code.jl
 Pipeline_ModelSolver/IntermediaryResults/benchmark*.csv
+testModellingToolkit.jl
+write_modellingToolkit_to_file.jl
+read_modellingToolkit_from_file.jl
+write_model_to_file.jl
+read_model_from_file.jl
+handWrittenModel.jl
+load_model_with_python.jl
+load_model_libSBML.jl
+simple_code.jl
+test.jl
+Pipeline_ModelSolver/estimate_time_span.jl
