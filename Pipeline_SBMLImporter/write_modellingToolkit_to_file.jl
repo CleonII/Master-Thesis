@@ -110,35 +110,36 @@ function getArguments(functionAsString, dictionary::Dict, baseFunctions::Dict)
     return [argumentString, includesFunction]
 end
 
-# replaces the word "time" in functions with "t". 
+# replaces a word, "toReplace" in functions with another word, "replacer. 
+# Often used to change "time" to "t"
 # Makes sure not to change for example "time1" or "shift_time"
-function replaceTime(timeString)
-    if timeString == "time"
-        return "t"
+function replaceWith(oldString, toReplace, replacer)
+    if oldString == toReplace
+        return replacer
     end
-    newTimeString = timeString
+    newString = oldString
     i = 1
-    while i < length(newTimeString)
-        indices = findnext("time", newTimeString, i)
+    while i < length(newString)
+        indices = findnext(toReplace, newString, i)
         if indices === nothing
             break
         end
         if indices[1] == 1
-            if newTimeString[indices[end]+1] in [' ', ')']
-                newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
+            if newString[indices[end]+1] in [' ', ',', ')']
+                newString = newString[1:indices[1]-1] * replacer * newString[indices[end]+1:end]
             end
-        elseif indices[end] == length(newTimeString)
-            if newTimeString[indices[1]-1] in [' ', '(', '-', '+']
-                newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
+        elseif indices[end] == length(newString)
+            if newString[indices[1]-1] in [' ', '(', '-', '+']
+                newString = newString[1:indices[1]-1] * replacer * newString[indices[end]+1:end]
             end
         else
-            if newTimeString[indices[1]-1] in [' ', '(', '-', '+'] && newTimeString[indices[end]+1] in [' ', ')', ',']
-                newTimeString = newTimeString[1:indices[1]-1] * "t" * newTimeString[indices[end]+1:end]
+            if newString[indices[1]-1] in [' ', ',', '(', '-', '+'] && newString[indices[end]+1] in [' ', ')', ',']
+                newString = newString[1:indices[1]-1] * replacer * newString[indices[end]+1:end]
             end
         end
         i = indices[1] + 1
     end
-    return newTimeString
+    return newString
 end
 
 # Goes through a condition for an event written for SBML and creates the appropriate events in ModelingToolkit.
@@ -176,7 +177,7 @@ function goToBottomPiecewiseToEvent(condition, variable, valActive, valInactive,
 
         parts = splitBetween(strippedCondition, ',')
         if occursin("time", parts[1])
-            parts[1] = replaceTime(parts[1])
+            parts[1] = replaceWith(parts[1], "time", "t")
         end
         trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
         event = "[" * variable * " ~ " * valActive * "]"
@@ -200,7 +201,7 @@ function goToBottomPiecewiseToEvent(condition, variable, valActive, valInactive,
 
         parts = splitBetween(strippedCondition, ',')
         if occursin("time", parts[1])
-            parts[1] = replaceTime(parts[1])
+            parts[1] = replaceWith(parts[1], "time", "t")
         end
         trigger = "[" * parts[1] * " ~ " * parts[2] * "]"
         event = "[" * variable * " ~ " * valInactive * "]"
@@ -277,7 +278,7 @@ function asTrigger(triggerFormula)
     end
     parts = splitBetween(strippedFormula, ',')
     if occursin("time", parts[1])
-        parts[1] = replaceTime(parts[1])
+        parts[1] = replaceWith(parts[1], "time", "t")
     end
     expression = "[" * parts[1] * " ~ " * parts[2] * "]"
     return expression
@@ -464,7 +465,7 @@ function goToBottomPiecewiseToFunction(condition, valActive, valInactive)
         end
         parts = splitBetween(strippedCondition, ',')
         if occursin("time", parts[1])
-            parts[1] = replaceTime(parts[1])
+            parts[1] = replaceWith(parts[1], "time", "t")
         end
 
         trigger = "(" * parts[1] * operator * parts[2] * ")"
@@ -479,7 +480,7 @@ function goToBottomPiecewiseToFunction(condition, valActive, valInactive)
         end
         parts = splitBetween(strippedCondition, ',')
         if occursin("time", parts[1])
-            parts[1] = replaceTime(parts[1])
+            parts[1] = replaceWith(parts[1], "time", "t")
         end
 
         trigger = "(" * parts[1] * operator * parts[2] * ")"
@@ -582,7 +583,7 @@ function rewriteDerivatives(derivativeAsString, dicts)
     return newDerivativeAsString
 end
 
-function writeODEModelToFile(model, modelName, path)
+function writeODEModelToFile(libsbml, model, modelName, path)
     dicts = Dict()
     variableDict = Dict()
     dicts["variables"] = variableDict
@@ -723,7 +724,7 @@ function writeODEModelToFile(model, modelName, path)
         if ruleType == "assignmentRule" # TODO: fix for functions with too many arguments
             ruleVariable = rule[:getVariable]() # variable
             ruleFormula = rule[:getFormula]() 
-            ruleFormula = replaceTime(ruleFormula) 
+            ruleFormula = replaceWith(ruleFormula, "time", "t") 
             ruleFormula = removePowFunctions(ruleFormula)
             if occursin("piecewise(", ruleFormula)
                 next = findfirst("piecewise(", ruleFormula)
@@ -774,7 +775,7 @@ function writeODEModelToFile(model, modelName, path)
         elseif ruleType == "rateRule"
             ruleVariable = rule[:getVariable]() # variable
             ruleFormula = rule[:getFormula]() 
-            ruleFormula = replaceTime(ruleFormula) 
+            ruleFormula = replaceWith(ruleFormula, "time", "t") 
             ruleFormula = removePowFunctions(ruleFormula)
             if occursin("piecewise(", ruleFormula)
                 # set as derivative
@@ -819,6 +820,7 @@ function writeODEModelToFile(model, modelName, path)
 
     ### Implement Initial assignments 
     # Positioned after rules since some assignments may include functions
+    initallyAssignedVariable = Dict{String, String}()
     for initAssign in model[:getListOfInitialAssignments]()
         assignName = initAssign[:getId]()
         assignMath = initAssign[:getMath]()
@@ -826,8 +828,10 @@ function writeODEModelToFile(model, modelName, path)
         assignFormula = rewriteDerivatives(assignFormula, dicts)
         if assignName in keys(variableDict)
             variableDict[assignName] = assignFormula
+            initallyAssignedVariable[assignName] = "variableDict"
         elseif assignName in keys(variableParameterDict)
             variableParameterDict[assignName] = assignFormula
+            initallyAssignedVariable[assignName] = "variableParameterDict"
         elseif assignName in keys(parameterDict)
             parameterDict[assignName] = assignFormula
         elseif assignName in keys(constantsDict)
@@ -836,6 +840,41 @@ function writeODEModelToFile(model, modelName, path)
             println("Error: could not find assigned variable/parameter")
         end
     end
+
+    while true
+        nestedVariables = false
+        for (variable, dictName) in initallyAssignedVariable
+            if dictName == "variableDict"
+                variableValue = variableDict[variable]
+                args = split(getArguments(variableValue, baseFunctions))
+                for arg in args
+                    if arg in keys(variableDict)
+                        nestedVariables = true
+                        variableValue = replaceWith(variableValue, arg, variableDict[arg])
+                    elseif arg in keys(variableParameterDict)
+                        nestedVariables = true
+                        variableValue = replaceWith(variableValue, arg, variableParameterDict[arg])
+                    end
+                end
+                variableDict[variable] = variableValue
+            else
+                variableValue = variableParameterDict[variable]
+                args = split(getArguments(variableValue, baseFunctions))
+                for arg in args
+                    if arg in keys(variableDict)
+                        nestedVariables = true
+                        variableValue = replaceWith(variableValue, arg, variableDict[arg])
+                    elseif arg in keys(variableParameterDict)
+                        nestedVariables = true
+                        variableValue = replaceWith(variableValue, arg, variableParameterDict[arg])
+                    end
+                end
+                variableParameterDict[variable] = variableValue
+            end
+        end
+        nestedVariables || break
+    end
+    
 
     reactions = [(r, r[:getKineticLaw]()[:getFormula]()) for r in model[:getListOfReactions]()]
     for (reac, formula) in reactions
@@ -852,7 +891,7 @@ function writeODEModelToFile(model, modelName, path)
 
 
     ### Writing to file 
-    modelFile = open(path * "\\" * modelName * ".jl", "w")
+    modelFile = open(path * "/" * modelName * ".jl", "w")
 
     println(modelFile, "# Model name: " * modelName)
 

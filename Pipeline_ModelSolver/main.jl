@@ -1,13 +1,11 @@
-using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV
+using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
 
-# TODO:
-# get time by finding time to steady state
-# use a high precission solver to estimate the ground truth for each model
+include(pwd() * "/Pipeline_ModelSolver/BigFloatODEProblem.jl")
 
 function getModelFiles(path)
     if isdir(path)
         modelFiles = readdir(path)
-        return modelFiles[1:2]
+        return modelFiles
     else
         println("No such directory")
         return nothing
@@ -15,13 +13,29 @@ function getModelFiles(path)
 end
 
 function getSolvers()
-    solvers = [Vern6(), Tsit5()]
-    return solvers
+    algs_DiffEq = [Vern6(), Vern7(), Vern8(), Tsit5(), DP5(), DP8(), Feagin14(), VCABM(),
+                   Rosenbrock23(), TRBDF2(), Rodas4(), Rodas4P(), Rodas4P2(), Rodas5(), QNDF(), FBDF(), 
+                   Trapezoid(), KenCarp4(), Kvaerno5(), RadauIIA3(), RadauIIA5(), 
+                   AutoTsit5(Rosenbrock23()), AutoVern7(Rodas5()), AutoVern9(Rodas4P()), AutoVern9(Rodas5())]
+    algs_LSODA = [lsoda()]
+    algs_Sundials = [CVODE_BDF(linear_solver=:Dense), CVODE_BDF(linear_solver=:LapackDense), CVODE_BDF(linear_solver=:GMRES), 
+                     CVODE_BDF(method=:Functional), CVODE_Adams(linear_solver=:Dense), CVODE_Adams(linear_solver=:LapackDense), 
+                     ARKODE(Sundials.Explicit(), order=4), ARKODE(Sundials.Explicit(), order=8), 
+                     ARKODE(Sundials.Implicit(), order = 3), ARKODE(Sundials.Implicit(), order = 5)]
+    algs_ODEInterface = [dopri5(), dop853(), radau(), radau5(), rodas(), ddeabm(), ddebdf()]
+    algs = [algs_DiffEq; algs_LSODA; algs_Sundials; algs_ODEInterface]
+    alg_hints = [[:auto], [:nonstiff], [:stiff]]
+    return algs, alg_hints
+end
+
+function getHiAccSolver()
+    algs = [AutoVern9(Rodas5()), Rodas4P()]
+    return algs
 end
 
 function getTolerances()
-    relTols = [1e-5, 1e-8, 1e-14]
-    absTols = [1e-5, 1e-8, 1e-14]
+    relTols = [1e-3, 1e-6, 1e-9, 1e-12, 1e-15] # 1e-3 is standard
+    absTols = [1e-6, 1e-9, 1e-12, 1e-15] # 1e-6 is standard
     return relTols, absTols
 end
 
@@ -42,8 +56,10 @@ function getNumberOfFiles(path)
     end
 end
 
-function modelSolver(modelFile, solver, relTol, absTol, iterations, readPath, writefile)
-    modelPath = readPath * "\\" * modelFile
+function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols, iterations, readPath, writefile)
+    nonStiffHiAccSolver, stiffHiAccSolver = hiAccSolvers
+    println(modelFile)
+    modelPath = readPath * "/" * modelFile
     include(modelPath)
 
     new_sys = ode_order_lowering(sys)
@@ -53,64 +69,144 @@ function modelSolver(modelFile, solver, relTol, absTol, iterations, readPath, wr
 
     c = trueConstantsValues
 
-    steadyStateProblem = SteadyStateProblem{true}(new_sys,u0,[p;c])
+    tspan = (0.0, timeEnd)
 
-    #steadyStateProblem = ODEProblem(new_sys, u0, [p;c], jac=true)
-
-    simulationTime = solve(steadyStateProblem, DynamicSS(Tsit5()))
-
-    tspan = (0.0,500.0)
+    # Estimate ground truth
+    minRelTol = minimum(relTols)
+    minAbsTol = minimum(absTols)
+    bfProb = BigFloatODEProblem(new_sys, u0, tspan, [p;c])
+    local hiAccSol
+    try 
+        hiAccSol = solve(bfProb, nonStiffHiAccSolver, reltol = minRelTol, abstol = minAbsTol) 
+    catch 
+        hiAccSol = solve(bfProb, stiffHiAccSolver, reltol = minRelTol, abstol = minAbsTol) 
+    end
+    
+    # Solve with different solvers
     prob = ODEProblem(new_sys,u0,tspan,[p;c],jac=true)
 
-    runTime = Vector{Float64}(undef, iterations)
+    alg_solvers, alg_hints = solvers
+    for alg_solver in alg_solvers
+        for relTol in relTols
+            for absTol in absTols
+                println(absTol)
+                benchRunTime = Vector{Float64}(undef, iterations)
+                benchMemory = Vector{Float64}(undef, iterations)
+                benchAllocs = Vector{Float64}(undef, iterations)
+                sqDiff = Float64
+                success = true
 
-    for i in 1:iterations
-        println("iteration: " * string(i))
-        b = @benchmark solve($prob, $solver, reltol = $relTol, abstol = $absTol) 
-        bm = mean(b)
-        runTime[i] = bm.time 
-    end
-    data = DataFrame(model=modelFile, solver=solver, relTol=relTol, absTol=absTol, runTime=runTime, iteration=1:iterations)
-    if isfile(writefile)
-        CSV.write(writefile, data, append = true)
-    else
-        CSV.write(writefile, data)
-    end
-end
+                try
+                    sol = solve(prob, alg_solver, relTol = relTol, absTol = absTol)
+                    if sol.t[end] == timeEnd
+                        sqDiff = sum((sol(hiAccSol.t)[:,:] - hiAccSol[:,:]).^2)
+                    else
+                        sqDiff = NaN
+                        success = false
+                    end
+                catch 
+                    sqDiff = NaN
+                    success = false
+                end
+                
+                if success
+                    for i in 1:iterations
+                        b = @benchmark solve($prob, $alg_solver, relTol = $relTol, absTol = $absTol) 
+                        bMin = minimum(b)
+                        benchRunTime[i] = bMin.time # microsecond
+                        benchMemory[i] = bMin.memory # bytes
+                        benchAllocs[i] = bMin.allocs # number of allocations
+                    end
+                else
+                    benchRunTime .= NaN
+                    benchMemory .= NaN
+                    benchAllocs .= NaN
+                end
 
-function modelSolverIterator(modelFiles, solvers, relTols, absTols, iterations, readPath, writefile)
-    for modelFile in modelFiles
-        
-        println(modelFile)
-        for solver in solvers
-            println(solver)
-            for relTol in relTols
-                println(relTol)
-                for absTol in absTols
-                    println(absTol)
-                    modelSolver(modelFile, solver, relTol, absTol, iterations, readPath, writefile)
+                data = DataFrame(model = modelFile, solver = alg_solver, relTol = relTol, absTol = absTol, 
+                                 success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs,
+                                 sqDiff = sqDiff, iteration = 1:iterations)
+                if isfile(writefile)
+                    CSV.write(writefile, data, append = true)
+                else
+                    CSV.write(writefile, data)
                 end
             end
         end
+    end
+    for alg_hint in alg_hints
+        println(alg_hint)
+        for relTol in relTols
+            for absTol in absTols
+                benchRunTime = Vector{Float64}(undef, iterations)
+                benchMemory = Vector{Float64}(undef, iterations)
+                benchAllocs = Vector{Float64}(undef, iterations)
+                sqDiff = Float64
+                success = true
+
+                try
+                    sol = solve(prob, alg_hint = alg_hint, relTol = relTol, absTol = absTol)
+                    if sol.t[end] == timeEnd
+                        sqDiff = sum((sol(hiAccSol.t)[:,:] - hiAccSol[:,:]).^2)
+                    else
+                        sqDiff = NaN
+                        success = false
+                    end
+                catch 
+                    sqDiff = NaN
+                    success = false
+                end
+
+                if success
+                    for i in 1:iterations
+                        b = @benchmark solve($prob, alg_hint = $alg_hint, relTol = $relTol, absTol = $absTol) 
+                        bMin = minimum(b)
+                        benchRunTime[i] = bMin.time # microsecond
+                        benchMemory[i] = bMin.memory # bytes
+                        benchAllocs[i] = bMin.allocs # number of allocations
+                    end
+                else
+                    benchRunTime .= NaN
+                    benchMemory .= NaN
+                    benchAllocs .= NaN
+                end
+
+                data = DataFrame(model = modelFile, solver = alg_hint[1], relTol = relTol, absTol = absTol, 
+                                 success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs, 
+                                 sqDiff = sqDiff, iteration = 1:iterations)
+                if isfile(writefile)
+                    CSV.write(writefile, data, append = true)
+                else
+                    CSV.write(writefile, data)
+                end
+            end
+        end
+    end
+    
+end
+
+function modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, relTols, absTols, iterations, readPath, writefile)
+    for modelFile in modelFiles
+        timeEnd = timeEnds[timeEnds[:,1] .== modelFile, 2][1]
+        modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols, iterations, readPath, writefile)
     end
 end
 
 
 function main()
-    readPath = pwd() * "\\Pipeline_SBMLImporter\\JuliaModels"
-    writePath = pwd() * "\\Pipeline_ModelSolver\\IntermediaryResults"
+    readPath = pwd() * "/Pipeline_SBMLImporter/JuliaModels"
+    writePath = pwd() * "/Pipeline_ModelSolver/IntermediaryResults"
     fixDirectories(writePath)
-    writefile = writePath * "\\benchmark_" * string(getNumberOfFiles(writePath) + 1) * ".csv"
+    writefile = writePath * "/benchmark_" * string(getNumberOfFiles(writePath) + 1) * ".csv"
 
     modelFiles = getModelFiles(readPath)
+    timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
     solvers = getSolvers()
+    hiAccSolvers = getHiAccSolver()
     relTols, absTols = getTolerances()
-    iterations = 5
+    iterations = 30
     
-    modelSolverIterator(modelFiles, solvers, relTols, absTols, iterations, readPath, writefile)
-
-    #modelSolver(modelFiles[1], solvers[1], relTols[1], absTols[1], iterations, readPath, writefile)
-    
+    modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, relTols, absTols, iterations, readPath, writefile)
 
 end
 
