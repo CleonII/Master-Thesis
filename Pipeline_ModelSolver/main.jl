@@ -19,10 +19,10 @@ function getSolvers()
                    AutoTsit5(Rosenbrock23()), AutoVern7(Rodas5()), AutoVern9(Rodas4P()), AutoVern9(Rodas5())]
     algs_LSODA = [lsoda()]
     algs_Sundials = [CVODE_BDF(linear_solver=:Dense), CVODE_BDF(linear_solver=:LapackDense), CVODE_BDF(linear_solver=:GMRES), 
-                     CVODE_BDF(method=:Functional), CVODE_Adams(linear_solver=:Dense), CVODE_Adams(linear_solver=:LapackDense), 
+                     CVODE_Adams(linear_solver=:Dense), CVODE_Adams(linear_solver=:LapackDense), 
                      ARKODE(Sundials.Explicit(), order=4), ARKODE(Sundials.Explicit(), order=8), 
                      ARKODE(Sundials.Implicit(), order = 3), ARKODE(Sundials.Implicit(), order = 5)]
-    algs_ODEInterface = [dopri5(), dop853(), radau(), radau5(), rodas(), ddeabm(), ddebdf()]
+    algs_ODEInterface = [dopri5(), dop853(), radau(), radau5(), rodas()]
     algs = [algs_DiffEq; algs_LSODA; algs_Sundials; algs_ODEInterface]
     alg_hints = [[:auto], [:nonstiff], [:stiff]]
     return algs, alg_hints
@@ -36,7 +36,7 @@ end
 function getTolerances()
     relTols = [1e-3, 1e-6, 1e-9, 1e-12, 1e-15] # 1e-3 is standard
     absTols = [1e-6, 1e-9, 1e-12, 1e-15] # 1e-6 is standard
-    return relTols, absTols
+    return [relTols[1]], [absTols[1]]
 end
 
 function fixDirectories(path)
@@ -81,15 +81,16 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
     catch 
         hiAccSol = solve(bfProb, stiffHiAccSolver, reltol = minRelTol, abstol = minAbsTol) 
     end
+    ts = hiAccSol.t
     
     # Solve with different solvers
     prob = ODEProblem(new_sys,u0,tspan,[p;c],jac=true)
 
     alg_solvers, alg_hints = solvers
     for alg_solver in alg_solvers
+        println(alg_solver)
         for relTol in relTols
             for absTol in absTols
-                println(absTol)
                 benchRunTime = Vector{Float64}(undef, iterations)
                 benchMemory = Vector{Float64}(undef, iterations)
                 benchAllocs = Vector{Float64}(undef, iterations)
@@ -97,9 +98,9 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
                 success = true
 
                 try
-                    sol = solve(prob, alg_solver, relTol = relTol, absTol = absTol)
+                    sol = solve(prob, alg_solver, relTol = relTol, absTol = absTol, saveat = ts)
                     if sol.t[end] == timeEnd
-                        sqDiff = sum((sol(hiAccSol.t)[:,:] - hiAccSol[:,:]).^2)
+                        sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
                     else
                         sqDiff = NaN
                         success = false
@@ -111,7 +112,7 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
                 
                 if success
                     for i in 1:iterations
-                        b = @benchmark solve($prob, $alg_solver, relTol = $relTol, absTol = $absTol) 
+                        b = @benchmark solve($prob, $alg_solver, relTol = $relTol, absTol = $absTol) samples=1 evals=1
                         bMin = minimum(b)
                         benchRunTime[i] = bMin.time # microsecond
                         benchMemory[i] = bMin.memory # bytes
@@ -145,7 +146,7 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
                 success = true
 
                 try
-                    sol = solve(prob, alg_hint = alg_hint, relTol = relTol, absTol = absTol)
+                    sol = solve(prob, alg_hint = alg_hint, relTol = relTol, absTol = absTol, saveat = ts)
                     if sol.t[end] == timeEnd
                         sqDiff = sum((sol(hiAccSol.t)[:,:] - hiAccSol[:,:]).^2)
                     else
@@ -159,7 +160,7 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
 
                 if success
                     for i in 1:iterations
-                        b = @benchmark solve($prob, alg_hint = $alg_hint, relTol = $relTol, absTol = $absTol) 
+                        b = @benchmark solve($prob, alg_hint = $alg_hint, relTol = $relTol, absTol = $absTol) samples=1 evals=1
                         bMin = minimum(b)
                         benchRunTime[i] = bMin.time # microsecond
                         benchMemory[i] = bMin.memory # bytes
@@ -204,7 +205,7 @@ function main()
     solvers = getSolvers()
     hiAccSolvers = getHiAccSolver()
     relTols, absTols = getTolerances()
-    iterations = 30
+    iterations = 15
     
     modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, relTols, absTols, iterations, readPath, writefile)
 
