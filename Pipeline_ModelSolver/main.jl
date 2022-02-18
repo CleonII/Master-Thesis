@@ -5,7 +5,7 @@ include(pwd() * "/Pipeline_ModelSolver/BigFloatODEProblem.jl")
 function getModelFiles(path)
     if isdir(path)
         modelFiles = readdir(path)
-        return modelFiles
+        return [modelFiles[1]]
     else
         println("No such directory")
         return nothing
@@ -148,7 +148,7 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
                 try
                     sol = solve(prob, alg_hint = alg_hint, relTol = relTol, absTol = absTol, saveat = ts)
                     if sol.t[end] == timeEnd
-                        sqDiff = sum((sol(hiAccSol.t)[:,:] - hiAccSol[:,:]).^2)
+                        sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
                     else
                         sqDiff = NaN
                         success = false
