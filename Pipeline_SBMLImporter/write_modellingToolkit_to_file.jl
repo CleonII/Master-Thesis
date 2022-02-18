@@ -900,7 +900,7 @@ function writeODEModelToFile(libsbml, model, modelName, path)
 
     println(modelFile, "")
     println(modelFile, "### Define independent and dependent variables")
-    defineVariables = "@variables t"
+    defineVariables = "ModelingToolkit.@variables t"
     for key in keys(variableDict)
         defineVariables = defineVariables * " " * key * "(t)"
     end
@@ -909,7 +909,7 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     println(modelFile, "")
     println(modelFile, "### Define variable parameters")
     if length(variableParameterDict) > 0
-        defineVariableParameters = "@variables"
+        defineVariableParameters = "ModelingToolkit.@variables"
         for key in keys(variableParameterDict)
             defineVariableParameters = defineVariableParameters * " " * key * "(t)"
         end
@@ -919,13 +919,13 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     println(modelFile, "")
     println(modelFile, "### Define dummy variable")
     if length(dummyVariableDict) > 0
-        defineDummyVariables = "@variables dummyVariable(t)"
+        defineDummyVariables = "ModelingToolkit.@variables dummyVariable(t)"
         println(modelFile, defineDummyVariables)
     end
     
     println(modelFile, "")
     println(modelFile, "### Define parameters")
-    defineParameters = "@parameters"
+    defineParameters = "ModelingToolkit.@parameters"
     for key in keys(parameterDict)
         defineParameters = defineParameters * " " * key
     end
@@ -933,7 +933,7 @@ function writeODEModelToFile(libsbml, model, modelName, path)
 
     println(modelFile, "")
     println(modelFile, "### Define constants")
-    defineConstants = "@parameters"
+    defineConstants = "ModelingToolkit.@parameters"
     for key in keys(constantsDict)
         defineConstants = defineConstants * " " * key
     end
