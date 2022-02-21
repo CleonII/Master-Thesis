@@ -5,7 +5,7 @@ include(pwd() * "/Pipeline_ModelSolver/BigFloatODEProblem.jl")
 function getModelFiles(path)
     if isdir(path)
         modelFiles = readdir(path)
-        return [modelFiles[1]]
+        return [modelFiles[21]]
     else
         println("No such directory")
         return nothing
@@ -77,9 +77,9 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
     bfProb = BigFloatODEProblem(new_sys, u0, tspan, [p;c])
     local hiAccSol
     try 
-        hiAccSol = solve(bfProb, nonStiffHiAccSolver, reltol = minRelTol, abstol = minAbsTol) 
+        hiAccSol = solve(bfProb, nonStiffHiAccSolver, relTol = minRelTol, absTol = minAbsTol) 
     catch 
-        hiAccSol = solve(bfProb, stiffHiAccSolver, reltol = minRelTol, abstol = minAbsTol) 
+        hiAccSol = solve(bfProb, stiffHiAccSolver, relTol = minRelTol, absTol = minAbsTol) 
     end
     ts = hiAccSol.t
     
