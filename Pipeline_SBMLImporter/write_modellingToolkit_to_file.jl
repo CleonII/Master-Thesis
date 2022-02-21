@@ -821,6 +821,7 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     ### Implement Initial assignments 
     # Positioned after rules since some assignments may include functions
     initallyAssignedVariable = Dict{String, String}()
+    initallyAssignedParameter = Dict{String, String}()
     for initAssign in model[:getListOfInitialAssignments]()
         assignName = initAssign[:getId]()
         assignMath = initAssign[:getMath]()
@@ -834,8 +835,10 @@ function writeODEModelToFile(libsbml, model, modelName, path)
             initallyAssignedVariable[assignName] = "variableParameterDict"
         elseif assignName in keys(parameterDict)
             parameterDict[assignName] = assignFormula
+            initallyAssignedParameter[assignName] = "parameterDict"
         elseif assignName in keys(constantsDict)
             constantsDict[assignName] = assignFormula
+            initallyAssignedParameter[assignName] = "constantsDict"
         else
             println("Error: could not find assigned variable/parameter")
         end
@@ -873,6 +876,40 @@ function writeODEModelToFile(libsbml, model, modelName, path)
             end
         end
         nestedVariables || break
+    end
+
+    while true
+        nestedParameter = false
+        for (parameter, dictName) in initallyAssignedParameter
+            if dictName == "parameterDict"
+                parameterValue = parameterDict[parameter]
+                args = split(getArguments(parameterValue, baseFunctions))
+                for arg in args
+                    if arg in keys(parameterDict)
+                        nestedParameter = true
+                        parameterValue = replaceWith(parameterValue, arg, parameterDict[arg])
+                    elseif arg in keys(constantsDict)
+                        nestedParameter = true
+                        parameterValue = replaceWith(parameterValue, arg, constantsDict[arg])
+                    end
+                end
+                parameterDict[parameter] = parameterValue
+            else
+                parameterValue = constantsDict[parameter]
+                args = split(getArguments(parameterValue, baseFunctions))
+                for arg in args
+                    if arg in keys(parameterDict)
+                        nestedParameter = true
+                        parameterValue = replaceWith(parameterValue, arg, parameterDict[arg])
+                    elseif arg in keys(constantsDict)
+                        nestedParameter = true
+                        parameterValue = replaceWith(parameterValue, arg, constantsDict[arg])
+                    end
+                end
+                constantsDict[parameter] = parameterValue
+            end
+        end
+        nestedParameter || break
     end
     
 
