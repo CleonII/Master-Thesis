@@ -5,7 +5,7 @@ include(pwd() * "/Pipeline_ModelSolver/BigFloatODEProblem.jl")
 function getModelFiles(path)
     if isdir(path)
         modelFiles = readdir(path)
-        return [modelFiles[21]]
+        return modelFiles
     else
         println("No such directory")
         return nothing
@@ -88,97 +88,101 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
 
     alg_solvers, alg_hints = solvers
     for alg_solver in alg_solvers
-        println(alg_solver)
-        for relTol in relTols
-            for absTol in absTols
-                benchRunTime = Vector{Float64}(undef, iterations)
-                benchMemory = Vector{Float64}(undef, iterations)
-                benchAllocs = Vector{Float64}(undef, iterations)
-                sqDiff = Float64
-                success = true
+        if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) && ~(modelFile == "model_Chen_MSB2009.jl")
+            println(alg_solver)
+            for relTol in relTols
+                for absTol in absTols
+                    benchRunTime = Vector{Float64}(undef, iterations)
+                    benchMemory = Vector{Float64}(undef, iterations)
+                    benchAllocs = Vector{Float64}(undef, iterations)
+                    sqDiff = Float64
+                    success = true
 
-                try
-                    sol = solve(prob, alg_solver, relTol = relTol, absTol = absTol, saveat = ts)
-                    if sol.t[end] == timeEnd
-                        sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
-                    else
+                    try
+                        sol = solve(prob, alg_solver, relTol = relTol, absTol = absTol, saveat = ts)
+                        if sol.t[end] == timeEnd
+                            sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
+                        else
+                            sqDiff = NaN
+                            success = false
+                        end
+                    catch 
                         sqDiff = NaN
                         success = false
                     end
-                catch 
-                    sqDiff = NaN
-                    success = false
-                end
-                
-                if success
-                    for i in 1:iterations
-                        b = @benchmark solve($prob, $alg_solver, relTol = $relTol, absTol = $absTol) samples=1 evals=1
-                        bMin = minimum(b)
-                        benchRunTime[i] = bMin.time # microsecond
-                        benchMemory[i] = bMin.memory # bytes
-                        benchAllocs[i] = bMin.allocs # number of allocations
+                    
+                    if success
+                        for i in 1:iterations
+                            b = @benchmark solve($prob, $alg_solver, relTol = $relTol, absTol = $absTol) samples=1 evals=1
+                            bMin = minimum(b)
+                            benchRunTime[i] = bMin.time # microsecond
+                            benchMemory[i] = bMin.memory # bytes
+                            benchAllocs[i] = bMin.allocs # number of allocations
+                        end
+                    else
+                        benchRunTime .= NaN
+                        benchMemory .= NaN
+                        benchAllocs .= NaN
                     end
-                else
-                    benchRunTime .= NaN
-                    benchMemory .= NaN
-                    benchAllocs .= NaN
-                end
 
-                data = DataFrame(model = modelFile, solver = alg_solver, relTol = relTol, absTol = absTol, 
-                                 success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs,
-                                 sqDiff = sqDiff, iteration = 1:iterations)
-                if isfile(writefile)
-                    CSV.write(writefile, data, append = true)
-                else
-                    CSV.write(writefile, data)
+                    data = DataFrame(model = modelFile, solver = alg_solver, relTol = relTol, absTol = absTol, 
+                                    success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs,
+                                    sqDiff = sqDiff, iteration = 1:iterations)
+                    if isfile(writefile)
+                        CSV.write(writefile, data, append = true)
+                    else
+                        CSV.write(writefile, data)
+                    end
                 end
             end
         end
     end
     for alg_hint in alg_hints
-        println(alg_hint)
-        for relTol in relTols
-            for absTol in absTols
-                benchRunTime = Vector{Float64}(undef, iterations)
-                benchMemory = Vector{Float64}(undef, iterations)
-                benchAllocs = Vector{Float64}(undef, iterations)
-                sqDiff = Float64
-                success = true
+        if ~(modelFile == "model_Crauste_CellSystems2017.jl") && ~(modelFile == "model_Chen_MSB2009.jl")
+            println(alg_hint)
+            for relTol in relTols
+                for absTol in absTols
+                    benchRunTime = Vector{Float64}(undef, iterations)
+                    benchMemory = Vector{Float64}(undef, iterations)
+                    benchAllocs = Vector{Float64}(undef, iterations)
+                    sqDiff = Float64
+                    success = true
 
-                try
-                    sol = solve(prob, alg_hint = alg_hint, relTol = relTol, absTol = absTol, saveat = ts)
-                    if sol.t[end] == timeEnd
-                        sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
-                    else
+                    try
+                        sol = solve(prob, alg_hint = alg_hint, relTol = relTol, absTol = absTol, saveat = ts)
+                        if sol.t[end] == timeEnd
+                            sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
+                        else
+                            sqDiff = NaN
+                            success = false
+                        end
+                    catch 
                         sqDiff = NaN
                         success = false
                     end
-                catch 
-                    sqDiff = NaN
-                    success = false
-                end
 
-                if success
-                    for i in 1:iterations
-                        b = @benchmark solve($prob, alg_hint = $alg_hint, relTol = $relTol, absTol = $absTol) samples=1 evals=1
-                        bMin = minimum(b)
-                        benchRunTime[i] = bMin.time # microsecond
-                        benchMemory[i] = bMin.memory # bytes
-                        benchAllocs[i] = bMin.allocs # number of allocations
+                    if success
+                        for i in 1:iterations
+                            b = @benchmark solve($prob, alg_hint = $alg_hint, relTol = $relTol, absTol = $absTol) samples=1 evals=1
+                            bMin = minimum(b)
+                            benchRunTime[i] = bMin.time # microsecond
+                            benchMemory[i] = bMin.memory # bytes
+                            benchAllocs[i] = bMin.allocs # number of allocations
+                        end
+                    else
+                        benchRunTime .= NaN
+                        benchMemory .= NaN
+                        benchAllocs .= NaN
                     end
-                else
-                    benchRunTime .= NaN
-                    benchMemory .= NaN
-                    benchAllocs .= NaN
-                end
 
-                data = DataFrame(model = modelFile, solver = alg_hint[1], relTol = relTol, absTol = absTol, 
-                                 success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs, 
-                                 sqDiff = sqDiff, iteration = 1:iterations)
-                if isfile(writefile)
-                    CSV.write(writefile, data, append = true)
-                else
-                    CSV.write(writefile, data)
+                    data = DataFrame(model = modelFile, solver = alg_hint[1], relTol = relTol, absTol = absTol, 
+                                    success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs, 
+                                    sqDiff = sqDiff, iteration = 1:iterations)
+                    if isfile(writefile)
+                        CSV.write(writefile, data, append = true)
+                    else
+                        CSV.write(writefile, data)
+                    end
                 end
             end
         end
