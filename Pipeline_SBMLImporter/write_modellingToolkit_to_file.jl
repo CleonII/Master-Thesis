@@ -621,7 +621,8 @@ function writeODEModelToFile(libsbml, model, modelName, path)
 
     ### Define variables and read initial value
     for spec in model[:getListOfSpecies]()
-        variableDict[spec[:getId]()] = spec[:getInitialAmount]() == 0 ? string(spec[:getInitialConcentration]()) : string(spec[:getInitialAmount]())
+        variableDict[spec[:getId]()] = spec[:getInitialAmount]() == 0 ? spec[:getInitialConcentration]() === NaN ? 
+            string(spec[:getInitialAmount]()) : string(spec[:getInitialConcentration]()) : string(spec[:getInitialAmount]())
     end
     ### Defining derivatives
     for spec in model[:getListOfSpecies]()
