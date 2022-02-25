@@ -34,9 +34,8 @@ function getHiAccSolver()
 end
 
 function getTolerances()
-    relTols = [1e-3, 1e-6, 1e-9, 1e-12, 1e-15] # 1e-3 is standard
-    absTols = [1e-6, 1e-9, 1e-12, 1e-15] # 1e-6 is standard
-    return [relTols[1]], [absTols[1]]
+    tolList = [1e-6, 1e-9, 1e-12, 1e-15] # 1e-6 is standard
+    return [tolList[1]]
 end
 
 function fixDirectories(path)
@@ -56,7 +55,7 @@ function getNumberOfFiles(path)
     end
 end
 
-function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols, iterations, readPath, writefile)
+function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, readPath, writefile)
     nonStiffHiAccSolver, stiffHiAccSolver = hiAccSolvers
     println(modelFile)
     modelPath = readPath * "/" * modelFile
@@ -72,67 +71,66 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
     tspan = (0.0, timeEnd)
 
     # Estimate ground truth
-    minRelTol = minimum(relTols)
-    minAbsTol = minimum(absTols)
+    println("Obtaining high accuracy solution")
     bfProb = BigFloatODEProblem(new_sys, u0, tspan, [p;c])
     local hiAccSol
     try 
-        hiAccSol = solve(bfProb, nonStiffHiAccSolver, relTol = minRelTol, absTol = minAbsTol) 
+        hiAccSol = solve(bfProb, stiffHiAccSolver, reltol = 1e-15, abstol = 1e-15) 
     catch 
-        hiAccSol = solve(bfProb, stiffHiAccSolver, relTol = minRelTol, absTol = minAbsTol) 
+        hiAccSol = solve(bfProb, nonStiffHiAccSolver, reltol = 1e-15, abstol = 1e-15) 
     end
     ts = hiAccSol.t
+    println("Done")
     
     # Solve with different solvers
     prob = ODEProblem(new_sys,u0,tspan,[p;c],jac=true)
 
     alg_solvers, alg_hints = solvers
     for alg_solver in alg_solvers
-        if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) && ~(modelFile == "model_Chen_MSB2009.jl")
+        println("Alg_solver = ", alg_solver)
+        if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) 
             println(alg_solver)
-            for relTol in relTols
-                for absTol in absTols
-                    benchRunTime = Vector{Float64}(undef, iterations)
-                    benchMemory = Vector{Float64}(undef, iterations)
-                    benchAllocs = Vector{Float64}(undef, iterations)
-                    sqDiff = Float64
-                    success = true
+            for tol in Tols
+            
+                benchRunTime = Vector{Float64}(undef, iterations)
+                benchMemory = Vector{Float64}(undef, iterations)
+                benchAllocs = Vector{Float64}(undef, iterations)
+                sqDiff = Float64
+                success = true
 
-                    try
-                        sol = solve(prob, alg_solver, relTol = relTol, absTol = absTol, saveat = ts)
-                        if sol.t[end] == timeEnd
-                            sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
-                        else
-                            sqDiff = NaN
-                            success = false
-                        end
-                    catch 
+                try
+                    sol = solve(prob, alg_solver, reltol = tol, abstol = tol, saveat = ts)
+                    if sol.t[end] == timeEnd && sol.retcode == :Success
+                        sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
+                    else
                         sqDiff = NaN
                         success = false
                     end
+                catch 
+                    sqDiff = NaN
+                    success = false
+                end
                     
-                    if success
-                        for i in 1:iterations
-                            b = @benchmark solve($prob, $alg_solver, relTol = $relTol, absTol = $absTol) samples=1 evals=1
-                            bMin = minimum(b)
-                            benchRunTime[i] = bMin.time # microsecond
-                            benchMemory[i] = bMin.memory # bytes
-                            benchAllocs[i] = bMin.allocs # number of allocations
-                        end
-                    else
-                        benchRunTime .= NaN
-                        benchMemory .= NaN
-                        benchAllocs .= NaN
+                if success
+                    for i in 1:iterations
+                        b = @benchmark solve($prob, $alg_solver, reltol = $tol, abstol = $tol) samples=1 evals=1
+                        bMin = minimum(b)
+                        benchRunTime[i] = bMin.time # microsecond
+                        benchMemory[i] = bMin.memory # bytes
+                        benchAllocs[i] = bMin.allocs # number of allocations
                     end
-
-                    data = DataFrame(model = modelFile, solver = alg_solver, relTol = relTol, absTol = absTol, 
-                                    success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs,
-                                    sqDiff = sqDiff, iteration = 1:iterations)
-                    if isfile(writefile)
-                        CSV.write(writefile, data, append = true)
-                    else
-                        CSV.write(writefile, data)
-                    end
+                else
+                    benchRunTime .= NaN
+                    benchMemory .= NaN
+                    benchAllocs .= NaN
+                end
+                data = DataFrame(model = modelFile, solver = alg_solver, reltol = tol, abstol = tol, 
+                                 success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs,
+                                 sqDiff = sqDiff, iteration = 1:iterations)
+                if isfile(writefile)
+                    CSV.write(writefile, data, append = true)
+                else
+                    CSV.write(writefile, data)
                 end
             end
         end
@@ -140,49 +138,47 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
     for alg_hint in alg_hints
         if ~(modelFile == "model_Crauste_CellSystems2017.jl") && ~(modelFile == "model_Chen_MSB2009.jl")
             println(alg_hint)
-            for relTol in relTols
-                for absTol in absTols
-                    benchRunTime = Vector{Float64}(undef, iterations)
-                    benchMemory = Vector{Float64}(undef, iterations)
-                    benchAllocs = Vector{Float64}(undef, iterations)
-                    sqDiff = Float64
-                    success = true
+            for tol in Tols
+                benchRunTime = Vector{Float64}(undef, iterations)
+                benchMemory = Vector{Float64}(undef, iterations)
+                benchAllocs = Vector{Float64}(undef, iterations)
+                sqDiff = Float64
+                success = true
 
-                    try
-                        sol = solve(prob, alg_hint = alg_hint, relTol = relTol, absTol = absTol, saveat = ts)
-                        if sol.t[end] == timeEnd
-                            sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
-                        else
-                            sqDiff = NaN
-                            success = false
-                        end
-                    catch 
+                try
+                    sol = solve(prob, alg_hint = alg_hint, reltol = tol, abstol = tol, saveat = ts)
+                    if sol.t[end] == timeEnd && sol.retcode == :Success
+                        sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
+                    else
                         sqDiff = NaN
                         success = false
                     end
+                catch 
+                    sqDiff = NaN
+                    success = false
+                end
 
-                    if success
-                        for i in 1:iterations
-                            b = @benchmark solve($prob, alg_hint = $alg_hint, relTol = $relTol, absTol = $absTol) samples=1 evals=1
-                            bMin = minimum(b)
-                            benchRunTime[i] = bMin.time # microsecond
-                            benchMemory[i] = bMin.memory # bytes
-                            benchAllocs[i] = bMin.allocs # number of allocations
-                        end
-                    else
-                        benchRunTime .= NaN
-                        benchMemory .= NaN
-                        benchAllocs .= NaN
+                if success
+                    for i in 1:iterations
+                        b = @benchmark solve($prob, alg_hint = $alg_hint, reltol = $tol, abstol = $tol) samples=1 evals=1
+                        bMin = minimum(b)
+                        benchRunTime[i] = bMin.time # microsecond
+                        benchMemory[i] = bMin.memory # bytes
+                        benchAllocs[i] = bMin.allocs # number of allocations
                     end
+                else
+                    benchRunTime .= NaN
+                    benchMemory .= NaN
+                    benchAllocs .= NaN
+                end
 
-                    data = DataFrame(model = modelFile, solver = alg_hint[1], relTol = relTol, absTol = absTol, 
-                                    success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs, 
-                                    sqDiff = sqDiff, iteration = 1:iterations)
-                    if isfile(writefile)
-                        CSV.write(writefile, data, append = true)
-                    else
-                        CSV.write(writefile, data)
-                    end
+                data = DataFrame(model = modelFile, solver = alg_hint[1], reltol = tol, abstol = tol, 
+                                 success = success, runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs, 
+                                 sqDiff = sqDiff, iteration = 1:iterations)
+                if isfile(writefile)
+                    CSV.write(writefile, data, append = true)
+                else
+                    CSV.write(writefile, data)
                 end
             end
         end
@@ -190,29 +186,60 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols
     
 end
 
-function modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, relTols, absTols, iterations, readPath, writefile)
+
+function modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, Tols, iterations, readPath, writefile)
     for modelFile in modelFiles
         timeEnd = timeEnds[timeEnds[:,1] .== modelFile, 2][1]
-        modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, relTols, absTols, iterations, readPath, writefile)
+        modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, readPath, writefile)
     end
 end
 
 
-function main()
+function getBigFloatProb(modelFile)
+    
+    writePath = pwd() * "/Pipeline_ModelSolver/IntermediaryResults"
+    readPath = pwd() * "/Pipeline_SBMLImporter/JuliaModels"
+    fixDirectories(writePath)
+    timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
+    timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
+    timeEnd = timeEnds[timeEnds[:,1] .== modelFile, 2][1]
+
+    modelPath = readPath * "/" * modelFile
+    include(modelPath)
+    new_sys = ode_order_lowering(sys)
+    u0 = initialSpeciesValues
+    p = trueParameterValues
+    c = trueConstantsValues
+    tspan = (0.0, timeEnd)
+
+    # Estimate ground truth
+    bfProb = BigFloatODEProblem(new_sys, u0, tspan, [p;c])
+
+    return bfProb
+end
+
+
+function main(;modelFiles=["all"], modelsExclude=[""])
     readPath = pwd() * "/Pipeline_SBMLImporter/JuliaModels"
     writePath = pwd() * "/Pipeline_ModelSolver/IntermediaryResults"
     fixDirectories(writePath)
     writefile = writePath * "/benchmark_" * string(getNumberOfFiles(writePath) + 1) * ".csv"
 
-    modelFiles = getModelFiles(readPath)
+    if modelFiles[1] == "all"
+        modelFiles = getModelFiles(readPath)
+    end
+    for modelExclude in modelsExclude
+        modelFiles = modelFiles[.!(occursin.(modelFiles, modelExclude))]
+    end
+    
     timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
     solvers = getSolvers()
     hiAccSolvers = getHiAccSolver()
-    relTols, absTols = getTolerances()
+    tolList = getTolerances()
     iterations = 15
     
-    modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, relTols, absTols, iterations, readPath, writefile)
-
+    modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, tolList, iterations, readPath, writefile)
 end
 
-main()
+
+modelFiles = main(modelFiles=["model_Elowitz_Nature2000.jl"], modelsExclude=["model_Chen_MSB2009.jl", "model_Rahman_MBS2016.jl", "model_SalazarCavazos_MBoC2020.jl"])
