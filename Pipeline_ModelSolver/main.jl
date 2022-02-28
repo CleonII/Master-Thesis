@@ -25,7 +25,7 @@ function getSolvers()
     algs_ODEInterface = [dopri5(), dop853(), radau(), radau5(), rodas()]
     algs = [algs_DiffEq; algs_LSODA; algs_Sundials; algs_ODEInterface]
     alg_hints = [[:auto], [:nonstiff], [:stiff]]
-    return algs, alg_hints
+    return algs[[1,9,14,17]], alg_hints
 end
 
 function getHiAccSolver()
@@ -89,7 +89,6 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
     for alg_solver in alg_solvers
         println("Alg_solver = ", alg_solver)
         if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) 
-            println(alg_solver)
             for tol in Tols
             
                 benchRunTime = Vector{Float64}(undef, iterations)
@@ -101,7 +100,12 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
                 try
                     sol = solve(prob, alg_solver, reltol = tol, abstol = tol, saveat = ts)
                     if sol.t[end] == timeEnd && sol.retcode == :Success
-                        sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
+                        if length(sol.t) != length(ts)
+                            index = findall(sol.t .!= setdiff(sol.t, ts))
+                            sqDiff = sum((sol[:,index] - hiAccSol[:,:]).^2)
+                        else
+                            sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
+                        end
                     else
                         sqDiff = NaN
                         success = false
@@ -133,11 +137,20 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
                     CSV.write(writefile, data)
                 end
             end
+        else
+            data = DataFrame(model = modelFile, solver = alg_solver, reltol = tol, abstol = tol, 
+                                 success = false, runTime = NaN, memory = NaN, allocs = NaN,
+                                 sqDiff = NaN, iteration = 1:iterations)
+            if isfile(writefile)
+                CSV.write(writefile, data, append = true)
+            else
+                CSV.write(writefile, data)
+            end
         end
     end
     for alg_hint in alg_hints
-        if ~(modelFile == "model_Crauste_CellSystems2017.jl") && ~(modelFile == "model_Chen_MSB2009.jl")
-            println(alg_hint)
+        println("Alg_hint = " * alg_hint)
+        if ~(modelFile == "model_Crauste_CellSystems2017.jl")
             for tol in Tols
                 benchRunTime = Vector{Float64}(undef, iterations)
                 benchMemory = Vector{Float64}(undef, iterations)
@@ -148,7 +161,12 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
                 try
                     sol = solve(prob, alg_hint = alg_hint, reltol = tol, abstol = tol, saveat = ts)
                     if sol.t[end] == timeEnd && sol.retcode == :Success
-                        sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
+                        if length(sol.t) != length(ts)
+                            index = findall(sol.t .!= setdiff(sol.t, ts))
+                            sqDiff = sum((sol[:,index] - hiAccSol[:,:]).^2)
+                        else
+                            sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
+                        end
                     else
                         sqDiff = NaN
                         success = false
@@ -181,6 +199,15 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
                     CSV.write(writefile, data)
                 end
             end
+        else
+            data = DataFrame(model = modelFile, solver = alg_hint[1], reltol = tol, abstol = tol, 
+                                 success = false, runTime = NaN, memory = NaN, allocs = NaN, 
+                                 sqDiff = NaN, iteration = 1:iterations)
+            if isfile(writefile)
+                CSV.write(writefile, data, append = true)
+            else
+                CSV.write(writefile, data)
+            end
         end
     end
     
@@ -200,7 +227,6 @@ function getBigFloatProb(modelFile)
     writePath = pwd() * "/Pipeline_ModelSolver/IntermediaryResults"
     readPath = pwd() * "/Pipeline_SBMLImporter/JuliaModels"
     fixDirectories(writePath)
-    timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
     timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
     timeEnd = timeEnds[timeEnds[:,1] .== modelFile, 2][1]
 
@@ -242,4 +268,4 @@ function main(;modelFiles=["all"], modelsExclude=[""])
 end
 
 
-modelFiles = main(modelFiles=["model_Elowitz_Nature2000.jl"], modelsExclude=["model_Chen_MSB2009.jl", "model_Rahman_MBS2016.jl", "model_SalazarCavazos_MBoC2020.jl"])
+modelFiles = main(modelFiles=["model_Beer_MolBioSystems2014.jl"], modelsExclude=["model_Chen_MSB2009.jl", "model_Rahman_MBS2016.jl", "model_SalazarCavazos_MBoC2020.jl"])
