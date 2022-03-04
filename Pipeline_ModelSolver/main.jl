@@ -1,59 +1,8 @@
 using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
 
 include(pwd() * "/Pipeline_ModelSolver/BigFloatODEProblem.jl")
-
-function getModelFiles(path)
-    if isdir(path)
-        modelFiles = readdir(path)
-        return modelFiles
-    else
-        println("No such directory")
-        return nothing
-    end
-end
-
-function getSolvers()
-    algs_DiffEq = [Vern6(), Vern7(), Vern8(), Tsit5(), DP5(), DP8(), Feagin14(), VCABM(),
-                   Rosenbrock23(), TRBDF2(), Rodas4(), Rodas4P(), Rodas4P2(), Rodas5(), QNDF(), FBDF(), 
-                   Trapezoid(), KenCarp4(), Kvaerno5(), RadauIIA3(), RadauIIA5(), 
-                   AutoTsit5(Rosenbrock23()), AutoVern7(Rodas5()), AutoVern9(Rodas4P()), AutoVern9(Rodas5())]
-    algs_LSODA = [lsoda()]
-    algs_Sundials = [CVODE_BDF(linear_solver=:Dense), CVODE_BDF(linear_solver=:LapackDense), CVODE_BDF(linear_solver=:GMRES), 
-                     CVODE_Adams(linear_solver=:Dense), CVODE_Adams(linear_solver=:LapackDense), 
-                     ARKODE(Sundials.Explicit(), order=4), ARKODE(Sundials.Explicit(), order=8), 
-                     ARKODE(Sundials.Implicit(), order = 3), ARKODE(Sundials.Implicit(), order = 5)]
-    algs_ODEInterface = [dopri5(), dop853(), radau(), radau5(), rodas()]
-    algs = [algs_DiffEq; algs_LSODA; algs_Sundials; algs_ODEInterface]
-    alg_hints = [[:auto], [:nonstiff], [:stiff]]
-    return algs[[1,9,14,17]], alg_hints
-end
-
-function getHiAccSolver()
-    algs = [AutoVern9(Rodas5()), Rodas4P()]
-    return algs
-end
-
-function getTolerances()
-    tolList = [1e-6, 1e-9, 1e-12, 1e-15] # 1e-6 is standard
-    return [tolList[1]]
-end
-
-function fixDirectories(path)
-    if ~isdir(path)
-        println("Create directory: " * path)
-        mkdir(path)
-    end
-end
-
-function getNumberOfFiles(path)
-    if isdir(path)
-        files = readdir(path)
-        return length(files)
-    else
-        mkdir(path)
-        return 0
-    end
-end
+include(pwd() * "/Additional_functions/additional_tools.jl")
+include(pwd() * "/Additional_functions/Solver_info.jl")
 
 function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, readPath, writefile)
     nonStiffHiAccSolver, stiffHiAccSolver = hiAccSolvers
@@ -149,7 +98,7 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
         end
     end
     for alg_hint in alg_hints
-        println("Alg_hint = " * alg_hint)
+        println("Alg_hint = ", alg_hint[1])
         if ~(modelFile == "model_Crauste_CellSystems2017.jl")
             for tol in Tols
                 benchRunTime = Vector{Float64}(undef, iterations)
@@ -221,7 +170,7 @@ function modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, Tols, 
     end
 end
 
-
+#=
 function getBigFloatProb(modelFile)
     
     writePath = pwd() * "/Pipeline_ModelSolver/IntermediaryResults"
@@ -243,7 +192,7 @@ function getBigFloatProb(modelFile)
 
     return bfProb
 end
-
+=#
 
 function main(;modelFiles=["all"], modelsExclude=[""])
     readPath = pwd() * "/Pipeline_SBMLImporter/JuliaModels"
@@ -261,11 +210,11 @@ function main(;modelFiles=["all"], modelsExclude=[""])
     timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
     solvers = getSolvers()
     hiAccSolvers = getHiAccSolver()
-    tolList = getTolerances()
+    tolList = getTolerances(onlyMaxTol = true)
     iterations = 15
     
     modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, tolList, iterations, readPath, writefile)
 end
 
 
-modelFiles = main(modelFiles=["model_Beer_MolBioSystems2014.jl"], modelsExclude=["model_Chen_MSB2009.jl", "model_Rahman_MBS2016.jl", "model_SalazarCavazos_MBoC2020.jl"])
+modelFiles = main(modelFiles=["model_Alkan_SciSignal2018.jl"], modelsExclude=["model_Chen_MSB2009.jl", "model_Rahman_MBS2016.jl", "model_SalazarCavazos_MBoC2020.jl"])
