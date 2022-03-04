@@ -1,7 +1,6 @@
 
 SBML/*
 RewrittenModels/*
-Pipeline_SBMLImporter/JuliaModels/*
 Pipeline_ModelSolver/IntermediaryResults/benchmark*.csv
 testModellingToolkit.jl
 write_modellingToolkit_to_file.jl
