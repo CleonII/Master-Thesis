@@ -14,8 +14,7 @@ struct StaticParameters
 end
 
 struct ConstantValues
-    isObserved::Vector{Bool}
-    iterations::Int64
+    observedObservable::Vector{Int64}
     measurementFor::Vector{Vector{Float64}}
     minVariance::Float64
     observablesTimeIndexIndices::Array{Vector{Int64}, 2}
@@ -97,8 +96,8 @@ function f_proto(prob, staticParameters, constantValues, mutatingArrays, p_tuple
         costFor[i] = (num_t[i]/2) * log(2*pi*variance[i]) + (dot(measurementFor[i], measurementFor[i]) - 2*dot(measurementFor[i], h_hat[i]) + dot(h_hat[i], h_hat[i])) / (2 * variance[i])
     end
 
-    println(sum(costFor[constantValues.isObserved]))
-    return sum(costFor[constantValues.isObserved])
+    println(sum(costFor[constantValues.observedObservable]))
+    return sum(costFor[constantValues.observedObservable])
 end
 
 # the total cost, G, is the integral/sum of the costs at each time step, g
@@ -171,7 +170,7 @@ function f_prime_proto(grad, prob, constantValues, mutatingArrays, dg!, p_tuple.
 end
 
 
-function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, observables, iterations)
+function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, observables)
     minVariance = 1e-2
 
     observableIDs = relevantMeasurementData[:,1]
@@ -180,6 +179,7 @@ function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, obser
     numObservables = length(observables)
 
     isObserved = [observables[i] in unique(observableIDs) for i=1:numObservables]
+    observedObservable = collect(1:numObservables)[isObserved]
 
     observedAt = Vector{Vector{Float64}}(undef, numObservables)
     for (i, obsId) = enumerate(observables)
@@ -207,6 +207,7 @@ function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, obser
     numParameters = length(pars)
     orderedParameters = varmap_to_vars(pars, parameters(new_sys))
     orderedParameters .+= rand()
+    test_orderedParameters = [0.9035043754031366, 10.800326532739959, 0.8344511564921195, 0.9413681449465665, 0.8491275291854607, 1.1567776661662026, 0.8003265327399586, 0.8905447897457612, 0.8057041743522487, 0.8003365327399586, 0.800336533086573, 0.8016809782200571, 4.201342833436018, 1000.800326532659, 1.1567777122376215, 1.8003265327398825, 1.8003265327398794, 0.8003365327399585, 0.9003265327399586, 0.9238281021846115, 0.8003265327399586, 50.67037354402176, 175.23506363076496, 1000.800000864946, 1000.8003265326599, 0.830826159563432, 0.8003365327399585, 0.8515656668919402, 0.9729940750555356, 0.8003365327399585, 0.8003365327399586, 1.8003265327399585, 0.8071935357203198, 1.3003265327399585, 1.2003265327399586, 1.1245241609043495, 215.56060811614194, 0.8003365327399585, 0.9877186257774035, 0.9096809374131896, 4.2119694568059485, 0.8003365327399585, 1000.80032653274, 0.8003365327399585, 7.693408510878489, 10.80032653273916, 0.8795099522271821, 100.80032653273996, 10.800326521591268, 9.23282578370948, 7.388395759824789, 10.800324181981878]
 
     numVariables = length(u0)
     numTimePointsFor = Vector{Float64}(undef, numObservables)
@@ -219,7 +220,7 @@ function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, obser
         end
     end
 
-    constantValues = ConstantValues(isObserved, iterations, measurementFor, minVariance, observablesTimeIndexIndices, observedAtIndex, 
+    constantValues = ConstantValues(observedObservable, measurementFor, minVariance, observablesTimeIndexIndices, observedAtIndex, 
                                     ts, numObservables, numParameters, numUsedParameters, numTimePointsFor, numTimeSteps, numVariables)
 
     scale = Array{Float64, 1}(undef, numObservables)
@@ -235,29 +236,22 @@ function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, obser
     p_vector = Vector{Float64}(undef, numUsedParameters)
     mutatingArrays = MutatingArrays(h_bar, h_hat, costFor, p_vector)
 
-    #_pars = [Pair(pars[i].first, pars[i].second+abs(rand())) for i in 1:numParameters]
-
-    #p_tuple = Tuple(orderedParameters)
 
     f = (p_tuple...) -> f_proto(prob, staticParameters, constantValues, mutatingArrays, p_tuple...)    
-    #totcost = costFunc(p_tuple...)
-    #println(totcost)
+
 
     dg! = (out, u, p, t, i) -> dg_proto!(out, u, p, t, i, staticParameters, constantValues, mutatingArrays)
 
-    #grad = Vector{Float64}(undef, numUsedParameters)
 
     f_prime = (grad, p_tuple...) -> f_prime_proto(grad, prob, constantValues, mutatingArrays, dg!, p_tuple...)
-    #f_prime(grad, p_tuple...)
 
-    #println(grad)
 
 
     model = Model(NLopt.Optimizer)
     #JuMP.register(model::Model, s::Symbol, dimension::Integer, f::Function, ∇f::Function, ∇²f::Function)
     register(model, :f, numUsedParameters, f, f_prime)
     set_optimizer_attribute(model, "algorithm", :LD_MMA)
-    @variable(model, p[1:numUsedParameters] >= 0)
+    @variable(model, p[1:numUsedParameters] >= 0) # fix lower and upper bounds
     for i in 1:numUsedParameters
         set_start_value(p[i], orderedParameters[i])
     end
@@ -299,10 +293,9 @@ function main()
     relevantMeasurementData = measurementData[measurementData[:,3] .== experimentalConditions[1,1], :]
     observables = CSV.read(readDataPath * "/observables_Alkan_SciSignal2018.tsv", DataFrame)[:,1]
 
-    iterations = 5
 
     println("Starting optimisation")
-    GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, observables, iterations)
+    GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, observables)
 
 end
 
