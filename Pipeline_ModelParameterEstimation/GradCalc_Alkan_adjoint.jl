@@ -4,6 +4,11 @@ using ModelingToolkit: varmap_to_vars
 
 println("Done loading modules")
 
+# TODO:
+# Fix so that only some parameters are used in the optimization
+# Fix so that results from diffrerent experimental conditions can be combined to the gradient 
+# Implement lower and upper bounds
+
 include(pwd() * "/Additional_functions/additional_tools.jl")
 include(pwd() * "/Additional_functions/Solver_info.jl")
 
@@ -19,10 +24,10 @@ struct ConstantValues
     minVariance::Float64
     observablesTimeIndexIndices::Array{Vector{Int64}, 2}
     observedAtIndex::Vector{Vector{Int64}}
+    optParameterIndices::Vector{Int64}
     ts::Vector{Float64}
     #
     numObservables::Int64
-    numParameters::Int64
     numUsedParameters::Int64
     numTimePointsFor::Vector{Float64}
     numTimeSteps::Int64
@@ -34,6 +39,7 @@ struct MutatingArrays
     h_hat::Vector{Vector{Float64}}
     costFor::Vector{Float64}
     p_vector::Vector{Float64}
+    tmp_grad::Vector{Float64}
 end
 
 struct FilesAndPaths
@@ -46,9 +52,10 @@ end
 
 function f_proto(prob, staticParameters, constantValues, mutatingArrays, p_tuple...)
     println("in f()")
+    
 
     p_vector = mutatingArrays.p_vector
-    p_vector .= p_tuple
+    p_vector[constantValues.optParameterIndices] .= p_tuple
     _prob = remake(prob, p = p_vector) 
     
     sol = OrdinaryDiffEq.solve(_prob, AutoVern7(Rodas5()), reltol=1e-8, abstol=1e-8, saveat = constantValues.ts)
@@ -158,19 +165,21 @@ end
 function f_prime_proto(grad, prob, constantValues, mutatingArrays, dg!, p_tuple...)
     println("In f_prime()")
     p_vector = mutatingArrays.p_vector
-    p_vector .= p_tuple
+    p_vector[constantValues.optParameterIndices] .= p_tuple
+    #p_vector .= p_tuple
     _prob = remake(prob, p = p_vector) 
 
     sol = OrdinaryDiffEq.solve(_prob, AutoVern7(Rodas5()), reltol=1e-8, abstol=1e-8, saveat = constantValues.ts, 
             sensealg=InterpolatingAdjoint(checkpointing=true))
 
-    ~, grad[:] = adjoint_sensitivities(sol, Trapezoid(), dg!, constantValues.ts, sensalg = BacksolveAdjoint(autojacvec = ReverseDiffVJP(true)))
+    ~, mutatingArrays.tmp_grad[:] = adjoint_sensitivities(sol, Trapezoid(), dg!, constantValues.ts, sensalg = BacksolveAdjoint(autojacvec = ReverseDiffVJP(true)))
 
+    grad[:] = mutatingArrays.tmp_grad[constantValues.optParameterIndices]
     nothing
 end
 
 
-function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, observables)
+function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, observables, inputParameterValues)
     minVariance = 1e-2
 
     observableIDs = relevantMeasurementData[:,1]
@@ -203,11 +212,21 @@ function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, obser
     
     tspan = (0.0, timeEnd)
     prob = ODEProblem(new_sys,u0,tspan,pars,jac=true)
+
     numUsedParameters = length(prob.p)
-    numParameters = length(pars)
-    orderedParameters = varmap_to_vars(pars, parameters(new_sys))
-    orderedParameters .+= rand()
-    test_orderedParameters = [0.9035043754031366, 10.800326532739959, 0.8344511564921195, 0.9413681449465665, 0.8491275291854607, 1.1567776661662026, 0.8003265327399586, 0.8905447897457612, 0.8057041743522487, 0.8003365327399586, 0.800336533086573, 0.8016809782200571, 4.201342833436018, 1000.800326532659, 1.1567777122376215, 1.8003265327398825, 1.8003265327398794, 0.8003365327399585, 0.9003265327399586, 0.9238281021846115, 0.8003265327399586, 50.67037354402176, 175.23506363076496, 1000.800000864946, 1000.8003265326599, 0.830826159563432, 0.8003365327399585, 0.8515656668919402, 0.9729940750555356, 0.8003365327399585, 0.8003365327399586, 1.8003265327399585, 0.8071935357203198, 1.3003265327399585, 1.2003265327399586, 1.1245241609043495, 215.56060811614194, 0.8003365327399585, 0.9877186257774035, 0.9096809374131896, 4.2119694568059485, 0.8003365327399585, 1000.80032653274, 0.8003365327399585, 7.693408510878489, 10.80032653273916, 0.8795099522271821, 100.80032653273996, 10.800326521591268, 9.23282578370948, 7.388395759824789, 10.800324181981878]
+    problemParameterSymbols = parameters(new_sys)
+    inputParameterSymbols = [:Dox_level, :Gem_level, :SN38_level]
+    inputParameterIndices = collect(1:numUsedParameters)[[pPS.name ∈ inputParameterSymbols for pPS in problemParameterSymbols]]
+    numInputParameters = length(inputParameterIndices)
+    optParameterIndices = collect(1:numUsedParameters)[[pPS.name ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
+    numOptParameters = length(optParameterIndices)
+
+    orderedParameters = varmap_to_vars(pars, parameters(new_sys))[optParameterIndices]
+    #orderedParameters = varmap_to_vars(pars, parameters(new_sys))
+    orderedParameters .+= (rand() - 0.5)*2
+    test_orderedParameters = [0.5963242072135031, 10.493146364550325, 0.5272709883024861, 0.6341879767569332, 0.5419473609958273, 0.8495974979765691, 0.4931463645503251, 0.5833646215561278, 0.4985240061626153, 0.49315636455032524, 0.49315636489693954, 0.49450081003042373, 3.8941626652463848, 1000.4931463644693, 0.8495975440479882, 1.493146364550249, 1.493146364550246, 0.49315636455032513, 0.5931463645503251, 0.6166479339949781, 0.4931463645503251, 50.363193375832125, 174.92788346257532, 1000.4928206967563, 1000.4931463644702, 0.5236459913737985, 0.49315636455032513, 0.5443854987023068, 0.6658139068659021, 0.49315636455032513, 0.4931563645503252, 1.4931463645503251, 0.5000133675306864, 0.9931463645503251, 0.8931463645503251, 0.8173439927147161, 215.2534279479523, 0.49315636455032513, 0.6805384575877701, 0.6025007692235561, 3.904789288616315, 0.49315636455032513, 1000.4931463645503, 0.49315636455032513, 7.386228342688855, 10.493146364549526, 0.5723297840375486, 100.49314636455033, 10.493146353401634, 8.925645615519846, 7.081215591635155, 10.493144013792245]
+    #orderedParameters[inputParameterIndices] .= 0.0
+    orderedParameters = test_orderedParameters[optParameterIndices]
 
     numVariables = length(u0)
     numTimePointsFor = Vector{Float64}(undef, numObservables)
@@ -220,8 +239,8 @@ function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, obser
         end
     end
 
-    constantValues = ConstantValues(observedObservable, measurementFor, minVariance, observablesTimeIndexIndices, observedAtIndex, 
-                                    ts, numObservables, numParameters, numUsedParameters, numTimePointsFor, numTimeSteps, numVariables)
+    constantValues = ConstantValues(observedObservable, measurementFor, minVariance, observablesTimeIndexIndices, observedAtIndex, optParameterIndices, 
+                                    ts, numObservables, numUsedParameters, numTimePointsFor, numTimeSteps, numVariables)
 
     scale = Array{Float64, 1}(undef, numObservables)
     scale[[1,2]] .= 1.0
@@ -234,7 +253,9 @@ function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, obser
     h_hat = Array{Array{Float64, 1}, 1}(undef, numObservables)
     costFor = Array{Float64, 1}(undef, numObservables)
     p_vector = Vector{Float64}(undef, numUsedParameters)
-    mutatingArrays = MutatingArrays(h_bar, h_hat, costFor, p_vector)
+    p_vector[inputParameterIndices] = inputParameterValues
+    tmp_grad = Vector{Float64}(undef, numUsedParameters)
+    mutatingArrays = MutatingArrays(h_bar, h_hat, costFor, p_vector, tmp_grad)
 
 
     f = (p_tuple...) -> f_proto(prob, staticParameters, constantValues, mutatingArrays, p_tuple...)    
@@ -245,21 +266,28 @@ function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, obser
 
     f_prime = (grad, p_tuple...) -> f_prime_proto(grad, prob, constantValues, mutatingArrays, dg!, p_tuple...)
 
+    cost = f(orderedParameters...)
+    println(cost)
+    #29.216144533943794
+    grad2 = Vector{Float64}(undef, numOptParameters)
+    f_prime(grad2, orderedParameters...)
+    println(grad2)
+    #[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.1403879661249957e-16, 0.0, 10.272928517343939, 12.215692634666242, 0.0, 0.0, 0.0, -1.7268148909989662, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.2938948990360588e-5, 0.0, 0.0, 0.0, 0.0]
 
-
+    #=
     model = Model(NLopt.Optimizer)
     #JuMP.register(model::Model, s::Symbol, dimension::Integer, f::Function, ∇f::Function, ∇²f::Function)
-    register(model, :f, numUsedParameters, f, f_prime)
+    register(model, :f, numOptParameters, f, f_prime)
     set_optimizer_attribute(model, "algorithm", :LD_MMA)
-    @variable(model, p[1:numUsedParameters] >= 0) # fix lower and upper bounds
-    for i in 1:numUsedParameters
+    @variable(model, p[1:numOptParameters] >= 0) # fix lower and upper bounds
+    for i in 1:numOptParameters
         set_start_value(p[i], orderedParameters[i])
     end
     @NLobjective(model, Min, f(p...))
     JuMP.optimize!(model)
     #@show termination_status(model)
     #@show primal_status(model)
-    p_opt = [value(p[i]) for i=1:numUsedParameters]
+    p_opt = [value(p[i]) for i=1:numOptParameters]
     println("Done!")
     println(p_opt)
     cost_opt = objective_value(model)
@@ -267,7 +295,7 @@ function GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, obser
     
     #return p_opt, cost_opt
     
-    
+    =#
     nothing
 end
 
@@ -293,9 +321,10 @@ function main()
     relevantMeasurementData = measurementData[measurementData[:,3] .== experimentalConditions[1,1], :]
     observables = CSV.read(readDataPath * "/observables_Alkan_SciSignal2018.tsv", DataFrame)[:,1]
 
+    inputParameterValues = [0.0, 0.0, 0.0]
 
     println("Starting optimisation")
-    GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, observables)
+    GradCalc_adjoint(filesAndPaths, timeEnd, relevantMeasurementData, observables, inputParameterValues)
 
 end
 

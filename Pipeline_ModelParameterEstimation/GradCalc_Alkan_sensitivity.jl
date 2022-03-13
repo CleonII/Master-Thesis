@@ -8,7 +8,7 @@ include(pwd() * "/Additional_functions/additional_tools.jl")
 include(pwd() * "/Additional_functions/Solver_info.jl")
 
 
-struct StaticParameters
+mutable struct StaticParameters
     scale::Vector{Float64}
     shift::Vector{Float64}
     variance::Vector{Float64}
@@ -18,13 +18,12 @@ struct ConstantValues
     observedObservable::Vector{Int64}
     measurementFor::Vector{Vector{Float64}}
     minVariance::Float64
-    observablesTimeIndexIndices::Array{Vector{Int64}, 2}
     observedAtIndex::Vector{Vector{Int64}}
+    optParameterIndices::Vector{Int64}
     ts::Vector{Float64}
     variablesObservedBy::Vector{Vector{Int64}}
     #
     numObservables::Int64
-    numParameters::Int64
     numUsedParameters::Int64
     numTimePointsFor::Vector{Int64}
     numTimeSteps::Int64
@@ -53,10 +52,9 @@ end
 
 function f_proto(prob, staticParameters, constantValues, mutatingArrays, p_tuple...)
     println("in f()")
-    println(p_tuple)
 
     p_vector = mutatingArrays.p_vector
-    p_vector .= p_tuple
+    p_vector[constantValues.optParameterIndices] .= p_tuple
     _prob = remake(prob, p = p_vector) 
     
     sol = OrdinaryDiffEq.solve(_prob, AutoVern7(Rodas5()), reltol=1e-8, abstol=1e-8, saveat = constantValues.ts)
@@ -111,7 +109,7 @@ function f_prime_proto(grad, senProb, staticParameters, constantValues, mutating
     println("In f_prime()")
 
     p_vector = mutatingArrays.p_vector
-    p_vector .= p_tuple
+    p_vector[constantValues.optParameterIndices] .= p_tuple
 
     _senProb = remake(senProb, p = p_vector) 
 
@@ -142,7 +140,7 @@ function f_prime_proto(grad, senProb, staticParameters, constantValues, mutating
     h_hat = mutatingArrays.h_hat
     measurementFor = constantValues.measurementFor
     dfdu[:] = reduce(vcat, (scale ./ variance) .* (h_hat .- measurementFor))
-    grad[:] = dhdp * dfdu
+    grad[:] = (dhdp * dfdu)[constantValues.optParameterIndices]
     println(grad)   
 
     nothing
@@ -150,7 +148,7 @@ end
 
 
 
-function GradCalc_sensitivity_eq(filesAndPaths, timeEnd, relevantMeasurementData, observables)
+function GradCalc_sensitivity_eq(filesAndPaths, timeEnd, relevantMeasurementData, observables, inputParameterValues)
     minVariance = 1e-2
 
     observableIDs = relevantMeasurementData[:,1]
@@ -183,13 +181,21 @@ function GradCalc_sensitivity_eq(filesAndPaths, timeEnd, relevantMeasurementData
     pars = [p;c]
     tspan = (0.0, timeEnd)
     prob = ODEProblem(new_sys,u0,tspan,pars,jac=true)
-    numUsedParameters = length(prob.p)
-    numParameters = length(pars)
-    orderedParameters = varmap_to_vars(pars, parameters(new_sys))
-    orderedParameters .+= rand()
-    test_orderedParameters = [0.9035043754031366, 10.800326532739959, 0.8344511564921195, 0.9413681449465665, 0.8491275291854607, 1.1567776661662026, 0.8003265327399586, 0.8905447897457612, 0.8057041743522487, 0.8003365327399586, 0.800336533086573, 0.8016809782200571, 4.201342833436018, 1000.800326532659, 1.1567777122376215, 1.8003265327398825, 1.8003265327398794, 0.8003365327399585, 0.9003265327399586, 0.9238281021846115, 0.8003265327399586, 50.67037354402176, 175.23506363076496, 1000.800000864946, 1000.8003265326599, 0.830826159563432, 0.8003365327399585, 0.8515656668919402, 0.9729940750555356, 0.8003365327399585, 0.8003365327399586, 1.8003265327399585, 0.8071935357203198, 1.3003265327399585, 1.2003265327399586, 1.1245241609043495, 215.56060811614194, 0.8003365327399585, 0.9877186257774035, 0.9096809374131896, 4.2119694568059485, 0.8003365327399585, 1000.80032653274, 0.8003365327399585, 7.693408510878489, 10.80032653273916, 0.8795099522271821, 100.80032653273996, 10.800326521591268, 9.23282578370948, 7.388395759824789, 10.800324181981878]
-    #[1.8666279863282882, 10.800325983245347, 1.4849914433851856, 0.0, 0.07882578708199628, 2.2765182792654164, 0.0, 0.03537292965290244, 0.8057041743522487, 0.8003365327399586, 0.800336533086573, 0.8016809782200571, 4.208261180909193, 1000.8002040862448, 1.5241810171634373, 2.2661656037562476, 1.9231351564113515, 0.7941765327140669, 0.8963112375082627, 2.084685334577463, 0.7866795993355498, 50.67030144394519, 175.23499891290757, 1000.8017826414157, 1000.7963109698443, 0.8326079360332286, 0.8003381610913134, 1.1741817873312708, 0.575669389212187, 0.7734650612695332, 0.6871828727236781, 1.800326532739958, 0.9975373454097706, 1.2963401508219894, 1.3046421389407894, 0.9186651322476836, 215.56151063598094, 0.7603790855837445, 0.851366860474014, 1.8696322766123301, 4.218789878042009, 0.4546347191828532, 1000.7998405537494, 0.0, 7.519032585820315, 11.196735858380208, 0.17357304856409217, 100.803954578622, 10.779598392784923, 8.908264050383941, 7.489795067966958, 10.79468160240232]
 
+    numUsedParameters = length(prob.p)
+    problemParameterSymbols = parameters(new_sys)
+    inputParameterSymbols = [:Dox_level, :Gem_level, :SN38_level]
+    inputParameterIndices = collect(1:numUsedParameters)[[pPS.name ∈ inputParameterSymbols for pPS in problemParameterSymbols]]
+    numInputParameters = length(inputParameterIndices)
+    optParameterIndices = collect(1:numUsedParameters)[[pPS.name ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
+    numOptParameters = length(optParameterIndices)
+
+    orderedParameters = varmap_to_vars(pars, parameters(new_sys))[optParameterIndices]
+    #orderedParameters = varmap_to_vars(pars, parameters(new_sys))
+    orderedParameters .+= (rand() - 0.5)*2
+    test_orderedParameters = [0.5963242072135031, 10.493146364550325, 0.5272709883024861, 0.6341879767569332, 0.5419473609958273, 0.8495974979765691, 0.4931463645503251, 0.5833646215561278, 0.4985240061626153, 0.49315636455032524, 0.49315636489693954, 0.49450081003042373, 3.8941626652463848, 1000.4931463644693, 0.8495975440479882, 1.493146364550249, 1.493146364550246, 0.49315636455032513, 0.5931463645503251, 0.6166479339949781, 0.4931463645503251, 50.363193375832125, 174.92788346257532, 1000.4928206967563, 1000.4931463644702, 0.5236459913737985, 0.49315636455032513, 0.5443854987023068, 0.6658139068659021, 0.49315636455032513, 0.4931563645503252, 1.4931463645503251, 0.5000133675306864, 0.9931463645503251, 0.8931463645503251, 0.8173439927147161, 215.2534279479523, 0.49315636455032513, 0.6805384575877701, 0.6025007692235561, 3.904789288616315, 0.49315636455032513, 1000.4931463645503, 0.49315636455032513, 7.386228342688855, 10.493146364549526, 0.5723297840375486, 100.49314636455033, 10.493146353401634, 8.925645615519846, 7.081215591635155, 10.493144013792245]
+    #orderedParameters[inputParameterIndices] .= 0.0
+    orderedParameters = test_orderedParameters[optParameterIndices]
 
     senProb = ODELocalSensitivityProblem(new_sys, prob.u0, tspan, orderedParameters)
 
@@ -197,18 +203,11 @@ function GradCalc_sensitivity_eq(filesAndPaths, timeEnd, relevantMeasurementData
     numTimePointsFor = Vector{Int64}(undef, numObservables)
     numTimePointsFor .= length.(observedAt)
 
-    observablesTimeIndexIndices = Array{Array{Int64, 1}, 2}(undef, numObservables, numTimeSteps)
-    for i = 1:numObservables
-        for j = 1:numTimeSteps
-            observablesTimeIndexIndices[i,j] = findall(x->x==j, observedAtIndex[i])
-        end
-    end
-
     variablesObservedBy = [[13, 18], [2, 8, 11, 12, 13, 18, 19, 20, 25, 29, 30, 36], [0], [0], [6, 10], [31, 33], [21, 28], [32, 34], [9, 35], [7, 24], [9, 35], [4, 14]]
     numVariablesObservedBy = [2, 12, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2]
     
-    constantValues = ConstantValues(observedObservable, measurementFor, minVariance, observablesTimeIndexIndices, observedAtIndex, 
-                                    ts, variablesObservedBy, numObservables, numParameters, numUsedParameters, numTimePointsFor, numTimeSteps, numVariables, numVariablesObservedBy)
+    constantValues = ConstantValues(observedObservable, measurementFor, minVariance, observedAtIndex, optParameterIndices,
+                                    ts, variablesObservedBy, numObservables, numUsedParameters, numTimePointsFor, numTimeSteps, numVariables, numVariablesObservedBy)
 
     scale = Array{Float64, 1}(undef, numObservables)
     scale[[1,2]] .= 1.0
@@ -230,6 +229,7 @@ function GradCalc_sensitivity_eq(filesAndPaths, timeEnd, relevantMeasurementData
     h_hat[4] = Float64[]
     costFor = Array{Float64, 1}(undef, numObservables)
     p_vector = Vector{Float64}(undef, numUsedParameters)
+    p_vector[inputParameterIndices] = inputParameterValues
     u = Array{Float64, 2}(undef, numVariables, numTimeSteps)
     mutatingArrays = MutatingArrays(dfdu, dhdp, dp, h_bar, h_hat, costFor, p_vector, u)
 
@@ -239,33 +239,34 @@ function GradCalc_sensitivity_eq(filesAndPaths, timeEnd, relevantMeasurementData
 
 
     # test first cost and grad at test_orderedParameters
-    # cost: 47.333303744050696
-    # grad: [-5.3182143165552676, 5.515530130306332e-7, -5.82086852469523, 3.7521742178916146, 0.44418628571104485, -1.762966208682973, 2.7063868066930308, -0.08352076007252987, 4.336808689942018e-19, 2.168404344971009e-19, -1.3010426069826053e-18, 3.0567087759227537e-19, -5.8784745398482716e-5, 2.2111025691617808e-5, -0.10343374323538441, 0.10080976815337757, 0.012841677960984607, 0.0011469332691993667, 0.004470247451825353, 0.6855534324271183, 0.01545960769334584, 7.942870966394309e-5, 7.060649830222212e-5, 5.159319581707668e-5, -0.00023485864224371874, 5.1593195817076664e-5, -2.3789424486946293e-6, 0.2000771484241956, 0.1306018374948179, 0.04250949832814352, 0.08605708929116086, -6.092607821075757e-19, 0.008445227773165528, -0.00032214328237251897, -0.010848558916109821, -0.00810496166007523, 3.23963827930824e-5, -0.00023211705648472909, 0.2408354729850729, -0.004237850096504894, -5.8438497677064455e-5, 0.34360585205990357, -4.969438210718985e-5, 1.0095047751672284, 0.0008281019919793915, -0.00030820500687614595, -0.06336619008821796, -0.00238476288533326, -3.0566021566127903e-5, -0.017195498749074372, -0.00253013601676205, -0.0015803689278361642]
-    #=
-    cost = f(test_orderedParameters...)
+    cost = f(orderedParameters...)
     println(cost)
-    grad = zeros(Float64, length(test_orderedParameters))
-    f_prime(grad, test_orderedParameters...)
+    # 29.216144533943794
+    grad = zeros(Float64, numOptParameters)
+    f_prime(grad, orderedParameters...)
     println(grad)
-    =#
+    # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.9510894754496647e-16, 0.0, 10.276324511313856, 12.216211010949758, 0.0, 0.0, 0.0, -1.7268644853198856, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.2758121304483095e-5, 0.0, 0.0, 0.0, 0.0]
     
+    
+    #=
     model = Model(NLopt.Optimizer)
     #JuMP.register(model::Model, s::Symbol, dimension::Integer, f::Function, ∇f::Function, ∇²f::Function)
-    register(model, :f, numUsedParameters, f, f_prime)
+    register(model, :f, numOptParameters, f, f_prime)
     set_optimizer_attribute(model, "algorithm", :LD_MMA)
-    @variable(model, p[1:numUsedParameters] >= 0) # fix lower and upper bounds
-    for i in 1:numUsedParameters
-        set_start_value(p[i], test_orderedParameters[i])
+    @variable(model, p[1:numOptParameters] >= 0) # fix lower and upper bounds
+    for i in 1:numOptParameters
+        set_start_value(p[i], orderedParameters[i])
     end
     @NLobjective(model, Min, f(p...))
     JuMP.optimize!(model)
     #@show termination_status(model)
     #@show primal_status(model)
-    p_opt = [value(p[i]) for i=1:numUsedParameters]
     println("Done!")
+    p_opt = [value(p[i]) for i=1:numOptParameters]
     println(p_opt)
     cost_opt = objective_value(model)
     println(cost_opt)
+    =#
     
 end
 
@@ -292,8 +293,10 @@ function main()
     relevantMeasurementData = measurementData[measurementData[:,3] .== experimentalConditions[1,1], :]
     observables = CSV.read(readDataPath * "/observables_Alkan_SciSignal2018.tsv", DataFrame)[:,1]
 
+    inputParameterValues = [0.0, 0.0, 0.0]
+
     println("Starting optimisation")
-    GradCalc_sensitivity_eq(filesAndPaths, timeEnd, relevantMeasurementData, observables)
+    GradCalc_sensitivity_eq(filesAndPaths, timeEnd, relevantMeasurementData, observables, inputParameterValues)
 
 end
 

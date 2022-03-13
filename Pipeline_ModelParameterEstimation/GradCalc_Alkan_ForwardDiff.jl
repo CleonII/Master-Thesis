@@ -1,6 +1,8 @@
 using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
 using JuMP, NLopt, LinearAlgebra, DiffEqSensitivity, DiffEqFlux, ForwardDiff
 using ModelingToolkit: varmap_to_vars
+using ForwardDiff: GradientConfig, Chunk
+using ProfileView
 
 println("Done loading modules")
 
@@ -8,25 +10,23 @@ include(pwd() * "/Additional_functions/additional_tools.jl")
 include(pwd() * "/Additional_functions/Solver_info.jl")
 
 struct StaticParameters
-    scale::Vector{ForwardDiff.Dual}
+    scale::Vector{Float64} 
     shift::Vector{Float64}
-    variance::Vector{ForwardDiff.Dual}
+    variance::Vector{Float64}
 end
 
 struct ConstantValues
     observedObservable::Vector{Int64}
     measurementFor::Vector{Vector{Float64}}
     minVariance::Float64
-    observablesTimeIndexIndices::Array{Vector{Int64}, 2}
     observedAtIndex::Vector{Vector{Int64}}
+    optParameterIndices::Vector{Int64}
     ts::Vector{Float64}
     #
     numObservables::Int64
-    numParameters::Int64
     numUsedParameters::Int64
     numTimePointsFor::Vector{Int64}
     numTimeSteps::Int64
-    numVariables::Int64
 end
 
 struct MutatingArrays
@@ -34,6 +34,8 @@ struct MutatingArrays
     h_hat::Vector{Vector{ForwardDiff.Dual}}
     costFor::Vector{ForwardDiff.Dual}
     p_vector::Vector{Float64}
+    dualP_vector::Vector{ForwardDiff.Dual}
+    grad::Vector{Float64}
 end
 
 struct FilesAndPaths
@@ -43,19 +45,15 @@ struct FilesAndPaths
     writefile_sensealg::String
 end
 
-function f_proto(prob, staticParameters, constantValues, mutatingArrays, p)
-    println("in f()")
-    #println(p, "\n")
+function costFunc(prob::ODEProblem, staticParameters::StaticParameters, constantValues::ConstantValues, mutatingArrays::MutatingArrays, p::Vector{T1})::T1 where T1 <: ForwardDiff.Dual
+    
+    dualP_vector = mutatingArrays.dualP_vector
+    dualP_vector[constantValues.optParameterIndices] .= p
 
-    #p_vector = mutatingArrays.p_vector
-    #p_vector .= p_tuple
-    #_prob = remake(prob, p = p_vector) 
-    _prob = remake(prob, u0 = convert.(eltype(p), prob.u0), p = p)
+    _prob = remake(prob, u0 = convert.(eltype(p), prob.u0), p = dualP_vector)
 
     sol = OrdinaryDiffEq.solve(_prob, AutoVern7(Rodas5()), reltol=1e-8, abstol=1e-8, saveat = constantValues.ts)
     
-    #println(sol.t)
-    #println(sol[Symbol("Cells_Apo4(t)")])
     h_bar = mutatingArrays.h_bar
     observedAtIndex = constantValues.observedAtIndex
     
@@ -86,14 +84,14 @@ function f_proto(prob, staticParameters, constantValues, mutatingArrays, p)
     minVariance = constantValues.minVariance
 
     for i = 3:numObservables
-        scale[i] = (dot(h_bar[i], measurementFor[i]) - shift[i] * sum(h_bar[i])) / dot(h_bar[i], h_bar[i])
+        scale[i] = ((dot(h_bar[i], measurementFor[i]) - shift[i] * sum(h_bar[i])) / dot(h_bar[i], h_bar[i])).value
     end
     replace!(scale, NaN=>0.0) # necessary when h_bar is zeros 
     # Mayby replace 0.0 (for non zero h_bar) with a lower bound
 
     for i = 1:numObservables
         h_hat[i] = scale[i] * h_bar[i] .+ shift[i]
-        variance[i] = (dot(measurementFor[i], measurementFor[i]) - 2 * dot(measurementFor[i], h_hat[i]) + dot(h_hat[i], h_hat[i])) / num_t[i]
+        variance[i] = ((dot(measurementFor[i], measurementFor[i]) - 2 * dot(measurementFor[i], h_hat[i]) + dot(h_hat[i], h_hat[i])) / num_t[i]).value
         variance[i] = max(variance[i], minVariance)
         costFor[i] = (num_t[i]/2) * log(2*pi*variance[i]) + (dot(measurementFor[i], measurementFor[i]) - 2*dot(measurementFor[i], h_hat[i]) + dot(h_hat[i], h_hat[i])) / (2 * variance[i])
     end
@@ -102,8 +100,24 @@ function f_proto(prob, staticParameters, constantValues, mutatingArrays, p)
 end
 
 
+function f_cost_proto(result::DiffResults.MutableDiffResult, f::Function, cfg::GradientConfig, mutatingArrays::MutatingArrays, p_tuple...)::Float64
+    p = mutatingArrays.p_vector
+    p .= p_tuple
 
-function GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, observables)
+    ForwardDiff.gradient!(result, f, p, cfg)
+    mutatingArrays.grad[:] = DiffResults.gradient(result)
+    
+    println(DiffResults.value(result), "\n")
+    return DiffResults.value(result)
+end
+
+function f_grad_proto(grad, mutatingArrays, p_tuple...)
+    grad[:] = mutatingArrays.grad
+    nothing
+end
+
+
+function GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, observables, inputParameterValues)
     minVariance = 1e-2
 
     observableIDs = relevantMeasurementData[:,1]
@@ -136,70 +150,94 @@ function GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, o
     
     tspan = (0.0, timeEnd)
     prob = ODEProblem(new_sys,u0,tspan,pars,jac=true)
-    numUsedParameters = length(prob.p)
-    numParameters = length(pars)
-    orderedParameters = varmap_to_vars(pars, parameters(new_sys))
-    orderedParameters .+= rand()
-    test_orderedParameters = [0.9035043754031366, 10.800326532739959, 0.8344511564921195, 0.9413681449465665, 0.8491275291854607, 1.1567776661662026, 0.8003265327399586, 0.8905447897457612, 0.8057041743522487, 0.8003365327399586, 0.800336533086573, 0.8016809782200571, 4.201342833436018, 1000.800326532659, 1.1567777122376215, 1.8003265327398825, 1.8003265327398794, 0.8003365327399585, 0.9003265327399586, 0.9238281021846115, 0.8003265327399586, 50.67037354402176, 175.23506363076496, 1000.800000864946, 1000.8003265326599, 0.830826159563432, 0.8003365327399585, 0.8515656668919402, 0.9729940750555356, 0.8003365327399585, 0.8003365327399586, 1.8003265327399585, 0.8071935357203198, 1.3003265327399585, 1.2003265327399586, 1.1245241609043495, 215.56060811614194, 0.8003365327399585, 0.9877186257774035, 0.9096809374131896, 4.2119694568059485, 0.8003365327399585, 1000.80032653274, 0.8003365327399585, 7.693408510878489, 10.80032653273916, 0.8795099522271821, 100.80032653273996, 10.800326521591268, 9.23282578370948, 7.388395759824789, 10.800324181981878]
 
-    numVariables = length(u0)
+    numUsedParameters = length(prob.p)
+    problemParameterSymbols = parameters(new_sys)
+    inputParameterSymbols = [:Dox_level, :Gem_level, :SN38_level]
+    inputParameterIndices = collect(1:numUsedParameters)[[pPS.name ∈ inputParameterSymbols for pPS in problemParameterSymbols]]
+    numInputParameters = length(inputParameterIndices)
+    optParameterIndices = collect(1:numUsedParameters)[[pPS.name ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
+    numOptParameters = length(optParameterIndices)
+
+    orderedParameters = varmap_to_vars(pars, parameters(new_sys))[optParameterIndices]
+    #orderedParameters = varmap_to_vars(pars, parameters(new_sys))
+    orderedParameters .+= (rand() - 0.5)*2
+    test_orderedParameters = [0.5963242072135031, 10.493146364550325, 0.5272709883024861, 0.6341879767569332, 0.5419473609958273, 0.8495974979765691, 0.4931463645503251, 0.5833646215561278, 0.4985240061626153, 0.49315636455032524, 0.49315636489693954, 0.49450081003042373, 3.8941626652463848, 1000.4931463644693, 0.8495975440479882, 1.493146364550249, 1.493146364550246, 0.49315636455032513, 0.5931463645503251, 0.6166479339949781, 0.4931463645503251, 50.363193375832125, 174.92788346257532, 1000.4928206967563, 1000.4931463644702, 0.5236459913737985, 0.49315636455032513, 0.5443854987023068, 0.6658139068659021, 0.49315636455032513, 0.4931563645503252, 1.4931463645503251, 0.5000133675306864, 0.9931463645503251, 0.8931463645503251, 0.8173439927147161, 215.2534279479523, 0.49315636455032513, 0.6805384575877701, 0.6025007692235561, 3.904789288616315, 0.49315636455032513, 1000.4931463645503, 0.49315636455032513, 7.386228342688855, 10.493146364549526, 0.5723297840375486, 100.49314636455033, 10.493146353401634, 8.925645615519846, 7.081215591635155, 10.493144013792245]
+    #orderedParameters[inputParameterIndices] .= 0.0
+    orderedParameters = test_orderedParameters[optParameterIndices]
+
     numTimePointsFor = Vector{Int64}(undef, numObservables)
     numTimePointsFor .= length.(observedAt)
 
-    observablesTimeIndexIndices = Array{Vector{Int64}, 2}(undef, numObservables, numTimeSteps)
-    for i = 1:numObservables
-        for j = 1:numTimeSteps
-            observablesTimeIndexIndices[i,j] = findall(x->x==j, observedAtIndex[i])
-        end
-    end
+    constantValues = ConstantValues(observedObservable, measurementFor, minVariance, observedAtIndex, optParameterIndices,
+                                    ts, numObservables, numUsedParameters, numTimePointsFor, numTimeSteps)
 
-    constantValues = ConstantValues(observedObservable, measurementFor, minVariance, observablesTimeIndexIndices, observedAtIndex, 
-                                    ts, numObservables, numParameters, numUsedParameters, numTimePointsFor, numTimeSteps, numVariables)
-
-    scale = Array{ForwardDiff.Dual, 1}(undef, numObservables)
-    #scale[[1,2]] .= 1.0
-    shift = zeros(Float64, numObservables)# Array{Float64, 1}(undef, numObservables)
-    shift[[3,4]] .+= 1.0
-    variance = Array{ForwardDiff.Dual, 1}(undef, numObservables)
-    #shift[[3,4]] .= 1.0
+    
+    scale = Vector{Float64}(undef, numObservables)
+    scale[[1,2]] .= 1.0
+    shift = zeros(Float64, numObservables)
+    shift[[3,4]] .= 1.0
+    variance = Vector{Float64}(undef, numObservables)
     staticParameters = StaticParameters(scale, shift, variance)
 
+    usedType = ForwardDiff.Dual
+    h_bar = Vector{Vector{usedType}}(undef, numObservables)
+    h_hat = Vector{Vector{usedType}}(undef, numObservables)
+    costFor = Vector{usedType}(undef, numObservables)
+    p_vector = Vector{Float64}(undef, numOptParameters)
+    dualP_vector = Vector{usedType}(undef, numUsedParameters)
+    grad = Vector{Float64}(undef, numOptParameters)
+    mutatingArrays = MutatingArrays(h_bar, h_hat, costFor, p_vector, dualP_vector, grad)
+
+    f_cost = (p) -> costFunc(prob, staticParameters, constantValues, mutatingArrays, p)
+
+    chunkSize = 13
+    cfg = GradientConfig(f_cost, orderedParameters, Chunk{chunkSize}())
+
+    dualP_vector[inputParameterIndices] .= inputParameterValues .* one(ForwardDiff.Dual{ForwardDiff.Tag{typeof(f_cost), Float64},Float64, chunkSize})
+
+    #
+    result = DiffResults.GradientResult(orderedParameters::Vector{Float64})
+
+    f = (p_tuple...) -> f_cost_proto(result, f_cost, cfg, mutatingArrays, p_tuple...)
+    f_grad = (grad, p_tuple...) -> f_grad_proto(grad, mutatingArrays, p_tuple...)
+
+    cost = f(orderedParameters...)
+    # 29.21614392324067
+    grad2 = Vector{Float64}(undef, numOptParameters)
+    f_grad(grad2, orderedParameters...)
+    println(grad2)
+    # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.6406411214537998e-16, 0.0, 10.276324153033542, 12.216214038184734, 0.0, 0.0, 0.0, -1.7268649092217891, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.275811836644368e-5, 0.0, 0.0, 0.0, 0.0]
+
+    # test first cost and grad at test_orderedParameters
+    # cost: 47.33330405467803
+    # grad: [-5.318215299039426, 5.515534973056204e-7, -5.820869002075568, 3.752174833073845, 0.44418583163493813, -1.7629644064642325, 2.7063844789080984, -0.08352082360898885, 0.0, -3.009265538105056e-34, 1.2037062152420224e-33, -1.504632769052528e-34, -5.8784718997286444e-5, 2.2111064355330217e-5, -0.10343392410137235, 0.10080959381932418, 0.01284167627301536, 0.001146966953022865, 0.004470244153038387, 0.6855533519457021, 0.015459596285039507, 7.94286510500958e-5, 7.060644619866742e-5, 5.163092560927721e-5, -0.0002348586275941731, 5.1630925609287945e-5, -2.3425009389426196e-6, 0.20007711244312204, 0.13060181312925243, 0.04250949099587211, 0.0860570749829805, -5.877350297371893e-19, 0.008445234457328957, -0.00032214327389440785, -0.010848559062022471, -0.008104965953355267, 3.239638604151488e-5, -0.00023211706158480746, 0.2408354592904409, -0.00423789046207008, -5.843846087025392e-5, 0.3436057744244619, -4.9694372697670505e-5, 1.0095043641393266, 0.0008280843800659434, -0.0003082048401328952, -0.06336618742551742, -0.002384762259748042, -3.056610602007926e-5, -0.01719550591281074, -0.002530135631328737, -0.0015803688265661744]
     #=
-    h_bar = Array{Array{Float64, 1}, 1}(undef, numObservables)
-    h_hat = Array{Array{Float64, 1}, 1}(undef, numObservables)
-    costFor = Array{Float64, 1}(undef, numObservables)
-    p_vector = Vector{Float64}(undef, numUsedParameters)
-    mutatingArrays = MutatingArrays(h_bar, h_hat, costFor, p_vector)
+    cost = f(test_orderedParameters...)
+    grad2 = Vector{Float64}(undef, numUsedParameters)
+    f_grad(grad2, test_orderedParameters...)
+    println(cost)
+    println(grad2)
     =#
-    h_bar = Array{Array{ForwardDiff.Dual, 1}, 1}(undef, numObservables)
-    h_hat = Array{Array{ForwardDiff.Dual, 1}, 1}(undef, numObservables)
-    costFor = Array{ForwardDiff.Dual, 1}(undef, numObservables)
-    p_vector = Vector{Float64}(undef, numUsedParameters)
-    mutatingArrays = MutatingArrays(h_bar, h_hat, costFor, p_vector)
-
-    f = (p) -> f_proto(prob, staticParameters, constantValues, mutatingArrays, p)
-
-    chunkSize = 11
-
-    for i in 1:numObservables
-        scale[i] = zero(ForwardDiff.Dual{ForwardDiff.Tag{typeof(f), Float64},Float64, chunkSize})
-        variance[i] = zero(ForwardDiff.Dual{ForwardDiff.Tag{typeof(f), Float64},Float64, chunkSize})
+    #=
+    model = Model(NLopt.Optimizer)
+    #JuMP.register(model::Model, s::Symbol, dimension::Integer, f::Function, ∇f::Function, ∇²f::Function)
+    register(model, :f, numUsedParameters, f, f_grad)
+    set_optimizer_attribute(model, "algorithm", :LD_MMA)
+    @variable(model, p[1:numUsedParameters] >= 0) # fix lower and upper bounds
+    for i in 1:numUsedParameters
+        set_start_value(p[i], orderedParameters[i])
     end
-    scale[[1,2]] .+= 1.0
-
-
-    for i in 1:numObservables
-        h_bar[i] = zeros(ForwardDiff.Dual{ForwardDiff.Tag{typeof(f), Float64},Float64, chunkSize}, numTimePointsFor[i])
-        h_hat[i] = zeros(ForwardDiff.Dual{ForwardDiff.Tag{typeof(f), Float64},Float64, chunkSize}, numTimePointsFor[i])
-        costFor[i] = zero(ForwardDiff.Dual{ForwardDiff.Tag{typeof(f), Float64},Float64, chunkSize})
-    end
-
-
-    #grad = ForwardDiff.gradient(f, test_orderedParameters)
-    #println(grad)
-    out = Vector{Float64}(undef, numUsedParameters)
-    ForwardDiff.gradient!(out, f, test_orderedParameters)
-    println(out)
+    @NLobjective(model, Min, f(p...))
+    JuMP.optimize!(model)
+    #@show termination_status(model)
+    #@show primal_status(model)
+    p_opt = [value(p[i]) for i=1:numUsedParameters]
+    println("Done!")
+    println(p_opt)
+    cost_opt = objective_value(model)
+    println(cost_opt)
+    =#
 end
 
 
@@ -240,9 +278,10 @@ function main()
     relevantMeasurementData = measurementData[measurementData[:,3] .== experimentalConditions[1,1], :]
     observables = CSV.read(readDataPath * "/observables_Alkan_SciSignal2018.tsv", DataFrame)[:,1]
 
+    inputParameterValues = [0.0, 0.0, 0.0]
 
     println("Starting optimisation")
-    GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, observables)
+    GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, observables, inputParameterValues)
 
 end
 
