@@ -202,11 +202,11 @@ function GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, o
     f = (p_tuple...) -> f_cost_proto(result, f_cost, cfg, mutatingArrays, p_tuple...)
     f_grad = (grad, p_tuple...) -> f_grad_proto(grad, mutatingArrays, p_tuple...)
 
-    cost = f(orderedParameters...)
+    #cost = f(orderedParameters...)
     # 29.21614392324067
-    grad2 = Vector{Float64}(undef, numOptParameters)
-    f_grad(grad2, orderedParameters...)
-    println(grad2)
+    #grad2 = Vector{Float64}(undef, numOptParameters)
+    #f_grad(grad2, orderedParameters...)
+    #println(grad2)
     # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.6406411214537998e-16, 0.0, 10.276324153033542, 12.216214038184734, 0.0, 0.0, 0.0, -1.7268649092217891, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.275811836644368e-5, 0.0, 0.0, 0.0, 0.0]
 
     # test first cost and grad at test_orderedParameters
@@ -219,25 +219,25 @@ function GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, o
     println(cost)
     println(grad2)
     =#
-    #=
+    
     model = Model(NLopt.Optimizer)
     #JuMP.register(model::Model, s::Symbol, dimension::Integer, f::Function, ∇f::Function, ∇²f::Function)
-    register(model, :f, numUsedParameters, f, f_grad)
+    register(model, :f, numOptParameters, f, f_grad)
     set_optimizer_attribute(model, "algorithm", :LD_MMA)
-    @variable(model, p[1:numUsedParameters] >= 0) # fix lower and upper bounds
-    for i in 1:numUsedParameters
+    @variable(model, p[1:numOptParameters] >= 0) # fix lower and upper bounds
+    for i in 1:numOptParameters
         set_start_value(p[i], orderedParameters[i])
     end
     @NLobjective(model, Min, f(p...))
     JuMP.optimize!(model)
     #@show termination_status(model)
     #@show primal_status(model)
-    p_opt = [value(p[i]) for i=1:numUsedParameters]
     println("Done!")
+    p_opt = [value(p[i]) for i=1:numOptParameters]
     println(p_opt)
     cost_opt = objective_value(model)
     println(cost_opt)
-    =#
+    
 end
 
 
