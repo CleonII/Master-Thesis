@@ -9,7 +9,7 @@ function getModelFiles(path)
 end
 
 function getTolerances(; onlyMaxTol = false)
-    tolList = [1e-6, 1e-9, 1e-12, 1e-15] # 1e-6 is standard
+    tolList = [1e-6, 1e-9, 1e-12] # 1e-6 is standard
     if onlyMaxTol
         return [tolList[1]]
     else
