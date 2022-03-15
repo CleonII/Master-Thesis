@@ -1,8 +1,10 @@
 using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
 
+
 include(pwd() * "/Pipeline_ModelSolver/BigFloatODEProblem.jl")
 include(pwd() * "/Additional_functions/additional_tools.jl")
 include(pwd() * "/Additional_functions/Solver_info.jl")
+
 
 function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, readPath, writefile)
     nonStiffHiAccSolver, stiffHiAccSolver = hiAccSolvers
@@ -24,12 +26,22 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
     bfProb = BigFloatODEProblem(new_sys, u0, tspan, [p;c])
     local hiAccSol
     try 
-        hiAccSol = solve(bfProb, stiffHiAccSolver, reltol = 1e-15, abstol = 1e-15) 
+        hiAccSol = solve(bfProb, stiffHiAccSolver, reltol=1e-15, abstol=1e-15) 
     catch 
-        hiAccSol = solve(bfProb, nonStiffHiAccSolver, reltol = 1e-15, abstol = 1e-15) 
+        hiAccSol = solve(bfProb, nonStiffHiAccSolver, reltol=1e-15, abstol=1e-15) 
     end
+
+    if hiAccSol.retcode != :Success
+        println("High accuracy solver failed for $modelFile")
+        open(pwd() * "/Pipeline_ModelSolver/Log.txt", "a") do io
+            println(io, "Failed with high accuracy solution for $modelFile")
+        end
+        return 
+    else
+        println("Done with high accuracy solver")
+    end
+
     ts = hiAccSol.t
-    println("Done")
     
     # Solve with different solvers
     prob = ODEProblem(new_sys,u0,tspan,[p;c],jac=true)
@@ -170,29 +182,6 @@ function modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, Tols, 
     end
 end
 
-#=
-function getBigFloatProb(modelFile)
-    
-    writePath = pwd() * "/Pipeline_ModelSolver/IntermediaryResults"
-    readPath = pwd() * "/Pipeline_SBMLImporter/JuliaModels"
-    fixDirectories(writePath)
-    timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
-    timeEnd = timeEnds[timeEnds[:,1] .== modelFile, 2][1]
-
-    modelPath = readPath * "/" * modelFile
-    include(modelPath)
-    new_sys = ode_order_lowering(sys)
-    u0 = initialSpeciesValues
-    p = trueParameterValues
-    c = trueConstantsValues
-    tspan = (0.0, timeEnd)
-
-    # Estimate ground truth
-    bfProb = BigFloatODEProblem(new_sys, u0, tspan, [p;c])
-
-    return bfProb
-end
-=#
 
 function main(;modelFiles=["all"], modelsExclude=[""])
     readPath = pwd() * "/Pipeline_SBMLImporter/JuliaModels"
@@ -210,11 +199,11 @@ function main(;modelFiles=["all"], modelsExclude=[""])
     timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
     solvers = getSolvers()
     hiAccSolvers = getHiAccSolver()
-    tolList = getTolerances(onlyMaxTol = true)
+    tolList = getTolerances(onlyMaxTol = false) # Get tolerances = [1e-6, 1e-9, 1e-12]
     iterations = 15
     
     modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, tolList, iterations, readPath, writefile)
 end
 
 
-modelFiles = main(modelFiles=["model_Alkan_SciSignal2018.jl"], modelsExclude=["model_Chen_MSB2009.jl", "model_Rahman_MBS2016.jl", "model_SalazarCavazos_MBoC2020.jl"])
+main(modelsExclude=["model_Chen_MSB2009.jl"])

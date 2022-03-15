@@ -43,7 +43,7 @@ function getSolvers(;algSets = ["all"], algNum = nothing, algHintSet = true, alg
 end
 
 function getHiAccSolver()
-    algs = [AutoVern9(Rodas5()), Rodas4P()]
+    algs = [AutoVern9(Rodas5()), Rodas5()]
     return algs
 end
 
