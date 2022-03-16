@@ -1,8 +1,8 @@
 using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
-using JuMP, NLopt, LinearAlgebra, DiffEqSensitivity, DiffEqFlux, ForwardDiff
+using LinearAlgebra, DiffEqSensitivity, DiffEqFlux, ForwardDiff, Random
 using ModelingToolkit: varmap_to_vars
 using ForwardDiff: GradientConfig, Chunk
-using ProfileView
+using ProfileView, ProgressMeter
 
 println("Done loading modules")
 
@@ -33,7 +33,6 @@ struct MutatingArrays
     h_bar::Vector{Vector{ForwardDiff.Dual}}
     h_hat::Vector{Vector{ForwardDiff.Dual}}
     costFor::Vector{ForwardDiff.Dual}
-    p_vector::Vector{Float64}
     dualP_vector::Vector{ForwardDiff.Dual}
     grad::Vector{Float64}
 end
@@ -45,14 +44,64 @@ struct FilesAndPaths
     writefile_sensealg::String
 end
 
+mutable struct Adam
+    theta::AbstractArray{Float64} # Parameter array
+    grad::Function                # Gradient function
+    loss::Float64
+    m::AbstractArray{Float64}     # First moment
+    v::AbstractArray{Float64}     # Second moment
+    b1::Float64                   # Exp. decay first moment
+    b2::Float64                   # Exp. decay second moment
+    a::Float64                    # Step size
+    eps::Float64                  # Epsilon for stability
+    t::Int                        # Time step (iteration)
+end
+  
+# Outer constructor
+function Adam(theta::AbstractArray{Float64}, grad::Function; a::Float64=0.005)
+    loss = 0
+    m   = zeros(size(theta))
+    v   = zeros(size(theta))
+    b1  = 0.9
+    b2  = 0.999
+    a   = a
+    eps = 1e-8
+    t   = 0
+    Adam(theta, grad, loss, m, v, b1, b2, a, eps, t)
+end
+
+# Step function with optional keyword arguments for the data passed to grad()
+function step!(opt::Adam)
+    opt.t += 1
+    gt, opt.loss    = opt.grad(opt.theta)
+    opt.m = opt.b1 .* opt.m + (1 - opt.b1) .* gt
+    opt.v = opt.b2 .* opt.v + (1 - opt.b2) .* gt .^ 2
+    mhat = opt.m ./ (1 - opt.b1^opt.t)
+    vhat = opt.v ./ (1 - opt.b2^opt.t)
+    opt.theta -= opt.a .* (mhat ./ (sqrt.(vhat) .+ opt.eps))
+end
+
+# F - function on p 
+function unbiased_grad(p::T1, f::Function, result)::Tuple{Array{Float64, 1}, Float64} where T1<:Array{<:AbstractFloat, 1}
+
+    v::Array{Float64, 1} = randn(length(p)) # v ~ MV(0, I)
+
+    g = r -> f(p + r*v)
+    result = ForwardDiff.derivative!(result, g, 0.0)
+    uGrad = DiffResults.gradient(result) * v
+    loss = DiffResults.value(result)
+    return uGrad, loss
+end
+
 function costFunc(prob::ODEProblem, staticParameters::StaticParameters, constantValues::ConstantValues, mutatingArrays::MutatingArrays, p::Vector{T1})::T1 where T1 <: ForwardDiff.Dual
-    
+
     dualP_vector = mutatingArrays.dualP_vector
+    dualP_vector[:] = convert.(eltype(p), prob.p)
     dualP_vector[constantValues.optParameterIndices] .= p
 
     _prob = remake(prob, u0 = convert.(eltype(p), prob.u0), p = dualP_vector)
 
-    sol = OrdinaryDiffEq.solve(_prob, AutoVern7(Rodas5()), reltol=1e-8, abstol=1e-8, saveat = constantValues.ts)
+    sol = OrdinaryDiffEq.solve(_prob, Rodas5(), reltol=1e-8, abstol=1e-8, saveat = constantValues.ts)
     
     h_bar = mutatingArrays.h_bar
     observedAtIndex = constantValues.observedAtIndex
@@ -99,24 +148,6 @@ function costFunc(prob::ODEProblem, staticParameters::StaticParameters, constant
     return sum(costFor[constantValues.observedObservable])
 end
 
-
-function f_cost_proto(result::DiffResults.MutableDiffResult, f::Function, cfg::GradientConfig, mutatingArrays::MutatingArrays, p_tuple...)::Float64
-    p = mutatingArrays.p_vector
-    p .= p_tuple
-
-    ForwardDiff.gradient!(result, f, p, cfg)
-    mutatingArrays.grad[:] = DiffResults.gradient(result)
-    
-    println(DiffResults.value(result), "\n")
-    return DiffResults.value(result)
-end
-
-function f_grad_proto(grad, mutatingArrays, p_tuple...)
-    grad[:] = mutatingArrays.grad
-    nothing
-end
-
-
 function GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, observables, inputParameterValues)
     minVariance = 1e-2
 
@@ -159,20 +190,26 @@ function GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, o
     optParameterIndices = collect(1:numUsedParameters)[[pPS.name ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
     numOptParameters = length(optParameterIndices)
 
+    pWithInputs = prob.p 
+    pWithInputs[inputParameterIndices] .= inputParameterValues
+    prob = remake(prob, p=pWithInputs)
+
     orderedParameters = varmap_to_vars(pars, parameters(new_sys))[optParameterIndices]
     #orderedParameters = varmap_to_vars(pars, parameters(new_sys))
-    orderedParameters .+= (rand() - 0.5)*2
-    test_orderedParameters = [0.5963242072135031, 10.493146364550325, 0.5272709883024861, 0.6341879767569332, 0.5419473609958273, 0.8495974979765691, 0.4931463645503251, 0.5833646215561278, 0.4985240061626153, 0.49315636455032524, 0.49315636489693954, 0.49450081003042373, 3.8941626652463848, 1000.4931463644693, 0.8495975440479882, 1.493146364550249, 1.493146364550246, 0.49315636455032513, 0.5931463645503251, 0.6166479339949781, 0.4931463645503251, 50.363193375832125, 174.92788346257532, 1000.4928206967563, 1000.4931463644702, 0.5236459913737985, 0.49315636455032513, 0.5443854987023068, 0.6658139068659021, 0.49315636455032513, 0.4931563645503252, 1.4931463645503251, 0.5000133675306864, 0.9931463645503251, 0.8931463645503251, 0.8173439927147161, 215.2534279479523, 0.49315636455032513, 0.6805384575877701, 0.6025007692235561, 3.904789288616315, 0.49315636455032513, 1000.4931463645503, 0.49315636455032513, 7.386228342688855, 10.493146364549526, 0.5723297840375486, 100.49314636455033, 10.493146353401634, 8.925645615519846, 7.081215591635155, 10.493144013792245]
+    orderedParameters .+= (rand() - 0.5)*5
+    orderedParameters[orderedParameters .< 0.0] .= 0.0
+    orderedParameters .= rand()*5
+    #test_orderedParameters = [0.5963242072135031, 10.493146364550325, 0.5272709883024861, 0.6341879767569332, 0.5419473609958273, 0.8495974979765691, 0.4931463645503251, 0.5833646215561278, 0.4985240061626153, 0.49315636455032524, 0.49315636489693954, 0.49450081003042373, 3.8941626652463848, 1000.4931463644693, 0.8495975440479882, 1.493146364550249, 1.493146364550246, 0.49315636455032513, 0.5931463645503251, 0.6166479339949781, 0.4931463645503251, 50.363193375832125, 174.92788346257532, 1000.4928206967563, 1000.4931463644702, 0.5236459913737985, 0.49315636455032513, 0.5443854987023068, 0.6658139068659021, 0.49315636455032513, 0.4931563645503252, 1.4931463645503251, 0.5000133675306864, 0.9931463645503251, 0.8931463645503251, 0.8173439927147161, 215.2534279479523, 0.49315636455032513, 0.6805384575877701, 0.6025007692235561, 3.904789288616315, 0.49315636455032513, 1000.4931463645503, 0.49315636455032513, 7.386228342688855, 10.493146364549526, 0.5723297840375486, 100.49314636455033, 10.493146353401634, 8.925645615519846, 7.081215591635155, 10.493144013792245]
     #orderedParameters[inputParameterIndices] .= 0.0
-    orderedParameters = test_orderedParameters[optParameterIndices]
+    #orderedParameters = test_orderedParameters[optParameterIndices]
 
     numTimePointsFor = Vector{Int64}(undef, numObservables)
     numTimePointsFor .= length.(observedAt)
 
-    constantValues = ConstantValues(observedObservable, measurementFor, minVariance, observedAtIndex, optParameterIndices,
+    constantValues = ConstantValues(observedObservable, measurementFor, minVariance, observedAtIndex, optParameterIndices, 
                                     ts, numObservables, numUsedParameters, numTimePointsFor, numTimeSteps)
 
-    
+    usedType = ForwardDiff.Dual
     scale = Vector{Float64}(undef, numObservables)
     scale[[1,2]] .= 1.0
     shift = zeros(Float64, numObservables)
@@ -180,68 +217,37 @@ function GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, o
     variance = Vector{Float64}(undef, numObservables)
     staticParameters = StaticParameters(scale, shift, variance)
 
-    usedType = ForwardDiff.Dual
     h_bar = Vector{Vector{usedType}}(undef, numObservables)
     h_hat = Vector{Vector{usedType}}(undef, numObservables)
     costFor = Vector{usedType}(undef, numObservables)
-    p_vector = Vector{Float64}(undef, numOptParameters)
     dualP_vector = Vector{usedType}(undef, numUsedParameters)
     grad = Vector{Float64}(undef, numOptParameters)
-    mutatingArrays = MutatingArrays(h_bar, h_hat, costFor, p_vector, dualP_vector, grad)
+    mutatingArrays = MutatingArrays(h_bar, h_hat, costFor, dualP_vector, grad)
 
     f_cost = (p) -> costFunc(prob, staticParameters, constantValues, mutatingArrays, p)
 
-    chunkSize = 13
-    cfg = GradientConfig(f_cost, orderedParameters, Chunk{chunkSize}())
+    result = DiffResults.DiffResult(0.0, 0.0)
 
-    dualP_vector[inputParameterIndices] .= inputParameterValues .* one(ForwardDiff.Dual{ForwardDiff.Tag{typeof(f_cost), Float64},Float64, chunkSize})
+    grad_g = (p) -> unbiased_grad(p, f_cost, result)
 
-    #
-    result = DiffResults.GradientResult(orderedParameters::Vector{Float64})
 
-    f = (p_tuple...) -> f_cost_proto(result, f_cost, cfg, mutatingArrays, p_tuple...)
-    f_grad = (grad, p_tuple...) -> f_grad_proto(grad, mutatingArrays, p_tuple...)
 
-    #cost = f(orderedParameters...)
-    # 29.21614392324067
-    #grad2 = Vector{Float64}(undef, numOptParameters)
-    #f_grad(grad2, orderedParameters...)
-    #println(grad2)
-    # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.6406411214537998e-16, 0.0, 10.276324153033542, 12.216214038184734, 0.0, 0.0, 0.0, -1.7268649092217891, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.275811836644368e-5, 0.0, 0.0, 0.0, 0.0]
 
-    # test first cost and grad at test_orderedParameters
-    # cost: 47.33330405467803
-    # grad: [-5.318215299039426, 5.515534973056204e-7, -5.820869002075568, 3.752174833073845, 0.44418583163493813, -1.7629644064642325, 2.7063844789080984, -0.08352082360898885, 0.0, -3.009265538105056e-34, 1.2037062152420224e-33, -1.504632769052528e-34, -5.8784718997286444e-5, 2.2111064355330217e-5, -0.10343392410137235, 0.10080959381932418, 0.01284167627301536, 0.001146966953022865, 0.004470244153038387, 0.6855533519457021, 0.015459596285039507, 7.94286510500958e-5, 7.060644619866742e-5, 5.163092560927721e-5, -0.0002348586275941731, 5.1630925609287945e-5, -2.3425009389426196e-6, 0.20007711244312204, 0.13060181312925243, 0.04250949099587211, 0.0860570749829805, -5.877350297371893e-19, 0.008445234457328957, -0.00032214327389440785, -0.010848559062022471, -0.008104965953355267, 3.239638604151488e-5, -0.00023211706158480746, 0.2408354592904409, -0.00423789046207008, -5.843846087025392e-5, 0.3436057744244619, -4.9694372697670505e-5, 1.0095043641393266, 0.0008280843800659434, -0.0003082048401328952, -0.06336618742551742, -0.002384762259748042, -3.056610602007926e-5, -0.01719550591281074, -0.002530135631328737, -0.0015803688265661744]
-    #=
-    cost = f(test_orderedParameters...)
-    grad2 = Vector{Float64}(undef, numUsedParameters)
-    f_grad(grad2, test_orderedParameters...)
-    println(cost)
-    println(grad2)
-    =#
+
+    n_it = 7500
+    theta_save = Array{Float64, 2}(undef, (numOptParameters, n_it))
+    loss_val = Array{Float64, 1}(undef, n_it)
+
+    adam_opt = Adam(orderedParameters, grad_g, a=0.001)
     
-    model = Model(NLopt.Optimizer)
-    #JuMP.register(model::Model, s::Symbol, dimension::Integer, f::Function, ∇f::Function, ∇²f::Function)
-    register(model, :f, numOptParameters, f, f_grad)
-    set_optimizer_attribute(model, "algorithm", :LD_MMA)
-    @variable(model, p[1:numOptParameters] >= 0) # fix lower and upper bounds
-    for i in 1:numOptParameters
-        set_start_value(p[i], orderedParameters[i])
+    @showprogress 1 "Running ADAM... " for i in 1:n_it
+        step!(adam_opt)
+        theta_save[:, i] .= adam_opt.theta
+        loss_val[i] = adam_opt.loss
     end
-    @NLobjective(model, Min, f(p...))
-    JuMP.optimize!(model)
-    #@show termination_status(model)
-    #@show primal_status(model)
-    println("Done!")
-    p_opt = [value(p[i]) for i=1:numOptParameters]
-    println(p_opt)
-    cost_opt = objective_value(model)
-    println(cost_opt)
-    
+
+    return theta_save, loss_val
 end
-
-
-
 
 
 
@@ -281,8 +287,10 @@ function main()
     inputParameterValues = [0.0, 0.0, 0.0]
 
     println("Starting optimisation")
-    GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, observables, inputParameterValues)
+    theta_save, loss_val = GradCalc_forwardDiff(filesAndPaths, timeEnd, relevantMeasurementData, observables, inputParameterValues)
 
+    plotly()
+    plot(loss_val)
 end
 
 main()
