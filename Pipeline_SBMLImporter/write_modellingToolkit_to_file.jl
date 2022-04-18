@@ -843,6 +843,13 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         else
             println("Error: could not find assigned variable/parameter")
         end
+        for part in split(getArguments(assignFormula, baseFunctions), ", ")
+            if part in keys(parameterDict)
+                dummyVariableDict[part] = parameterDict[part]
+            elseif part in keys(constantsDict)
+                dummyVariableDict[part] = constantsDict[part]
+            end
+        end
     end
 
     while true
