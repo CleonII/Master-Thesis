@@ -147,7 +147,7 @@ function step!(opt::Adam, parameterSpace, modelParameters)
     pars .= min.(max.(pars, plb), pub)
 end
 
-function startCalcCost_proto(prob, modelParameters, modelData, experimentalData, modelOutput, iCond, p)
+function calcUnscaledObservable_proto(prob, modelParameters, modelData, experimentalData, modelOutput, iCond, p)
     parameterIndices = modelParameters.parameterIndices
     dynPars = view(p, parameterIndices)
     dynParVector = modelParameters.dynamicParametersVector
@@ -200,7 +200,7 @@ function startCalcCost_proto(prob, modelParameters, modelData, experimentalData,
     nothing
 end
 
-function calcStaticParameters_proto(modelParameters, modelData, modelOutput, experimentalData, p)
+function calcScaledObservable_proto(modelParameters, modelData, modelOutput, experimentalData, p)
     scaleIndices = modelParameters.scaleIndices
     scale = view(p, scaleIndices)
     scaleVector = modelParameters.scaleVector
@@ -237,7 +237,7 @@ function calcStaticParameters_proto(modelParameters, modelData, modelOutput, exp
     nothing
 end
 
-function finishCalcCost_proto(modelParameters, modelOutput, experimentalData, p)
+function calcCost_proto(modelParameters, modelOutput, experimentalData, p)
     varianceIndices = modelParameters.varianceIndices
     variance = view(p, varianceIndices)
     dualVarianceVector = modelParameters.dualVarianceVector
@@ -264,19 +264,19 @@ function finishCalcCost_proto(modelParameters, modelOutput, experimentalData, p)
     return cost
 end
 
-function allConditionsCost_proto(modelParameters, experimentalData, modelData, startCalcCost, calcStaticParameters, finishCalcCost, p)
+function allConditionsCost_proto(modelParameters, experimentalData, modelData, calcUnscaledObservable, calcScaledObservable, calcCost, p)
     dynParVector = modelParameters.dynamicParametersVector
     inputPVFC = experimentalData.inputParameterValuesForCond
     inputPI = modelData.inputParameterIndices
 
     for (iCond, inputParameterValues) in enumerate(inputPVFC)
         dynParVector[inputPI] = inputParameterValues
-        startCalcCost(iCond, p)
+        calcUnscaledObservable(iCond, p)
     end
 
-    calcStaticParameters(p)
+    calcScaledObservable(p)
 
-    cost = finishCalcCost(p)
+    cost = calcCost(p)
 
     return cost
 end
