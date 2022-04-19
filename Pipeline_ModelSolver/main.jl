@@ -99,13 +99,15 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
                 end
             end
         else
-            data = DataFrame(model = modelFile, solver = alg_solver, reltol = tol, abstol = tol, 
-                                 success = false, runTime = NaN, memory = NaN, allocs = NaN,
-                                 sqDiff = NaN, iteration = 1:iterations)
-            if isfile(writefile)
-                CSV.write(writefile, data, append = true)
-            else
-                CSV.write(writefile, data)
+            for tol in Tols
+                data = DataFrame(model = modelFile, solver = alg_solver, reltol = tol, abstol = tol, 
+                                    success = false, runTime = NaN, memory = NaN, allocs = NaN,
+                                    sqDiff = NaN, iteration = 1:iterations)
+                if isfile(writefile)
+                    CSV.write(writefile, data, append = true)
+                else
+                    CSV.write(writefile, data)
+                end
             end
         end
     end
@@ -161,13 +163,15 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
                 end
             end
         else
-            data = DataFrame(model = modelFile, solver = alg_hint[1], reltol = tol, abstol = tol, 
-                                 success = false, runTime = NaN, memory = NaN, allocs = NaN, 
-                                 sqDiff = NaN, iteration = 1:iterations)
-            if isfile(writefile)
-                CSV.write(writefile, data, append = true)
-            else
-                CSV.write(writefile, data)
+            for tol in Tols
+                data = DataFrame(model = modelFile, solver = alg_hint[1], reltol = tol, abstol = tol, 
+                                    success = false, runTime = NaN, memory = NaN, allocs = NaN, 
+                                    sqDiff = NaN, iteration = 1:iterations)
+                if isfile(writefile)
+                    CSV.write(writefile, data, append = true)
+                else
+                    CSV.write(writefile, data)
+                end
             end
         end
     end
@@ -206,4 +210,4 @@ function main(;modelFiles=["all"], modelsExclude=[""])
 end
 
 
-main(modelsExclude=["model_Chen_MSB2009.jl"])
+main(modelFiles=["model_Laske_PLOSComputBiol2019.jl"], modelsExclude=["model_Chen_MSB2009.jl"])
