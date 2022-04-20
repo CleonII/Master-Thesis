@@ -702,14 +702,14 @@ function GradCalc_forwardDiff(filesAndPaths, timeEnd, experimentalConditions, me
 
     # Initialize functions
 
-    startCalcCost = (iCond, p) -> startCalcCost_proto(prob, modelParameters, modelData, experimentalData, modelOutput, iCond, p)
+    calcUnscaledObservable = (iCond, p) -> calcUnscaledObservable_proto(prob, modelParameters, modelData, experimentalData, modelOutput, iCond, p)
 
-    calcStaticParameters = (p) -> calcStaticParameters_proto(modelParameters, modelData, modelOutput, experimentalData, p)
+    calcScaledObservable = (p) -> calcScaledObservable_proto(modelParameters, modelData, modelOutput, experimentalData, p)
 
-    finishCalcCost = (p) -> finishCalcCost_proto(modelParameters, modelOutput, experimentalData, p)
+    calcCost = (p) -> calcCost_proto(modelParameters, modelOutput, experimentalData, p)
 
     allConditionsCost = (p) -> allConditionsCost_proto(modelParameters, experimentalData, modelData,
-                                                      startCalcCost, calcStaticParameters, finishCalcCost, p)
+            calcUnscaledObservable, calcScaledObservable, calcCost, p)
 
     result = DiffResults.DiffResult(0.0, 0.0)
 
