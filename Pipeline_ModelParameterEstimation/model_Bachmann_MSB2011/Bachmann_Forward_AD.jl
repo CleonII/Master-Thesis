@@ -1,18 +1,18 @@
-using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
-using JuMP, NLopt, LinearAlgebra, DiffEqSensitivity, DiffEqFlux, ForwardDiff, Distributions
+using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV
+using JuMP, NLopt, LinearAlgebra, DiffEqSensitivity, ForwardDiff
 using ModelingToolkit: varmap_to_vars
 using ForwardDiff: GradientConfig, Chunk
 
 println("Done loading modules")
 
-include(pwd() * "/Additional_functions/additional_tools.jl")
-
+include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
+include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters", "LatinHyperCubeSampledParameters.jl"))
 
 struct ParameterSpace
-    offsetLowerBound::Vector{Float64}
-    offsetUpperBound::Vector{Float64}
     scaleLowerBound::Vector{Float64}
     scaleUpperBound::Vector{Float64}
+    offsetLowerBound::Vector{Float64}
+    offsetUpperBound::Vector{Float64}
     varianceLowerBound::Vector{Float64}
     varianceUpperBound::Vector{Float64}
     parameterLowerBound::Vector{Float64}
@@ -26,6 +26,7 @@ struct ExperimentalData
     observedAtIndexForCondObs::Array{Vector{Int64}, 2}
     numConditions::Int64
     numObservables::Int64
+    numDataForCondObs::Array{Int64, 2}
     inputParameterValuesForCond::Vector{Vector{Float64}}
     observedObservableForCond::Vector{Vector{Int64}}
 end
@@ -246,6 +247,7 @@ function calcCost_proto(modelParameters, modelOutput, experimentalData, p)
     varianceMap = modelParameters.varianceMap
 
     h_hatFCO = modelOutput.h_hatForCondObs
+    numDataFCO = experimentalData.numDataForCondObs
     
     costFCO = modelOutput.costForCondObs
     measurementFCO = experimentalData.measurementForCondObs
@@ -254,7 +256,7 @@ function calcCost_proto(modelParameters, modelOutput, experimentalData, p)
     cost = 0.0
     for iCond in 1:experimentalData.numConditions
         for iObs in observedOFC[iCond]
-            costFCO[iCond, iObs] = log(2*pi*dualVarianceVector[varianceMap[iCond, iObs]]) + (dot(measurementFCO[iCond, iObs], measurementFCO[iCond, iObs]) - 
+            costFCO[iCond, iObs] = log(2*pi*dualVarianceVector[varianceMap[iCond, iObs]]) * numDataFCO[iCond, iObs] + (dot(measurementFCO[iCond, iObs], measurementFCO[iCond, iObs]) - 
                 2*dot(measurementFCO[iCond, iObs], h_hatFCO[iCond, iObs]) + 
                 dot(h_hatFCO[iCond, iObs], h_hatFCO[iCond, iObs])) / (2 * dualVarianceVector[varianceMap[iCond, iObs]])
         end
@@ -317,19 +319,15 @@ function ParameterSpace(modelParameters, parameterBounds;
     slb = Vector{Float64}(undef, numScale)
     sub = Vector{Float64}(undef, numScale)
     isLogScale = Vector{Bool}(undef, numScale) 
-    startScale = Vector{Float64}(undef, numScale) 
     olb = Vector{Float64}(undef, numOffset)
     oub = Vector{Float64}(undef, numOffset)
     isLogOffset = Vector{Bool}(undef, numOffset) 
-    startOffset = Vector{Float64}(undef, numOffset) 
     vlb = Vector{Float64}(undef, numVariance)
     vub = Vector{Float64}(undef, numVariance)
     isLogVariance = Vector{Bool}(undef, numVariance) 
-    startVariance = Vector{Float64}(undef, numVariance) 
     plb = Vector{Float64}(undef, numOptParameters)
     pub = Vector{Float64}(undef, numOptParameters) 
     isLogParameter = Vector{Bool}(undef, numOptParameters) 
-    startParameters = Vector{Float64}(undef, numOptParameters) 
 
     scaleNames = modelParameters.scaleNames
     offsetNames = modelParameters.offsetNames
@@ -348,7 +346,6 @@ function ParameterSpace(modelParameters, parameterBounds;
                 slb[sIndex] = parameterBounds[i, 4]
                 sub[sIndex] = parameterBounds[i, 5]
             end
-            startScale[sIndex] = rand(Uniform(slb[sIndex], sub[sIndex]))
         elseif occursin(offsetDeterminer, parId)
             oIndex = findfirst(lowercase(parId) .== lowercase.(offsetNames))
             if parameterBounds[i, 3] == "log10"
@@ -360,7 +357,6 @@ function ParameterSpace(modelParameters, parameterBounds;
                 olb[oIndex] = parameterBounds[i, 4]
                 oub[oIndex] = parameterBounds[i, 5]
             end
-            startOffset[oIndex] = rand(Uniform(olb[oIndex], oub[oIndex]))
         elseif occursin(varianceDeterminer, parId)
             vIndex = findfirst(lowercase(parId) .== lowercase.(varianceNames))
             if parameterBounds[i, 3] == "log10"
@@ -372,7 +368,6 @@ function ParameterSpace(modelParameters, parameterBounds;
                 vlb[vIndex] = parameterBounds[i, 4]
                 vub[vIndex] = parameterBounds[i, 5]
             end
-            startVariance[vIndex] = rand(Uniform(vlb[vIndex], vub[vIndex]))
         else
             pIndex = findfirst(lowercase(parId) .== lowercase.(optParameterNames))
             if parameterBounds[i, 3] == "log10"
@@ -384,7 +379,6 @@ function ParameterSpace(modelParameters, parameterBounds;
                 plb[pIndex] = parameterBounds[i, 4]
                 pub[pIndex] = parameterBounds[i, 5]
             end
-            startParameters[pIndex] = rand(Uniform(plb[pIndex], pub[pIndex]))
         end
     end
 
@@ -399,11 +393,13 @@ function ParameterSpace(modelParameters, parameterBounds;
     doLogSearchParameter = parameterIndices[isLogParameter]
     doLogSearch = vcat(doLogSearchScale, doLogSearchOffset, doLogSearchVariance, doLogSearchParameter)
 
-    startAllParameters = vcat(startScale, startOffset, startVariance, startParameters)
+    parameterSpace = ParameterSpace(slb, sub, olb, oub, vlb, vub, plb, pub, doLogSearch)
 
-    parameterSpace = ParameterSpace(olb, oub, slb, sub, vlb, vub, plb, pub, doLogSearch)
+    lowerBounds = vcat(slb, olb, vlb, plb)
+    upperBounds = vcat(sub, oub, vub, pub)
+    numAllStartParameters = length(lowerBounds)
 
-    return parameterSpace, startAllParameters
+    return parameterSpace, numAllStartParameters, lowerBounds, upperBounds
 end
 
 function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData; 
@@ -616,6 +612,7 @@ function ExperimentalData(observables, experimentalConditions, measurementData, 
     observedAtForCond = Vector{Vector{Vector{Float64}}}(undef, numConditions)
     observedAtIndexForCondObs = Array{Vector{Int64}, 2}(undef, numConditions, numObservables)
     measurementForCondObs = Array{Vector{Float64}, 2}(undef, numConditions, numObservables)
+    numDataForCondObs = Array{Int64, 2}(undef, numConditions, numObservables)
 
     for (iCond, condId) in enumerate(experimentalConditions[!,1])
         inputParameterValuesForCond[iCond] = [experimentalConditions[iCond, inPar] for inPar in inputParameterSymbols]
@@ -628,18 +625,19 @@ function ExperimentalData(observables, experimentalConditions, measurementData, 
         observedObservableForCond[iCond] = collect(1:numObservables)[isObserved]
 
         observedAtForCond[iCond] = Vector{Vector{Float64}}(undef, numObservables)
-        for (i, obsId) = enumerate(observableNames)
-            observedAtForCond[iCond][i] = relevantMeasurementData[observableIDs .== obsId, 5]
+        for (iObs, obsId) = enumerate(observableNames)
+            observedAtForCond[iCond][iObs] = relevantMeasurementData[observableIDs .== obsId, 5]
         end
-        for i = 1:numObservables
-            observedAtIndexForCondObs[iCond, i] = indexin(observedAtForCond[iCond][i], timeStepsForCond[iCond])
+        for iObs = 1:numObservables
+            observedAtIndexForCondObs[iCond, iObs] = indexin(observedAtForCond[iCond][iObs], timeStepsForCond[iCond])
         end
-        for (i, obsId) = enumerate(observableNames)
-            measurementForCondObs[iCond, i] = relevantMeasurementData[observableIDs .== obsId, 4]
+        for (iObs, obsId) = enumerate(observableNames)
+            measurementForCondObs[iCond, iObs] = relevantMeasurementData[observableIDs .== obsId, 4]
+            numDataForCondObs[iCond, iObs] = length(measurementForCondObs[iCond, iObs])
         end
     end
 
-    experimentalData = ExperimentalData(measurementForCondObs, timeStepsForCond, observedAtIndexForCondObs, numConditions, numObservables, inputParameterValuesForCond, observedObservableForCond)
+    experimentalData = ExperimentalData(measurementForCondObs, timeStepsForCond, observedAtIndexForCondObs, numConditions, numObservables, numDataForCondObs, inputParameterValuesForCond, observedObservableForCond)
 
     return experimentalData
 end
@@ -680,7 +678,7 @@ function GradCalc_forwardDiff(filesAndPaths, timeEnd, experimentalConditions, me
 
     modelParameters = ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData)
 
-    parameterSpace, startOptParameters = ParameterSpace(modelParameters, parameterBounds)
+    parameterSpace, numAllStartParameters, lowerBounds, upperBounds = ParameterSpace(modelParameters, parameterBounds)
 
     usedType = ForwardDiff.Dual
     modelOutput = ModelOutput(usedType, experimentalData, modelParameters)
@@ -696,31 +694,31 @@ function GradCalc_forwardDiff(filesAndPaths, timeEnd, experimentalConditions, me
     allConditionsCost = (p) -> allConditionsCost_proto(modelParameters, experimentalData, modelData,
             calcUnscaledObservable, calcScaledObservable, calcCost, p)
 
-    chunkSize = 13
-    cfg = GradientConfig(allConditionsCost, startOptParameters, Chunk{chunkSize}())
+    allStartParameters = getSamples(numAllStartParameters, lowerBounds, upperBounds, 1)
 
-    result = DiffResults.GradientResult(startOptParameters::Vector{Float64})
+    chunkSize = 23
+    cfg = GradientConfig(allConditionsCost, allStartParameters, Chunk{chunkSize}())
+
+    result = DiffResults.GradientResult(allStartParameters::Vector{Float64})
 
     f = (p_tuple...) -> f_cost_proto(result, allConditionsCost, cfg, parameterSpace, modelParameters, modelOutput, p_tuple...)
     f_grad = (grad, p_tuple...) -> f_grad_proto(grad, modelOutput, p_tuple...)
+
     
     model = Model(NLopt.Optimizer)
-    numStartOptParameters = length(startOptParameters)
     #JuMP.register(model::Model, s::Symbol, dimension::Integer, f::Function, ∇f::Function, ∇²f::Function)
-    register(model, :f, numStartOptParameters, f, f_grad)
+    register(model, :f, numAllStartParameters, f, f_grad)
     set_optimizer_attribute(model, "algorithm", :LD_MMA)
-    lowerBounds = vcat(parameterSpace.scaleLowerBound, parameterSpace.offsetLowerBound, parameterSpace.varianceLowerBound, parameterSpace.parameterLowerBound)
-    upperBounds = vcat(parameterSpace.scaleUpperBound, parameterSpace.offsetUpperBound, parameterSpace.varianceUpperBound, parameterSpace.parameterUpperBound)
-    @variable(model, lowerBounds[i] <= p[i = 1:numStartOptParameters] <= upperBounds[i]) # fix lower and upper bounds
-    for i in 1:numStartOptParameters
-        set_start_value(p[i], startOptParameters[i])
+    @variable(model, lowerBounds[i] <= p[i = 1:numAllStartParameters] <= upperBounds[i]) # fix lower and upper bounds
+    for i in 1:numAllStartParameters
+        set_start_value(p[i], allStartParameters[i])
     end
     @NLobjective(model, Min, f(p...))
     JuMP.optimize!(model)
     @show termination_status(model)
     @show primal_status(model)
     println("Done!")
-    p_opt = [value(p[i]) for i=1:numStartOptParameters]
+    p_opt = [value(p[i]) for i=1:numAllStartParameters]
     cost_opt = objective_value(model)
     println("Final cost: ", cost_opt)
 
