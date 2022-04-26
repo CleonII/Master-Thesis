@@ -13,3 +13,6 @@ load_model_libSBML.jl
 simple_code.jl
 test.jl
 Pipeline_ModelSolver/estimate_time_span.jl
+Pipeline_ModelParameterEstimation/test*
+Pipeline_ModelParameterEstimation/GradCalc*
+Pipeline_ModelParameterEstimation/bench*
