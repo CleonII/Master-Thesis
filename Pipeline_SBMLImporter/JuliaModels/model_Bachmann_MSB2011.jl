@@ -8,6 +8,7 @@ ModelingToolkit.@variables t p1EpoRpJAK2(t) pSTAT5(t) EpoRJAK2_CIS(t) SOCS3nRNA4
 ### Define variable parameters
 
 ### Define dummy variable
+ModelingToolkit.@variables dummyVariable(t)
 
 ### Define parameters
 ModelingToolkit.@parameters STAT5Exp STAT5Imp init_SOCS3_multiplier EpoRCISRemove STAT5ActEpoR SHP1ActEpoR JAK2EpoRDeaSHP1 CISTurn SOCS3Turn init_EpoRJAK2_CIS SOCS3Inh ActD init_CIS_multiplier CISRNAEqc JAK2ActEpo Epo SOCS3oe CISInh SHP1Dea SOCS3EqcOE CISRNADelay init_SHP1 CISEqcOE EpoRActJAK2 SOCS3RNAEqc CISEqc SHP1ProOE SOCS3RNADelay init_STAT5 CISoe CISRNATurn init_SHP1_multiplier init_EpoRJAK2 EpoRCISInh STAT5ActJAK2 SOCS3RNATurn SOCS3Eqc
@@ -22,31 +23,33 @@ D = Differential(t)
 
 ### Derivatives ###
 eqs = [
-D(p1EpoRpJAK2) ~ +1.0 * (cyt * (EpoRpJAK2 * EpoRActJAK2 / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (cyt * (3 * EpoRActJAK2 * p1EpoRpJAK2 / ((SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (EpoRCISInh * EpoRJAK2_CIS + 1))))-1.0 * (cyt * (JAK2EpoRDeaSHP1 * SHP1Act * p1EpoRpJAK2 / init_SHP1)),
-D(pSTAT5) ~ +1.0 * (cyt * (STAT5 * STAT5ActJAK2 * (EpoRpJAK2 + p12EpoRpJAK2 + p1EpoRpJAK2 + p2EpoRpJAK2) / (init_EpoRJAK2 * (SOCS3 * SOCS3Inh / SOCS3Eqc + 1))))+1.0 * (cyt * (STAT5 * STAT5ActEpoR * (p12EpoRpJAK2 + p1EpoRpJAK2)^(2) / ((init_EpoRJAK2)^(2) * (SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (CIS * CISInh / CISEqc + 1))))-1.0 * (cyt * STAT5Imp * pSTAT5),
-D(EpoRJAK2_CIS) ~ -1.0 * (cyt * (EpoRJAK2_CIS * EpoRCISRemove * (p12EpoRpJAK2 + p1EpoRpJAK2) / init_EpoRJAK2)),
-D(SOCS3nRNA4) ~ +1.0 * (nuc * SOCS3nRNA3 * SOCS3RNADelay)-1.0 * (nuc * SOCS3nRNA4 * SOCS3RNADelay),
-D(SOCS3RNA) ~ +1.0 * (nuc * SOCS3nRNA5 * SOCS3RNADelay)-1.0 * (cyt * SOCS3RNA * SOCS3RNATurn),
-D(SHP1) ~ -1.0 * (cyt * (SHP1 * SHP1ActEpoR * (EpoRpJAK2 + p12EpoRpJAK2 + p1EpoRpJAK2 + p2EpoRpJAK2) / init_EpoRJAK2))+1.0 * (cyt * SHP1Dea * SHP1Act),
-D(STAT5) ~ -1.0 * (cyt * (STAT5 * STAT5ActJAK2 * (EpoRpJAK2 + p12EpoRpJAK2 + p1EpoRpJAK2 + p2EpoRpJAK2) / (init_EpoRJAK2 * (SOCS3 * SOCS3Inh / SOCS3Eqc + 1))))-1.0 * (cyt * (STAT5 * STAT5ActEpoR * (p12EpoRpJAK2 + p1EpoRpJAK2)^(2) / ((init_EpoRJAK2)^(2) * (SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (CIS * CISInh / CISEqc + 1))))+1.0 * (nuc * STAT5Exp * npSTAT5),
-D(EpoRJAK2) ~ -1.0 * (cyt * (Epo * EpoRJAK2 * JAK2ActEpo / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))+1.0 * (cyt * (EpoRpJAK2 * JAK2EpoRDeaSHP1 * SHP1Act / init_SHP1))+1.0 * (cyt * (JAK2EpoRDeaSHP1 * SHP1Act * p1EpoRpJAK2 / init_SHP1))+1.0 * (cyt * (JAK2EpoRDeaSHP1 * SHP1Act * p2EpoRpJAK2 / init_SHP1))+1.0 * (cyt * (JAK2EpoRDeaSHP1 * SHP1Act * p12EpoRpJAK2 / init_SHP1)),
-D(CISnRNA1) ~ +1.0 * (nuc * (CISRNAEqc * CISRNATurn * npSTAT5 * ActD / init_STAT5))-1.0 * (nuc * CISnRNA1 * CISRNADelay),
-D(SOCS3nRNA1) ~ +1.0 * (nuc * (SOCS3RNAEqc * SOCS3RNATurn * npSTAT5 * ActD / init_STAT5))-1.0 * (nuc * SOCS3nRNA1 * SOCS3RNADelay),
-D(SOCS3nRNA2) ~ +1.0 * (nuc * SOCS3nRNA1 * SOCS3RNADelay)-1.0 * (nuc * SOCS3nRNA2 * SOCS3RNADelay),
-D(CISnRNA3) ~ +1.0 * (nuc * CISnRNA2 * CISRNADelay)-1.0 * (nuc * CISnRNA3 * CISRNADelay),
-D(CISnRNA4) ~ +1.0 * (nuc * CISnRNA3 * CISRNADelay)-1.0 * (nuc * CISnRNA4 * CISRNADelay),
-D(SOCS3) ~ +1.0 * (cyt * (SOCS3RNA * SOCS3Eqc * SOCS3Turn / SOCS3RNAEqc))-1.0 * (cyt * SOCS3 * SOCS3Turn)+1.0 * (cyt * SOCS3oe * SOCS3Eqc * SOCS3Turn * SOCS3EqcOE),
-D(CISnRNA5) ~ +1.0 * (nuc * CISnRNA4 * CISRNADelay)-1.0 * (nuc * CISnRNA5 * CISRNADelay),
-D(SOCS3nRNA5) ~ +1.0 * (nuc * SOCS3nRNA4 * SOCS3RNADelay)-1.0 * (nuc * SOCS3nRNA5 * SOCS3RNADelay),
-D(SOCS3nRNA3) ~ +1.0 * (nuc * SOCS3nRNA2 * SOCS3RNADelay)-1.0 * (nuc * SOCS3nRNA3 * SOCS3RNADelay),
-D(SHP1Act) ~ +1.0 * (cyt * (SHP1 * SHP1ActEpoR * (EpoRpJAK2 + p12EpoRpJAK2 + p1EpoRpJAK2 + p2EpoRpJAK2) / init_EpoRJAK2))-1.0 * (cyt * SHP1Dea * SHP1Act),
-D(npSTAT5) ~ +1.0 * (cyt * STAT5Imp * pSTAT5)-1.0 * (nuc * STAT5Exp * npSTAT5),
-D(p12EpoRpJAK2) ~ +1.0 * (cyt * (3 * EpoRActJAK2 * p1EpoRpJAK2 / ((SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (EpoRCISInh * EpoRJAK2_CIS + 1))))+1.0 * (cyt * (EpoRActJAK2 * p2EpoRpJAK2 / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (cyt * (JAK2EpoRDeaSHP1 * SHP1Act * p12EpoRpJAK2 / init_SHP1)),
-D(p2EpoRpJAK2) ~ +1.0 * (cyt * (3 * EpoRpJAK2 * EpoRActJAK2 / ((SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (EpoRCISInh * EpoRJAK2_CIS + 1))))-1.0 * (cyt * (EpoRActJAK2 * p2EpoRpJAK2 / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (cyt * (JAK2EpoRDeaSHP1 * SHP1Act * p2EpoRpJAK2 / init_SHP1)),
-D(CIS) ~ +1.0 * (cyt * (CISRNA * CISEqc * CISTurn / CISRNAEqc))-1.0 * (cyt * CIS * CISTurn)+1.0 * (cyt * CISEqc * CISTurn * CISEqcOE * CISoe),
-D(EpoRpJAK2) ~ +1.0 * (cyt * (Epo * EpoRJAK2 * JAK2ActEpo / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (cyt * (EpoRpJAK2 * JAK2EpoRDeaSHP1 * SHP1Act / init_SHP1))-1.0 * (cyt * (EpoRpJAK2 * EpoRActJAK2 / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (cyt * (3 * EpoRpJAK2 * EpoRActJAK2 / ((SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (EpoRCISInh * EpoRJAK2_CIS + 1)))),
-D(CISnRNA2) ~ +1.0 * (nuc * CISnRNA1 * CISRNADelay)-1.0 * (nuc * CISnRNA2 * CISRNADelay),
-D(CISRNA) ~ +1.0 * (nuc * CISnRNA5 * CISRNADelay)-1.0 * (cyt * CISRNA * CISRNATurn)]
+D(p1EpoRpJAK2) ~ +1.0 * (0.4 * (EpoRpJAK2 * EpoRActJAK2 / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (0.4 * (3 * EpoRActJAK2 * p1EpoRpJAK2 / ((SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (EpoRCISInh * EpoRJAK2_CIS + 1))))-1.0 * (0.4 * (JAK2EpoRDeaSHP1 * SHP1Act * p1EpoRpJAK2 / init_SHP1)),
+D(pSTAT5) ~ +1.0 * (0.4 * (STAT5 * STAT5ActJAK2 * (EpoRpJAK2 + p12EpoRpJAK2 + p1EpoRpJAK2 + p2EpoRpJAK2) / (init_EpoRJAK2 * (SOCS3 * SOCS3Inh / SOCS3Eqc + 1))))+1.0 * (0.4 * (STAT5 * STAT5ActEpoR * (p12EpoRpJAK2 + p1EpoRpJAK2)^(2) / ((init_EpoRJAK2)^(2) * (SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (CIS * CISInh / CISEqc + 1))))-1.0 * (0.4 * STAT5Imp * pSTAT5),
+D(EpoRJAK2_CIS) ~ -1.0 * (0.4 * (EpoRJAK2_CIS * EpoRCISRemove * (p12EpoRpJAK2 + p1EpoRpJAK2) / init_EpoRJAK2)),
+D(SOCS3nRNA4) ~ +1.0 * (0.275 * SOCS3nRNA3 * SOCS3RNADelay)-1.0 * (0.275 * SOCS3nRNA4 * SOCS3RNADelay),
+D(SOCS3RNA) ~ +1.0 * (0.275 * SOCS3nRNA5 * SOCS3RNADelay)-1.0 * (0.4 * SOCS3RNA * SOCS3RNATurn),
+D(SHP1) ~ -1.0 * (0.4 * (SHP1 * SHP1ActEpoR * (EpoRpJAK2 + p12EpoRpJAK2 + p1EpoRpJAK2 + p2EpoRpJAK2) / init_EpoRJAK2))+1.0 * (0.4 * SHP1Dea * SHP1Act),
+D(STAT5) ~ -1.0 * (0.4 * (STAT5 * STAT5ActJAK2 * (EpoRpJAK2 + p12EpoRpJAK2 + p1EpoRpJAK2 + p2EpoRpJAK2) / (init_EpoRJAK2 * (SOCS3 * SOCS3Inh / SOCS3Eqc + 1))))-1.0 * (0.4 * (STAT5 * STAT5ActEpoR * (p12EpoRpJAK2 + p1EpoRpJAK2)^(2) / ((init_EpoRJAK2)^(2) * (SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (CIS * CISInh / CISEqc + 1))))+1.0 * (0.275 * STAT5Exp * npSTAT5),
+D(EpoRJAK2) ~ -1.0 * (0.4 * (Epo * EpoRJAK2 * JAK2ActEpo / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))+1.0 * (0.4 * (EpoRpJAK2 * JAK2EpoRDeaSHP1 * SHP1Act / init_SHP1))+1.0 * (0.4 * (JAK2EpoRDeaSHP1 * SHP1Act * p1EpoRpJAK2 / init_SHP1))+1.0 * (0.4 * (JAK2EpoRDeaSHP1 * SHP1Act * p2EpoRpJAK2 / init_SHP1))+1.0 * (0.4 * (JAK2EpoRDeaSHP1 * SHP1Act * p12EpoRpJAK2 / init_SHP1)),
+D(CISnRNA1) ~ +1.0 * (0.275 * (CISRNAEqc * CISRNATurn * npSTAT5 * ActD / init_STAT5))-1.0 * (0.275 * CISnRNA1 * CISRNADelay),
+D(SOCS3nRNA1) ~ +1.0 * (0.275 * (SOCS3RNAEqc * SOCS3RNATurn * npSTAT5 * ActD / init_STAT5))-1.0 * (0.275 * SOCS3nRNA1 * SOCS3RNADelay),
+D(SOCS3nRNA2) ~ +1.0 * (0.275 * SOCS3nRNA1 * SOCS3RNADelay)-1.0 * (0.275 * SOCS3nRNA2 * SOCS3RNADelay),
+D(CISnRNA3) ~ +1.0 * (0.275 * CISnRNA2 * CISRNADelay)-1.0 * (0.275 * CISnRNA3 * CISRNADelay),
+D(CISnRNA4) ~ +1.0 * (0.275 * CISnRNA3 * CISRNADelay)-1.0 * (0.275 * CISnRNA4 * CISRNADelay),
+D(SOCS3) ~ +1.0 * (0.4 * (SOCS3RNA * SOCS3Eqc * SOCS3Turn / SOCS3RNAEqc))-1.0 * (0.4 * SOCS3 * SOCS3Turn)+1.0 * (0.4 * SOCS3oe * SOCS3Eqc * SOCS3Turn * SOCS3EqcOE),
+D(CISnRNA5) ~ +1.0 * (0.275 * CISnRNA4 * CISRNADelay)-1.0 * (0.275 * CISnRNA5 * CISRNADelay),
+D(SOCS3nRNA5) ~ +1.0 * (0.275 * SOCS3nRNA4 * SOCS3RNADelay)-1.0 * (0.275 * SOCS3nRNA5 * SOCS3RNADelay),
+D(SOCS3nRNA3) ~ +1.0 * (0.275 * SOCS3nRNA2 * SOCS3RNADelay)-1.0 * (0.275 * SOCS3nRNA3 * SOCS3RNADelay),
+D(SHP1Act) ~ +1.0 * (0.4 * (SHP1 * SHP1ActEpoR * (EpoRpJAK2 + p12EpoRpJAK2 + p1EpoRpJAK2 + p2EpoRpJAK2) / init_EpoRJAK2))-1.0 * (0.4 * SHP1Dea * SHP1Act),
+D(npSTAT5) ~ +1.0 * (0.4 * STAT5Imp * pSTAT5)-1.0 * (0.275 * STAT5Exp * npSTAT5),
+D(p12EpoRpJAK2) ~ +1.0 * (0.4 * (3 * EpoRActJAK2 * p1EpoRpJAK2 / ((SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (EpoRCISInh * EpoRJAK2_CIS + 1))))+1.0 * (0.4 * (EpoRActJAK2 * p2EpoRpJAK2 / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (0.4 * (JAK2EpoRDeaSHP1 * SHP1Act * p12EpoRpJAK2 / init_SHP1)),
+D(p2EpoRpJAK2) ~ +1.0 * (0.4 * (3 * EpoRpJAK2 * EpoRActJAK2 / ((SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (EpoRCISInh * EpoRJAK2_CIS + 1))))-1.0 * (0.4 * (EpoRActJAK2 * p2EpoRpJAK2 / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (0.4 * (JAK2EpoRDeaSHP1 * SHP1Act * p2EpoRpJAK2 / init_SHP1)),
+D(CIS) ~ +1.0 * (0.4 * (CISRNA * CISEqc * CISTurn / CISRNAEqc))-1.0 * (0.4 * CIS * CISTurn)+1.0 * (0.4 * CISEqc * CISTurn * CISEqcOE * CISoe),
+D(EpoRpJAK2) ~ +1.0 * (0.4 * (Epo * EpoRJAK2 * JAK2ActEpo / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (0.4 * (EpoRpJAK2 * JAK2EpoRDeaSHP1 * SHP1Act / init_SHP1))-1.0 * (0.4 * (EpoRpJAK2 * EpoRActJAK2 / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * (0.4 * (3 * EpoRpJAK2 * EpoRActJAK2 / ((SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (EpoRCISInh * EpoRJAK2_CIS + 1)))),
+D(CISnRNA2) ~ +1.0 * (0.275 * CISnRNA1 * CISRNADelay)-1.0 * (0.275 * CISnRNA2 * CISRNADelay),
+D(CISRNA) ~ +1.0 * (0.275 * CISnRNA5 * CISRNADelay)-1.0 * (0.4 * CISRNA * CISRNATurn),
+D(dummyVariable) ~ +init_SOCS3_multiplier+init_EpoRJAK2_CIS+init_CIS_multiplier+SOCS3EqcOE+init_SHP1+CISEqcOE+CISEqc+SHP1ProOE+init_STAT5+init_SHP1_multiplier+init_EpoRJAK2+SOCS3Eqc
+]
 
 @named sys = ODESystem(eqs)
 
@@ -76,7 +79,8 @@ p2EpoRpJAK2 => 0.0,
 CIS => init_CIS_multiplier * CISEqc * CISEqcOE,
 EpoRpJAK2 => 0.0,
 CISnRNA2 => 0.0,
-CISRNA => 0.0]
+CISRNA => 0.0,
+dummyVariable => 0.0]
 
 ### True parameter values ###
 trueParameterValues = [
