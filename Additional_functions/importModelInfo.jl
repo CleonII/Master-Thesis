@@ -8,6 +8,7 @@ struct ModelData
     observableVariableIndices::Vector{Int64}
     parameterInObservableIndices::Vector{Int64}
     parameterInU0Indices::Vector{Int64}
+    inputParameterSymbols::Vector{Symbol}
 end
 
 function ModelData(new_sys, prob, observables, experimentalConditions, initVariableNames, observableVariableNames, parameterInU0Names, parameterInObservableNames)
@@ -34,9 +35,9 @@ function ModelData(new_sys, prob, observables, experimentalConditions, initVaria
     parameterInObservableIndices = [findfirst(parION .== parameterNames) for parION in parameterInObservableNames]
 
     modelData = ModelData(observableLogTransformation, optParameterIndices, inputParameterIndices, 
-        initVariableIndices, observableVariableIndices, parameterInObservableIndices, parameterInU0Indices)
+        initVariableIndices, observableVariableIndices, parameterInObservableIndices, parameterInU0Indices, inputParameterSymbols)
 
-    return modelData, inputParameterSymbols
+    return modelData
 end
 
 
@@ -52,8 +53,10 @@ struct ExperimentalData
     observablesTimeIndexIndicesForCond::Vector{Array{Vector{Int64}, 2}}
 end
 
-function ExperimentalData(observables, experimentalConditions, measurementData, inputParameterSymbols)
+function ExperimentalData(observables, experimentalConditions, measurementData, modelData)
     observableNames = observables[!, 1]
+    inputParameterSymbols = modelData.inputParameterSymbols
+    observableLogTransformation = modelData.observableLogTransformation
 
     numConditions = length(experimentalConditions[!,1])
     numObservables = length(observableNames) 
@@ -89,7 +92,11 @@ function ExperimentalData(observables, experimentalConditions, measurementData, 
             observedAtIndexForCondObs[iCond, iObs] = indexin(observedAtForCond[iCond][iObs], timeStepsForCond[iCond])
         end
         for (iObs, obsId) = enumerate(observableNames)
-            measurementForCondObs[iCond, iObs] = relevantMeasurementData[observableIDs .== obsId, 4]
+            if observableLogTransformation[iObs]
+                measurementForCondObs[iCond, iObs] = log10.(relevantMeasurementData[observableIDs .== obsId, 4])
+            else
+                measurementForCondObs[iCond, iObs] = relevantMeasurementData[observableIDs .== obsId, 4]
+            end
             numDataForCondObs[iCond, iObs] = length(measurementForCondObs[iCond, iObs])
         end
         observablesTimeIndexIndicesForCond[iCond] = Array{Vector{Int64}, 2}(undef, numObservables, numTimeStepsForCond[iCond])

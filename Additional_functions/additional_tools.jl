@@ -100,4 +100,38 @@ function updateAllParameterVectors_proto(modelParameters, modelData)
     variance = view(allParameters, varianceIndices)
     varianceVector = modelParameters.varianceVector
     varianceVector[1:modelParameters.numVariance] .= variance
+
+    nothing
+end
+
+function updateAllDualParameterVectors_proto(modelParameters, dualModelParameters, modelData, p)
+    parameterIndices = modelParameters.parameterIndices
+    dynPars = view(p, parameterIndices)
+    dynParVector = modelParameters.dynamicParametersVector
+    dualDynParVector = dualModelParameters.dualDynamicParametersVector
+    dualDynParVector .= convert.(eltype(p), dynParVector)
+    dualDynParVector[modelData.optParameterIndices] .= dynPars
+
+    scaleIndices = modelParameters.scaleIndices
+    scale = view(p, scaleIndices)
+    scaleVector = modelParameters.scaleVector
+    dualScaleVector = dualModelParameters.dualScaleVector
+    dualScaleVector .= convert.(eltype(p), scaleVector)
+    dualScaleVector[1:modelParameters.numScale] .= scale
+
+    offsetIndices = modelParameters.offsetIndices
+    offset = view(p, offsetIndices)
+    offsetVector = modelParameters.offsetVector
+    dualOffsetVector = dualModelParameters.dualOffsetVector
+    dualOffsetVector .= convert.(eltype(p), offsetVector)
+    dualOffsetVector[1:modelParameters.numOffset] .= offset
+
+    varianceIndices = modelParameters.varianceIndices
+    variance = view(p, varianceIndices)
+    varianceVector = modelParameters.varianceVector
+    dualVarianceVector = dualModelParameters.dualVarianceVector
+    dualVarianceVector .= convert.(eltype(p), varianceVector)
+    dualVarianceVector[1:modelParameters.numVariance] .= variance
+
+    nothing
 end
