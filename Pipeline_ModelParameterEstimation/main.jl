@@ -1,7 +1,8 @@
 using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV
-using JuMP, NLopt, LinearAlgebra, DiffEqSensitivity, ForwardDiff
+using JuMP, NLopt, Ipopt, LinearAlgebra, DiffEqSensitivity, ForwardDiff
 using ModelingToolkit: varmap_to_vars
 using ForwardDiff: GradientConfig, Chunk
+using LatinHypercubeSampling
 
 println("Done loading modules")
 
@@ -9,167 +10,123 @@ include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters", "LatinHyperCubeSampledParameters.jl"))
 include(joinpath(pwd(), "Additional_functions", "importModelInfo.jl"))
 
-function optModelSaveResults(model, p, doLogSearch, option1, option2, option3, iStartPar, iterations, methodFile, write)
+include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "optAndSave.jl"))
+include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "model_Bachmann_MSB2011", "adjointSensitivities.jl"))
+include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "model_Bachmann_MSB2011", "forwardAutomaticDifferentiation.jl"))
+include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "model_Bachmann_MSB2011", "forwardGradient.jl"))
+include(joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels", "model_Bachmann_MSB2011.jl"))
 
-    benchRunTime = Vector{Float64}(undef, iterations)
-    benchMemory = Vector{Float64}(undef, iterations)
-    benchAllocs = Vector{Float64}(undef, iterations)
-    success = true
-    p_opt = Vector{Float64}(undef, length(p))
-    cost_opt = 0.0 
+function orderParameters(modelParameters, parameterBounds;
+    scaleDeterminer = "scale", offsetDeterminer = "offset", varianceDeterminer = "sd_")
 
-    p_save = copy(p)
+    numScale = modelParameters.numScale
+    numOffset = modelParameters.numOffset
+    numVariance = modelParameters.numVariance
+    numOptParameters = modelParameters.numOptParameters
 
-    try
-        JuMP.optimize!(model)
-        p_opt[:] = [value(p[i]) for i=1:length(p)]
-        view(p_opt, doLogSearch) .= exp10.(view(p_opt, doLogSearch))
-        cost_opt = objective_value(model)
-        success = true 
-    catch err
-        println(err)
-        success = false
-        p_opt .= NaN
-        cost_opt = Inf
-    end
+    scaleNames = modelParameters.scaleNames
+    offsetNames = modelParameters.offsetNames
+    varianceNames = modelParameters.varianceNames
+    optParameterNames = modelParameters.optParameterNames
 
-    terminationStatus = termination_status(model)
-    primalStatus = primal_status(model)
+    newScaleVector = Vector{Float64}(undef, numScale)
+    newOffsetVector = Vector{Float64}(undef, numOffset)
+    newVarianceVector = Vector{Float64}(undef, numVariance)
+    newDynamicParameterVector = Vector{Float64}(undef, numOptParameters)
 
-    if success
-        for iter in 1:iterations
-            b = @benchmark begin
-                $p = copy($p_save)
-                JuMP.optimize!($model) 
-            end samples=1 evals=1 
-            
-            bMin = minimum(b)
-            benchRunTime[iter] = bMin.time # microsecond
-            benchMemory[iter] = bMin.memory # bytes
-            benchAllocs[iter] = bMin.allocs # number of allocations
+    for (i, parId) in enumerate(parameterBounds[!, 1])
+        if occursin(scaleDeterminer, parId)
+            sIndex = findfirst(lowercase(parId) .== lowercase.(scaleNames))
+            newScaleVector[sIndex] = parameterBounds[i, :nominalValue]
+        elseif occursin(offsetDeterminer, parId)
+            oIndex = findfirst(lowercase(parId) .== lowercase.(offsetNames))
+            newOffsetVector[oIndex] = parameterBounds[i, :nominalValue]
+        elseif occursin(varianceDeterminer, parId)
+            vIndex = findfirst(lowercase(parId) .== lowercase.(varianceNames))
+            newVarianceVector[vIndex] = parameterBounds[i, :nominalValue]^2
+        else
+            pIndex = findfirst(lowercase(parId) .== lowercase.(optParameterNames))
+            newDynamicParameterVector[pIndex] = parameterBounds[i, :nominalValue]
         end
-    else
-        benchRunTime .= NaN
-        benchMemory .= NaN
-        benchAllocs .= NaN
     end
 
-    data = DataFrame(method = methodFile[1:end-3], option1 = option1, option2 = option2, option3 = option3, startParameterIndex = iStartPar, 
-            success = success, terminationStatus = terminationStatus, primalStatus = primalStatus, cost = cost_opt, 
-            runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs, iteration = 1:iterations)
-    if isfile(write)
-        CSV.write(write, data, append = true)
-    else
-        CSV.write(write, data)
-    end
+    return vcat(newScaleVector, newOffsetVector, newVarianceVector, newDynamicParameterVector)
+end
 
-    data_pars = DataFrame(p_opt', :auto)
-    insertcols!(data_pars, 1, :method => methodFile[1:end-3])
-    insertcols!(data_pars, 2, :option1 => option1)
-    insertcols!(data_pars, 3, :option2 => option2)
-    insertcols!(data_pars, 4, :option3 => option3)
-    insertcols!(data_pars, 5, :startParameterIndex => iStartPar)
-    insertcols!(data_pars, 6, :iteration => 1)
-    write_pars = write[1:end-4] * "_pars.csv"
-    if isfile(write_pars)
-        CSV.write(write_pars, data_pars, append = true)
-    else
-        CSV.write(write_pars, data_pars)
-    end
-            
+function calcCorrectCost(timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
+
+    sys, initialSpeciesValues, trueParameterValues = getODEModel()
+    new_sys = ode_order_lowering(sys)
+    u0 = initialSpeciesValues
+    pars = trueParameterValues 
+    tspan = (0.0, timeEnd)
+    prob = ODEProblem(new_sys,u0,tspan,pars,jac=true)
+
+
+    initVariableNames = ["EpoRJAK2_CIS", "SHP1", "STAT5", "EpoRJAK2", "SOCS3", "CIS"]
+
+    observableVariableNames = ["CISRNA", "CIS", "SHP1", "SHP1Act", "SOCS3RNA", "SOCS3", "STAT5", 
+            "p12EpoRpJAK2", "p1EpoRpJAK2", "p2EpoRpJAK2", "EpoRpJAK2", "pSTAT5"]
+
+    parameterInU0Names = ["init_EpoRJAK2_CIS", "init_SHP1", "init_SHP1_multiplier", "SHP1ProOE", "init_STAT5", 
+            "init_EpoRJAK2", "init_SOCS3_multiplier", "SOCS3EqcOE", "SOCS3Eqc", "init_CIS_multiplier", "CISEqc", "CISEqcOE"]
+
+    parameterInObservableNames = ["CISRNAEqc", "CISEqc", "SOCS3RNAEqc", "SOCS3Eqc", "init_EpoRJAK2", "init_STAT5", "init_SHP1"]
+
+    # Initialize structs
+
+    modelData = ModelData(new_sys, prob, observables, experimentalConditions, 
+            initVariableNames, observableVariableNames, parameterInU0Names, parameterInObservableNames)
+
+    experimentalData = ExperimentalData(observables, experimentalConditions, measurementData, modelData)
+
+    modelParameters = ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData)
+
+    parameterSpace, numAllStartParameters, lowerBounds, upperBounds = ParameterSpace(modelParameters, parameterBounds)
+
+    modelOutput = ModelOutput(Float64, experimentalData, modelParameters)
+
+    # Get correct parameters
+
+    corrParameters = orderParameters(modelParameters, parameterBounds)
+
+    #
+
+    updateAllParameterVectors = () -> updateAllParameterVectors_proto(modelParameters, modelData)
+
+    solveODESystem = (iCond) -> solveODESystem_AdjSens_proto(prob, modelParameters.dynamicParametersVector, modelParameters.u0Vector, modelData, modelOutput, iCond)
+
+    g_unscaledObservables = (type, u, dynPar, i, iCond) -> g_unscaledObservables_AdjSens_proto(type, u, dynPar, i, iCond, modelData, experimentalData)
+
+    g_scaledObservationFunctions = (type, h_bar, scaleVector, offsetVector, iCond) -> g_scaledObservationFunctions_AdjSens_proto(type, h_bar, scaleVector, offsetVector, iCond, modelParameters, experimentalData, modelData)
+
+    g_cost = (type, h_hat, varianceVector, i, iCond) -> g_cost_AdjSens_proto(type, h_hat, varianceVector, i, iCond, modelParameters, experimentalData)
+
+    g = (u, dynPar, scale, offset, variance, i, iCond; type = get_type([u, dynPar, scale, offset, variance])) -> g_AdjSens_proto(u, dynPar, scale, offset, variance, i, iCond, g_unscaledObservables, g_scaledObservationFunctions, g_cost; type = get_type([u, dynPar, scale, offset, variance]))
+
+    G = (iCond) -> G_AdjSens_proto(solveODESystem, g, iCond, modelParameters, experimentalData, modelOutput)
+
+    allConditionsCost = (p...) -> allConditionsCost_AdjSens_proto(parameterSpace, modelParameters, experimentalData, modelData, 
+    updateAllParameterVectors, G, p...)
+
+    view(corrParameters, parameterSpace.doLogSearch) .= log10.(view(corrParameters, parameterSpace.doLogSearch))
+    cost = allConditionsCost(corrParameters...)
+
+    return cost
+    
 end
 
 
-function optAdamSaveResults(step, adam_opt, doLogSearch, n_it, b2, stepRange, iStartPar, iterations, methodFile, write)
-    loss_val = zeros(Float64, n_it)
-    theta_save = copy(adam_opt.theta)
-
-    benchRunTime = Vector{Float64}(undef, iterations)
-    benchMemory = Vector{Float64}(undef, iterations)
-    benchAllocs = Vector{Float64}(undef, iterations)
-    success = Vector{Bool}(undef, iterations)
-    success .= true
-    p_opt = Vector{Float64}(undef, length(theta_save))
-    cost_opt = Vector{Float64}(undef, iterations)
-    
-    for iter in 1:iterations 
-        
-        b = @benchmark begin
-            $adam_opt.theta = copy($theta_save)
-            $adam_opt.loss = 0.0
-            $adam_opt.m = zeros(length($theta_save))
-            $adam_opt.v = zeros(length($theta_save))
-            $adam_opt.t = 0
-            $adam_opt.β = 1.0
-            $adam_opt.fail = 0
-            for i in 1:$n_it
-                $step()
-                $loss_val[i] = $adam_opt.loss
-    
-                if $adam_opt.fail >= 10
-                    $success[$iter] = false
-                    break
-                end
-            end
-        end samples=1 evals=1
-
-        cost_opt[iter] = adam_opt.loss
-        p_opt[:] = adam_opt.theta
-        view(p_opt, doLogSearch) .= exp10.(view(p_opt, doLogSearch))
-
-        bMin = minimum(b)
-        benchRunTime[iter] = bMin.time # microsecond
-        benchMemory[iter] = bMin.memory # bytes
-        benchAllocs[iter] = bMin.allocs # number of allocations
-
-        data_pars = DataFrame(p_opt', :auto)
-        insertcols!(data_pars, 1, :method => methodFile[1:end-3])
-        insertcols!(data_pars, 2, :option1 => n_it)
-        insertcols!(data_pars, 3, :option2 => b2)
-        insertcols!(data_pars, 4, :option3 => string(stepRange))
-        insertcols!(data_pars, 5, :startParameterIndex => iStartPar)
-        insertcols!(data_pars, 6, :iteration => iter)
-        write_pars = write[1:end-4] * "_pars.csv"
-        if isfile(write_pars)
-            CSV.write(write_pars, data_pars, append = true)
-        else
-            CSV.write(write_pars, data_pars)
-        end
-
-        data_cost = DataFrame(loss_val', :auto)
-        insertcols!(data_cost, 1, :method => methodFile[1:end-3])
-        insertcols!(data_cost, 2, :option1 => n_it)
-        insertcols!(data_cost, 3, :option2 => b2)
-        insertcols!(data_cost, 4, :option3 => string(stepRange))
-        insertcols!(data_cost, 5, :startParameterIndex => iStartPar)
-        insertcols!(data_cost, 6, :iteration => iter)
-        write_cost = write[1:end-4] * "_forwGrad_cost.csv"
-        if isfile(write_cost)
-            CSV.write(write_cost, data_cost, append = true)
-        else
-            CSV.write(write_cost, data_cost)
-        end
-
-    end
-
-    data = DataFrame(method = methodFile[1:end-3], option1 = n_it, option2 = b2, option3 = string(stepRange), startParameterIndex = iStartPar, 
-            success = success, terminationStatus = "-", primalStatus = "-", cost = cost_opt,
-            runTime = benchRunTime, memory = benchMemory, allocs = benchAllocs, iteration = 1:iterations)
-    if isfile(write)
-        CSV.write(write, data, append = true)
-    else
-        CSV.write(write, data)
-    end
-
-end
 
 
-function benchMethod(filesAndPaths, methodFile, iStartPar, iterations, adjointSensitivities, forwardAutomaticDifferentiation, forwardGradient)
+
+function benchMethod(methodFile, iStartPar, iterations, 
+        filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
     write = joinpath(filesAndPaths.writePath, filesAndPaths.writeFile)
     
     # runtime, objective_value (at each step), end parameters, iterations 
     senseAlgs = getSenseAlgs()
-    optAlgs = [:LD_MMA, :LD_SLSQP, :LD_LBFGS]
+    optAlgs = [:LD_MMA, :LD_LBFGS, :Ipopt]
     chunkSizes = [23, 60, 115]
     stepRanges = [[0.0, -3.0], [-1.0, -4.0], [-2.0, -5.0], [-3.0, -3.0]]
     b2s = [0.999, 0.9]
@@ -181,11 +138,13 @@ function benchMethod(filesAndPaths, methodFile, iStartPar, iterations, adjointSe
         println("Running: adjointSensitivities.jl \n")
 
         for senseAlg in senseAlgs
-            model, p, doLogSearch = adjointSensitivities(iStartPar, senseAlg, optAlgs[1])
+            model, p, doLogSearch = adjointSensitivities(iStartPar, senseAlg, optAlgs[1], 
+                    timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
             optModelSaveResults(model, p, doLogSearch, senseAlg, optAlgs[1], "-", iStartPar, iterations, methodFile, write)
         end
         for optAlg in optAlgs
-            model, p, doLogSearch = adjointSensitivities(iStartPar, senseAlgs[1], optAlg)
+            model, p, doLogSearch = adjointSensitivities(iStartPar, senseAlgs[1], optAlg, 
+                    timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
             optModelSaveResults(model, p, doLogSearch, senseAlgs[1], optAlg, "-", iStartPar, iterations, methodFile, write)
         end
         
@@ -193,11 +152,13 @@ function benchMethod(filesAndPaths, methodFile, iStartPar, iterations, adjointSe
         println("Running: forwardAutomaticDifferentiation.jl \n")
 
         for chunkSize in chunkSizes
-            model, p, doLogSearch = forwardAutomaticDifferentiation(iStartPar, chunkSize, optAlgs[1])
+            model, p, doLogSearch = forwardAutomaticDifferentiation(iStartPar, chunkSize, optAlgs[1], 
+                    timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
             optModelSaveResults(model, p, doLogSearch, chunkSize, optAlgs[1], "-", iStartPar, iterations, methodFile, write)
         end
         for optAlg in optAlgs
-            model, p, doLogSearch = forwardAutomaticDifferentiation(iStartPar, chunkSizes[1], optAlg)
+            model, p, doLogSearch = forwardAutomaticDifferentiation(iStartPar, chunkSizes[1], optAlg, 
+                    timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
             optModelSaveResults(model, p, doLogSearch, chunkSizes[1], optAlg, "-", iStartPar, iterations, methodFile, write)
         end
         
@@ -205,21 +166,26 @@ function benchMethod(filesAndPaths, methodFile, iStartPar, iterations, adjointSe
         println("Running: forwardGradient.jl \n")
 
         for n_it in n_its
-            step, adam_opt, doLogSearch = forwardGradient(iStartPar, n_it, b2s[1], stepRanges[2])
+            step, adam_opt, doLogSearch = forwardGradient(iStartPar, n_it, b2s[1], stepRanges[2], 
+                    timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
             optAdamSaveResults(step, adam_opt, doLogSearch, n_it, b2s[1], stepRanges[2], iStartPar, iterations, methodFile, write)
         end
 
         for b2 in b2s
-            step, adam_opt, doLogSearch = forwardGradient(iStartPar, n_its[3], b2, stepRanges[2])
+            step, adam_opt, doLogSearch = forwardGradient(iStartPar, n_its[3], b2, stepRanges[2], 
+                    timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
             optAdamSaveResults(step, adam_opt, doLogSearch, n_its[3], b2, stepRanges[2], iStartPar, iterations, methodFile, write)
         end
 
         for stepRange in stepRanges
-            step, adam_opt, doLogSearch = forwardGradient(iStartPar, n_its[3], b2s[1], stepRange)
+            step, adam_opt, doLogSearch = forwardGradient(iStartPar, n_its[3], b2s[1], stepRange, 
+                    timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
             optAdamSaveResults(step, adam_opt, doLogSearch, n_its[3], b2s[1], stepRange, iStartPar, iterations, methodFile, write)
         end
 
     end
+
+    nothing
 
 end
 
@@ -227,13 +193,18 @@ end
 
 
 
-function iterateMethods(filesAndPaths, methodFiles, iterations, adjointSensitivities, forwardAutomaticDifferentiation, forwardGradient)
+function iterateMethods(methodFiles, iterations, 
+        filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
     
     for iStartPar=1:50
         for methodFile in methodFiles
-            benchMethod(filesAndPaths, methodFile, iStartPar, iterations, adjointSensitivities, forwardAutomaticDifferentiation, forwardGradient)
+            benchMethod(methodFile, iStartPar, iterations, 
+                    filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
         end
     end
+
+    nothing
+
 end
 
 
@@ -261,26 +232,18 @@ function main(; modelName = "model_Bachmann_MSB2011")
     parameterBounds = CSV.read(joinpath(readDataPath, "parameters_" * dataEnding), DataFrame)
     #
 
+    #correctCost = calcCorrectCost(filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
+    #println("Cost with correct parameters: ", correctCost) # 
+
     methodFiles = readdir(methodPath)
-    for methodFile in methodFiles
-        if methodFile !== "sensitivityEquations.jl"
-            include(joinpath(methodPath, methodFile))
-        end
-    end
-
-    adjointSensitivities = (iStartPar, senseAlg, optAlg) -> adjointSensitivities_proto(iStartPar, senseAlg, optAlg, 
-            filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
-
-    forwardAutomaticDifferentiation = (iStartPar, chunkSize, optAlg) -> forwardAutomaticDifferentiation_proto(iStartPar, chunkSize, optAlg, 
-            filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
-
-    forwardGradient = (iStartPar, n_it, b2, stepRange) -> forwardGradient_proto(iStartPar, n_it, b2, stepRange, 
-            filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
 
     println("Starting benchmark")
     
     iterations = 5
-    iterateMethods(filesAndPaths, methodFiles, iterations, adjointSensitivities, forwardAutomaticDifferentiation, forwardGradient)
+    iterateMethods(methodFiles, iterations, 
+            filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
+
+    nothing
 
 end
 

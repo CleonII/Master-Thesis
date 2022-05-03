@@ -83,6 +83,7 @@ function g_cost_AdjSens_proto(type, h_hat, varianceVector, i, iCond, modelParame
                 2*dot(measurementFCO[iCond, iObs][observablesTIIFC[iObs, i]], h_hat[iObs]) + 
                 dot(h_hat[iObs], h_hat[iObs])) / (2 * varianceVector[varianceMap[iCond, iObs]])
     end
+    
     return sum(costFCO[observedOFC[iCond]])
 end
 
@@ -189,12 +190,16 @@ function calcCostGrad_AdjSens_proto(g, dg!, G_specifiedDynPar, iCond, modelParam
 
     sol = modelOutput.sols[iCond]
 
-    ~, dynParGrad[:] = adjoint_sensitivities(sol, Rodas4P(), dg!, timeSteps, 
+    try
+        ~, dynParGrad[:] = adjoint_sensitivities(sol, Rodas4P(), dg!, timeSteps, 
             sensealg = senseAlg, reltol = 1e-9, abstol = 1e-9)
+    catch err
+        println(err)
+    end
 
     # when a parameter is included in the observation function the gradient is incorrect, has to correct with adding dgdp 
 
-    # gradient for scales, offsets and variances 
+    # gradient for scales, offsets, variances and dgdp 
     dynPar = modelParameters.dynamicParametersVector
     ∂g∂p = modelOutput.∂g∂p
     ∂g∂p .= 0.0
@@ -293,15 +298,13 @@ end
 
 
 
-function adjointSensitivities_proto(iStartPar, senseAlg, optAlg, 
-        filesAndPaths::FilesAndPaths, timeEnd::Float64, experimentalConditions::DataFrame, measurementData::DataFrame, observables::DataFrame, parameterBounds::DataFrame)
+function adjointSensitivities(iStartPar, senseAlg, optAlg, 
+        timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
 
-    include(joinpath(filesAndPaths.modelPath, filesAndPaths.modelFile))
+    sys, initialSpeciesValues, trueParameterValues = getODEModel()
     new_sys = ode_order_lowering(sys)
     u0 = initialSpeciesValues
-    p = trueParameterValues 
-    c = trueConstantsValues
-    pars = [p;c]
+    pars = trueParameterValues 
     tspan = (0.0, timeEnd)
     prob = ODEProblem(new_sys,u0,tspan,pars,jac=true)
 
@@ -318,10 +321,10 @@ function adjointSensitivities_proto(iStartPar, senseAlg, optAlg,
 
     # Initialize structs
 
-    modelData, inputParameterSymbols = ModelData(new_sys, prob, observables, experimentalConditions, 
+    modelData = ModelData(new_sys, prob, observables, experimentalConditions, 
             initVariableNames, observableVariableNames, parameterInU0Names, parameterInObservableNames)
 
-    experimentalData = ExperimentalData(observables, experimentalConditions, measurementData, inputParameterSymbols)
+    experimentalData = ExperimentalData(observables, experimentalConditions, measurementData, modelData)
 
     modelParameters = ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData)
 
@@ -364,15 +367,25 @@ function adjointSensitivities_proto(iStartPar, senseAlg, optAlg,
     allConditionsCostGrad = (grad, p...) -> allConditionsCostGrad_AdjSens_proto(parameterSpace, modelParameters, modelData, modelOutput, experimentalData, 
             updateAllParameterVectors, calcCostGrad, g, grad, p...)
 
-    model = Model(NLopt.Optimizer)
+    if optAlg == :Ipopt
+        model = Model(Ipopt.Optimizer)
+        set_optimizer_attribute(model, "print_level", 0)
+        set_optimizer_attribute(model, "max_iter", 1000)
+        set_optimizer_attribute(model, "hessian_approximation", "limited-memory")
+        set_optimizer_attribute(model, "tol", 1e-6)
+        set_optimizer_attribute(model, "acceptable_tol", 1e-4)
+        
+    else
+        model = Model(NLopt.Optimizer)
+        #model.moi_backend.optimizer.model.options
+        set_optimizer_attribute(model, "algorithm", optAlg)
+        set_optimizer_attribute(model, "maxeval", 1000)
+        set_optimizer_attribute(model, "ftol_rel", 1e-6)
+        set_optimizer_attribute(model, "xtol_rel", 1e-4)
+    end
+
     #JuMP.register(model::Model, s::Symbol, dimension::Integer, f::Function, ∇f::Function, ∇²f::Function)
     register(model, :f, numAllStartParameters, allConditionsCost, allConditionsCostGrad)
-
-    model.moi_backend.optimizer.model.options
-    set_optimizer_attribute(model, "algorithm", optAlg)
-    set_optimizer_attribute(model, "maxeval", 1000)
-    set_optimizer_attribute(model, "ftol_rel", 1e-8)
-    set_optimizer_attribute(model, "xtol_rel", 1e-6)
     
     @variable(model, lowerBounds[i] <= p[i = 1:numAllStartParameters] <= upperBounds[i])
     for i in 1:numAllStartParameters

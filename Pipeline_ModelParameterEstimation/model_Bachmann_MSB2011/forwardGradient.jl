@@ -79,25 +79,18 @@ function step_forwGrad_proto!(opt::Adam, keepInBounds!)
     end
 end
 
-function solveODESystem_forwGrad_proto(prob, modelParameters, dualModelParameters, modelData, modelOutput, iCond, p)
-    parameterIndices = modelParameters.parameterIndices
-    dynPars = view(p, parameterIndices)
-    dynParVector = modelParameters.dynamicParametersVector
-    dualDynParVector = dualModelParameters.dualDynamicParametersVector
-    dualDynParVector .= convert.(eltype(dynPars), dynParVector)
-    dualDynParVector[modelData.optParameterIndices] .= dynPars
+function solveODESystem_forwGrad_proto(prob, dynParVector, u0Vector, modelData, modelOutput, iCond)
 
-    dualU0 = convert(Vector{eltype(p)}, prob.u0)
     initVariable = modelData.initVariableIndices
     parameterInU0Indices = modelData.parameterInU0Indices
-    dualU0[initVariable[1]] = dualDynParVector[parameterInU0Indices[1]]
-    dualU0[initVariable[2]] = dualDynParVector[parameterInU0Indices[2]] * (dualDynParVector[parameterInU0Indices[3]] * dualDynParVector[parameterInU0Indices[4]] + 1)
-    dualU0[initVariable[3]] = dualDynParVector[parameterInU0Indices[5]]
-    dualU0[initVariable[4]] = dualDynParVector[parameterInU0Indices[6]]
-    dualU0[initVariable[5]] = dualDynParVector[parameterInU0Indices[7]] * dualDynParVector[parameterInU0Indices[8]] * dualDynParVector[parameterInU0Indices[9]]
-    dualU0[initVariable[6]] = dualDynParVector[parameterInU0Indices[10]] * dualDynParVector[parameterInU0Indices[11]] * dualDynParVector[parameterInU0Indices[12]]
+    u0Vector[initVariable[1]] = dynParVector[parameterInU0Indices[1]]
+    u0Vector[initVariable[2]] = dynParVector[parameterInU0Indices[2]] * (dynParVector[parameterInU0Indices[3]] * dynParVector[parameterInU0Indices[4]] + 1)
+    u0Vector[initVariable[3]] = dynParVector[parameterInU0Indices[5]]
+    u0Vector[initVariable[4]] = dynParVector[parameterInU0Indices[6]]
+    u0Vector[initVariable[5]] = dynParVector[parameterInU0Indices[7]] * dynParVector[parameterInU0Indices[8]] * dynParVector[parameterInU0Indices[9]]
+    u0Vector[initVariable[6]] = dynParVector[parameterInU0Indices[10]] * dynParVector[parameterInU0Indices[11]] * dynParVector[parameterInU0Indices[12]]
 
-    _prob = remake(prob, u0 = dualU0, p = dualDynParVector)
+    _prob = remake(prob, u0 = u0Vector, p = dynParVector)
 
     try
         modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, Rodas5(), reltol=1e-9, abstol=1e-9)
@@ -108,14 +101,8 @@ function solveODESystem_forwGrad_proto(prob, modelParameters, dualModelParameter
 
 end
 
-function calcUnscaledObservable_forwGrad_proto(modelParameters, dualModelParameters, modelData, experimentalData, modelOutput, iCond, p)
-    parameterIndices = modelParameters.parameterIndices
-    dynPars = view(p, parameterIndices)
-    dynParVector = modelParameters.dynamicParametersVector
-    dualDynParVector = dualModelParameters.dualDynamicParametersVector
-    dualDynParVector .= convert.(eltype(dynPars), dynParVector)
-    dualDynParVector[modelData.optParameterIndices] .= dynPars
-
+function calcUnscaledObservable_forwGrad_proto(dynParVector, modelData, experimentalData, modelOutput, iCond)
+    
     timeSteps = experimentalData.timeStepsForCond[iCond]
     sol = modelOutput.sols[iCond](timeSteps)
 
@@ -124,74 +111,56 @@ function calcUnscaledObservable_forwGrad_proto(modelParameters, dualModelParamet
 
     optParIOI = modelData.parameterInObservableIndices
 
-    h_barFCO[iCond, 1] = ( sol[Symbol("CISRNA(t)")] ./ dualDynParVector[optParIOI[1]] )[observedAIFCO[iCond, 1]]
-    h_barFCO[iCond, 2] = ( sol[Symbol("CISRNA(t)")] ./ dualDynParVector[optParIOI[1]] )[observedAIFCO[iCond, 2]]
-    h_barFCO[iCond, 3] = ( sol[Symbol("CISRNA(t)")] ./ dualDynParVector[optParIOI[1]] )[observedAIFCO[iCond, 3]]
+    h_barFCO[iCond, 1] = ( sol[Symbol("CISRNA(t)")] ./ dynParVector[optParIOI[1]] )[observedAIFCO[iCond, 1]]
+    h_barFCO[iCond, 2] = ( sol[Symbol("CISRNA(t)")] ./ dynParVector[optParIOI[1]] )[observedAIFCO[iCond, 2]]
+    h_barFCO[iCond, 3] = ( sol[Symbol("CISRNA(t)")] ./ dynParVector[optParIOI[1]] )[observedAIFCO[iCond, 3]]
     h_barFCO[iCond, 4] = ( sol[Symbol("CIS(t)")] )[observedAIFCO[iCond, 4]]
-    h_barFCO[iCond, 5] = ( sol[Symbol("CIS(t)")] ./ dualDynParVector[optParIOI[2]] )[observedAIFCO[iCond, 5]]
-    h_barFCO[iCond, 6] = ( sol[Symbol("CIS(t)")] ./ dualDynParVector[optParIOI[2]] )[observedAIFCO[iCond, 6]]
-    h_barFCO[iCond, 7] = ( sol[Symbol("CIS(t)")] ./ dualDynParVector[optParIOI[2]] )[observedAIFCO[iCond, 7]]
+    h_barFCO[iCond, 5] = ( sol[Symbol("CIS(t)")] ./ dynParVector[optParIOI[2]] )[observedAIFCO[iCond, 5]]
+    h_barFCO[iCond, 6] = ( sol[Symbol("CIS(t)")] ./ dynParVector[optParIOI[2]] )[observedAIFCO[iCond, 6]]
+    h_barFCO[iCond, 7] = ( sol[Symbol("CIS(t)")] ./ dynParVector[optParIOI[2]] )[observedAIFCO[iCond, 7]]
     h_barFCO[iCond, 8] = ( sol[Symbol("SHP1(t)")] + sol[Symbol("SHP1Act(t)")] )[observedAIFCO[iCond, 8]]
-    h_barFCO[iCond, 9] = ( sol[Symbol("SOCS3RNA(t)")] ./ dualDynParVector[optParIOI[3]] )[observedAIFCO[iCond, 9]]
-    h_barFCO[iCond, 10] = ( sol[Symbol("SOCS3RNA(t)")] ./ dualDynParVector[optParIOI[3]] )[observedAIFCO[iCond, 10]]
-    h_barFCO[iCond, 11] = ( sol[Symbol("SOCS3RNA(t)")] ./ dualDynParVector[optParIOI[3]] )[observedAIFCO[iCond, 11]]
+    h_barFCO[iCond, 9] = ( sol[Symbol("SOCS3RNA(t)")] ./ dynParVector[optParIOI[3]] )[observedAIFCO[iCond, 9]]
+    h_barFCO[iCond, 10] = ( sol[Symbol("SOCS3RNA(t)")] ./ dynParVector[optParIOI[3]] )[observedAIFCO[iCond, 10]]
+    h_barFCO[iCond, 11] = ( sol[Symbol("SOCS3RNA(t)")] ./ dynParVector[optParIOI[3]] )[observedAIFCO[iCond, 11]]
     h_barFCO[iCond, 12] = ( sol[Symbol("SOCS3(t)")] )[observedAIFCO[iCond, 12]]
-    h_barFCO[iCond, 13] = ( sol[Symbol("SOCS3(t)")] ./ dualDynParVector[optParIOI[4]] )[observedAIFCO[iCond, 13]]
+    h_barFCO[iCond, 13] = ( sol[Symbol("SOCS3(t)")] ./ dynParVector[optParIOI[4]] )[observedAIFCO[iCond, 13]]
     h_barFCO[iCond, 14] = ( sol[Symbol("STAT5(t)")] )[observedAIFCO[iCond, 14]]
     h_barFCO[iCond, 15] = ( 16 * (sol[Symbol("p12EpoRpJAK2(t)")] + sol[Symbol("p1EpoRpJAK2(t)")] + 
-            sol[Symbol("p2EpoRpJAK2(t)")]) / dualDynParVector[optParIOI[5]] )[observedAIFCO[iCond, 15]]
+            sol[Symbol("p2EpoRpJAK2(t)")]) / dynParVector[optParIOI[5]] )[observedAIFCO[iCond, 15]]
     h_barFCO[iCond, 16] = ( 2 * (sol[Symbol("EpoRpJAK2(t)")] + sol[Symbol("p12EpoRpJAK2(t)")] + 
-            sol[Symbol("p1EpoRpJAK2(t)")] + sol[Symbol("p2EpoRpJAK2(t)")]) / dualDynParVector[optParIOI[5]] )[observedAIFCO[iCond, 16]]
+            sol[Symbol("p1EpoRpJAK2(t)")] + sol[Symbol("p2EpoRpJAK2(t)")]) / dynParVector[optParIOI[5]] )[observedAIFCO[iCond, 16]]
     h_barFCO[iCond, 17] = ( (100 * sol[Symbol("pSTAT5(t)")]) ./ (sol[Symbol("STAT5(t)")] + sol[Symbol("pSTAT5(t)")]) )[observedAIFCO[iCond, 17]]
-    h_barFCO[iCond, 18] = ( sol[Symbol("pSTAT5(t)")] / dualDynParVector[optParIOI[6]] )[observedAIFCO[iCond, 18]]
-    h_barFCO[iCond, 19] = ( (sol[Symbol("SHP1(t)")] + sol[Symbol("SHP1Act(t)")]) / dualDynParVector[optParIOI[7]] )[observedAIFCO[iCond, 19]]
-    h_barFCO[iCond, 20] = ( (sol[Symbol("STAT5(t)")] + sol[Symbol("pSTAT5(t)")]) / dualDynParVector[optParIOI[6]] )[observedAIFCO[iCond, 20]]
+    h_barFCO[iCond, 18] = ( sol[Symbol("pSTAT5(t)")] / dynParVector[optParIOI[6]] )[observedAIFCO[iCond, 18]]
+    h_barFCO[iCond, 19] = ( (sol[Symbol("SHP1(t)")] + sol[Symbol("SHP1Act(t)")]) / dynParVector[optParIOI[7]] )[observedAIFCO[iCond, 19]]
+    h_barFCO[iCond, 20] = ( (sol[Symbol("STAT5(t)")] + sol[Symbol("pSTAT5(t)")]) / dynParVector[optParIOI[6]] )[observedAIFCO[iCond, 20]]
 
     nothing
 end
 
-function calcScaledObservable_forwGrad_proto(modelParameters, dualModelParameters, modelData, modelOutput, experimentalData, p)
-    scaleIndices = modelParameters.scaleIndices
-    scale = view(p, scaleIndices)
-    scaleVector = modelParameters.scaleVector
-    dualScaleVector = dualModelParameters.dualScaleVector
-    dualScaleVector .= convert.(eltype(scale), scaleVector)
-    dualScaleVector[1:modelParameters.numScale] .= scale
-    scaleMap = modelParameters.scaleMap
+function calcScaledObservable_forwGrad_proto(scaleVector, offsetVector, modelParameters, modelData, modelOutput, experimentalData, iCond)
 
-    offsetIndices = modelParameters.offsetIndices
-    offset = view(p, offsetIndices)
-    offsetVector = modelParameters.offsetVector
-    dualOffsetVector = dualModelParameters.dualOffsetVector
-    dualOffsetVector .= convert.(eltype(offset), offsetVector)
-    dualOffsetVector[1:modelParameters.numOffset] .= offset
+    scaleMap = modelParameters.scaleMap
     offsetMap = modelParameters.offsetMap
 
-    numConditions = experimentalData.numConditions
     observedOFC = experimentalData.observedObservableForCond
     
     h_barFCO = modelOutput.h_barForCondObs
     h_hatFCO = modelOutput.h_hatForCondObs
     observableLT = modelData.observableLogTransformation
 
-    for iCond in 1:numConditions
-        for iObs = observedOFC[iCond]
-            if observableLT[iObs]
-                h_hatFCO[iCond, iObs] = log10.(dualScaleVector[scaleMap[iCond, iObs]] * h_barFCO[iCond, iObs] .+ dualOffsetVector[offsetMap[iCond, iObs]])
-            else
-                h_hatFCO[iCond, iObs] = dualScaleVector[scaleMap[iCond, iObs]] * h_barFCO[iCond, iObs] .+ dualOffsetVector[offsetMap[iCond, iObs]]
-            end
+    for iObs = observedOFC[iCond]
+        if observableLT[iObs]
+            h_hatFCO[iCond, iObs] = log10.(scaleVector[scaleMap[iCond, iObs]] * h_barFCO[iCond, iObs] .+ offsetVector[offsetMap[iCond, iObs]])
+        else
+            h_hatFCO[iCond, iObs] = scaleVector[scaleMap[iCond, iObs]] * h_barFCO[iCond, iObs] .+ offsetVector[offsetMap[iCond, iObs]]
         end
     end
 
     nothing
 end
 
-function calcCost_forwGrad_proto(modelParameters, dualModelParameters, modelOutput, experimentalData, p)
-    varianceIndices = modelParameters.varianceIndices
-    variance = view(p, varianceIndices)
-    dualVarianceVector = dualModelParameters.dualVarianceVector
-    dualVarianceVector[1:modelParameters.numVariance] .= variance
+function calcCost_forwGrad_proto(varianceVector, modelParameters, modelOutput, experimentalData, iCond)
+
     varianceMap = modelParameters.varianceMap
 
     h_hatFCO = modelOutput.h_hatForCondObs
@@ -201,38 +170,38 @@ function calcCost_forwGrad_proto(modelParameters, dualModelParameters, modelOutp
     measurementFCO = experimentalData.measurementForCondObs
     observedOFC = experimentalData.observedObservableForCond
 
-    cost = 0.0
-    for iCond in 1:experimentalData.numConditions
-        for iObs in observedOFC[iCond]
-            costFCO[iCond, iObs] = log(2*pi*dualVarianceVector[varianceMap[iCond, iObs]]) * numDataFCO[iCond, iObs] + (dot(measurementFCO[iCond, iObs], measurementFCO[iCond, iObs]) - 
-                2*dot(measurementFCO[iCond, iObs], h_hatFCO[iCond, iObs]) + 
-                dot(h_hatFCO[iCond, iObs], h_hatFCO[iCond, iObs])) / (2 * dualVarianceVector[varianceMap[iCond, iObs]])
-        end
-
-        cost += sum(costFCO[iCond, observedOFC[iCond]])
+    for iObs in observedOFC[iCond]
+        costFCO[iCond, iObs] = log(2*pi*varianceVector[varianceMap[iCond, iObs]]) * numDataFCO[iCond, iObs] + (dot(measurementFCO[iCond, iObs], measurementFCO[iCond, iObs]) - 
+            2*dot(measurementFCO[iCond, iObs], h_hatFCO[iCond, iObs]) + 
+            dot(h_hatFCO[iCond, iObs], h_hatFCO[iCond, iObs])) / (varianceVector[varianceMap[iCond, iObs]])
     end
 
-    return cost
+    return sum(costFCO[iCond, observedOFC[iCond]])
 end
 
-function allConditionsCost_forwGrad_proto(modelParameters, experimentalData, modelData, solveODESystem, calcUnscaledObservable, calcScaledObservable, calcCost, p)
-    dynParVector = modelParameters.dynamicParametersVector
+function allConditionsCost_forwGrad_proto(modelParameters, dualModelParameters, experimentalData, modelData, updateAllDualParameterVectors, solveODESystem, calcUnscaledObservable, calcScaledObservable, calcCost, p)
+
+    updateAllDualParameterVectors(p)
+
+    u0Vector = modelParameters.u0Vector
+    dualU0Vector = convert(Vector{eltype(p)}, u0Vector)
+
+    dualDynParVector = dualModelParameters.dualDynamicParametersVector
     inputPVFC = experimentalData.inputParameterValuesForCond
     inputPI = modelData.inputParameterIndices
 
+    cost = 0.0
     for (iCond, inputParameterValues) in enumerate(inputPVFC)
-        dynParVector[inputPI] = inputParameterValues
-        fail = solveODESystem(iCond, p)
+        dualDynParVector[inputPI] = convert.(eltype(p), inputParameterValues)
+        fail = solveODESystem(dualU0Vector, iCond)
         if fail
             # If infeasible parameters, return dual (Inf, NaN)
             return ForwardDiff.Dual{ForwardDiff.Tag{eltype(p), Float64},Float64, 1}(Inf, ForwardDiff.Partials{1, Float64}((NaN,)))
         end
-        calcUnscaledObservable(iCond, p)
+        calcUnscaledObservable(iCond)
+        calcScaledObservable(iCond)
+        cost += calcCost(iCond)
     end
-
-    calcScaledObservable(p)
-
-    cost = calcCost(p)
 
     return cost
 end
@@ -245,8 +214,6 @@ function unbiasedGrad_forwGrad_proto(p::T1, f::Function, parameterSpace, modelPa
     allParameters .= p 
     view(allParameters, doLogSearch) .= exp10.(view(allParameters, doLogSearch))
 
-    #updateAllParameterVectors()
-
     v::Array{Float64, 1} = randn(length(p)) # v ~ MV(0, I)
 
     g = r -> f(allParameters + r*v)
@@ -254,22 +221,19 @@ function unbiasedGrad_forwGrad_proto(p::T1, f::Function, parameterSpace, modelPa
     uGrad = DiffResults.gradient(result) * v
     view(uGrad, doLogSearch) .*= view(allParameters, doLogSearch) * log(10)
     loss = DiffResults.value(result)
+
     return uGrad, loss
 end
 
 
 
+function forwardGradient(iStartPar, n_it, b2, stepRange, 
+        timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
 
-
-function forwardGradient_proto(iStartPar, n_it, b2, stepRange, 
-        filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
-
-    include(joinpath(filesAndPaths.modelPath, filesAndPaths.modelFile))
+    sys, initialSpeciesValues, trueParameterValues = getODEModel()
     new_sys = ode_order_lowering(sys)
     u0 = initialSpeciesValues
-    p = trueParameterValues 
-    c = trueConstantsValues
-    pars = [p;c]
+    pars = trueParameterValues 
     tspan = (0.0, timeEnd)
     prob = ODEProblem(new_sys,u0,tspan,pars,jac=true)
 
@@ -285,10 +249,10 @@ function forwardGradient_proto(iStartPar, n_it, b2, stepRange,
 
     # Initialize structs
 
-    modelData, inputParameterSymbols = ModelData(new_sys, prob, observables, experimentalConditions, 
+    modelData = ModelData(new_sys, prob, observables, experimentalConditions, 
             initVariableNames, observableVariableNames, parameterInU0Names, parameterInObservableNames)
 
-    experimentalData = ExperimentalData(observables, experimentalConditions, measurementData, inputParameterSymbols)
+    experimentalData = ExperimentalData(observables, experimentalConditions, measurementData, modelData)
 
     modelParameters = ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData)
 
@@ -296,8 +260,7 @@ function forwardGradient_proto(iStartPar, n_it, b2, stepRange,
 
     parameterSpace, numAllStartParameters, lowerBounds, upperBounds = ParameterSpace(modelParameters, parameterBounds)
 
-    usedType = ForwardDiff.Dual
-    modelOutput = ModelOutput(usedType, experimentalData, modelParameters)
+    modelOutput_dual = ModelOutput(ForwardDiff.Dual, experimentalData, modelParameters)
 
     # Getting start values
 
@@ -307,27 +270,26 @@ function forwardGradient_proto(iStartPar, n_it, b2, stepRange,
 
     keepInBounds! = (theta) -> keepInBounds_forwGrad_proto!(theta, parameterSpace, modelParameters)
 
-    solveODESystem = (iCond, p) -> solveODESystem_forwGrad_proto(prob, modelParameters, dualModelParameters, modelData, modelOutput, iCond, p)
+    solveODESystem_dual = (u0Vector, iCond) -> solveODESystem_forwGrad_proto(prob, dualModelParameters.dualDynamicParametersVector, u0Vector, modelData, modelOutput_dual, iCond)
 
-    calcUnscaledObservable = (iCond, p) -> calcUnscaledObservable_forwGrad_proto(modelParameters, dualModelParameters, modelData, experimentalData, modelOutput, iCond, p)
+    calcUnscaledObservable_dual = (iCond) -> calcUnscaledObservable_forwGrad_proto(dualModelParameters.dualDynamicParametersVector, modelData, experimentalData, modelOutput_dual, iCond)
 
-    calcScaledObservable = (p) -> calcScaledObservable_forwGrad_proto(modelParameters, dualModelParameters, modelData, modelOutput, experimentalData, p)
+    calcScaledObservable_dual = (iCond) -> calcScaledObservable_forwGrad_proto(dualModelParameters.dualScaleVector, dualModelParameters.dualOffsetVector, modelParameters, modelData, modelOutput_dual, experimentalData, iCond)
 
-    calcCost = (p) -> calcCost_forwGrad_proto(modelParameters, dualModelParameters, modelOutput, experimentalData, p)
+    calcCost_dual = (iCond) -> calcCost_forwGrad_proto(dualModelParameters.dualVarianceVector, modelParameters, modelOutput_dual, experimentalData, iCond)
 
-    allConditionsCost = (p) -> allConditionsCost_forwGrad_proto(modelParameters, experimentalData, modelData,
-            solveODESystem, calcUnscaledObservable, calcScaledObservable, calcCost, p)
+    updateAllDualParameterVectors = (p) -> updateAllDualParameterVectors_proto(modelParameters, dualModelParameters, modelData, p)
+
+    allConditionsCost_dual = (p) -> allConditionsCost_forwGrad_proto(modelParameters, dualModelParameters, experimentalData, modelData,
+            updateAllDualParameterVectors, solveODESystem_dual, calcUnscaledObservable_dual, calcScaledObservable_dual, calcCost_dual, p)
 
     result = DiffResults.DiffResult(0.0, 0.0)
 
-    grad_g = (p) -> unbiasedGrad_forwGrad_proto(p, allConditionsCost, parameterSpace, modelParameters, result)
+    grad_g = (p) -> unbiasedGrad_forwGrad_proto(p, allConditionsCost_dual, parameterSpace, modelParameters, result)
 
     stepLengths = exp10.(range(stepRange[1], stepRange[1], n_it))
     adam_opt = Adam(allStartParameters, grad_g, stepLengths; b2 = b2)
     step = () -> step_forwGrad_proto!(adam_opt, keepInBounds!)
-    
+
     return step, adam_opt, parameterSpace.doLogSearch
 end
-
-
-
