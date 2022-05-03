@@ -583,18 +583,18 @@ function rewriteDerivatives(derivativeAsString, dicts)
     return newDerivativeAsString
 end
 
-function writeODEModelToFile(libsbml, model, modelName, path)
+function writeODEModelToFile(libsbml, model, modelName, path, experimentalConditions, parameterBounds)
     dicts = Dict()
     variableDict = Dict()
     dicts["variables"] = variableDict
     parameterDict = Dict()
     dicts["parameters"] = parameterDict
-    constantsDict = Dict()
-    dicts["constants"] = constantsDict
     variableParameterDict = Dict()
     dicts["variableParameters"] = variableParameterDict
     dummyVariableDict = Dict()
     dicts["dummyVariable"] = dummyVariableDict
+    constantParameterDict = Dict()
+    dicts["constantParameter"] = constantParameterDict
 
     # for functions defined by the model, these functions will be rewritten
     modelFuncNameArgFormula = Dict()
@@ -634,9 +634,9 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         parameterDict[par[:getId]()] = string(par[:getValue]())
     end
 
-    ### Define constants and read constants values
+    ### Define compartments and read compartments values
     for comp in model[:getListOfCompartments]()
-        constantsDict[comp[:getId]()] = string(comp[:getSize]())
+        parameterDict[comp[:getId]()] = string(comp[:getSize]())
     end
 
     ### Read functions defined by the model
@@ -686,9 +686,6 @@ function writeODEModelToFile(libsbml, model, modelName, path)
             if variableName in keys(parameterDict)
                 variableParameterDict[variableName] = parameterDict[variableName]
                 delete!(parameterDict, variableName)
-            elseif variableName in keys(constantsDict)
-                variableParameterDict[variableName] = constantsDict[variableName]
-                delete!(constantsDict, variableName)
             end
 
             eventMath = eventAssignment[:getMath]()
@@ -698,8 +695,6 @@ function writeODEModelToFile(libsbml, model, modelName, path)
             for eventMathArg in eventMathArgs
                 if eventMathArg in keys(parameterDict)
                     dummyVariableDict[eventMathArg] = parameterDict[eventMathArg]
-                elseif eventMathArg in keys(constantsDict)
-                    dummyVariableDict[eventMathArg] = constantsDict[eventMathArg]
                 end
             end
 
@@ -807,10 +802,6 @@ function writeODEModelToFile(libsbml, model, modelName, path)
                     variableDict[ruleVariable] = parameterDict[ruleVariable]
                     delete!(parameterDict, ruleVariable)
                     dus[ruleVariable] = "D(" * ruleVariable * ") ~ " * ruleFormula
-                elseif ruleVariable in keys(constantsDict)
-                    variableDict[ruleVariable] = constantsDict[ruleVariable]
-                    delete!(constantsDict, ruleVariable)
-                    dus[ruleVariable] = "D(" * ruleVariable * ") ~ " * ruleFormula
                 else
                     variableDict[ruleVariable] = "0"
                     dus[ruleVariable] = "D(" * ruleVariable * ") ~ " * ruleFormula
@@ -837,17 +828,12 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         elseif assignName in keys(parameterDict)
             parameterDict[assignName] = assignFormula
             initallyAssignedParameter[assignName] = "parameterDict"
-        elseif assignName in keys(constantsDict)
-            constantsDict[assignName] = assignFormula
-            initallyAssignedParameter[assignName] = "constantsDict"
         else
             println("Error: could not find assigned variable/parameter")
         end
         for part in split(getArguments(assignFormula, baseFunctions), ", ")
             if part in keys(parameterDict)
                 dummyVariableDict[part] = parameterDict[part]
-            elseif part in keys(constantsDict)
-                dummyVariableDict[part] = constantsDict[part]
             end
         end
     end
@@ -889,35 +875,29 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     while true
         nestedParameter = false
         for (parameter, dictName) in initallyAssignedParameter
-            if dictName == "parameterDict"
-                parameterValue = parameterDict[parameter]
-                args = split(getArguments(parameterValue, baseFunctions))
-                for arg in args
-                    if arg in keys(parameterDict)
-                        nestedParameter = true
-                        parameterValue = replaceWith(parameterValue, arg, parameterDict[arg])
-                    elseif arg in keys(constantsDict)
-                        nestedParameter = true
-                        parameterValue = replaceWith(parameterValue, arg, constantsDict[arg])
-                    end
+            parameterValue = parameterDict[parameter]
+            args = split(getArguments(parameterValue, baseFunctions))
+            for arg in args
+                if arg in keys(parameterDict)
+                    nestedParameter = true
+                    parameterValue = replaceWith(parameterValue, arg, parameterDict[arg])
                 end
-                parameterDict[parameter] = parameterValue
-            else
-                parameterValue = constantsDict[parameter]
-                args = split(getArguments(parameterValue, baseFunctions))
-                for arg in args
-                    if arg in keys(parameterDict)
-                        nestedParameter = true
-                        parameterValue = replaceWith(parameterValue, arg, parameterDict[arg])
-                    elseif arg in keys(constantsDict)
-                        nestedParameter = true
-                        parameterValue = replaceWith(parameterValue, arg, constantsDict[arg])
-                    end
-                end
-                constantsDict[parameter] = parameterValue
             end
+            parameterDict[parameter] = parameterValue
         end
         nestedParameter || break
+    end
+
+    # sort out the parameters that are assumed to be known 
+
+    optParameters = parameterBounds[:,:parameterId]
+    inputParameters = names(experimentalConditions)
+
+    for key in keys(parameterDict)
+        if key ∉ inputParameters && key ∉ optParameters 
+            constantParameterDict[key] = parameterDict[key]
+            delete!(parameterDict, key)
+        end
     end
     
 
@@ -943,18 +923,26 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     println(modelFile, "# Number of parameters: " * string(length(model[:getListOfParameters]())))
     println(modelFile, "# Number of species: " * string(length(model[:getListOfSpecies]())))
 
+    println(modelFile, "function getODEModel()")
+
     println(modelFile, "")
-    println(modelFile, "### Define independent and dependent variables")
-    defineVariables = "ModelingToolkit.@variables t"
+    println(modelFile, "    ### Define constant parameters")
+    for key in keys(constantParameterDict)
+        println(modelFile, "    " * key * " = " * constantParameterDict[key])
+    end
+
+    println(modelFile, "")
+    println(modelFile, "    ### Define independent and dependent variables")
+    defineVariables = "    ModelingToolkit.@variables t"
     for key in keys(variableDict)
         defineVariables = defineVariables * " " * key * "(t)"
     end
     println(modelFile, defineVariables)
 
     println(modelFile, "")
-    println(modelFile, "### Define variable parameters")
+    println(modelFile, "    ### Define variable parameters")
     if length(variableParameterDict) > 0
-        defineVariableParameters = "ModelingToolkit.@variables"
+        defineVariableParameters = "    ModelingToolkit.@variables"
         for key in keys(variableParameterDict)
             defineVariableParameters = defineVariableParameters * " " * key * "(t)"
         end
@@ -962,114 +950,102 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     end
     
     println(modelFile, "")
-    println(modelFile, "### Define dummy variable")
+    println(modelFile, "    ### Define dummy variable")
     if length(dummyVariableDict) > 0
-        defineDummyVariables = "ModelingToolkit.@variables dummyVariable(t)"
+        defineDummyVariables = "    ModelingToolkit.@variables dummyVariable(t)"
         println(modelFile, defineDummyVariables)
     end
     
     println(modelFile, "")
-    println(modelFile, "### Define parameters")
-    defineParameters = "ModelingToolkit.@parameters"
+    println(modelFile, "    ### Define parameters")
+    defineParameters = "    ModelingToolkit.@parameters"
     for key in keys(parameterDict)
         defineParameters = defineParameters * " " * key
     end
     println(modelFile, defineParameters)
 
     println(modelFile, "")
-    println(modelFile, "### Define constants")
-    defineConstants = "ModelingToolkit.@parameters"
-    for key in keys(constantsDict)
-        defineConstants = defineConstants * " " * key
-    end
-    println(modelFile, defineConstants)
+    println(modelFile, "    ### Define an operator for the differentiation w.r.t. time")
+    println(modelFile, "    D = Differential(t)")
 
     println(modelFile, "")
-    println(modelFile, "### Define an operator for the differentiation w.r.t. time")
-    println(modelFile, "D = Differential(t)")
-
-    println(modelFile, "")
-    println(modelFile, "### Events ###")
+    println(modelFile, "    ### Events ###")
     if length(stringOfEvents) > 0
-        println(modelFile, "continuous_events = [")
-        println(modelFile, stringOfEvents)
-        println(modelFile, "]")
+        println(modelFile, "    continuous_events = [")
+        println(modelFile, "    " * stringOfEvents)
+        println(modelFile, "    ]")
     end
     
     println(modelFile, "")
-    println(modelFile, "### Derivatives ###")
-    println(modelFile, "eqs = [")
+    println(modelFile, "    ### Derivatives ###")
+    println(modelFile, "    eqs = [")
     for (sIndex, key) in enumerate(keys(variableDict))
         if sIndex == 1
-            print(modelFile, dus[key])
+            print(modelFile, "    " * dus[key])
         else
-            print(modelFile, ",\n" * dus[key])
+            print(modelFile, ",\n    " * dus[key])
         end
     end
     for key in keys(variableParameterDict)
-        print(modelFile, ",\nD(" * key * ") ~ 0")
+        print(modelFile, ",\n    D(" * key * ") ~ 0")
     end
     if length(dummyVariableDict) > 0
-        dummyVariableDerivative = ",\nD(dummyVariable) ~ "
+        dummyVariableDerivative = ",\n    D(dummyVariable) ~ "
         for key in keys(dummyVariableDict)
             dummyVariableDerivative = dummyVariableDerivative * "+" * key
         end
         println(modelFile, dummyVariableDerivative)
     end
     
-    println(modelFile, "]")
+    println(modelFile, "    ]")
 
     println(modelFile, "")
     if length(stringOfEvents) > 0
-        println(modelFile, "@named sys = ODESystem(eqs, t, continuous_events = continuous_events)")
+        println(modelFile, "    @named sys = ODESystem(eqs, t, continuous_events = continuous_events)")
     else
-        println(modelFile, "@named sys = ODESystem(eqs)")
+        println(modelFile, "    @named sys = ODESystem(eqs)")
     end
 
     println(modelFile, "")
-    println(modelFile, "### Initial species concentrations ###")
-    println(modelFile, "initialSpeciesValues = [")
+    println(modelFile, "    ### Initial species concentrations ###")
+    println(modelFile, "    initialSpeciesValues = [")
     for (index, (key, value)) in enumerate(variableDict)
         if index == 1
-            assignString = key * " => " * value
+            assignString = "    " * key * " => " * value
         else
-            assignString = ",\n" * key * " => " * value
+            assignString = ",\n    " * key * " => " * value
         end
         print(modelFile, assignString)
     end
     for (key, value) in variableParameterDict
-        assignString = ",\n" * key * " => " * value
+        assignString = ",\n    " * key * " => " * value
         print(modelFile, assignString)
     end
     if length(dummyVariableDict) > 0
-        assignString = ",\ndummyVariable => 0.0"
+        assignString = ",\n    dummyVariable => 0.0"
         print(modelFile, assignString)
     end
     println(modelFile, "]")
 
     println(modelFile, "")
-    println(modelFile, "### True parameter values ###")
-    println(modelFile, "trueParameterValues = [")
+    println(modelFile, "    ### True parameter values ###")
+    println(modelFile, "    trueParameterValues = [")
     for (index, (key, value)) in enumerate(parameterDict)
         if index == 1
-            assignString = key * " => " * value
+            assignString = "    " * key * " => " * value
         else
-            assignString = ",\n" * key * " => " * value
+            assignString = ",\n    " * key * " => " * value
         end
         print(modelFile, assignString)
     end
     println(modelFile, "]")
     println(modelFile, "")
-    println(modelFile, "trueConstantsValues = [")
-    for (index, (key, value)) in enumerate(constantsDict)
-        if index == 1
-            assignString = key * " => " * value
-        else
-            assignString = ",\n" * key * " => " * value
-        end
-        print(modelFile, assignString)
-    end
-    println(modelFile, "]")
+
+    println(modelFile, "    return sys, initialSpeciesValues, trueParameterValues")
+
+    println(modelFile, "")
+
+    println(modelFile, "end")
     
     close(modelFile)
 end
