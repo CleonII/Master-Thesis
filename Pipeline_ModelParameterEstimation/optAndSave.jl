@@ -1,18 +1,18 @@
 
-function optModelSaveResults(model, p, doLogSearch, option1, option2, option3, iStartPar, iterations, methodFile, write)
+function optModelSaveResults(model, p, doLogSearch, option1, option2, option3, iStartPar, methodFile, write)
 
-    benchRunTime = Vector{Float64}(undef, iterations)
+    benchRunTime = 0.0
     success = true
     p_opt = Vector{Float64}(undef, length(p))
     cost_opt = 0.0 
 
-    p_save = copy(p)
-
+    println("Starting optimizing...")
     try
-        JuMP.optimize!(model)
+        benchRunTime = @elapsed JuMP.optimize!(model)
         cost_opt = objective_value(model)
         if cost_opt == 0.0 && occursin("error", lowercase(termination_status(model)))
             p_opt .= NaN
+            benchRunTime = NaN
             success = false
         else
             p_opt[:] = [value(p[i]) for i=1:length(p)]
@@ -25,24 +25,16 @@ function optModelSaveResults(model, p, doLogSearch, option1, option2, option3, i
         success = false
         p_opt .= NaN
         cost_opt = Inf
+        benchRunTime = NaN
     end
+    println("Done optimizing!")
 
     terminationStatus = termination_status(model)
     primalStatus = primal_status(model)
 
-    if success
-        for iter in 1:iterations
-            p = copy(p_save)
-            benchRunTime[iter] = @elapsed JuMP.optimize!(model) # in seconds
-        
-        end
-    else
-        benchRunTime .= NaN
-    end
-
     data = DataFrame(method = methodFile[1:end-3], option1 = option1, option2 = option2, option3 = option3, startParameterIndex = iStartPar, 
             success = success, terminationStatus = terminationStatus, primalStatus = primalStatus, cost = cost_opt, 
-            runTime = benchRunTime, iteration = 1:iterations)
+            runTime = benchRunTime, iteration = 1)
     if isfile(write)
         CSV.write(write, data, append = true)
     else
@@ -71,8 +63,6 @@ function optAdamSaveResults(step, adam_opt, doLogSearch, n_it, b2, stepRange, iS
     theta_save = copy(adam_opt.theta)
 
     benchRunTime = Vector{Float64}(undef, iterations)
-    benchMemory = Vector{Float64}(undef, iterations)
-    benchAllocs = Vector{Float64}(undef, iterations)
     success = Vector{Bool}(undef, iterations)
     success .= true
     p_opt = Vector{Float64}(undef, length(theta_save))
@@ -86,6 +76,8 @@ function optAdamSaveResults(step, adam_opt, doLogSearch, n_it, b2, stepRange, iS
         adam_opt.t = 0
         adam_opt.β = 1.0
         adam_opt.fail = 0
+
+        println("Starting optimizing...")
         benchRunTime[iter] = @elapsed begin # in seconds
             for i in 1:n_it
                 step()
@@ -97,6 +89,7 @@ function optAdamSaveResults(step, adam_opt, doLogSearch, n_it, b2, stepRange, iS
                 end
             end
         end
+        println("Done optimizing!")
 
         cost_opt[iter] = adam_opt.loss
         p_opt[:] = adam_opt.theta

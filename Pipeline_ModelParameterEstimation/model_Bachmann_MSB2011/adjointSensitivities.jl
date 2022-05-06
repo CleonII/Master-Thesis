@@ -33,7 +33,7 @@ function g_unscaledObservables_AdjSens_proto(type, u, dynPar, i, iCond, modelDat
     h_bar[5] = [ u[observableVI[2]] / dynPar[optParIOI[2]] ][ones(Int64, length(observablesTIIFC[5, i]))]                                               # log10
     h_bar[6] = [ u[observableVI[2]] / dynPar[optParIOI[2]] ][ones(Int64, length(observablesTIIFC[6, i]))]                                               # log10
     h_bar[7] = [ u[observableVI[2]] / dynPar[optParIOI[2]] ][ones(Int64, length(observablesTIIFC[7, i]))]                                               # log10
-    h_bar[8] = [ u[observableVI[3]] + dynPar[observableVI[4]] ][ones(Int64, length(observablesTIIFC[8, i]))]                                                # log10
+    h_bar[8] = [ u[observableVI[3]] + u[observableVI[4]] ][ones(Int64, length(observablesTIIFC[8, i]))]                                                # log10
     h_bar[9] = [ u[observableVI[5]] / dynPar[optParIOI[3]] ][ones(Int64, length(observablesTIIFC[9, i]))]                                          # log10
     h_bar[10] = [ u[observableVI[5]] / dynPar[optParIOI[3]] ][ones(Int64, length(observablesTIIFC[10, i]))]                                        # log10
     h_bar[11] = [ u[observableVI[5]] / dynPar[optParIOI[3]] ][ones(Int64, length(observablesTIIFC[11, i]))]                                        # log10
@@ -81,9 +81,9 @@ function g_cost_AdjSens_proto(type, h_hat, varianceVector, i, iCond, modelParame
         costFCO[iObs] = log(2*pi*varianceVector[varianceMap[iCond, iObs]]) * length(h_hat[iObs]) + 
                 (dot(measurementFCO[iCond, iObs][observablesTIIFC[iObs, i]], measurementFCO[iCond, iObs][observablesTIIFC[iObs, i]]) - 
                 2*dot(measurementFCO[iCond, iObs][observablesTIIFC[iObs, i]], h_hat[iObs]) + 
-                dot(h_hat[iObs], h_hat[iObs])) / (2 * varianceVector[varianceMap[iCond, iObs]])
+                dot(h_hat[iObs], h_hat[iObs])) / (varianceVector[varianceMap[iCond, iObs]])
     end
-    
+
     return sum(costFCO[observedOFC[iCond]])
 end
 
@@ -170,8 +170,6 @@ function allConditionsCost_AdjSens_proto(parameterSpace, modelParameters, experi
         cost += G(iCond)
     end
 
-    println("Cost: ", cost)
-
     return cost
 end
 
@@ -190,12 +188,9 @@ function calcCostGrad_AdjSens_proto(g, dg!, G_specifiedDynPar, iCond, modelParam
 
     sol = modelOutput.sols[iCond]
 
-    try
-        ~, dynParGrad[:] = adjoint_sensitivities(sol, Rodas4P(), dg!, timeSteps, 
-            sensealg = senseAlg, reltol = 1e-9, abstol = 1e-9)
-    catch err
-        println(err)
-    end
+     ~, dynParGrad[:] = adjoint_sensitivities(sol, Rodas4P(), dg!, timeSteps, 
+        sensealg = senseAlg, reltol = 1e-9, abstol = 1e-9)
+
 
     # when a parameter is included in the observation function the gradient is incorrect, has to correct with adding dgdp 
 
@@ -263,7 +258,6 @@ end
 
 function allConditionsCostGrad_AdjSens_proto(parameterSpace, modelParameters, modelData, modelOutput, experimentalData, 
     updateAllParameterVectors, calcCostGrad, g, grad, p...)
-    println("In f_prime()")
 
     doLogSearch = parameterSpace.doLogSearch
     allParameters = modelParameters.allParameters
@@ -352,7 +346,7 @@ function adjointSensitivities(iStartPar, senseAlg, optAlg,
 
     g_cost = (type, h_hat, varianceVector, i, iCond) -> g_cost_AdjSens_proto(type, h_hat, varianceVector, i, iCond, modelParameters, experimentalData)
 
-    g = (u, dynPar, scale, offset, variance, i, iCond; type = get_type([u, dynPar, scale, offset, variance])) -> g_AdjSens_proto(u, dynPar, scale, offset, variance, i, iCond, g_unscaledObservables, g_scaledObservationFunctions, g_cost; type = get_type([u, dynPar, scale, offset, variance]))
+    g = (u, dynPar, scale, offset, variance, i, iCond; type = get_type([u, dynPar, scale, offset, variance])) -> g_AdjSens_proto(u, dynPar, scale, offset, variance, i, iCond, g_unscaledObservables, g_scaledObservationFunctions, g_cost; type)
 
     G = (iCond) -> G_AdjSens_proto(solveODESystem, g, iCond, modelParameters, experimentalData, modelOutput)
 
@@ -370,7 +364,7 @@ function adjointSensitivities(iStartPar, senseAlg, optAlg,
     if optAlg == :Ipopt
         model = Model(Ipopt.Optimizer)
         set_optimizer_attribute(model, "print_level", 0)
-        set_optimizer_attribute(model, "max_iter", 1000)
+        set_optimizer_attribute(model, "max_iter", 500)
         set_optimizer_attribute(model, "hessian_approximation", "limited-memory")
         set_optimizer_attribute(model, "tol", 1e-6)
         set_optimizer_attribute(model, "acceptable_tol", 1e-4)
@@ -379,7 +373,7 @@ function adjointSensitivities(iStartPar, senseAlg, optAlg,
         model = Model(NLopt.Optimizer)
         #model.moi_backend.optimizer.model.options
         set_optimizer_attribute(model, "algorithm", optAlg)
-        set_optimizer_attribute(model, "maxeval", 1000)
+        set_optimizer_attribute(model, "maxeval", 500)
         set_optimizer_attribute(model, "ftol_rel", 1e-6)
         set_optimizer_attribute(model, "xtol_rel", 1e-4)
     end

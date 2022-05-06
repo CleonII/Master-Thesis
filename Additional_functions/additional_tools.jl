@@ -55,11 +55,10 @@ end
 
 function getSenseAlgs()
     autojacvecs = getAutojacvecs()
-    senseAlgs = [[BacksolveAdjoint(autojacvec = autojacvecs[i]) for i in 1:length(autojacvecs)],
-                 [InterpolatingAdjoint(checkpointing=true, autojacvec = autojacvecs[i]) for i in 1:length(autojacvecs)], 
-                 [InterpolatingAdjoint(autojacvec = autojacvecs[i]) for i in 1:length(autojacvecs)], 
-                 [InterpolatingAdjoint(autodiff = true, autojacvec = false)], 
-                 [QuadratureAdjoint(autojacvec = autojacvecs[i]) for i in 1:length(autojacvecs)]]
+    senseAlgs = [[QuadratureAdjoint(autojacvec = autojacvecs[i]) for i in 1:length(autojacvecs)],
+            [InterpolatingAdjoint(autojacvec = autojacvecs[i]) for i in 1:length(autojacvecs)], 
+            [InterpolatingAdjoint(autodiff = true, autojacvec = false)]]
+                 
     senseAlgs = reduce(vcat, senseAlgs)
     return senseAlgs
 end

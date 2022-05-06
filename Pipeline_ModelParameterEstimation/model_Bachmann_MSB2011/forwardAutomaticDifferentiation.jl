@@ -13,7 +13,7 @@ function solveODESystem_forwAD_proto(prob, dynParVector, u0Vector, modelData, mo
 
     _prob = remake(prob, u0 = u0Vector, p = dynParVector)
 
-    modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, Rodas5(), reltol=1e-9, abstol=1e-9)
+    modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, Rodas4P(), reltol=1e-9, abstol=1e-9)
 end
 
 
@@ -130,8 +130,6 @@ function f_cost_forwAD_proto(result::DiffResults.MutableDiffResult, f::Function,
     allParametersGrad = modelOutput.allParametersGrad
     allParametersGrad[:] = DiffResults.gradient(result)
     view(allParametersGrad, doLogSearch) .*= view(allPar, doLogSearch) * log(10)
-    
-    println(DiffResults.value(result), "\n")
 
     return DiffResults.value(result)
 end
@@ -211,7 +209,7 @@ function forwardAutomaticDifferentiation(iStartPar, chunkSize, optAlg,
     if optAlg == :Ipopt
         model = Model(Ipopt.Optimizer)
         set_optimizer_attribute(model, "print_level", 0)
-        set_optimizer_attribute(model, "max_iter", 1000)
+        set_optimizer_attribute(model, "max_iter", 500)
         set_optimizer_attribute(model, "hessian_approximation", "limited-memory")
         set_optimizer_attribute(model, "tol", 1e-6)
         set_optimizer_attribute(model, "acceptable_tol", 1e-4)
@@ -220,7 +218,7 @@ function forwardAutomaticDifferentiation(iStartPar, chunkSize, optAlg,
         model = Model(NLopt.Optimizer)
         #model.moi_backend.optimizer.model.options
         set_optimizer_attribute(model, "algorithm", optAlg)
-        set_optimizer_attribute(model, "maxeval", 1000)
+        set_optimizer_attribute(model, "maxeval", 500)
         set_optimizer_attribute(model, "ftol_rel", 1e-6)
         set_optimizer_attribute(model, "xtol_rel", 1e-4)
     end
