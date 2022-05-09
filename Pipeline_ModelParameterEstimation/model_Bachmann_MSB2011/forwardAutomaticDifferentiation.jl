@@ -12,8 +12,9 @@ function solveODESystem_forwAD_proto(prob, dynParVector, u0Vector, modelData, mo
     u0Vector[initVariable[6]] = dynParVector[parameterInU0Indices[10]] * dynParVector[parameterInU0Indices[11]] * dynParVector[parameterInU0Indices[12]]
 
     _prob = remake(prob, u0 = u0Vector, p = dynParVector)
-
     modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, Rodas4P(), reltol=1e-9, abstol=1e-9)
+
+    nothing
 end
 
 
@@ -95,7 +96,27 @@ function calcCost_forwAD_proto(varianceVector, modelParameters, modelOutput, exp
     return sum(costFCO[iCond, observedOFC[iCond]])
 end
 
-function allConditionsCost_forwAD_proto(modelParameters, dualModelParameters, experimentalData, modelData, updateAllDualParameterVectors, solveODESystem, calcUnscaledObservable, calcScaledObservable, calcCost, p)
+function allConditionsCost_forwAD_float_proto(modelParameters, experimentalData, modelData, updateAllParameterVectors, solveODESystem, calcUnscaledObservable, calcScaledObservable, calcCost)
+
+    updateAllParameterVectors()
+
+    dynParVector = modelParameters.dynamicParametersVector
+    inputPVFC = experimentalData.inputParameterValuesForCond
+    inputPI = modelData.inputParameterIndices
+
+    cost = 0.0
+    for (iCond, inputParameterValues) in enumerate(inputPVFC)
+        dynParVector[inputPI] = inputParameterValues
+        solveODESystem(iCond)
+        calcUnscaledObservable(iCond)
+        calcScaledObservable(iCond)
+        cost += calcCost(iCond)
+    end
+
+    return cost
+end
+
+function allConditionsCost_forwAD_dual_proto(modelParameters, dualModelParameters, experimentalData, modelData, updateAllDualParameterVectors, solveODESystem, calcUnscaledObservable, calcScaledObservable, calcCost, p)
 
     updateAllDualParameterVectors(p)
 
@@ -119,23 +140,30 @@ function allConditionsCost_forwAD_proto(modelParameters, dualModelParameters, ex
 end
 
 
-
-function f_cost_forwAD_proto(result::DiffResults.MutableDiffResult, f::Function, cfg::GradientConfig, parameterSpace, modelParameters, modelOutput, p...)::Float64
+function f_cost_forwAD_proto(allConditionsCost::Function, parameterSpace, modelParameters, p...)::Float64
     doLogSearch = parameterSpace.doLogSearch
     allPar = modelParameters.allParameters
     allPar .= p
     view(allPar, doLogSearch) .= exp10.(view(allPar, doLogSearch))
 
-    ForwardDiff.gradient!(result, f, allPar, cfg)
+    cost = allConditionsCost()
+
+    return cost
+end
+
+function f_grad_forwAD_proto(grad, result::DiffResults.MutableDiffResult, allConditionsCost::Function, cfg::GradientConfig, parameterSpace, modelParameters, modelOutput, p...)
+    doLogSearch = parameterSpace.doLogSearch
+    allPar = modelParameters.allParameters
+    allPar .= p
+    view(allPar, doLogSearch) .= exp10.(view(allPar, doLogSearch))
+
+    ForwardDiff.gradient!(result, allConditionsCost, allPar, cfg)
+
     allParametersGrad = modelOutput.allParametersGrad
     allParametersGrad[:] = DiffResults.gradient(result)
     view(allParametersGrad, doLogSearch) .*= view(allPar, doLogSearch) * log(10)
 
-    return DiffResults.value(result)
-end
-
-function f_grad_forwAD_proto(grad, modelOutput, p...)
-    grad[:] = modelOutput.allParametersGrad
+    grad[:] = allParametersGrad
 
     nothing
 end
@@ -145,10 +173,10 @@ end
 
 
 
-function forwardAutomaticDifferentiation(iStartPar, chunkSize, optAlg,
+function forwardAutomaticDifferentiation(modelFunction, iStartPar, chunkSize, optAlg,
         timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
 
-    sys, initialSpeciesValues, trueParameterValues = getODEModel()
+    sys, initialSpeciesValues, trueParameterValues = modelFunction()
     new_sys = ode_order_lowering(sys)
     u0 = initialSpeciesValues
     pars = trueParameterValues 
@@ -174,9 +202,11 @@ function forwardAutomaticDifferentiation(iStartPar, chunkSize, optAlg,
 
     modelParameters = ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData)
 
-    dualModelParameters = DualModelParameters(prob, parameterBounds)
+    dualModelParameters = DualModelParameters(modelParameters)
 
     parameterSpace, numAllStartParameters, lowerBounds, upperBounds = ParameterSpace(modelParameters, parameterBounds)
+
+    modelOutput_float = ModelOutput(Float64, experimentalData, modelParameters)
 
     modelOutput_dual = ModelOutput(ForwardDiff.Dual, experimentalData, modelParameters)
 
@@ -186,25 +216,38 @@ function forwardAutomaticDifferentiation(iStartPar, chunkSize, optAlg,
 
     # Initialize functions
 
+    solveODESystem_float = (iCond) -> solveODESystem_forwAD_proto(prob, modelParameters.dynamicParametersVector, modelParameters.u0Vector, modelData, modelOutput_float, iCond)
+
     solveODESystem_dual = (dualU0Vector, iCond) -> solveODESystem_forwAD_proto(prob, dualModelParameters.dualDynamicParametersVector, dualU0Vector, modelData, modelOutput_dual, iCond)
+
+    calcUnscaledObservable_float = (iCond) -> calcUnscaledObservable_forwAD_proto(modelParameters.dynamicParametersVector, modelData, experimentalData, modelOutput_float, iCond)
 
     calcUnscaledObservable_dual = (iCond) -> calcUnscaledObservable_forwAD_proto(dualModelParameters.dualDynamicParametersVector, modelData, experimentalData, modelOutput_dual, iCond)
 
+    calcScaledObservable_float = (iCond) -> calcScaledObservable_forwAD_proto(modelParameters.scaleVector, modelParameters.offsetVector, modelParameters, modelData, modelOutput_float, experimentalData, iCond)
+
     calcScaledObservable_dual = (iCond) -> calcScaledObservable_forwAD_proto(dualModelParameters.dualScaleVector, dualModelParameters.dualOffsetVector, modelParameters, modelData, modelOutput_dual, experimentalData, iCond)
+
+    calcCost_float = (iCond) -> calcCost_forwAD_proto(modelParameters.varianceVector, modelParameters, modelOutput_float, experimentalData, iCond)
 
     calcCost_dual = (iCond) -> calcCost_forwAD_proto(dualModelParameters.dualVarianceVector, modelParameters, modelOutput_dual, experimentalData, iCond)
 
+    updateAllParameterVectors = () -> updateAllParameterVectors_proto(modelParameters, modelData)
+
     updateAllDualParameterVectors = (p) -> updateAllDualParameterVectors_proto(modelParameters, dualModelParameters, modelData, p)
 
-    allConditionsCost_dual = (p) -> allConditionsCost_forwAD_proto(modelParameters, dualModelParameters, experimentalData, modelData,
+    allConditionsCost_float = () -> allConditionsCost_forwAD_float_proto(modelParameters, experimentalData, modelData, 
+            updateAllParameterVectors, solveODESystem_float, calcUnscaledObservable_float, calcScaledObservable_float, calcCost_float)
+
+    allConditionsCost_dual = (p) -> allConditionsCost_forwAD_dual_proto(modelParameters, dualModelParameters, experimentalData, modelData,
             updateAllDualParameterVectors, solveODESystem_dual, calcUnscaledObservable_dual, calcScaledObservable_dual, calcCost_dual, p)
 
     cfg = GradientConfig(allConditionsCost_dual, allStartParameters, Chunk{chunkSize}())
 
     result = DiffResults.GradientResult(allStartParameters::Vector{Float64})
 
-    f = (p_tuple...) -> f_cost_forwAD_proto(result, allConditionsCost_dual, cfg, parameterSpace, modelParameters, modelOutput_dual, p_tuple...)
-    f_grad = (grad, p_tuple...) -> f_grad_forwAD_proto(grad, modelOutput_dual, p_tuple...)
+    f = (p_tuple...) -> f_cost_forwAD_proto(allConditionsCost_float, parameterSpace, modelParameters, p_tuple...)
+    f_grad = (grad, p_tuple...) -> f_grad_forwAD_proto(grad, result, allConditionsCost_dual, cfg, parameterSpace, modelParameters, modelOutput_dual, p_tuple...)
 
     if optAlg == :Ipopt
         model = Model(Ipopt.Optimizer)
