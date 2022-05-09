@@ -145,7 +145,7 @@ end
 # Goes through a condition for an event written for SBML and creates the appropriate events in ModelingToolkit.
 # May call itself to handle more complicated events.
 # Makes sure there are no doublett events. 
-# Also adds constants and parameters used to a dummy variable so that ModelingToolkit does not think they are unused.
+# Also adds parameters used to a dummy variable so that ModelingToolkit does not think they are unused.
 function goToBottomPiecewiseToEvent(condition, variable, valActive, valInactive, eventDict, dicts)   
     if "and" == condition[1:3]
         strippedCondition = condition[5:end-1]
@@ -170,8 +170,6 @@ function goToBottomPiecewiseToEvent(condition, variable, valActive, valInactive,
         for arg in args
             if arg in keys(dicts["parameters"])
                 dicts["dummyVariable"][arg] = dicts["parameters"][arg]
-            elseif arg in keys(dicts["constants"])
-                dicts["dummyVariable"][arg] = dicts["constants"][arg]
             end
         end
 
@@ -194,8 +192,6 @@ function goToBottomPiecewiseToEvent(condition, variable, valActive, valInactive,
         for arg in args
             if arg in keys(dicts["parameters"])
                 dicts["dummyVariable"][arg] = dicts["parameters"][arg]
-            elseif arg in keys(dicts["constants"])
-                dicts["dummyVariable"][arg] = dicts["constants"][arg]
             end
         end
 
@@ -223,9 +219,6 @@ function rewritePiecewiseToEvent(piecewiseString, variable, dicts)
     if variable in keys(dicts["parameters"])
         dicts["variableParameters"][variable] = dicts["parameters"][variable]
         delete!(dicts["parameters"], variable)
-    elseif variable in keys(dicts["constants"])
-        dicts["variableParameters"][variable] = dicts["constants"][variable]
-        delete!(dicts["constants"], variable)
     end
 
     eventDict = Dict()
@@ -242,8 +235,6 @@ function rewritePiecewiseToEvent(piecewiseString, variable, dicts)
         for valArg in split(valArgs[1], ", ")
             if valArg in keys(dicts["parameters"])
                 dicts["dummyVariable"][valArg] = dicts["parameters"][valArg]
-            elseif valArg in keys(dicts["constants"])
-                dicts["dummyVariable"][valArg] = dicts["constants"][valArg]
             end
         end
     end    
@@ -583,7 +574,7 @@ function rewriteDerivatives(derivativeAsString, dicts)
     return newDerivativeAsString
 end
 
-function writeODEModelToFile(libsbml, model, modelName, path, experimentalConditions, parameterBounds)
+function writeODEModelToFile(libsbml, model, modelName, path, useData, wrapped; experimentalConditions = [], parameterBounds = [])
     dicts = Dict()
     variableDict = Dict()
     dicts["variables"] = variableDict
@@ -593,8 +584,11 @@ function writeODEModelToFile(libsbml, model, modelName, path, experimentalCondit
     dicts["variableParameters"] = variableParameterDict
     dummyVariableDict = Dict()
     dicts["dummyVariable"] = dummyVariableDict
-    constantParameterDict = Dict()
-    dicts["constantParameter"] = constantParameterDict
+
+    if useData
+        constantParameterDict = Dict()
+        dicts["constantParameter"] = constantParameterDict
+    end
 
     # for functions defined by the model, these functions will be rewritten
     modelFuncNameArgFormula = Dict()
@@ -670,13 +664,11 @@ function writeODEModelToFile(libsbml, model, modelName, path, experimentalCondit
         trigger = event[:getTrigger]()
         triggerMath = trigger[:getMath]()
         triggerFormula = asTrigger(libsbml[:formulaToString](triggerMath))
-        # if the trigger contains parameters or constants, add them to the dummy variables
+        # if the trigger contains parameters, add them to the dummy variables
         triggerArgs = split(getArguments(triggerFormula[2:end-1], baseFunctions), ", ")
         for triggerArg in triggerArgs
             if triggerArg in keys(dicts["parameters"])
                 dicts["dummyVariable"][triggerArg] = dicts["parameters"][triggerArg]
-            elseif triggerArg in keys(dicts["constants"])
-                dicts["dummyVariable"][triggerArg] = dicts["constants"][triggerArg]
             end
         end
         eventAsString = ""
@@ -690,7 +682,7 @@ function writeODEModelToFile(libsbml, model, modelName, path, experimentalCondit
 
             eventMath = eventAssignment[:getMath]()
             eventMathAsString = libsbml[:formulaToString](eventMath)
-            # if the event math contains parameters or constants, add them to the dummy variable so that they stay defined 
+            # if the event math contains parameters, add them to the dummy variable so that they stay defined 
             eventMathArgs = split(getArguments(eventMathAsString, baseFunctions), ", ")
             for eventMathArg in eventMathArgs
                 if eventMathArg in keys(parameterDict)
@@ -888,18 +880,19 @@ function writeODEModelToFile(libsbml, model, modelName, path, experimentalCondit
         nestedParameter || break
     end
 
-    # sort out the parameters that are assumed to be known 
+    if useData
+        # sort out the parameters that are assumed to be known 
 
-    optParameters = parameterBounds[:,:parameterId]
-    inputParameters = names(experimentalConditions)
+        optParameters = parameterBounds[:,:parameterId]
+        inputParameters = names(experimentalConditions)
 
-    for key in keys(parameterDict)
-        if key ∉ inputParameters && key ∉ optParameters 
-            constantParameterDict[key] = parameterDict[key]
-            delete!(parameterDict, key)
+        for key in keys(parameterDict)
+            if key ∉ inputParameters && key ∉ optParameters 
+                constantParameterDict[key] = parameterDict[key]
+                delete!(parameterDict, key)
+            end
         end
     end
-    
 
     reactions = [(r, r[:getKineticLaw]()[:getFormula]()) for r in model[:getListOfReactions]()]
     for (reac, formula) in reactions
@@ -923,12 +916,18 @@ function writeODEModelToFile(libsbml, model, modelName, path, experimentalCondit
     println(modelFile, "# Number of parameters: " * string(length(model[:getListOfParameters]())))
     println(modelFile, "# Number of species: " * string(length(model[:getListOfSpecies]())))
 
-    println(modelFile, "function getODEModel()")
+    if wrapped 
+        println(modelFile, "function getODEModel_" * modelName * "()")
+    end
 
-    println(modelFile, "")
-    println(modelFile, "    ### Define constant parameters")
-    for key in keys(constantParameterDict)
-        println(modelFile, "    " * key * " = " * constantParameterDict[key])
+    if useData
+
+        println(modelFile, "")
+        println(modelFile, "    ### Define constant parameters")
+        for key in keys(constantParameterDict)
+            println(modelFile, "    " * key * " = " * constantParameterDict[key])
+        end
+
     end
 
     println(modelFile, "")
@@ -1041,11 +1040,13 @@ function writeODEModelToFile(libsbml, model, modelName, path, experimentalCondit
     println(modelFile, "]")
     println(modelFile, "")
 
-    println(modelFile, "    return sys, initialSpeciesValues, trueParameterValues")
+    if wrapped
+        println(modelFile, "    return sys, initialSpeciesValues, trueParameterValues")
 
-    println(modelFile, "")
+        println(modelFile, "")
 
-    println(modelFile, "end")
+        println(modelFile, "end")
+    end
     
     close(modelFile)
 end

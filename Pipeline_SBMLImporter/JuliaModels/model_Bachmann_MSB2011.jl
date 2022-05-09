@@ -1,7 +1,7 @@
 # Model name: model_Bachmann_MSB2011
 # Number of parameters: 37
 # Number of species: 25
-function getODEModel()
+function getODEModel_model_Bachmann_MSB2011()
 
     ### Define constant parameters
     cyt = 0.4
