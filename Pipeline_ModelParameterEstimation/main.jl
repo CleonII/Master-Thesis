@@ -1,4 +1,4 @@
-using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV
+using ModelingToolkit, DifferentialEquations, DataFrames, CSV, Random
 using JuMP, NLopt, Ipopt, LinearAlgebra, DiffEqSensitivity, ForwardDiff
 using ModelingToolkit: varmap_to_vars
 using ForwardDiff: GradientConfig, Chunk
@@ -9,15 +9,20 @@ println("Done loading modules")
 include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters", "LatinHyperCubeSampledParameters.jl"))
 include(joinpath(pwd(), "Additional_functions", "importModelInfo.jl"))
-
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "optAndSave.jl"))
+
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "model_Bachmann_MSB2011", "adjointSensitivities.jl"))
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "model_Bachmann_MSB2011", "forwardAutomaticDifferentiation.jl"))
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "model_Bachmann_MSB2011", "forwardGradient.jl"))
 include(joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels", "model_Bachmann_MSB2011.jl"))
 
 
-function benchMethod_proto(iStartPar, filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds,
+allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")), 
+        joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels"))
+
+
+
+function benchMethod_proto(usedModelFunction, iStartPar, filesAndPaths, timeEnd, experimentalConditions, measurementData, observables, parameterBounds,
         optAlg, method)
     write = joinpath(filesAndPaths.writePath, filesAndPaths.writeFile)
     
@@ -27,7 +32,7 @@ function benchMethod_proto(iStartPar, filesAndPaths, timeEnd, experimentalCondit
         senseAlgs = getSenseAlgs()
 
         for senseAlg in senseAlgs
-            model, p, doLogSearch = adjointSensitivities(iStartPar, senseAlg, optAlg, 
+            model, p, doLogSearch = adjointSensitivities(usedModelFunction, iStartPar, senseAlg, optAlg, 
                     timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
             optModelSaveResults(model, p, doLogSearch, senseAlg, optAlg, "-", iStartPar, "adjointSensitivities", write)
         end
@@ -37,7 +42,7 @@ function benchMethod_proto(iStartPar, filesAndPaths, timeEnd, experimentalCondit
         chunkSizes = [23, 60, 115]
 
         for chunkSize in chunkSizes
-            model, p, doLogSearch = forwardAutomaticDifferentiation(iStartPar, chunkSize, optAlg, 
+            model, p, doLogSearch = forwardAutomaticDifferentiation(usedModelFunction, iStartPar, chunkSize, optAlg, 
                     timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
             optModelSaveResults(model, p, doLogSearch, chunkSize, optAlg, "-", iStartPar, "forwardAutomaticDifferentiation", write)
         end
@@ -53,7 +58,7 @@ function benchMethod_proto(iStartPar, filesAndPaths, timeEnd, experimentalCondit
             for b2 in b2s
                 for stepRange in stepRanges
 
-                    step, adam_opt, doLogSearch = forwardGradient(iStartPar, n_it, b2, stepRange, 
+                    step, adam_opt, doLogSearch = forwardGradient(usedModelFunction, iStartPar, n_it, b2, stepRange, 
                             timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
                     optAdamSaveResults(step, adam_opt, doLogSearch, n_it, b2, stepRange, iStartPar, iterations, "forwardGradient", write)
 
@@ -103,11 +108,12 @@ function main(; modelName = "model_Bachmann_MSB2011", optAlg = :Ipopt, method = 
     timeEnd = maximum(measurementData[!, 5])
     observables = CSV.read(joinpath(readDataPath, "observables_" * dataEnding), DataFrame)
     parameterBounds = CSV.read(joinpath(readDataPath, "parameters_" * dataEnding), DataFrame)
-    #
+    
+    allModelFiles = getModelFiles(modelPath)
+    usedModelFunction = allModelFunctionVector[[allModelFile in [modelFile] for allModelFile in allModelFiles]]
 
-    benchMethod = (iStartPar) -> benchMethod_proto(iStartPar, filesAndPaths, timeEnd, experimentalConditions, 
+    benchMethod = (iStartPar) -> benchMethod_proto(usedModelFunction, iStartPar, filesAndPaths, timeEnd, experimentalConditions, 
             measurementData, observables, parameterBounds, optAlg, method)
-
 
     println("Starting benchmark")
     
@@ -117,7 +123,7 @@ function main(; modelName = "model_Bachmann_MSB2011", optAlg = :Ipopt, method = 
 
 end
 
-main(method = "forwardAutomaticDifferentiation")
+main(modelName = "model_Raimundez_PCB2020", method = "forwardAutomaticDifferentiation")
 
 #optAlgs = [:LD_MMA, :LD_LBFGS, :Ipopt]
 #methods = ["adjointSensitivities", "forwardAutomaticDifferentiation", "forwardGradient", "all"]
