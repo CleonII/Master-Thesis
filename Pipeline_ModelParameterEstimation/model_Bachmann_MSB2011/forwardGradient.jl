@@ -77,6 +77,8 @@ function step_forwGrad_proto!(opt::Adam, keepInBounds!)
         keepInBounds!(opt.theta)
 
     end
+
+    nothing
 end
 
 function solveODESystem_forwGrad_proto(prob, dynParVector, u0Vector, modelData, modelOutput, iCond)
@@ -94,7 +96,11 @@ function solveODESystem_forwGrad_proto(prob, dynParVector, u0Vector, modelData, 
 
     try
         modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, Rodas5(), reltol=1e-9, abstol=1e-9)
-        return false
+        if minimum(modelOutput.sols[iCond][:,:]).value < 0.0
+            return true
+        else
+            return false
+        end
     catch err
         return true
     end
@@ -227,10 +233,10 @@ end
 
 
 
-function forwardGradient(iStartPar, n_it, b2, stepRange, 
+function forwardGradient(modelFunction, iStartPar, n_it, b2, stepRange, 
         timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
 
-    sys, initialSpeciesValues, trueParameterValues = getODEModel()
+    sys, initialSpeciesValues, trueParameterValues = modelFunction()
     new_sys = ode_order_lowering(sys)
     u0 = initialSpeciesValues
     pars = trueParameterValues 
@@ -256,7 +262,7 @@ function forwardGradient(iStartPar, n_it, b2, stepRange,
 
     modelParameters = ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData)
 
-    dualModelParameters = DualModelParameters(prob, parameterBounds)
+    dualModelParameters = DualModelParameters(modelParameters)
 
     parameterSpace, numAllStartParameters, lowerBounds, upperBounds = ParameterSpace(modelParameters, parameterBounds)
 
