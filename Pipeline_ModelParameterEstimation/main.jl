@@ -110,7 +110,7 @@ function main(; modelName = "model_Bachmann_MSB2011", optAlg = :Ipopt, method = 
     parameterBounds = CSV.read(joinpath(readDataPath, "parameters_" * dataEnding), DataFrame)
     
     allModelFiles = getModelFiles(modelPath)
-    usedModelFunction = allModelFunctionVector[[allModelFile in [modelFile] for allModelFile in allModelFiles]]
+    usedModelFunction = allModelFunctionVector[[allModelFile in [modelFile] for allModelFile in allModelFiles]][1]
 
     benchMethod = (iStartPar) -> benchMethod_proto(usedModelFunction, iStartPar, filesAndPaths, timeEnd, experimentalConditions, 
             measurementData, observables, parameterBounds, optAlg, method)
