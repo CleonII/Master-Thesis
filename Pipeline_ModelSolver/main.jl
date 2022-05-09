@@ -1,29 +1,27 @@
 using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
 
 
-include(pwd() * "/Pipeline_ModelSolver/BigFloatODEProblem.jl")
-include(pwd() * "/Additional_functions/additional_tools.jl")
-include(pwd() * "/Additional_functions/Solver_info.jl")
+include(joinpath(pwd(), "Pipeline_ModelSolver", "BigFloatODEProblem.jl"))
+include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
+include(joinpath(pwd(), "Additional_functions", "Solver_info.jl"))
+
+allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")), 
+        joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels"))
 
 
-function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, readPath, writefile)
+function modelSolver(modelFunction, modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, writefile)
     nonStiffHiAccSolver, stiffHiAccSolver = hiAccSolvers
     println(modelFile)
-    modelPath = readPath * "/" * modelFile
-    include(modelPath)
 
+    sys, initialSpeciesValues, trueParameterValues = modelFunction()
     new_sys = ode_order_lowering(sys)
     u0 = initialSpeciesValues
-
-    p = trueParameterValues
-
-    c = trueConstantsValues
-
+    pars = trueParameterValues 
     tspan = (0.0, timeEnd)
 
     # Estimate ground truth
     println("Obtaining high accuracy solution")
-    bfProb = BigFloatODEProblem(new_sys, u0, tspan, [p;c])
+    bfProb = BigFloatODEProblem(new_sys, u0, tspan, pars)
     local hiAccSol
     try 
         hiAccSol = solve(bfProb, stiffHiAccSolver, reltol=1e-15, abstol=1e-15) 
@@ -33,7 +31,7 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
 
     if hiAccSol.retcode != :Success
         println("High accuracy solver failed for $modelFile")
-        open(pwd() * "/Pipeline_ModelSolver/Log.txt", "a") do io
+        open(joinpath(pwd(), "Pipeline_ModelSolver", "Log.txt"), "a") do io
             println(io, "Failed with high accuracy solution for $modelFile")
         end
         return 
@@ -44,7 +42,7 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
     ts = hiAccSol.t
     
     # Solve with different solvers
-    prob = ODEProblem(new_sys,u0,tspan,[p;c],jac=true)
+    prob = ODEProblem(new_sys,u0,tspan,pars,jac=true)
 
     alg_solvers, alg_hints = solvers
     for alg_solver in alg_solvers
@@ -179,19 +177,22 @@ function modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations
 end
 
 
-function modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, Tols, iterations, readPath, writefile)
-    for modelFile in modelFiles
+function modelSolverIterator(modelFunctionVector, modelFiles, timeEnds, solvers, hiAccSolvers, Tols, iterations, writefile)
+    for (i, modelFile) in enumerate(modelFiles)
         timeEnd = timeEnds[timeEnds[:,1] .== modelFile, 2][1]
-        modelSolver(modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, readPath, writefile)
+        modelFunction = modelFunctionVector[i]
+        modelSolver(modelFunction, modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, writefile)
     end
 end
 
 
-function main(;modelFiles=["all"], modelsExclude=[""])
-    readPath = pwd() * "/Pipeline_SBMLImporter/JuliaModels"
-    writePath = pwd() * "/Pipeline_ModelSolver/IntermediaryResults"
+function main(; modelFiles=["all"], modelsExclude=[""])
+    readPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
+    writePath = joinpath(pwd(), "Pipeline_ModelSolver", "IntermediaryResults")
     fixDirectories(writePath)
-    writefile = writePath * "/benchmark_" * string(getNumberOfFiles(writePath) + 1) * ".csv"
+    writefile = joinpath(writePath, "benchmark_" * string(getNumberOfFiles(writePath) + 1) * ".csv")
+
+    allModelFiles = getModelFiles(readPath)
 
     if modelFiles[1] == "all"
         modelFiles = getModelFiles(readPath)
@@ -199,14 +200,16 @@ function main(;modelFiles=["all"], modelsExclude=[""])
     for modelExclude in modelsExclude
         modelFiles = modelFiles[.!(occursin.(modelFiles, modelExclude))]
     end
+
+    usedModelFunctionVector = allModelFunctionVector[[allModelFile in modelFiles for allModelFile in allModelFiles]]
     
-    timeEnds = CSV.read(writePath * "/timeScales.csv", DataFrame)
+    timeEnds = CSV.read(joinpath(writePath, "timeScales.csv"), DataFrame)
     solvers = getSolvers()
     hiAccSolvers = getHiAccSolver()
     tolList = getTolerances(onlyMaxTol = false) # Get tolerances = [1e-6, 1e-9, 1e-12]
     iterations = 15
     
-    modelSolverIterator(modelFiles, timeEnds, solvers, hiAccSolvers, tolList, iterations, readPath, writefile)
+    modelSolverIterator(usedModelFunctionVector, modelFiles, timeEnds, solvers, hiAccSolvers, tolList, iterations, writefile)
 end
 
 
