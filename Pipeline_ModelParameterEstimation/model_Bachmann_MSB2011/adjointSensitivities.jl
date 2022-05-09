@@ -188,9 +188,8 @@ function calcCostGrad_AdjSens_proto(g, dg!, G_specifiedDynPar, iCond, modelParam
 
     sol = modelOutput.sols[iCond]
 
-     ~, dynParGrad[:] = adjoint_sensitivities(sol, Rodas4P(), dg!, timeSteps, 
+    ~, dynParGrad[:] = adjoint_sensitivities(sol, Rodas4P(), dg!, timeSteps, 
         sensealg = senseAlg, reltol = 1e-9, abstol = 1e-9)
-
 
     # when a parameter is included in the observation function the gradient is incorrect, has to correct with adding dgdp 
 
@@ -234,7 +233,7 @@ function calcCostGrad_AdjSens_proto(g, dg!, G_specifiedDynPar, iCond, modelParam
     G_specDynPar = (specifiedDynPar) -> G_specifiedDynPar(specifiedDynPar, iCond)
     correctSpecDynParGrad = ForwardDiff.gradient(G_specDynPar, specifiedDynPar)
 
-    dynParGrad *= -1
+    dynParGrad *= -1 # adjoint sensitivities seems to return the negative gradient
     dynParGrad += ∂g∂p
     dynParGrad[specifiedDynParIndices] = correctSpecDynParGrad
 
@@ -292,10 +291,10 @@ end
 
 
 
-function adjointSensitivities(iStartPar, senseAlg, optAlg, 
+function adjointSensitivities(modelFunction, iStartPar, senseAlg, optAlg, 
         timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
 
-    sys, initialSpeciesValues, trueParameterValues = getODEModel()
+    sys, initialSpeciesValues, trueParameterValues = modelFunction()
     new_sys = ode_order_lowering(sys)
     u0 = initialSpeciesValues
     pars = trueParameterValues 
@@ -322,7 +321,7 @@ function adjointSensitivities(iStartPar, senseAlg, optAlg,
 
     modelParameters = ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData)
 
-    dualModelParameters = DualModelParameters(prob, parameterBounds)
+    dualModelParameters = DualModelParameters(modelParameters)
 
     parameterSpace, numAllStartParameters, lowerBounds, upperBounds = ParameterSpace(modelParameters, parameterBounds)
 
