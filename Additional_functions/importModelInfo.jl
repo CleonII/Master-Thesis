@@ -24,15 +24,31 @@ function ModelData(new_sys, prob, observables, experimentalConditions, initVaria
     optParameterIndices = collect(1:numUsedParameters)[[pPS.name ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
     parameterNames = string.(problemParameterSymbols)
 
-    initVariableNames = initVariableNames .* "(t)"
-    initVariableIndices = [findfirst(initVar .== variableNames) for initVar in initVariableNames]
+    if initVariableNames != []
+        initVariableNames = initVariableNames .* "(t)"
+        initVariableIndices = [findfirst(initVar .== variableNames) for initVar in initVariableNames]
+    else
+        initVariableIndices = Int[]
+    end
 
-    observableVariableNames = observableVariableNames .* "(t)"
-    observableVariableIndices = [findfirst(observableVar .== variableNames) for observableVar in observableVariableNames]
+    if observableVariableNames != []
+        observableVariableNames = observableVariableNames .* "(t)"
+        observableVariableIndices = [findfirst(observableVar .== variableNames) for observableVar in observableVariableNames]
+    else
+        observableVariableIndices = Int[]
+    end
 
-    parameterInU0Indices = [findfirst(parIU0N .== parameterNames) for parIU0N in parameterInU0Names]
+    if parameterInU0Names != []
+        parameterInU0Indices = [findfirst(parIU0N .== parameterNames) for parIU0N in parameterInU0Names]
+    else
+        parameterInU0Indices = Int[]
+    end
 
-    parameterInObservableIndices = [findfirst(parION .== parameterNames) for parION in parameterInObservableNames]
+    if parameterInObservableNames != []
+        parameterInObservableIndices = [findfirst(parION .== parameterNames) for parION in parameterInObservableNames]
+    else
+        parameterInObservableIndices = Int[]
+    end
 
     modelData = ModelData(observableLogTransformation, optParameterIndices, inputParameterIndices, 
         initVariableIndices, observableVariableIndices, parameterInObservableIndices, parameterInU0Indices, inputParameterSymbols)
@@ -158,9 +174,9 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
     numScale = length(findall(occursin.(scaleDeterminer, parameterBounds[!, 1])))
     # scale[numScale+1] = 1
     scaleMap = Array{Int64, 2}(undef, numConditions, numObservables) # Have as sparse?
-    for (iCond, Cond) in enumerate(experimentalConditions[!, 1])
-        for (iObs, Obs) in enumerate(observableNames)
-            measurementIndex = findfirst((measurementData[!, 1] .== Obs) .& (measurementData[!, 3] .== Cond))
+    for (iCond, cond) in enumerate(experimentalConditions[!, 1])
+        for (iObs, obs) in enumerate(observableNames)
+            measurementIndex = findfirst((measurementData[!, 1] .== obs) .& (measurementData[!, 3] .== cond))
             if measurementIndex === nothing
                 scaleMap[iCond, iObs] = numScale+1
             else
@@ -192,9 +208,9 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
     numOffset = length(findall(occursin.(offsetDeterminer, parameterBounds[!, 1])))
     # offset[numOffset+1] = 0, offset[numOffset+2] = 1
     offsetMap = Array{Int64, 2}(undef, numConditions, numObservables)
-    for (iCond, Cond) in enumerate(experimentalConditions[!, 1])
-        for (iObs, Obs) in enumerate(observableNames)
-            measurementIndex = findfirst((measurementData[!, 1] .== Obs) .& (measurementData[!, 3] .== Cond))
+    for (iCond, cond) in enumerate(experimentalConditions[!, 1])
+        for (iObs, obs) in enumerate(observableNames)
+            measurementIndex = findfirst((measurementData[!, 1] .== obs) .& (measurementData[!, 3] .== cond))
             if measurementIndex === nothing
                 offsetMap[iCond, iObs] = numOffset+1
             else
@@ -238,16 +254,22 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
     ## Creating a map from a condition, observable pair to a variance ##
     varianceNames = parameterBounds[findall(occursin.(varianceDeterminer, parameterBounds[!, 1])), 1]
     numVariance = length(findall(occursin.(varianceDeterminer, parameterBounds[!, 1])))
+    allKnownVariances = [1.0]
+    numKnownVariance = 1
+    if numVariance == 0 && typeof(measurementData[:, :noiseParameters]) <: Vector{Float64}
+        allKnownVariances = vcat(unique(measurementData[:, :noiseParameters]), allKnownVariances)
+        numKnownVariance = length(allKnownVariances)
+    end
     varianceMap = Array{Int64, 2}(undef, numConditions, numObservables)
-    for (iCond, Cond) in enumerate(experimentalConditions[!, 1])
-        for (iObs, Obs) in enumerate(observableNames)
-            measurementIndex = findfirst((measurementData[!, 1] .== Obs) .& (measurementData[!, 3] .== Cond))
+    for (iCond, cond) in enumerate(experimentalConditions[!, 1])
+        for (iObs, obs) in enumerate(observableNames)
+            measurementIndex = findfirst((measurementData[!, 1] .== obs) .& (measurementData[!, 3] .== cond))
             if measurementIndex === nothing
-                varianceMap[iCond, iObs] = numVariance+1
+                varianceMap[iCond, iObs] = numVariance + numKnownVariance
             else
-                obsPar = measurementData[measurementIndex, 7]
+                obsPar = measurementData[measurementIndex, :noiseParameters]
                 if obsPar === missing
-                    varianceMap[iCond, iObs] = numVariance+1
+                    varianceMap[iCond, iObs] = numVariance + numKnownVariance
                 else
                     if occursin(';', obsPar)
                         obsPars = split(obsPar, ';')
@@ -257,11 +279,16 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
                             end
                         end
                     end
-                    if occursin(varianceDeterminer, obsPar)
-                        varianceIndex = findfirst(varianceNames .== obsPar)
-                        varianceMap[iCond, iObs] = varianceIndex
+                    if typeof(obsPar) <: Float64
+                        knownVarianceIndex = findfirst(allKnownVariances .== obsPar)
+                        varianceMap[iCond, iObs] = numVariance + knownVarianceIndex
                     else
-                        varianceMap[iCond, iObs] = numVariance+1
+                        if occursin(varianceDeterminer, obsPar)
+                            varianceIndex = findfirst(varianceNames .== obsPar)
+                            varianceMap[iCond, iObs] = varianceIndex
+                        else
+                            varianceMap[iCond, iObs] = numVariance+1
+                        end
                     end
                 end
             end
@@ -281,17 +308,17 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
     optParameterNames = parameterNames[optParameterIndices]
 
     scaleIndices = collect(1:numScale)
-    offsetIndices = maximum(scaleIndices) .+ collect(1:numOffset)
-    varianceIndices = maximum(offsetIndices) .+ collect(1:numVariance)
-    parameterIndices = maximum(varianceIndices) .+ collect(1:numOptParameters)
+    offsetIndices = numScale .+ collect(1:numOffset)
+    varianceIndices = numScale + numOffset .+ collect(1:numVariance)
+    parameterIndices = numScale + numOffset + numVariance .+ collect(1:numOptParameters)
 
     scaleVector = Vector{Float64}(undef, numScale + 1)
     scaleVector[numScale + 1] = 1.0
     offsetVector = Vector{Float64}(undef, numOffset + 2)
     offsetVector[numOffset + 1] = 0.0
     offsetVector[numOffset + 2] = 1.0
-    varianceVector = Vector{Float64}(undef, numVariance + 1)
-    varianceVector[numVariance + 1] = 1.0
+    varianceVector = Vector{Float64}(undef, numVariance + numKnownVariance)
+    varianceVector[numVariance + 1:end] = allKnownVariances
     dynamicParametersVector = Vector{Float64}(undef, numUsedParameters)
     u0Vector = prob.u0
     numAllParameters = numScale + numOffset + numVariance + numOptParameters
@@ -314,19 +341,13 @@ struct DualModelParameters
     dualU0Vector::Vector{ForwardDiff.Dual}
 end
 
-function DualModelParameters(prob, parameterBounds; 
-    scaleDeterminer = "scale", offsetDeterminer = "offset", varianceDeterminer = "sd_")
+function DualModelParameters(modelParameters)
 
-    numScale = length(findall(occursin.(scaleDeterminer, parameterBounds[!, 1])))
-    numOffset = length(findall(occursin.(offsetDeterminer, parameterBounds[!, 1])))
-    numVariance = length(findall(occursin.(varianceDeterminer, parameterBounds[!, 1])))
-    numUsedParameters = length(prob.p)
-
-    dualScaleVector = Vector{ForwardDiff.Dual}(undef, numScale + 1)
-    dualOffsetVector = Vector{ForwardDiff.Dual}(undef, numOffset + 2)
-    dualVarianceVector = Vector{ForwardDiff.Dual}(undef, numVariance + 1)
-    dualDynamicParameters = Vector{ForwardDiff.Dual}(undef, numUsedParameters)
-    dualU0Vector = Vector{ForwardDiff.Dual}(undef, length(prob.u0))
+    dualScaleVector = Vector{ForwardDiff.Dual}(undef, length(modelParameters.scaleVector))
+    dualOffsetVector = Vector{ForwardDiff.Dual}(undef, length(modelParameters.offsetVector))
+    dualVarianceVector = Vector{ForwardDiff.Dual}(undef, length(modelParameters.varianceVector))
+    dualDynamicParameters = Vector{ForwardDiff.Dual}(undef, length(modelParameters.dynamicParametersVector))
+    dualU0Vector = Vector{ForwardDiff.Dual}(undef, length(modelParameters.u0Vector))
 
     dualModelParameters = DualModelParameters(dualScaleVector, dualOffsetVector, dualVarianceVector, dualDynamicParameters, dualU0Vector)
 

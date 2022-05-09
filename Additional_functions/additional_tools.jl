@@ -134,3 +134,15 @@ function updateAllDualParameterVectors_proto(modelParameters, dualModelParameter
 
     nothing
 end
+
+function includeAllModels(modelFiles, readPath)
+    modelFunctionVector = Vector{Function}(undef, length(modelFiles))
+
+    for (i, modelFile) in enumerate(modelFiles)
+        modelPath = joinpath(readPath, modelFile)
+        func = include(modelPath)
+        modelFunctionVector[i] = func
+    end
+
+    return modelFunctionVector
+end
