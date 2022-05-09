@@ -1,6 +1,7 @@
-using LatinHypercubeSampling, CSV, DataFrames
+# using LatinHypercubeSampling, CSV, DataFrames, Random
 
 function createSamples(nDims)
+    Random.seed!(123)
     dirName = joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters", )
     fileName = string(nDims) * ".csv"
     plan = LHCoptim(50, nDims, 1000)[1]
@@ -8,6 +9,7 @@ function createSamples(nDims)
 end
 
 function getSamples(nDims, lowerBounds, upperBounds, index)
+    Random.seed!(123)
     dirName = joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters")
     fileName = string(nDims) * ".csv"
     if fileName in readdir(dirName)
