@@ -24,6 +24,10 @@ function ModelData(new_sys, prob, observables, experimentalConditions, initVaria
     optParameterIndices = collect(1:numUsedParameters)[[pPS.name ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
     parameterNames = string.(problemParameterSymbols)
 
+    if inputParameterIndices == []
+        inputParameterIndices = Int[]
+    end
+
     if initVariableNames != []
         initVariableNames = initVariableNames .* "(t)"
         initVariableIndices = [findfirst(initVar .== variableNames) for initVar in initVariableNames]
