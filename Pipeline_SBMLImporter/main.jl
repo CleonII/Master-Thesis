@@ -51,4 +51,4 @@ function main(; usedFiles = ["all"]::Vector{String}, useData = false, wrapped = 
     end
 end
 
-main(usedFiles = ["model_Bachmann_MSB2011"], useData = true, wrapped = true)
+main(usedFiles = ["model_Boehm_JProteomeRes2014"], useData = true, wrapped = true)

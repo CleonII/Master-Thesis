@@ -907,6 +907,19 @@ function writeODEModelToFile(libsbml, model, modelName, path, useData, wrapped; 
         end
     end
 
+    isInODESys = falses(length(parameterDict))
+    for du in values(dus)
+        for (i, pars) in enumerate(keys(parameterDict))
+            if replaceWith(du, pars, "") !== du
+                isInODESys[i] = true
+            end
+        end
+    end
+    for (i, pars) in enumerate(keys(parameterDict))
+        if !isInODESys[i]
+            dummyVariableDict[pars] = parameterDict[pars]
+        end
+    end
 
     ### Writing to file 
     modelFile = open(path * "/" * modelName * ".jl", "w")
