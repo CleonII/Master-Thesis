@@ -3,6 +3,9 @@
 # Number of species: 36
 function getODEModel_model_Alkan_SciSignal2018()
 
+    ### Define constant parameters
+    default = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t Cells_Dead(t) Cells_Apo1(t) pATR_G2(t) yH2AX_G2(t) Wip1_mRNA_S(t) pATM_S(t) p21_G2(t) Cells_SSBDamage_S(t) pp53_S(t) pATM_G2(t) Cells_Apo2(t) Cells_Cycle_G2(t) Cells_Apo_ReOx(t) yH2AX_S(t) p21_mRNA_S(t) Wip1_S(t) Wip1_mRNA_G2(t) Cells_Apo4(t) Cells_DSBDamage_G2(t) Cells_Apo(t) pChk2_G2(t) Wip1_G2(t) pATR_S(t) p21_S(t) Cells_DSBDamage_S(t) p21_mRNA_G2(t) Space(t) pChk2_S(t) Cells_Cycle_S(t) Cells_Apo3(t) pChk1_G2(t) pDNAPK_S(t) pChk1_S(t) pDNAPK_G2(t) pp53_G2(t) Cells(t)
 
@@ -12,7 +15,7 @@ function getODEModel_model_Alkan_SciSignal2018()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters k_dox_apo p_p53_act_atm p_chk1_dea_wip1 k_rep_hr p_p53_act_chk1 k_rep_nhej k_death k_dox_kd init_Cells_Cycle_G2_rel k_apo_dsb_g2 k_rep_s p_p21_turn p_h2ax_act_atm p_p53_act_chk2 p_atr_act_ssb p_mrna_exp_inh_dox_kd p_chk2_dea_wip1 k_cyc_arr_chk2 p_wip1_mrna_turn p_mrna_exp_inh_dox Gem_level k_ssb_to_dsb k_rep_nhej_sat Dox_level k_lyse k_damage_sn38_ssb p_chk1_act p_atr_act_atm default k_apo_ssb k_apo_dsb_s k_cyc_arr_chk1 p_h2ax_act_atr k_death_delay p_h2ax_act_dnapk k_damage_dox_dsb p_chk2_act p_atm_act_dsb kt p_dnapk_act k_damage_gem_ssb p_p53_act_atr init_Cells_Cycle_S_rel k_death_reox kt_apo k_ssb_to_dsb_sn38 init_Space init_Cells p_dnapk_dea_wip1 SN38_level p_h2ax_dea p_p21_mrna_turn p_wip1_turn
+    ModelingToolkit.@parameters k_dox_apo p_p53_act_atm p_chk1_dea_wip1 k_rep_hr p_p53_act_chk1 k_rep_nhej k_death k_dox_kd init_Cells_Cycle_G2_rel k_apo_dsb_g2 k_rep_s p_p21_turn p_h2ax_act_atm p_p53_act_chk2 p_atr_act_ssb p_mrna_exp_inh_dox_kd p_chk2_dea_wip1 k_cyc_arr_chk2 p_wip1_mrna_turn p_mrna_exp_inh_dox Gem_level k_ssb_to_dsb k_rep_nhej_sat Dox_level k_lyse k_damage_sn38_ssb p_chk1_act p_atr_act_atm k_apo_ssb k_apo_dsb_s k_cyc_arr_chk1 p_h2ax_act_atr k_death_delay p_h2ax_act_dnapk k_damage_dox_dsb p_chk2_act p_atm_act_dsb kt p_dnapk_act k_damage_gem_ssb p_p53_act_atr init_Cells_Cycle_S_rel k_death_reox kt_apo k_ssb_to_dsb_sn38 init_Space init_Cells p_dnapk_dea_wip1 SN38_level p_h2ax_dea p_p21_mrna_turn p_wip1_turn
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -132,7 +135,6 @@ function getODEModel_model_Alkan_SciSignal2018()
     k_damage_sn38_ssb => 174.434737098025,
     p_chk1_act => 8.43249925096952,
     p_atr_act_atm => 0.0902182570058027,
-    default => 1.0,
     k_apo_ssb => 1.0e-5,
     k_apo_dsb_s => 1.0e-5,
     k_cyc_arr_chk1 => 999.99999999992,
