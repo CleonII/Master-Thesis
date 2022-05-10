@@ -189,7 +189,7 @@ function calcCostGrad_AdjSens_proto(g, dg!, G_specifiedDynPar, iCond, modelParam
     sol = modelOutput.sols[iCond]
 
     ~, dynParGrad[:] = adjoint_sensitivities(sol, Rodas4P(), dg!, timeSteps, 
-        sensealg = senseAlg, reltol = 1e-9, abstol = 1e-9)
+            sensealg = senseAlg, reltol = 1e-9, abstol = 1e-9)
 
     # when a parameter is included in the observation function the gradient is incorrect, has to correct with adding dgdp 
 

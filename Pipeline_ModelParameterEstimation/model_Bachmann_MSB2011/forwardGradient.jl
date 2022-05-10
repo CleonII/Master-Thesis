@@ -202,7 +202,8 @@ function allConditionsCost_forwGrad_proto(modelParameters, dualModelParameters, 
         fail = solveODESystem(dualU0Vector, iCond)
         if fail
             # If infeasible parameters, return dual (Inf, NaN)
-            return ForwardDiff.Dual{ForwardDiff.Tag{eltype(p), Float64},Float64, 1}(Inf, ForwardDiff.Partials{1, Float64}((NaN,)))
+            println("infeasible step")
+            return convert(eltype(p), Inf)
         end
         calcUnscaledObservable(iCond)
         calcScaledObservable(iCond)
