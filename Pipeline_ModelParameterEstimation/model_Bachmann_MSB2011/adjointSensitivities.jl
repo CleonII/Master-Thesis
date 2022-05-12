@@ -1,6 +1,7 @@
 
 
-function solveODESystem_AdjSens_proto(prob, dynParVector, U0Vector, modelData, modelOutput, iCond)
+function solveODESystem_AdjSens_proto(prob::ODEProblem, solver, dynParVector::Vector{T1}, U0Vector::Vector{T2}, modelData::ModelData, 
+        modelOutput::ModelOutput, iCond::Int64)::Nothing where {T1 <: Union{ForwardDiff.Dual, Float64}, T2 <: Union{ForwardDiff.Dual, Float64}}
 
     initVariable = modelData.initVariableIndices
     parameterInU0Indices = modelData.parameterInU0Indices
@@ -12,13 +13,15 @@ function solveODESystem_AdjSens_proto(prob, dynParVector, U0Vector, modelData, m
     U0Vector[initVariable[6]] = dynParVector[parameterInU0Indices[10]] * dynParVector[parameterInU0Indices[11]] * dynParVector[parameterInU0Indices[12]]
 
     _prob = remake(prob, u0 = U0Vector, p = dynParVector)
-    modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, Rodas5(), reltol=1e-9, abstol=1e-9)
+    modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, solver, reltol=1e-9, abstol=1e-9)
     
     nothing
 end
 
 
-function g_unscaledObservables_AdjSens_proto(type, u, dynPar, i, iCond, modelData, experimentalData)
+function g_unscaledObservables_AdjSens_proto(type::T1, u::Vector{T2}, dynPar::Vector{T3}, i::Int64, iCond::Int64, modelData::ModelData, 
+        experimentalData::ExperimentalData)::Vector{Vector{T1}} where {T1 <: Union{ForwardDiff.Dual, Float64}, 
+        T2 <: Union{ForwardDiff.Dual, Float64}, T3 <: Union{ForwardDiff.Dual, Float64}}
 
     optParIOI = modelData.parameterInObservableIndices
     observableVI = modelData.observableVariableIndices
@@ -52,7 +55,9 @@ function g_unscaledObservables_AdjSens_proto(type, u, dynPar, i, iCond, modelDat
     return h_bar
 end
 
-function g_scaledObservationFunctions_AdjSens_proto(type, h_bar, scaleVector, offsetVector, iCond, modelParameters, experimentalData, modelData)
+function g_scaledObservationFunctions_AdjSens_proto(type::T1, h_bar::Vector{Vector{T2}}, scaleVector::Vector{Vector{T3}}, offsetVector::Vector{Vector{T4}}, 
+        iCond::Int64, modelParameters::ModelParameters, experimentalData::ExperimentalData, modelData::ModelData)::Vector{Vector{T1}} where 
+        {T1 <: Union{ForwardDiff.Dual, Float64}, T2 <: Union{ForwardDiff.Dual, Float64}, T3 <: Union{ForwardDiff.Dual, Float64}, T4 <: Union{ForwardDiff.Dual, Float64}}
     scaleMap = modelParameters.scaleMap
     offsetMap = modelParameters.offsetMap
     observedOFC = experimentalData.observedObservableForCond
@@ -70,7 +75,8 @@ function g_scaledObservationFunctions_AdjSens_proto(type, h_bar, scaleVector, of
     return h_hat
 end
 
-function g_cost_AdjSens_proto(type, h_hat, varianceVector, i, iCond, modelParameters, experimentalData)
+function g_cost_AdjSens_proto(type::T1, h_hat::Vector{Vector{T2}}, varianceVector::Vector{T3}, i::Int64, iCond::Int64, modelParameters::ModelParameters, 
+        experimentalData::ExperimentalData)::T1 where {T1 <: Union{ForwardDiff.Dual, Float64}, T2 <: Union{ForwardDiff.Dual, Float64}, T3 <: Union{ForwardDiff.Dual, Float64}}
     varianceMap = modelParameters.varianceMap
     measurementFCO = experimentalData.measurementForCondObs
     observablesTIIFC = experimentalData.observablesTimeIndexIndicesForCond[iCond]
@@ -89,7 +95,10 @@ end
 
 
 
-function g_AdjSens_proto(u, dynPar, scale, offset, variance, i, iCond, g_unscaledObservables, g_scaledObservationFunctions, g_cost; type = get_type([u, dynPar, scale, offset, variance]))
+function g_AdjSens_proto(u::Vector{T1}, dynPar::Vector{T2}, scale::Vector{T3}, offset::Vector{T4}, variance::Vector{T5}, i::Int64, iCond::Int64, 
+        g_unscaledObservables::Function, g_scaledObservationFunctions::Function, g_cost::Function; 
+        type::T6 = get_type([u, dynPar, scale, offset, variance]))::T6 where {T1 <: Union{ForwardDiff.Dual, Float64}, T2 <: Union{ForwardDiff.Dual, Float64}, 
+        T3 <: Union{ForwardDiff.Dual, Float64}, T4 <: Union{ForwardDiff.Dual, Float64}, T5 <: Union{ForwardDiff.Dual, Float64}, T6 <: Union{ForwardDiff.Dual, Float64}}
 
     h_bar = g_unscaledObservables(type, u, dynPar, i, iCond)
 
@@ -100,7 +109,9 @@ function g_AdjSens_proto(u, dynPar, scale, offset, variance, i, iCond, g_unscale
     return cost
 end
 
-function G_AdjSens_proto(solveODESystem, g, iCond, modelParameters, experimentalData, modelOutput)
+function G_AdjSens_proto(solveODESystem::Function, g::Function, iCond::Int64, modelParameters::ModelParameters, experimentalData::ExperimentalData, 
+        modelOutput::ModelOutput)::Float64
+    
     solveODESystem(iCond)
     
     dynPar = modelParameters.dynamicParametersVector
@@ -119,7 +130,9 @@ function G_AdjSens_proto(solveODESystem, g, iCond, modelParameters, experimental
     return cost
 end
 
-function G_specifiedDynPar_AdjSens_proto(specifiedDynPar, specifiedDynParIndices, g, solveODESystem, iCond, modelParameters, dualModelParameters, experimentalData, modelOutput)
+function G_specifiedDynPar_AdjSens_proto(specifiedDynPar::T1, specifiedDynParIndices::Vector{Int64}, g::Function, solveODESystem::Function, 
+        iCond::Int64, modelParameters::ModelParameters, dualModelParameters::DualModelParameters, experimentalData::ExperimentalData, 
+        modelOutput::ModelOutput)::T1 where T1 <: ForwardDiff.Dual
     
     dynParVector = modelParameters.dynamicParametersVector
     dualDynParVector = dualModelParameters.dualDynamicParametersVector
@@ -150,8 +163,8 @@ end
 
 
 
-function allConditionsCost_AdjSens_proto(parameterSpace, modelParameters, experimentalData, modelData, 
-    updateAllParameterVectors, G, p...)
+function allConditionsCost_AdjSens_proto(parameterSpace::ParameterSpace, modelParameters::ModelParameters, experimentalData::ExperimentalData, 
+        modelData::ModelData, updateAllParameterVectors::Function, G::Function, p...)
 
     doLogSearch = parameterSpace.doLogSearch
     allParameters = modelParameters.allParameters
@@ -181,9 +194,10 @@ function dg_AdjSens_proto!(out, u, p, t, i, gu)
     nothing
 end
 
-function calcCostGrad_AdjSens_proto(g, dg!, G_specifiedDynPar, iCond, modelParameters, modelData, experimentalData, modelOutput, senseAlg)
+function calcCostGrad_AdjSens_proto(g::Function, dg!::Function, G_specifiedDynPar::Function, iCond::Int64, modelParameters::ModelParameters, 
+        modelData::ModelData, experimentalData::ExperimentalData, modelOutput::ModelOutput, senseAlg)::Nothing
 
-    timeSteps = experimentalData.timeStepsForCond[iCond]
+    timeSteps = experimentalData.timeStepsForCond[iCond],0
     dynParGrad = modelOutput.dynParGrad
 
     sol = modelOutput.sols[iCond]
@@ -255,8 +269,8 @@ function calcCostGrad_AdjSens_proto(g, dg!, G_specifiedDynPar, iCond, modelParam
 end
 
 
-function allConditionsCostGrad_AdjSens_proto(parameterSpace, modelParameters, modelData, modelOutput, experimentalData, 
-    updateAllParameterVectors, calcCostGrad, g, grad, p...)
+function allConditionsCostGrad_AdjSens_proto(parameterSpace::ParameterSpace, modelParameters::ModelParameters, modelData::ModelData, modelOutput::ModelOutput, 
+    experimentalData::ExperimentalData, updateAllParameterVectors::Function, calcCostGrad::Function, g::Function, grad, p...)
 
     doLogSearch = parameterSpace.doLogSearch
     allParameters = modelParameters.allParameters
@@ -291,8 +305,9 @@ end
 
 
 
-function adjointSensitivities(modelFunction, iStartPar, senseAlg, optAlg, 
-        timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
+function adjointSensitivities(modelFunction::Function, iStartPar::Int64, senseAlg, optAlg::Symbol, solver, 
+        timeEnd::AbstractFloat, experimentalConditions::ExperimentalConditions, measurementData::MeasurementData, 
+        observables::Observable, parameterBounds::ParameterBounds)
 
     sys, initialSpeciesValues, trueParameterValues = modelFunction()
     new_sys = ode_order_lowering(sys)
@@ -312,32 +327,32 @@ function adjointSensitivities(modelFunction, iStartPar, senseAlg, optAlg,
 
     parameterInObservableNames = ["CISRNAEqc", "CISEqc", "SOCS3RNAEqc", "SOCS3Eqc", "init_EpoRJAK2", "init_STAT5", "init_SHP1"]
 
-    # Initialize structs
+    ### Initialize structs
 
-    modelData = ModelData(new_sys, prob, observables, experimentalConditions, 
+    modelData = createModelData(new_sys, prob, observables, experimentalConditions, 
             initVariableNames, observableVariableNames, parameterInU0Names, parameterInObservableNames)
 
-    experimentalData = ExperimentalData(observables, experimentalConditions, measurementData, modelData)
+    experimentalData = createExperimentalData(observables, experimentalConditions, measurementData, modelData)
 
-    modelParameters = ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData)
+    modelParameters = createModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData)
 
-    dualModelParameters = DualModelParameters(modelParameters)
+    dualModelParameters = createDualModelParameters(modelParameters)
 
-    parameterSpace, numAllStartParameters, lowerBounds, upperBounds = ParameterSpace(modelParameters, parameterBounds)
+    parameterSpace, numAllStartParameters, lowerBounds, upperBounds = createParameterSpace(modelParameters, parameterBounds)
 
-    modelOutput = ModelOutput(Float64, experimentalData, modelParameters)
+    modelOutput = createModelOutput(Float64, experimentalData, modelParameters)
 
-    modelOutput_dual = ModelOutput(ForwardDiff.Dual, experimentalData, modelParameters)
+    modelOutput_dual = createModelOutput(ForwardDiff.Dual, experimentalData, modelParameters)
 
-    # Getting start values
+    ### Getting start values
 
     allStartParameters = getSamples(numAllStartParameters, lowerBounds, upperBounds, iStartPar)
 
-    # Initialize functions
+    ### Initialize functions
 
-    solveODESystem = (iCond) -> solveODESystem_AdjSens_proto(prob, modelParameters.dynamicParametersVector, modelParameters.u0Vector, modelData, modelOutput, iCond)
+    solveODESystem_float = (iCond) -> solveODESystem_AdjSens_proto(prob, solver, modelParameters.dynamicParametersVector, modelParameters.u0Vector, modelData, modelOutput, iCond)
 
-    solveODESystem_dual = (dualPars, dualU0Vector, iCond) -> solveODESystem_AdjSens_proto(prob, dualPars, dualU0Vector, modelData, modelOutput_dual, iCond)
+    solveODESystem_dual = (dualPars, dualU0Vector, iCond) -> solveODESystem_AdjSens_proto(prob, solver, dualPars, dualU0Vector, modelData, modelOutput_dual, iCond)
 
     g_unscaledObservables = (type, u, dynPar, i, iCond) -> g_unscaledObservables_AdjSens_proto(type, u, dynPar, i, iCond, modelData, experimentalData)
 
@@ -347,7 +362,7 @@ function adjointSensitivities(modelFunction, iStartPar, senseAlg, optAlg,
 
     g = (u, dynPar, scale, offset, variance, i, iCond; type = get_type([u, dynPar, scale, offset, variance])) -> g_AdjSens_proto(u, dynPar, scale, offset, variance, i, iCond, g_unscaledObservables, g_scaledObservationFunctions, g_cost; type)
 
-    G = (iCond) -> G_AdjSens_proto(solveODESystem, g, iCond, modelParameters, experimentalData, modelOutput)
+    G = (iCond) -> G_AdjSens_proto(solveODESystem_float, g, iCond, modelParameters, experimentalData, modelOutput)
 
     G_specifiedDynPar = (specifiedDynPar, iCond) -> G_specifiedDynPar_AdjSens_proto(specifiedDynPar, modelData.parameterInU0Indices, g, solveODESystem_dual, iCond, modelParameters, dualModelParameters, experimentalData, modelOutput_dual)
 
