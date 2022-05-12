@@ -1,58 +1,49 @@
 
 
-struct ModelData
-    observableLogTransformation::Vector{Bool}
-    optParameterIndices::Vector{Int64}
-    inputParameterIndices::Vector{Int64}
-    initVariableIndices::Vector{Int64}
-    observableVariableIndices::Vector{Int64}
-    parameterInObservableIndices::Vector{Int64}
-    parameterInU0Indices::Vector{Int64}
-    inputParameterSymbols::Vector{Symbol}
+struct ModelData{
+        T1 <: Vector{Bool},
+        T2 <: Vector{Int64},
+        T3 <: Vector{Int64},
+        T4 <: Vector{Int64},
+        T5 <: Vector{Int64},
+        T6 <: Vector{Int64},
+        T7 <: Vector{Int64},
+        T8 <: Vector{Symbol}
+        }
+    observableLogTransformation::T1
+    optParameterIndices::T2
+    inputParameterIndices::T3
+    initVariableIndices::T4
+    observableVariableIndices::T5
+    parameterInObservableIndices::T6
+    parameterInU0Indices::T7
+    inputParameterSymbols::T8
 end
 
-function ModelData(new_sys, prob, observables, experimentalConditions, initVariableNames, observableVariableNames, parameterInU0Names, parameterInObservableNames)
-    observableLogTransformation = [observables[i, :observableTransformation] == "log10" for i in eachindex(observables[!, :observableTransformation])]
+function createModelData(new_sys::ODESystem, prob::ODEProblem, observables::DataFrame, experimentalConditions::DataFrame, 
+        initVariableNames::Vector{String}, observableVariableNames::Vector{String}, parameterInU0Names::Vector{String}, 
+        parameterInObservableNames::Vector{String})::ModelData
+    observableLogTransformation::Vector{Bool} = [observables[i, :observableTransformation] == "log10" for i in eachindex(observables[!, :observableTransformation])]
 
-    variableNames = string.(states(new_sys))
-    numUsedParameters = length(prob.p)
-    problemParameterSymbols = parameters(new_sys)
-    inputParameterSymbols = Symbol.(names(experimentalConditions)[2:end])
-    tmp = [pPS.name for pPS in problemParameterSymbols]
-    inputParameterSymbols = inputParameterSymbols[[any(inpPar .== tmp) for inpPar in inputParameterSymbols]]
-    inputParameterIndices = [findfirst([pPS.name == inputParameterSymbols[i] for pPS in problemParameterSymbols]) for i in 1:length(inputParameterSymbols)]
-    optParameterIndices = collect(1:numUsedParameters)[[pPS.name ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
-    parameterNames = string.(problemParameterSymbols)
+    variableNames::Vector{String} = string.(states(new_sys))
+    numUsedParameters::Int64 = length(prob.p)
+    tmpvec::Vector{Any} = parameters(new_sys)
+    problemParameterSymbols::Vector{Symbol} = [tmp.name for tmp in tmpvec]
+    inputParameterSymbols_proto::Vector{Symbol} = Symbol.(names(experimentalConditions))
+    inputParameterSymbols::Vector{Symbol} = inputParameterSymbols_proto[[any(inpPar .== problemParameterSymbols) for inpPar in inputParameterSymbols_proto]]
+    inputParameterIndices::Vector{Int64} = [findfirst([pPS == inputParameterSymbols[i] for pPS in problemParameterSymbols]) for i in 1:length(inputParameterSymbols)]
+    optParameterIndices::Vector{Int64} = collect(1:numUsedParameters)[[pPS ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
+    parameterNames::Vector{String} = string.(problemParameterSymbols)
 
-    if inputParameterIndices == []
-        inputParameterIndices = Int[]
-    end
+    initVariableNames .*= "(t)"
+    initVariableIndices::Vector{Int64} = [findfirst(initVar .== variableNames) for initVar in initVariableNames]
 
-    if initVariableNames != []
-        initVariableNames = initVariableNames .* "(t)"
-        initVariableIndices = [findfirst(initVar .== variableNames) for initVar in initVariableNames]
-    else
-        initVariableIndices = Int[]
-    end
+    observableVariableNames .*= "(t)"
+    observableVariableIndices::Vector{Int64} = [findfirst(observableVar .== variableNames) for observableVar in observableVariableNames]
 
-    if observableVariableNames != []
-        observableVariableNames = observableVariableNames .* "(t)"
-        observableVariableIndices = [findfirst(observableVar .== variableNames) for observableVar in observableVariableNames]
-    else
-        observableVariableIndices = Int[]
-    end
+    parameterInU0Indices::Vector{Int64} = [findfirst(parIU0N .== parameterNames) for parIU0N in parameterInU0Names]
 
-    if parameterInU0Names != []
-        parameterInU0Indices = [findfirst(parIU0N .== parameterNames) for parIU0N in parameterInU0Names]
-    else
-        parameterInU0Indices = Int[]
-    end
-
-    if parameterInObservableNames != []
-        parameterInObservableIndices = [findfirst(parION .== parameterNames) for parION in parameterInObservableNames]
-    else
-        parameterInObservableIndices = Int[]
-    end
+    parameterInObservableIndices::Vector{Int64} = [findfirst(parION .== parameterNames) for parION in parameterInObservableNames]
 
     modelData = ModelData(observableLogTransformation, optParameterIndices, inputParameterIndices, 
         initVariableIndices, observableVariableIndices, parameterInObservableIndices, parameterInU0Indices, inputParameterSymbols)
@@ -61,47 +52,56 @@ function ModelData(new_sys, prob, observables, experimentalConditions, initVaria
 end
 
 
-struct ExperimentalData
-    measurementForCondObs::Array{Vector{Float64}, 2}
-    timeStepsForCond::Vector{Vector{Float64}}
-    observedAtIndexForCondObs::Array{Vector{Int64}, 2}
-    numConditions::Int64
-    numObservables::Int64
-    numDataForCondObs::Array{Int64, 2}
-    inputParameterValuesForCond::Vector{Vector{Float64}}
-    observedObservableForCond::Vector{Vector{Int64}}
-    observablesTimeIndexIndicesForCond::Vector{Array{Vector{Int64}, 2}}
+struct ExperimentalData{
+        T1 <: Array{Vector{Float64}, 2},
+        T2 <: Vector{Vector{Float64}},
+        T3 <: Array{Vector{Int64}, 2},
+        T4 <: Int64,
+        T5 <: Array{Int64, 2},
+        T6 <: Vector{Vector{Float64}},
+        T7 <: Vector{Vector{Int64}},
+        T8 <: Vector{Array{Vector{Int64}, 2}}
+        }
+    measurementForCondObs::T1
+    timeStepsForCond::T2
+    observedAtIndexForCondObs::T3
+    numConditions::T4
+    numObservables::T4
+    numDataForCondObs::T5
+    inputParameterValuesForCond::T6
+    observedObservableForCond::T7
+    observablesTimeIndexIndicesForCond::T8
 end
 
-function ExperimentalData(observables, experimentalConditions, measurementData, modelData)
-    observableNames = observables[!, 1]
+function createExperimentalData(observables::DataFrame, experimentalConditions::DataFrame, measurementData::DataFrame, modelData::ModelData)::ExperimentalData
+    observableNames::Vector{String} = observables[!, 1]
     inputParameterSymbols = modelData.inputParameterSymbols
     observableLogTransformation = modelData.observableLogTransformation
 
-    numConditions = length(experimentalConditions[!,1])
-    numObservables = length(observableNames) 
+    numConditions::Int64 = length(experimentalConditions[!,1])
+    numObservables::Int64 = length(observableNames) 
 
     ## Setting up for different conditions
-    inputParameterValuesForCond = Vector{Vector{Float64}}(undef, numConditions)
+    inputParameterValuesForCond::Vector{Vector{Float64}} = Vector{Vector{Float64}}(undef, numConditions)
 
-    timeStepsForCond = Vector{Vector{Float64}}(undef, numConditions)
-    numTimeStepsForCond = Vector{Int64}(undef, numConditions)
-    observedObservableForCond = Vector{Vector{Int64}}(undef, numConditions)
+    timeStepsForCond::Vector{Vector{Float64}} = Vector{Vector{Float64}}(undef, numConditions)
+    numTimeStepsForCond::Vector{Int64} = Vector{Int64}(undef, numConditions)
+    observedObservableForCond::Vector{Vector{Int64}} = Vector{Vector{Int64}}(undef, numConditions)
 
-    observedAtForCond = Vector{Vector{Vector{Float64}}}(undef, numConditions)
-    observedAtIndexForCondObs = Array{Vector{Int64}, 2}(undef, numConditions, numObservables)
-    measurementForCondObs = Array{Vector{Float64}, 2}(undef, numConditions, numObservables)
-    numDataForCondObs = Array{Int64, 2}(undef, numConditions, numObservables)
-    observablesTimeIndexIndicesForCond = Vector{Array{Vector{Int64}, 2}}(undef, numConditions)
+    observedAtForCond::Vector{Vector{Vector{Float64}}} = Vector{Vector{Vector{Float64}}}(undef, numConditions)
+    observedAtIndexForCondObs::Array{Vector{Int64}, 2} = Array{Vector{Int64}, 2}(undef, numConditions, numObservables)
+    measurementForCondObs::Array{Vector{Float64}, 2} = Array{Vector{Float64}, 2}(undef, numConditions, numObservables)
+    numDataForCondObs::Array{Int64, 2} = Array{Int64, 2}(undef, numConditions, numObservables)
+    observablesTimeIndexIndicesForCond::Vector{Array{Vector{Int64}, 2}} = Vector{Array{Vector{Int64}, 2}}(undef, numConditions)
 
-    for (iCond, condId) in enumerate(experimentalConditions[!,1])
+    for (iCond, condId::String) in enumerate(experimentalConditions[!,1])
         inputParameterValuesForCond[iCond] = [experimentalConditions[iCond, inPar] for inPar in inputParameterSymbols]
 
-        relevantMeasurementData = measurementData[measurementData[:,3] .== condId, :]
-        observableIDs = relevantMeasurementData[:,1]
+        relevantMeasurementData::DataFrame = measurementData[measurementData[:,3] .== condId, :]
+        observableIDs::Vector{String} = relevantMeasurementData[:,1]
         timeStepsForCond[iCond] = sort(unique(relevantMeasurementData[:,5]))
         numTimeStepsForCond[iCond] = length(timeStepsForCond[iCond])
-        isObserved = [observableNames[i] in unique(observableIDs) for i=1:numObservables]
+        isObserved::Vector{Bool} = [observableNames[i] in unique(observableIDs) for i=1:numObservables]
         observedObservableForCond[iCond] = collect(1:numObservables)[isObserved]
 
         observedAtForCond[iCond] = Vector{Vector{Float64}}(undef, numObservables)
@@ -135,49 +135,68 @@ function ExperimentalData(observables, experimentalConditions, measurementData, 
 end
 
 
-struct ModelParameters
-    scaleIndices::Vector{Int64}
-    offsetIndices::Vector{Int64}
-    varianceIndices::Vector{Int64}
-    parameterIndices::Vector{Int64}
+struct ModelParameters{
+        T1 <: Vector{Int64},
+        T2 <: Vector{Int64},
+        T3 <: Vector{Int64},
+        T4 <: Vector{Int64},
+        T5 <: Array{Int64, 2},
+        T6 <: Array{Vector{Int64}, 2},
+        T7 <: Int64,
+        T8 <: Vector{String},
+        T9 <: Vector{String},
+        T10 <: Vector{String},
+        T11 <: Vector{String},
+        T12 <: Vector{Float64},
+        T13 <: Vector{Float64},
+        T14 <: Vector{Float64},
+        T15 <: Vector{Float64},
+        T16 <: Vector{Float64},
+        T17 <: Vector{Float64}
+        }
+    scaleIndices::T1
+    offsetIndices::T2
+    varianceIndices::T3
+    parameterIndices::T4
     #
-    scaleMap::Array{Int64, 2}
-    offsetMap::Array{Int64, 2}
-    varianceMap::Array{Int64, 2}
+    scaleMap::T5
+    offsetMap::T5
+    varianceMap::T6
     #
-    numScale::Int64
-    numOffset::Int64
-    numVariance::Int64
-    numOptParameters::Int64
-    numUsedParameters::Int64
-    numAllParameters::Int64
-    numVariables::Int64
+    numScale::T7
+    numOffset::T7
+    numVariance::T7
+    numOptParameters::T7
+    numUsedParameters::T7
+    numAllParameters::T7
+    numVariables::T7
     #
-    scaleNames::Vector{String}
-    offsetNames::Vector{String}
-    varianceNames::Vector{String}
-    optParameterNames::Vector{String}
+    scaleNames::T8
+    offsetNames::T9
+    varianceNames::T10
+    optParameterNames::T11
     #
-    scaleVector::Vector{Float64}
-    offsetVector::Vector{Float64}
-    varianceVector::Vector{Float64}
-    dynamicParametersVector::Vector{Float64}
-    u0Vector::Vector{Float64}
-    allParameters::Vector{Float64}
+    scaleVector::T12
+    offsetVector::T13
+    varianceVector::T14
+    dynamicParametersVector::T15
+    u0Vector::T16
+    allParameters::T17
 end
 
 
-function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions, measurementData, observables, experimentalData; 
-    scaleDeterminer = "scale", offsetDeterminer = "offset", varianceDeterminer = "sd_")
+function createModelParameters(new_sys::ODESystem, prob::ODEProblem, parameterBounds::DataFrame, experimentalConditions::DataFrame, measurementData::DataFrame, 
+        observables::DataFrame, experimentalData::ExperimentalData; 
+        scaleDeterminer::String = "scale", offsetDeterminer::String = "offset", varianceDeterminer::String = "sd_")::ModelParameters
     numConditions = experimentalData.numConditions
     numObservables = experimentalData.numObservables
-    observableNames = observables[!, 1]
+    observableNames::Vector{String} = observables[!, 1]
 
     ## Creating a map from a condition, observable pair to a scale ##
-    scaleNames = parameterBounds[findall(occursin.(scaleDeterminer, parameterBounds[!, 1])), 1]
-    numScale = length(findall(occursin.(scaleDeterminer, parameterBounds[!, 1])))
+    scaleNames::Vector{String} = parameterBounds[findall(occursin.(scaleDeterminer, parameterBounds[!, 1])), 1]
+    numScale::Int64 = length(scaleNames)
     # scale[numScale+1] = 1
-    scaleMap = Array{Int64, 2}(undef, numConditions, numObservables) # Have as sparse?
+    scaleMap::Array{Int64, 2} = Array{Int64, 2}(undef, numConditions, numObservables) # Have as sparse?
     for (iCond, cond) in enumerate(experimentalConditions[!, 1])
         for (iObs, obs) in enumerate(observableNames)
             measurementIndex = findfirst((measurementData[!, 1] .== obs) .& (measurementData[!, 3] .== cond))
@@ -197,7 +216,7 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
                         end
                     end
                     if occursin(scaleDeterminer, obsPar)
-                        scaleIndex = findfirst(scaleNames .== obsPar)
+                        scaleIndex::Int64 = findfirst(scaleNames .== obsPar)
                         scaleMap[iCond, iObs] = scaleIndex
                     else
                         scaleMap[iCond, iObs] = numScale+1
@@ -208,10 +227,11 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
     end
 
     ## Creating a map from a condition, observable pair to an offset ##
-    offsetNames = parameterBounds[findall(occursin.(offsetDeterminer, parameterBounds[!, 1])), 1]
-    numOffset = length(findall(occursin.(offsetDeterminer, parameterBounds[!, 1])))
+    offsetNames::Vector{String} = parameterBounds[findall(occursin.(offsetDeterminer, parameterBounds[!, 1])), 1]
+    numOffset::Int64 = length(offsetNames)
     # offset[numOffset+1] = 0, offset[numOffset+2] = 1
-    offsetMap = Array{Int64, 2}(undef, numConditions, numObservables)
+    offsetMap::Array{Int64, 2} = Array{Int64, 2}(undef, numConditions, numObservables)
+    offsetIndex::Int64 = 0
     for (iCond, cond) in enumerate(experimentalConditions[!, 1])
         for (iObs, obs) in enumerate(observableNames)
             measurementIndex = findfirst((measurementData[!, 1] .== obs) .& (measurementData[!, 3] .== cond))
@@ -256,42 +276,53 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
     end
 
     ## Creating a map from a condition, observable pair to a variance ##
-    varianceNames = parameterBounds[findall(occursin.(varianceDeterminer, parameterBounds[!, 1])), 1]
-    numVariance = length(findall(occursin.(varianceDeterminer, parameterBounds[!, 1])))
-    allKnownVariances = [1.0]
-    numKnownVariance = 1
+    varianceNames::Vector{String} = parameterBounds[findall(occursin.(varianceDeterminer, parameterBounds[!, 1])), 1]
+    numVariance::Int64 = length(varianceNames)
+    allKnownVariances::Vector{Float64} = [1.0]
+    numKnownVariance::Int64 = 1
     if numVariance == 0 && typeof(measurementData[:, :noiseParameters]) <: Vector{Float64}
         allKnownVariances = vcat(unique(measurementData[:, :noiseParameters]), allKnownVariances)
         numKnownVariance = length(allKnownVariances)
     end
-    varianceMap = Array{Int64, 2}(undef, numConditions, numObservables)
+    varianceMap::Array{Vector{Int64}, 2} = Array{Vector{Int64}, 2}(undef, numConditions, numObservables)
     for (iCond, cond) in enumerate(experimentalConditions[!, 1])
         for (iObs, obs) in enumerate(observableNames)
             measurementIndex = findfirst((measurementData[!, 1] .== obs) .& (measurementData[!, 3] .== cond))
             if measurementIndex === nothing
-                varianceMap[iCond, iObs] = numVariance + numKnownVariance
+                varianceMap[iCond, iObs] = [numVariance + numKnownVariance]
             else
                 obsPar = measurementData[measurementIndex, :noiseParameters]
                 if obsPar === missing
-                    varianceMap[iCond, iObs] = numVariance + numKnownVariance
+                    varianceMap[iCond, iObs] = [numVariance + numKnownVariance]
                 else
                     if occursin(';', obsPar)
                         obsPars = split(obsPar, ';')
-                        for op in obsPars
-                            if occursin(varianceDeterminer, op)
-                                obsPar = op 
+                        tmpvec = Vector{Int64}(undef, length(obsPars))
+                        for (i, obsPar) in enumerate(obsPars)
+                            if typeof(obsPar) <: Float64
+                                knownVarianceIndex = findfirst(allKnownVariances .== obsPar)::Int64
+                                tmpvec[i] = numVariance + knownVarianceIndex
+                            else
+                                if occursin(varianceDeterminer, obsPar)
+                                    varianceIndex = findfirst(varianceNames .== obsPar)::Int64
+                                    tmpvec[i] = varianceIndex
+                                else
+                                    tmpvec[i] = numVariance + numKnownVariance
+                                end
                             end
                         end
-                    end
-                    if typeof(obsPar) <: Float64
-                        knownVarianceIndex = findfirst(allKnownVariances .== obsPar)
-                        varianceMap[iCond, iObs] = numVariance + knownVarianceIndex
+                        varianceMap[iCond, iObs] = copy(tmpvec)
                     else
-                        if occursin(varianceDeterminer, obsPar)
-                            varianceIndex = findfirst(varianceNames .== obsPar)
-                            varianceMap[iCond, iObs] = varianceIndex
+                        if typeof(obsPar) <: Float64
+                            knownVarianceIndex::Int64 = findfirst(allKnownVariances .== obsPar)
+                            varianceMap[iCond, iObs] = [numVariance + knownVarianceIndex]
                         else
-                            varianceMap[iCond, iObs] = numVariance+1
+                            if occursin(varianceDeterminer, obsPar)
+                                varianceIndex::Int64 = findfirst(varianceNames .== obsPar)
+                                varianceMap[iCond, iObs] = [varianceIndex]
+                            else
+                                varianceMap[iCond, iObs] = [numVariance + numKnownVariance]
+                            end
                         end
                     end
                 end
@@ -299,34 +330,35 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
         end
     end
 
-    numUsedParameters = length(prob.p)
-    numVariables = length(prob.u0)
-    problemParameterSymbols = parameters(new_sys)
-    inputParameterSymbols = Symbol.(names(experimentalConditions)[2:end])
-    tmp = [pPS.name for pPS in problemParameterSymbols]
-    inputParameterSymbols = inputParameterSymbols[[any(inpPar .== tmp) for inpPar in inputParameterSymbols]]
+    numUsedParameters::Int64 = length(prob.p)
+    numVariables::Int64 = length(prob.u0)
+    tmpvec = parameters(new_sys)
+    problemParameterSymbols::Vector{Symbol} = [tmp.name for tmp in tmpvec]
+    inputParameterSymbols_proto::Vector{Symbol} = Symbol.(names(experimentalConditions))
 
-    optParameterIndices = collect(1:numUsedParameters)[[pPS.name ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
-    numOptParameters = length(optParameterIndices)
-    parameterNames = string.(problemParameterSymbols)
-    optParameterNames = parameterNames[optParameterIndices]
+    inputParameterSymbols::Vector{Symbol} = inputParameterSymbols_proto[[any(inpPar .== problemParameterSymbols) for inpPar in inputParameterSymbols_proto]]
 
-    scaleIndices = collect(1:numScale)
-    offsetIndices = numScale .+ collect(1:numOffset)
-    varianceIndices = numScale + numOffset .+ collect(1:numVariance)
-    parameterIndices = numScale + numOffset + numVariance .+ collect(1:numOptParameters)
+    optParameterIndices::Vector{Int64} = collect(1:numUsedParameters)[[pPS ∉ inputParameterSymbols for pPS in problemParameterSymbols]]
+    numOptParameters::Int64 = length(optParameterIndices)
+    parameterNames::Vector{String} = string.(problemParameterSymbols)
+    optParameterNames::Vector{String} = parameterNames[optParameterIndices]
 
-    scaleVector = Vector{Float64}(undef, numScale + 1)
+    scaleIndices::Vector{Int64} = collect(1:numScale)
+    offsetIndices::Vector{Int64} = numScale .+ collect(1:numOffset)
+    varianceIndices::Vector{Int64} = numScale + numOffset .+ collect(1:numVariance)
+    parameterIndices::Vector{Int64} = numScale + numOffset + numVariance .+ collect(1:numOptParameters)
+
+    scaleVector::Vector{Float64} = Vector{Float64}(undef, numScale + 1)
     scaleVector[numScale + 1] = 1.0
-    offsetVector = Vector{Float64}(undef, numOffset + 2)
+    offsetVector::Vector{Float64} = Vector{Float64}(undef, numOffset + 2)
     offsetVector[numOffset + 1] = 0.0
     offsetVector[numOffset + 2] = 1.0
-    varianceVector = Vector{Float64}(undef, numVariance + numKnownVariance)
+    varianceVector::Vector{Float64} = Vector{Float64}(undef, numVariance + numKnownVariance)
     varianceVector[numVariance + 1:end] = allKnownVariances
-    dynamicParametersVector = Vector{Float64}(undef, numUsedParameters)
-    u0Vector = prob.u0
-    numAllParameters = numScale + numOffset + numVariance + numOptParameters
-    allParameters = Vector{Float64}(undef, numAllParameters)
+    dynamicParametersVector::Vector{Float64} = Vector{Float64}(undef, numUsedParameters)
+    u0Vector::Vector{Float64} = prob.u0
+    numAllParameters::Int64 = numScale + numOffset + numVariance + numOptParameters
+    allParameters::Vector{Float64} = Vector{Float64}(undef, numAllParameters)
 
     modelParameters = ModelParameters(scaleIndices, offsetIndices, varianceIndices, parameterIndices, 
         scaleMap, offsetMap, varianceMap, numScale, numOffset, numVariance, numOptParameters, numUsedParameters, numAllParameters, numVariables, 
@@ -337,21 +369,27 @@ function ModelParameters(new_sys, prob, parameterBounds, experimentalConditions,
 end
 
 
-struct DualModelParameters
-    dualScaleVector::Vector{ForwardDiff.Dual}
-    dualOffsetVector::Vector{ForwardDiff.Dual}
-    dualVarianceVector::Vector{ForwardDiff.Dual}
-    dualDynamicParametersVector::Vector{ForwardDiff.Dual}
-    dualU0Vector::Vector{ForwardDiff.Dual}
+struct DualModelParameters{
+        T1 <: Vector{ForwardDiff.Dual},
+        T2 <: Vector{ForwardDiff.Dual},
+        T3 <: Vector{ForwardDiff.Dual},
+        T4 <: Vector{ForwardDiff.Dual},
+        T5 <: Vector{ForwardDiff.Dual}
+        }
+    dualScaleVector::T1
+    dualOffsetVector::T2
+    dualVarianceVector::T3
+    dualDynamicParametersVector::T4
+    dualU0Vector::T5
 end
 
-function DualModelParameters(modelParameters)
+function createDualModelParameters(modelParameters::ModelParameters)::DualModelParameters
 
-    dualScaleVector = Vector{ForwardDiff.Dual}(undef, length(modelParameters.scaleVector))
-    dualOffsetVector = Vector{ForwardDiff.Dual}(undef, length(modelParameters.offsetVector))
-    dualVarianceVector = Vector{ForwardDiff.Dual}(undef, length(modelParameters.varianceVector))
-    dualDynamicParameters = Vector{ForwardDiff.Dual}(undef, length(modelParameters.dynamicParametersVector))
-    dualU0Vector = Vector{ForwardDiff.Dual}(undef, length(modelParameters.u0Vector))
+    dualScaleVector::Vector{ForwardDiff.Dual} = Vector{ForwardDiff.Dual}(undef, length(modelParameters.scaleVector))
+    dualOffsetVector::Vector{ForwardDiff.Dual} = Vector{ForwardDiff.Dual}(undef, length(modelParameters.offsetVector))
+    dualVarianceVector::Vector{ForwardDiff.Dual} = Vector{ForwardDiff.Dual}(undef, length(modelParameters.varianceVector))
+    dualDynamicParameters::Vector{ForwardDiff.Dual} = Vector{ForwardDiff.Dual}(undef, length(modelParameters.dynamicParametersVector))
+    dualU0Vector::Vector{ForwardDiff.Dual} = Vector{ForwardDiff.Dual}(undef, length(modelParameters.u0Vector))
 
     dualModelParameters = DualModelParameters(dualScaleVector, dualOffsetVector, dualVarianceVector, dualDynamicParameters, dualU0Vector)
 
@@ -359,38 +397,44 @@ function DualModelParameters(modelParameters)
 end
 
 
-struct ParameterSpace
-    scaleLowerBound::Vector{Float64}
-    scaleUpperBound::Vector{Float64}
-    offsetLowerBound::Vector{Float64}
-    offsetUpperBound::Vector{Float64}
-    varianceLowerBound::Vector{Float64}
-    varianceUpperBound::Vector{Float64}
-    parameterLowerBound::Vector{Float64}
-    parameterUpperBound::Vector{Float64}
-    doLogSearch::Vector{Int64}
+struct ParameterSpace{
+        T1 <: Vector{Float64},
+        T2 <: Vector{Float64},
+        T3 <: Vector{Float64},
+        T4 <: Vector{Float64},
+        T5 <: Vector{Int64}
+        }
+    scaleLowerBound::T1
+    scaleUpperBound::T1
+    offsetLowerBound::T2
+    offsetUpperBound::T2
+    varianceLowerBound::T3
+    varianceUpperBound::T3
+    parameterLowerBound::T4
+    parameterUpperBound::T4
+    doLogSearch::T5
 end
 
-function ParameterSpace(modelParameters, parameterBounds; 
-    scaleDeterminer = "scale", offsetDeterminer = "offset", varianceDeterminer = "sd_")
+function createParameterSpace(modelParameters::ModelParameters, parameterBounds::DataFrame; 
+    scaleDeterminer::String = "scale", offsetDeterminer::String = "offset", varianceDeterminer::String = "sd_")::Tuple{ParameterSpace, Int64, Vector{Float64}, Vector{Float64}}
     numScale = modelParameters.numScale
     numOffset = modelParameters.numOffset
     numVariance = modelParameters.numVariance
     numOptParameters = modelParameters.numOptParameters
 
     ## Setting up lower and upper bounds
-    slb = Vector{Float64}(undef, numScale)
-    sub = Vector{Float64}(undef, numScale)
-    isLogScale = Vector{Bool}(undef, numScale) 
-    olb = Vector{Float64}(undef, numOffset)
-    oub = Vector{Float64}(undef, numOffset)
-    isLogOffset = Vector{Bool}(undef, numOffset) 
-    vlb = Vector{Float64}(undef, numVariance)
-    vub = Vector{Float64}(undef, numVariance)
-    isLogVariance = Vector{Bool}(undef, numVariance) 
-    plb = Vector{Float64}(undef, numOptParameters)
-    pub = Vector{Float64}(undef, numOptParameters) 
-    isLogParameter = Vector{Bool}(undef, numOptParameters) 
+    slb::Vector{Float64} = Vector{Float64}(undef, numScale)
+    sub::Vector{Float64} = Vector{Float64}(undef, numScale)
+    isLogScale::Vector{Bool} = Vector{Bool}(undef, numScale) 
+    olb::Vector{Float64} = Vector{Float64}(undef, numOffset)
+    oub::Vector{Float64} = Vector{Float64}(undef, numOffset)
+    isLogOffset::Vector{Bool} = Vector{Bool}(undef, numOffset) 
+    vlb::Vector{Float64} = Vector{Float64}(undef, numVariance)
+    vub::Vector{Float64} = Vector{Float64}(undef, numVariance)
+    isLogVariance::Vector{Bool} = Vector{Bool}(undef, numVariance) 
+    plb::Vector{Float64} = Vector{Float64}(undef, numOptParameters)
+    pub::Vector{Float64} = Vector{Float64}(undef, numOptParameters) 
+    isLogParameter::Vector{Bool} = Vector{Bool}(undef, numOptParameters) 
 
     scaleNames = modelParameters.scaleNames
     offsetNames = modelParameters.offsetNames
@@ -399,7 +443,7 @@ function ParameterSpace(modelParameters, parameterBounds;
 
     for (i, parId) in enumerate(parameterBounds[!, 1])
         if occursin(scaleDeterminer, parId)
-            sIndex = findfirst(lowercase(parId) .== lowercase.(scaleNames))
+            sIndex::Int64 = findfirst(lowercase(parId) .== lowercase.(scaleNames))
             if parameterBounds[i, 3] == "log10"
                 isLogScale[sIndex] = true
                 slb[sIndex] = log10(parameterBounds[i, 4])
@@ -410,7 +454,7 @@ function ParameterSpace(modelParameters, parameterBounds;
                 sub[sIndex] = parameterBounds[i, 5]
             end
         elseif occursin(offsetDeterminer, parId)
-            oIndex = findfirst(lowercase(parId) .== lowercase.(offsetNames))
+            oIndex::Int64 = findfirst(lowercase(parId) .== lowercase.(offsetNames))
             if parameterBounds[i, 3] == "log10"
                 isLogOffset[oIndex] = true
                 olb[oIndex] = log10(parameterBounds[i, 4])
@@ -421,7 +465,7 @@ function ParameterSpace(modelParameters, parameterBounds;
                 oub[oIndex] = parameterBounds[i, 5]
             end
         elseif occursin(varianceDeterminer, parId)
-            vIndex = findfirst(lowercase(parId) .== lowercase.(varianceNames))
+            vIndex::Int64 = findfirst(lowercase(parId) .== lowercase.(varianceNames))
             if parameterBounds[i, 3] == "log10"
                 isLogVariance[vIndex] = true
                 vlb[vIndex] = log10(parameterBounds[i, 4])
@@ -432,7 +476,7 @@ function ParameterSpace(modelParameters, parameterBounds;
                 vub[vIndex] = parameterBounds[i, 5]
             end
         else
-            pIndex = findfirst(lowercase(parId) .== lowercase.(optParameterNames))
+            pIndex::Int64 = findfirst(lowercase(parId) .== lowercase.(optParameterNames))
             if parameterBounds[i, 3] == "log10"
                 isLogParameter[pIndex] = true
                 plb[pIndex] = log10(parameterBounds[i, 4])
@@ -450,44 +494,58 @@ function ParameterSpace(modelParameters, parameterBounds;
     varianceIndices = modelParameters.varianceIndices
     parameterIndices = modelParameters.parameterIndices
 
-    doLogSearchScale = scaleIndices[isLogScale]
-    doLogSearchOffset = offsetIndices[isLogOffset]
-    doLogSearchVariance = varianceIndices[isLogVariance]
-    doLogSearchParameter = parameterIndices[isLogParameter]
-    doLogSearch = vcat(doLogSearchScale, doLogSearchOffset, doLogSearchVariance, doLogSearchParameter)
+    doLogSearchScale::Vector{Int64} = scaleIndices[isLogScale]
+    doLogSearchOffset::Vector{Int64} = offsetIndices[isLogOffset]
+    doLogSearchVariance::Vector{Int64} = varianceIndices[isLogVariance]
+    doLogSearchParameter::Vector{Int64} = parameterIndices[isLogParameter]
+    doLogSearch::Vector{Int64} = vcat(doLogSearchScale, doLogSearchOffset, doLogSearchVariance, doLogSearchParameter)
 
     parameterSpace = ParameterSpace(slb, sub, olb, oub, vlb, vub, plb, pub, doLogSearch)
 
-    lowerBounds = vcat(slb, olb, vlb, plb)
-    upperBounds = vcat(sub, oub, vub, pub)
-    numAllStartParameters = length(lowerBounds)
+    lowerBounds::Vector{Float64} = vcat(slb, olb, vlb, plb)
+    upperBounds::Vector{Float64} = vcat(sub, oub, vub, pub)
+    numAllStartParameters::Int64 = length(lowerBounds)
 
     return parameterSpace, numAllStartParameters, lowerBounds, upperBounds
 end
 
 
-struct ModelOutput{T1<:Union{ForwardDiff.Dual, Float64}}
-    sols::Vector{ODESolution}
-    uForCond::Vector{Array{Float64, 2}}
-    dpForCond::Vector{Vector{Array{Float64, 2}}}
-    h_barForCondObs::Array{Vector{T1}, 2}
-    h_hatForCondObs::Array{Vector{T1}, 2}
-    costForCondObs::Array{T1, 2}
-    scaleGrad::Vector{Float64}
-    offsetGrad::Vector{Float64}
-    varianceGrad::Vector{Float64}
-    ∂g∂p::Vector{Float64}
-    dynParGrad::Vector{Float64}
-    gradMatrix::Array{Float64, 2}
-    allParametersGrad::Vector{Float64}
+struct ModelOutput{
+        T0 <: Union{ODESolution, OrdinaryDiffEq.ODECompositeSolution},
+        T1 <: Vector{T0},
+        T2 <: Vector{Array{Float64, 2}},
+        T3 <: Vector{Vector{Array{Float64, 2}}},
+        T4 <: Union{ForwardDiff.Dual, Float64},
+        T5 <: Array{Vector{T4}, 2},
+        T6 <: Array{T4, 2},
+        T7 <: Vector{Float64},
+        T8 <: Vector{Float64},
+        T9 <: Vector{Float64},
+        T10 <: Vector{Float64},
+        T11 <: Array{Float64, 2},
+        T12 <: Vector{Float64}
+        }
+    sols::T1
+    uForCond::T2
+    dpForCond::T3
+    h_barForCondObs::T5
+    h_hatForCondObs::T5
+    costForCondObs::T6
+    scaleGrad::T7
+    offsetGrad::T8
+    varianceGrad::T9
+    ∂g∂p::T10
+    dynParGrad::T10
+    gradMatrix::T11
+    allParametersGrad::T12
 end
 
-function ModelOutput(usedType, experimentalData, modelParameters)
+function createModelOutput(usedODESolType, usedType, experimentalData::ExperimentalData, modelParameters::ModelParameters)
     numConditions = experimentalData.numConditions
     numObservables = experimentalData.numObservables
     measurementForCondObs = experimentalData.measurementForCondObs
 
-    sols = Vector{ODESolution}(undef, numConditions)
+    sols = Vector{usedODESolType}(undef, numConditions)
     uForCond = Vector{Array{Float64, 2}}(undef, numConditions)
     dpForCond = Vector{Vector{Array{Float64, 2}}}(undef, numConditions)
 
@@ -503,19 +561,20 @@ function ModelOutput(usedType, experimentalData, modelParameters)
     gradMatrix = Array{Float64, 2}(undef, numConditions, length(modelParameters.allParameters))
     allParametersGrad = Vector{Float64}(undef, modelParameters.numAllParameters)
 
-    modelOutput = ModelOutput{usedType}(sols, uForCond, dpForCond, h_barForCondObs, h_hatForCondObs, costForCondObs, 
+    modelOutput = ModelOutput(sols, uForCond, dpForCond, h_barForCondObs, h_hatForCondObs, costForCondObs, 
             scaleGrad, offsetGrad, varianceGrad, ∂g∂p, dynamicParameterGrad, gradMatrix, allParametersGrad)
 
     return modelOutput
 end
 
 
-struct FilesAndPaths
-    modelName::String
-    modelPath::String
-    modelFile::String
-    methodPath::String
-    writePath::String
-    writeFile::String
+struct FilesAndPaths{
+        T1 <: String
+        }
+    modelName::T1
+    modelPath::T1
+    modelFile::T1
+    methodPath::T1
+    writePath::T1
+    writeFile::T1
 end
-
