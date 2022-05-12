@@ -4,7 +4,7 @@ mutable struct Adam{
         T1 <: AbstractArray{Float64},
         T2 <: Function,
         T3 <: Float64,
-        T4 <: Vector{Float64}
+        T4 <: Vector{Float64},
         T5 <: Int64
         }
     theta::T1 # Parameter array

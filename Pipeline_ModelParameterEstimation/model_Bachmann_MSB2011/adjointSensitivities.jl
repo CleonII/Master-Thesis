@@ -306,7 +306,7 @@ end
 
 
 function adjointSensitivities(modelFunction::Function, iStartPar::Int64, senseAlg, optAlg::Symbol, solver, 
-        timeEnd::AbstractFloat, experimentalConditions::ExperimentalConditions, measurementData::MeasurementData, 
+        timeEnd::AbstractFloat, experimentalConditions::DataFrame, measurementData::MeasurementData, 
         observables::Observable, parameterBounds::ParameterBounds)
 
     sys, initialSpeciesValues, trueParameterValues = modelFunction()
