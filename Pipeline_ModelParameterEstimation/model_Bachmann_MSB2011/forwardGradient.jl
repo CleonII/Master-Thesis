@@ -1,20 +1,26 @@
 
 
-mutable struct Adam
-    theta::AbstractArray{Float64} # Parameter array
-    grad::Function                # Gradient function
-    loss::Float64
-    m::AbstractArray{Float64}     # First moment
-    v::AbstractArray{Float64}     # Second moment
-    b1::Float64                   # Exp. decay first moment
-    b2::Float64                   # Exp. decay second moment
-    a::Vector{Float64}                    # list of (decaying) step sizes
-    eps::Float64                  # Epsilon for stability 
-    t::Int                        # Time step (iteration)
-    β::Float64                    # Reduction factor (scales the step length)
-    r::Float64                    # Reduction multiplier (shortens the step length at failed step)
-    c::Float64                    # Increas multiplyer (Increases the step length at successful step, up to 1.0)
-    fail::Int64                   # Number of infeasible points tested in a row
+mutable struct Adam{
+        T1 <: AbstractArray{Float64},
+        T2 <: Function,
+        T3 <: Float64,
+        T4 <: Vector{Float64}
+        T5 <: Int64
+        }
+    theta::T1 # Parameter array
+    grad::T2                # Gradient function
+    loss::T3
+    m::T1     # First moment
+    v::T1     # Second moment
+    b1::T3                   # Exp. decay first moment
+    b2::T3                   # Exp. decay second moment
+    a::T4                    # list of (decaying) step sizes
+    eps::T3                  # Epsilon for stability 
+    t::T5                        # Time step (iteration)
+    β::T3                    # Reduction factor (scales the step length)
+    r::T3                    # Reduction multiplier (shortens the step length at failed step)
+    c::T3                    # Increas multiplyer (Increases the step length at successful step, up to 1.0)
+    fail::T5                   # Number of infeasible points tested in a row
 end
   
 # Outer constructor
@@ -81,7 +87,7 @@ function step_forwGrad_proto!(opt::Adam, keepInBounds!)
     nothing
 end
 
-function solveODESystem_forwGrad_proto(prob, dynParVector, u0Vector, modelData, modelOutput, iCond)
+function solveODESystem_forwGrad_proto(prob, solver, dynParVector, u0Vector, modelData, modelOutput, iCond)
 
     initVariable = modelData.initVariableIndices
     parameterInU0Indices = modelData.parameterInU0Indices
@@ -95,7 +101,7 @@ function solveODESystem_forwGrad_proto(prob, dynParVector, u0Vector, modelData, 
     _prob = remake(prob, u0 = u0Vector, p = dynParVector)
 
     try
-        modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, Rodas5(), reltol=1e-9, abstol=1e-9)
+        modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, solver, reltol=1e-9, abstol=1e-9)
         if minimum(modelOutput.sols[iCond][:,:]).value < 0.0
             return true
         else
@@ -234,7 +240,7 @@ end
 
 
 
-function forwardGradient(modelFunction, iStartPar, n_it, b2, stepRange, 
+function forwardGradient(modelFunction, iStartPar, n_it, b2, stepRange, solver, 
         timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
 
     sys, initialSpeciesValues, trueParameterValues = modelFunction()
@@ -277,7 +283,7 @@ function forwardGradient(modelFunction, iStartPar, n_it, b2, stepRange,
 
     keepInBounds! = (theta) -> keepInBounds_forwGrad_proto!(theta, parameterSpace, modelParameters)
 
-    solveODESystem_dual = (u0Vector, iCond) -> solveODESystem_forwGrad_proto(prob, dualModelParameters.dualDynamicParametersVector, u0Vector, modelData, modelOutput_dual, iCond)
+    solveODESystem_dual = (u0Vector, iCond) -> solveODESystem_forwGrad_proto(prob, solver, dualModelParameters.dualDynamicParametersVector, u0Vector, modelData, modelOutput_dual, iCond)
 
     calcUnscaledObservable_dual = (iCond) -> calcUnscaledObservable_forwGrad_proto(dualModelParameters.dualDynamicParametersVector, modelData, experimentalData, modelOutput_dual, iCond)
 

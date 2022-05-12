@@ -26,26 +26,25 @@ function benchMethod_proto(usedModelFunction, iStartPar, filesAndPaths, timeEnd,
         optAlg, method)
     write = joinpath(filesAndPaths.writePath, filesAndPaths.writeFile)
     
+    solver = QNDF()
     
     if method == "adjointSensitivities" || method == "all"
         println("Running: adjointSensitivities \n")
         senseAlgs = getSenseAlgs()
 
         for senseAlg in senseAlgs
-            model, p, doLogSearch = adjointSensitivities(usedModelFunction, iStartPar, senseAlg, optAlg, 
+            model, p, doLogSearch = adjointSensitivities(usedModelFunction, iStartPar, senseAlg, optAlg, solver, 
                     timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
-            optModelSaveResults(model, p, doLogSearch, senseAlg, optAlg, "-", iStartPar, "adjointSensitivities", write)
+            optModelSaveResults(model, p, doLogSearch, solver, optAlg, senseAlg, iStartPar, "adjointSensitivities", write)
         end
     end
     if method == "forwardAutomaticDifferentiation" || method == "all"
         println("Running: forwardAutomaticDifferentiation \n")
-        chunkSizes = [23, 60, 115]
 
-        for chunkSize in chunkSizes
-            model, p, doLogSearch = forwardAutomaticDifferentiation(usedModelFunction, iStartPar, chunkSize, optAlg, 
-                    timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
-            optModelSaveResults(model, p, doLogSearch, chunkSize, optAlg, "-", iStartPar, "forwardAutomaticDifferentiation", write)
-        end
+        model, p, doLogSearch = forwardAutomaticDifferentiation(usedModelFunction, iStartPar, optAlg, solver, 
+                timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
+        optModelSaveResults(model, p, doLogSearch, solver, optAlg, "-", iStartPar, "forwardAutomaticDifferentiation", write)
+
     end
     if method == "forwardGradient" || method == "all"
         println("Running: forwardGradient \n")
@@ -58,9 +57,9 @@ function benchMethod_proto(usedModelFunction, iStartPar, filesAndPaths, timeEnd,
             for b2 in b2s
                 for stepRange in stepRanges
 
-                    step, adam_opt, doLogSearch = forwardGradient(usedModelFunction, iStartPar, n_it, b2, stepRange, 
+                    step, adam_opt, doLogSearch = forwardGradient(usedModelFunction, iStartPar, n_it, b2, stepRange, solver, 
                             timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
-                    optAdamSaveResults(step, adam_opt, doLogSearch, n_it, b2, stepRange, iStartPar, iterations, "forwardGradient", write)
+                    optAdamSaveResults(step, adam_opt, doLogSearch, solver, n_it, b2, stepRange, iStartPar, iterations, "forwardGradient", write)
 
                 end
             end
