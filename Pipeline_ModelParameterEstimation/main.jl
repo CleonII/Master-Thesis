@@ -35,7 +35,7 @@ function benchMethod_proto(usedModelFunction, iStartPar, filesAndPaths, timeEnd,
         for senseAlg in senseAlgs
             model, p, doLogSearch = adjointSensitivities(usedModelFunction, iStartPar, senseAlg, optAlg, solver, 
                     timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
-            optModelSaveResults(model, p, doLogSearch, solver, optAlg, senseAlg, iStartPar, "adjointSensitivities", write)
+            optModelSaveResults(model, p, doLogSearch, solver, optAlg, senseAlg, "-", iStartPar, "adjointSensitivities", write)
         end
     end
     if method == "forwardAutomaticDifferentiation" || method == "all"
@@ -43,7 +43,7 @@ function benchMethod_proto(usedModelFunction, iStartPar, filesAndPaths, timeEnd,
 
         model, p, doLogSearch = forwardAutomaticDifferentiation(usedModelFunction, iStartPar, optAlg, solver, 
                 timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
-        optModelSaveResults(model, p, doLogSearch, solver, optAlg, "-", iStartPar, "forwardAutomaticDifferentiation", write)
+        optModelSaveResults(model, p, doLogSearch, solver, optAlg, "-", "-", iStartPar, "forwardAutomaticDifferentiation", write)
 
     end
     if method == "forwardGradient" || method == "all"
@@ -122,7 +122,7 @@ function main(; modelName = "model_Bachmann_MSB2011", optAlg = :Ipopt, method = 
 
 end
 
-main(modelName = "model_Raimundez_PCB2020", method = "forwardAutomaticDifferentiation")
+main(modelName = "model_Bachmann_MSB2011", method = "forwardAutomaticDifferentiation")
 
 #optAlgs = [:LD_MMA, :LD_LBFGS, :Ipopt]
 #methods = ["adjointSensitivities", "forwardAutomaticDifferentiation", "forwardGradient", "all"]

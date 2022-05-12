@@ -183,9 +183,14 @@ function calcCost_forwGrad_proto(varianceVector, modelParameters, modelOutput, e
     observedOFC = experimentalData.observedObservableForCond
 
     for iObs in observedOFC[iCond]
-        costFCO[iCond, iObs] = log(2*pi*varianceVector[varianceMap[iCond, iObs]]) * numDataFCO[iCond, iObs] + (dot(measurementFCO[iCond, iObs], measurementFCO[iCond, iObs]) - 
+        if length(varianceMap[iCond, iObs]) > 1
+            variance = sum(sqrt.(varianceVector[varianceMap[iCond, iObs]]))^2
+        else
+            variance = varianceVector[varianceMap[iCond, iObs]][1]
+        end
+        costFCO[iCond, iObs] = log(2*pi*variance) * numDataFCO[iCond, iObs] + (dot(measurementFCO[iCond, iObs], measurementFCO[iCond, iObs]) - 
             2*dot(measurementFCO[iCond, iObs], h_hatFCO[iCond, iObs]) + 
-            dot(h_hatFCO[iCond, iObs], h_hatFCO[iCond, iObs])) / (varianceVector[varianceMap[iCond, iObs]])
+            dot(h_hatFCO[iCond, iObs], h_hatFCO[iCond, iObs])) / (variance)
     end
 
     return sum(costFCO[iCond, observedOFC[iCond]])

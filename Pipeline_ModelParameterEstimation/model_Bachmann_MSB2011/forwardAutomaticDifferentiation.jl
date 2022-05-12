@@ -294,13 +294,6 @@ function forwardAutomaticDifferentiation(modelFunction::Function, iStartPar::Int
     
     f_grad = (grad, p_tuple...) -> f_grad_forwAD_proto(grad, [result1, result2], updateAllParameterVectors, allConditionsCost_noODE_dual, allConditionsCost_dual, cfg, parameterSpace, modelParameters, modelOutput_dual, p_tuple...)
 
-    @time f(allStartParameters...)
-    grad = zeros(numAllStartParameters)
-    @time f_grad(grad, allStartParameters...)
-    @time f(allStartParameters...)
-    @time f_grad(grad, allStartParameters...)
-
-
     if optAlg == :Ipopt
         model = Model(Ipopt.Optimizer)
         set_optimizer_attribute(model, "print_level", 0)

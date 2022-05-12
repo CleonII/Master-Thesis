@@ -84,10 +84,15 @@ function g_cost_AdjSens_proto(type::T1, h_hat::Vector{Vector{T2}}, varianceVecto
 
     costFCO = Vector{type}(undef, experimentalData.numObservables)
     for iObs in observedOFC[iCond]
-        costFCO[iObs] = log(2*pi*varianceVector[varianceMap[iCond, iObs]]) * length(h_hat[iObs]) + 
+        if length(varianceMap[iCond, iObs]) > 1
+            variance = sum(sqrt.(varianceVector[varianceMap[iCond, iObs]]))^2
+        else
+            variance = varianceVector[varianceMap[iCond, iObs]][1]
+        end
+        costFCO[iObs] = log(2*pi*variance) * length(h_hat[iObs]) + 
                 (dot(measurementFCO[iCond, iObs][observablesTIIFC[iObs, i]], measurementFCO[iCond, iObs][observablesTIIFC[iObs, i]]) - 
                 2*dot(measurementFCO[iCond, iObs][observablesTIIFC[iObs, i]], h_hat[iObs]) + 
-                dot(h_hat[iObs], h_hat[iObs])) / (varianceVector[varianceMap[iCond, iObs]])
+                dot(h_hat[iObs], h_hat[iObs])) / (variance)
     end
 
     return sum(costFCO[observedOFC[iCond]])
@@ -306,8 +311,8 @@ end
 
 
 function adjointSensitivities(modelFunction::Function, iStartPar::Int64, senseAlg, optAlg::Symbol, solver, 
-        timeEnd::AbstractFloat, experimentalConditions::DataFrame, measurementData::MeasurementData, 
-        observables::Observable, parameterBounds::ParameterBounds)
+        timeEnd::AbstractFloat, experimentalConditions::DataFrame, measurementData::DataFrame, 
+        observables::DataFrame, parameterBounds::DataFrame)
 
     sys, initialSpeciesValues, trueParameterValues = modelFunction()
     new_sys = ode_order_lowering(sys)
