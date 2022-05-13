@@ -75,9 +75,9 @@ end
 
 
 
-function iterateMethods(benchMethod)
+function iterateMethods(benchMethod, numStartGuesses)
     
-    for iStartPar=1:50
+    for iStartPar=1:numStartGuesses
         benchMethod(iStartPar)
     end
 
@@ -117,7 +117,8 @@ function main(; modelName = "model_Bachmann_MSB2011", optAlg = :Ipopt, method = 
 
     println("Starting benchmark")
     
-    iterateMethods(benchMethod)
+    numStartGuesses = 10
+    iterateMethods(benchMethod, numStartGuesses)
 
     nothing
 
