@@ -176,6 +176,7 @@ end
 
 function f_grad_forwAD_proto(grad, results::Vector{<:DiffResults.MutableDiffResult}, updateAllParameterVectors::Function, allConditionsCost_noODE_dual::Function, allConditionsCost_dual::Function, cfg::GradientConfig, parameterSpace::ParameterSpace, 
         modelParameters::ModelParameters, modelOutput::ModelOutput, p...)
+
     doLogSearch = parameterSpace.doLogSearch
     allPar = modelParameters.allParameters
     allPar .= p
@@ -256,7 +257,6 @@ function forwardAutomaticDifferentiation(modelFunction::Function, iStartPar::Int
     allStartParameters = getSamples(numAllStartParameters, lowerBounds, upperBounds, iStartPar)
 
     ### Initialize functions
-
     # General
     updateAllParameterVectors = () -> updateAllParameterVectors_proto(modelParameters, modelData)
     updateAllDualParameterVectors = (p) -> updateAllDualParameterVectors_proto(modelParameters, dualModelParameters, modelData, p)
