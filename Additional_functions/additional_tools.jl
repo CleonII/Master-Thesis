@@ -171,3 +171,15 @@ function includeAllModels(modelFiles, readPath)
 
     return modelFunctionVector
 end
+
+function includeAllMethods(readPaths)
+    methodFunctionArray = Array{Function, 2}(undef, length(readPaths), 3)
+    for (i, readPath) in enumerate(readPaths)
+        methods = readdir(readPath)
+        for (j, method) in enumerate(methods)
+            func = include(joinpath(readPath, method))
+            methodFunctionArray[i, j] = func
+        end
+    end
+    return methodFunctionArray
+end
