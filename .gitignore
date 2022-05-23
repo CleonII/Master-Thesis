@@ -16,3 +16,4 @@ Pipeline_ModelSolver/estimate_time_span.jl
 Pipeline_ModelParameterEstimation/test*
 Pipeline_ModelParameterEstimation/GradCalc*
 Pipeline_ModelParameterEstimation/bench*
+Pipeline_ModelParameterEstimation/tmp*
