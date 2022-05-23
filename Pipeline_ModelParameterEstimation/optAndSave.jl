@@ -67,7 +67,7 @@ function optAdamSaveResults(step, adam_opt, doLogSearch, option1, n_it, b2, step
     success = Vector{Bool}(undef, iterations)
     success .= true
     p_opt = Vector{Float64}(undef, length(theta_save))
-    cost_opt = Vector{Float64}(undef, iterations)
+    cost_opt = fill(Inf64, iterations)
     
     for iter in 1:iterations 
         adam_opt.theta = copy(theta_save)
@@ -86,14 +86,18 @@ function optAdamSaveResults(step, adam_opt, doLogSearch, option1, n_it, b2, step
     
                 if adam_opt.fail >= 10
                     success[iter] = false
+                    loss_val[i+1:end] .= NaN
                     break
+                end
+
+                if adam_opt.loss < cost_opt[iter]
+                    cost_opt[iter] = adam_opt.loss
+                    p_opt .= adam_opt.theta
                 end
             end
         end
         println("Done optimizing!")
-
-        cost_opt[iter] = adam_opt.loss
-        p_opt[:] = adam_opt.theta
+        
         view(p_opt, doLogSearch) .= exp10.(view(p_opt, doLogSearch))
 
         data_pars = DataFrame(p_opt', :auto)
