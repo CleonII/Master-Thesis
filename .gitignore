@@ -17,3 +17,4 @@ Pipeline_ModelParameterEstimation/test*
 Pipeline_ModelParameterEstimation/GradCalc*
 Pipeline_ModelParameterEstimation/bench*
 Pipeline_ModelParameterEstimation/tmp*
+Pipeline_ModelParameterEstimation/IntermediaryResults*
