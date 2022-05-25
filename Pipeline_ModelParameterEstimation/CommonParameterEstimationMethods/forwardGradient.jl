@@ -74,21 +74,24 @@ function step_forwGrad_proto!(opt::Adam, keepInBounds!::Function)
 
     if loss == Inf
         if opt.t == 1
-            opt.fail = 100
+            opt.fail = Inf
         else
             opt.fail += 1
             opt.β *= opt.r 
             opt.theta .= opt.theta_old
         end
     else
-        opt.β = min(opt.β * opt.c, 1.0)
-        opt.fail = 0
-        opt.loss = loss
+        if all(opt.theta_old .!== opt.theta)
+            opt.β = min(opt.β * opt.c, 1.0)
+            opt.fail = 0
+            opt.loss = loss
+            opt.theta_old .= opt.theta
+        end
+        
         opt.m = opt.b1 .* opt.m + (1 - opt.b1) .* gt
         opt.v = opt.b2 .* opt.v + (1 - opt.b2) .* gt .^ 2
         mhat = opt.m ./ (1 - opt.b1^opt.t)
         vhat = opt.v ./ (1 - opt.b2^opt.t)
-        opt.theta_old .= opt.theta
         opt.theta -= opt.β * opt.a[opt.t] * (mhat ./ (sqrt.(vhat) .+ opt.eps))
 
         keepInBounds!(opt.theta)
