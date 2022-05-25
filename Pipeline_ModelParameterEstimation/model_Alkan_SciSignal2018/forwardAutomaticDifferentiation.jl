@@ -62,7 +62,7 @@ function forwardAutomaticDifferentiation_model_Alkan_SciSignal2018(modelFunction
 
     parameterInU0Names = ["init_Cells", "init_Cells_Cycle_G2_rel", "init_Cells_Cycle_S_rel"]
 
-    parameterInObservableNames = []
+    parameterInObservableNames = String[]
 
     ### Initialize structs
 

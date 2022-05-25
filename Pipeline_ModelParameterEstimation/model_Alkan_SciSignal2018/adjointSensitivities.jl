@@ -1,6 +1,6 @@
 
 
-function solveODESystem_AdjSens_proto_model_Alkan_SciSignal2018(prob::ODEProblem, solver, dynParVector::Vector{T1}, U0Vector::Vector{T2}, modelData::ModelData, 
+function solveODESystem_AdjSens_proto_model_Alkan_SciSignal2018(prob::ODEProblem, solver, dynParVector::Vector{T1}, u0Vector::Vector{T2}, modelData::ModelData, 
     modelOutput::ModelOutput, iCond::Int64)::Nothing where {T1 <: Union{ForwardDiff.Dual, Float64}, T2 <: Union{ForwardDiff.Dual, Float64}}
 
     initVariable = modelData.initVariableIndices
@@ -9,7 +9,7 @@ function solveODESystem_AdjSens_proto_model_Alkan_SciSignal2018(prob::ODEProblem
     u0Vector[initVariable[2]] = dynParVector[parameterInU0Indices[1]] * dynParVector[parameterInU0Indices[3]]
     u0Vector[initVariable[3]] = dynParVector[parameterInU0Indices[1]] * (dynParVector[parameterInU0Indices[2]] - 1) * (dynParVector[parameterInU0Indices[3]] - 1)
 
-    _prob = remake(prob, u0 = U0Vector, p = dynParVector)
+    _prob = remake(prob, u0 = u0Vector, p = dynParVector)
     modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, solver, reltol=1e-9, abstol=1e-9)
     
     nothing
@@ -65,7 +65,7 @@ function adjointSensitivities_model_Alkan_SciSignal2018(modelFunction::Function,
 
     parameterInU0Names = ["init_Cells", "init_Cells_Cycle_G2_rel", "init_Cells_Cycle_S_rel"]
 
-    parameterInObservableNames = []
+    parameterInObservableNames = String[]
 
     # Initialize structs
 
