@@ -38,7 +38,8 @@ function calcCost_forwAD_proto(varianceVector::Vector{T1}, h_hatFCO::Array{Vecto
         else
             variance = varianceVector[varianceMap[iCond, iObs]][1]
         end
-        costFCO[iCond, iObs] = log(2*pi*variance) * numDataFCO[iCond, iObs] + (dot(measurementFCO[iCond, iObs], measurementFCO[iCond, iObs]) - 
+        costFCO[iCond, iObs] = log(2*pi*variance) * numDataFCO[iCond, iObs] + 
+            (dot(measurementFCO[iCond, iObs], measurementFCO[iCond, iObs]) - 
             2*dot(measurementFCO[iCond, iObs], h_hatFCO[iCond, iObs]) + 
             dot(h_hatFCO[iCond, iObs], h_hatFCO[iCond, iObs])) / (variance)
     end
