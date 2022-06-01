@@ -175,11 +175,19 @@ function f_hessian_forwAD_proto_model_Boehm_JProteomeRes2014(hess, result::DiffR
     hess .= DiffResults.hessian(result)
 
     for i in eachindex(allPar)
-        for j in doLogSearch
-            if i == j
-                hess[i, j] = log(10)^2 * allPar[i] * ( grad[i] + allPar[i] * hess[i, j] )
-            else
-                hess[i, j] = log(10)^2 * allPar[i] * allPar[j] * hess[i, j]
+        if i in doLogSearch
+            for j in eachindex(allPar)
+                if i == j
+                    hess[i, j] = log(10)^2 * allPar[i] * ( grad[i] + allPar[i] * hess[i, j] )
+                elseif j in doLogSearch
+                    hess[i, j] = log(10)^2 * allPar[i] * allPar[j] * hess[i, j]
+                else
+                    hess[i, j] = log(10) * allPar[i] * hess[i, j]
+                end
+            end
+        else
+            for j in doLogSearch
+                hess[i, j] = log(10) * allPar[j] * hess[i, j]
             end
         end
     end
