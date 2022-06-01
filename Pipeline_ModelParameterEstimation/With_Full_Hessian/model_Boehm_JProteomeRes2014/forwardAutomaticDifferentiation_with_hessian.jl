@@ -169,18 +169,21 @@ function f_hessian_forwAD_proto_model_Boehm_JProteomeRes2014(hess, result::DiffR
     view(allPar, doLogSearch) .= exp10.(view(allPar, doLogSearch))
 
     ForwardDiff.hessian!(result, allConditionsCost_dual, allPar)
+
+    grad = modelOutput.allParametersGrad
+    grad .= DiffResults.gradient(result) 
     hess .= DiffResults.hessian(result)
-    println(hess)
-    println(doLogSearch)
-    println(view(hess, :, doLogSearch))
-    println(view(hess, doLogSearch, :))
-    println(view(allPar, doLogSearch))
+
     for i in eachindex(allPar)
-        view(hess, i, doLogSearch) .*= view(allPar, doLogSearch) * log(10)
-        view(hess, doLogSearch, i) .*= view(allPar, doLogSearch) * log(10)
+        for j in doLogSearch
+            if i == j
+                hess[i, j] = log(10)^2 * allPar[i] * ( grad[i] + allPar[i] * hess[i, j] )
+            else
+                hess[i, j] = log(10)^2 * allPar[i] * allPar[j] * hess[i, j]
+            end
+        end
     end
-    
-    
+
     nothing
 end
 
