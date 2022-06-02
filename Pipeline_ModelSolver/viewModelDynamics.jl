@@ -23,8 +23,11 @@ function modelSolver(modelFunction, timeEnd, solver, tol)
 
     sol = solve(prob, solver, reltol = tol, abstol = tol)
 
-    #plt = plot(sol)
-    #display(plt)
+    println(length(sol.t))
+
+    plot(sol.t, sol[5,:])
+
+    nothing
 end
 
 
@@ -42,6 +45,10 @@ function viewModelDynamics(modelFile, solver, tol)
     timeEnd = timeEnds[timeEnds[:,1] .== modelFile, 2][1]
             
     modelSolver(usedModelFunctionVector, timeEnd, solver, tol)
+
+    nothing
 end
 
-viewModelDynamics("model_Chen_MSB2009.jl", Rodas4P(), 1e-9)
+viewModelDynamics("model_Chen_MSB2009.jl", CVODE_BDF(linear_solver=:GMRES), 1e-6)
+
+# CVODE_BDF(linear_solver=:GMRES)
