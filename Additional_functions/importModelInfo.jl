@@ -20,10 +20,15 @@ struct ModelData{
     inputParameterSymbols::T8
 end
 
-function createModelData(new_sys::ODESystem, prob::ODEProblem, observables::DataFrame, experimentalConditions::DataFrame, 
-        initVariableNames::Vector{String}, observableVariableNames::Vector{String}, parameterInU0Names::Vector{String}, 
-        parameterInObservableNames::Vector{String})::ModelData
-    observableLogTransformation::Vector{Bool} = [observables[i, :observableTransformation] == "log10" for i in eachindex(observables[!, :observableTransformation])]
+function createModelData(new_sys::ODESystem, 
+                         prob::ODEProblem, 
+                         observables::DataFrame, 
+                         experimentalConditions::DataFrame, 
+                         initVariableNames::Vector{String}, 
+                         observableVariableNames::Vector{String}, 
+                         parameterInU0Names::Vector{String}, 
+                         parameterInObservableNames::Vector{String})::ModelData
+                         observableLogTransformation::Vector{Bool} = [observables[i, :observableTransformation] == "log10" for i in eachindex(observables[!, :observableTransformation])]
 
     variableNames::Vector{String} = string.(states(new_sys))
     numUsedParameters::Int64 = length(prob.p)
@@ -73,7 +78,11 @@ struct ExperimentalData{
     observablesTimeIndexIndicesForCond::T8
 end
 
-function createExperimentalData(observables::DataFrame, experimentalConditions::DataFrame, measurementData::DataFrame, modelData::ModelData)::ExperimentalData
+function createExperimentalData(observables::DataFrame, 
+                                experimentalConditions::DataFrame, 
+                                measurementData::DataFrame, 
+                                modelData::ModelData)::ExperimentalData
+
     observableNames::Vector{String} = observables[!, 1]
     inputParameterSymbols = modelData.inputParameterSymbols
     observableLogTransformation = modelData.observableLogTransformation
@@ -185,9 +194,17 @@ struct ModelParameters{
 end
 
 
-function createModelParameters(new_sys::ODESystem, prob::ODEProblem, parameterBounds::DataFrame, experimentalConditions::DataFrame, measurementData::DataFrame, 
-        observables::DataFrame, experimentalData::ExperimentalData; 
-        scaleDeterminer::String = "scale", offsetDeterminer::String = "offset", varianceDeterminer::String = "sd_")::ModelParameters
+function createModelParameters(new_sys::ODESystem, 
+                               prob::ODEProblem, 
+                               parameterBounds::DataFrame, 
+                               experimentalConditions::DataFrame, 
+                               measurementData::DataFrame, 
+                               observables::DataFrame, 
+                               experimentalData::ExperimentalData; 
+                               scaleDeterminer::String = "scale", 
+                               offsetDeterminer::String = "offset", 
+                               varianceDeterminer::String = "sd_")::ModelParameters
+
     numConditions = experimentalData.numConditions
     numObservables = experimentalData.numObservables
     observableNames::Vector{String} = observables[!, 1]
@@ -415,9 +432,13 @@ struct ParameterSpace{
     doLogSearch::T5
 end
 
-function createParameterSpace(modelParameters::ModelParameters, parameterBounds::DataFrame; 
-    scaleDeterminer::String = "scale", offsetDeterminer::String = "offset", varianceDeterminer::String = "sd_")::Tuple{ParameterSpace, Int64, Vector{Float64}, Vector{Float64}}
-    numScale = modelParameters.numScale
+function createParameterSpace(modelParameters::ModelParameters, 
+                              parameterBounds::DataFrame; 
+                              scaleDeterminer::String = "scale", 
+                              offsetDeterminer::String = "offset", 
+                              varianceDeterminer::String = "sd_")::Tuple{ParameterSpace, Int64, Vector{Float64}, Vector{Float64}}
+    
+                              numScale = modelParameters.numScale
     numOffset = modelParameters.numOffset
     numVariance = modelParameters.numVariance
     numOptParameters = modelParameters.numOptParameters
@@ -540,7 +561,11 @@ struct ModelOutput{
     allParametersGrad::T12
 end
 
-function createModelOutput(usedODESolType, usedType, experimentalData::ExperimentalData, modelParameters::ModelParameters)
+function createModelOutput(usedODESolType, 
+                           usedType, 
+                           experimentalData::ExperimentalData, 
+                           modelParameters::ModelParameters)
+                           
     numConditions = experimentalData.numConditions
     numObservables = experimentalData.numObservables
     measurementForCondObs = experimentalData.measurementForCondObs

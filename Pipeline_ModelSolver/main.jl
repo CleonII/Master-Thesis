@@ -4,32 +4,46 @@ using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, L
 include(joinpath(pwd(), "Pipeline_ModelSolver", "BigFloatODEProblem.jl"))
 include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
 include(joinpath(pwd(), "Additional_functions", "Solver_info.jl"))
+include(joinpath(pwd(), "Additional_functions", "benchmarkSolvers.jl"))
 
 allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")), 
         joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels"))
 
 
-function modelSolver(modelFunction, modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, writefile)
+function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile)
+    
     nonStiffHiAccSolver, stiffHiAccSolver = hiAccSolvers
     println(modelFile)
 
     sys, initialSpeciesValues, trueParameterValues = modelFunction()
     new_sys = ode_order_lowering(sys)
-    u0 = initialSpeciesValues
-    pars = trueParameterValues 
-    tspan = (0.0, timeEnd)
+    # Read experimental conditions and set up simulation conditions 
+    modelName = replace.(modelFile, ".jl" => "")
+    experimentalConditions, measurementData, parameterBounds = readDataFiles(modelName)
+    stateMap = initialSpeciesValues
+    paramMap = trueParameterValues     
+    # Set stateMap and paramMap non condition parameter to the nominal reporeted values n parameter-files
+    setParamToParamFileVal!(paramMap, stateMap, parameterBounds) 
+    # Get data on experimental conditions 
+    firstExpIds, shiftExpIds, simulateSS, parameterNames, stateNames = getSimulationInfo(measurementData, sys)
+    # Set up for first experimental condtition 
+    changeToCondUse! = (pVec, u0Vec, expID) -> changeToCond!(pVec, u0Vec, expID, parameterBounds, experimentalConditions, parameterNames, stateNames, paramMap, stateMap)
+    prob = ODEProblem(new_sys, stateMap, (0.0, 5e3), paramMap, jac=true)
+    prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0)) # Ensure everything is of proper data type (Float64)
 
     # Estimate ground truth
     println("Obtaining high accuracy solution")
-    bfProb = BigFloatODEProblem(new_sys, u0, tspan, pars)
-    local hiAccSol
+    tspan = (0.0, 5.0e3)
+    bfProb = BigFloatODEProblem(new_sys, stateMap, tspan, paramMap)
+    local hiAccSolArr
+    local successHighAcc
     try 
-        hiAccSol = solve(bfProb, stiffHiAccSolver, reltol=1e-15, abstol=1e-15) 
+        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, nonStiffHiAccSolver)
     catch 
-        hiAccSol = solve(bfProb, nonStiffHiAccSolver, reltol=1e-15, abstol=1e-15) 
+        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver)
     end
 
-    if hiAccSol.retcode != :Success
+    if successHighAcc != true
         println("High accuracy solver failed for $modelFile")
         open(joinpath(pwd(), "Pipeline_ModelSolver", "Log.txt"), "a") do io
             println(io, "Failed with high accuracy solution for $modelFile")
@@ -39,44 +53,27 @@ function modelSolver(modelFunction, modelFile, timeEnd, solvers, hiAccSolvers, T
         println("Done with high accuracy solver")
     end
 
-    ts = hiAccSol.t
-    
-    # Solve with different solvers
-    prob = ODEProblem(new_sys,u0,tspan,pars,jac=true)
-
     alg_solvers, alg_hints = solvers
     for alg_solver in alg_solvers
         println("Alg_solver = ", alg_solver)
-        if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) 
+        if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) # Crashes 
             for tol in Tols
             
                 benchRunTime = Vector{Float64}(undef, iterations)
                 benchMemory = Vector{Float64}(undef, iterations)
                 benchAllocs = Vector{Float64}(undef, iterations)
-                sqDiff = Float64
-                success = true
+                local sqDiff = Float64
 
                 try
-                    sol = solve(prob, alg_solver, reltol = tol, abstol = tol, saveat = ts)
-                    if sol.t[end] == timeEnd && sol.retcode == :Success
-                        if length(sol.t) != length(ts)
-                            index = findall(sol.t .!= setdiff(sol.t, ts))
-                            sqDiff = sum((sol[:,index] - hiAccSol[:,:]).^2)
-                        else
-                            sqDiff = sum((sol[:,:] - hiAccSol[:,:]).^2)
-                        end
-                    else
-                        sqDiff = NaN
-                        success = false
-                    end
+                    sqDiff = calcSqErr(prob, changeToCondUse!, hiAccSolArr, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, alg_solver)
                 catch 
-                    sqDiff = NaN
-                    success = false
+                    sqDiff = Inf
                 end
+                success = isinf(sqDiff) ? false : true
                     
                 if success
                     for i in 1:iterations
-                        b = @benchmark solve($prob, $alg_solver, reltol = $tol, abstol = $tol) samples=1 evals=1
+                        b = @benchmark solveOdeModelAllCond($prob, $changeToCondUse!, $simulateSS, $measurementData, $firstExpIds, $shiftExpIds, $tol, $alg_solver) samples=1 evals=1
                         bMin = minimum(b)
                         benchRunTime[i] = bMin.time # microsecond
                         benchMemory[i] = bMin.memory # bytes
@@ -177,11 +174,10 @@ function modelSolver(modelFunction, modelFile, timeEnd, solvers, hiAccSolvers, T
 end
 
 
-function modelSolverIterator(modelFunctionVector, modelFiles, timeEnds, solvers, hiAccSolvers, Tols, iterations, writefile)
+function modelSolverIterator(modelFunctionVector, modelFiles, solvers, hiAccSolvers, Tols, iterations, writefile)
     for (i, modelFile) in enumerate(modelFiles)
-        timeEnd = timeEnds[timeEnds[:,1] .== modelFile, 2][1]
         modelFunction = modelFunctionVector[i]
-        modelSolver(modelFunction, modelFile, timeEnd, solvers, hiAccSolvers, Tols, iterations, writefile)
+        return modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile)
     end
 end
 
@@ -202,15 +198,14 @@ function main(; modelFiles=["all"], modelsExclude=[""])
     end
 
     usedModelFunctionVector = allModelFunctionVector[[allModelFile in modelFiles for allModelFile in allModelFiles]]
-    
-    timeEnds = CSV.read(joinpath(writePath, "timeScales.csv"), DataFrame)
+        
     solvers = getSolvers()
     hiAccSolvers = getHiAccSolver()
     tolList = getTolerances(onlyMaxTol = false) # Get tolerances = [1e-6, 1e-9, 1e-12]
-    iterations = 15
+    iterations = 1
     
-    modelSolverIterator(usedModelFunctionVector, modelFiles, timeEnds, solvers, hiAccSolvers, tolList, iterations, writefile)
+    return modelSolverIterator(usedModelFunctionVector, modelFiles, solvers, hiAccSolvers, tolList, iterations, writefile)
 end
 
 
-main(modelFiles=["model_Laske_PLOSComputBiol2019.jl"], modelsExclude=["model_Chen_MSB2009.jl"])
+main(modelFiles=["model_Beer_MolBioSystems2014.jl"], modelsExclude=["model_Chen_MSB2009.jl"])

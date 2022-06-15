@@ -47,7 +47,7 @@ function getODEModel_model_Raimundez_PCB2020()
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
-    EGFR => 0,
+    EGFR => 0.0,
     pPI3K => 0,
     MMET_METinh_2 => 0,
     pMAPK => 0,

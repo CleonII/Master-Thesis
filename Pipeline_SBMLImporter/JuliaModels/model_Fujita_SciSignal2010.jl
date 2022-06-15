@@ -1,6 +1,7 @@
 # Model name: model_Fujita_SciSignal2010
 # Number of parameters: 20
 # Number of species: 9
+# Warning : Equation for EGF is not correctly read, hence is hard-coded below to reach the correct dosage.
 function getODEModel_model_Fujita_SciSignal2010()
 
     ### Define independent and dependent variables
@@ -20,7 +21,7 @@ function getODEModel_model_Fujita_SciSignal2010()
 
     ### Events ###
     continuous_events = [
-    [t ~ EGF_end] => [EGF ~ 0]
+        [t ~ EGF_end] => [EGF ~ 0]
     ]
 
     ### Derivatives ###
@@ -34,7 +35,7 @@ function getODEModel_model_Fujita_SciSignal2010()
     D(Akt) ~ -1.0 * (Cell * (Akt * pEGFR * reaction_2_k1 - pEGFR_Akt * reaction_2_k2))+1.0 * (Cell * pAkt * reaction_7_k1),
     D(S6) ~ -1.0 * (Cell * (S6 * pAkt * reaction_5_k1 - pAkt_S6 * reaction_5_k2))+1.0 * (Cell * pS6 * reaction_8_k1),
     D(EGF_EGFR) ~ +1.0 * (Cell * (EGF * EGFR * reaction_1_k1 - EGF_EGFR * reaction_1_k2))-1.0 * (Cell * EGF_EGFR * reaction_9_k1),
-    D(EGF) ~ 0,
+    D(EGF) ~ EGF_rate,
     D(dummyVariable) ~ +init_S6+EGF_end+init_EGFR+init_AKT+EGF_rate+EGF_0
     ]
 
@@ -51,7 +52,7 @@ function getODEModel_model_Fujita_SciSignal2010()
     Akt => init_AKT,
     S6 => init_S6,
     EGF_EGFR => 0.0,
-    EGF => 0.0,
+    EGF => EGF_0,
     dummyVariable => 0.0]
 
     ### True parameter values ###
