@@ -58,6 +58,7 @@ function changeToCond!(paramVec,
             valChangeTo = parameterBounds[iRow, "nominalValue"]
         else
             println("Error : Simulation parameter not found for experimental condition $expID")
+            println("valsChangeTo[i] = ", valsChangeTo[i])
         end
 
         # Check for value to change to in parameter file 
@@ -351,8 +352,10 @@ function calcSqErr(prob::ODEProblem,
         if length(solI.t) != length(solIHigh.t)
             # This likelly happens due to events in the solution 
             sqErrI = sum((Array(solI(solIHigh.t)) - Array(solIHigh)).^2)
+            sqErrI -= sum((Array(solIHigh(solIHigh.t)) - Array(solIHigh)).^2) # Protect against interpolation errors with events 
         else
             sqErrI = sum((solI[:,:] - solIHigh[:,:]).^2)
+            sqErrI -= sum((Array(solIHigh(solIHigh.t)) - Array(solIHigh)).^2) # Protect against interpolation errors with events 
         end
 
         sqErr += sqErrI
