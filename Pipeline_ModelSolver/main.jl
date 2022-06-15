@@ -202,10 +202,17 @@ function main(; modelFiles=["all"], modelsExclude=[""])
     solvers = getSolvers()
     hiAccSolvers = getHiAccSolver()
     tolList = getTolerances(onlyMaxTol = false) # Get tolerances = [1e-6, 1e-9, 1e-12]
-    iterations = 1
+    iterations = 3
     
     return modelSolverIterator(usedModelFunctionVector, modelFiles, solvers, hiAccSolvers, tolList, iterations, writefile)
 end
 
+modelList = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model_Schwen_PONE2014.jl", "model_Alkan_SciSignal2018.jl", 
+    "model_Bachmann_MSB2011.jl", "model_Bertozzi_PNAS2020.jl", "model_Blasi_CellSystems2016.jl", "model_Boehm_JProteomeRes2014.jl", 
+    "model_Borghans_BiophysChem1997.jl", "model_Brannmark_JBC2010.jl", "model_Bruno_JExpBot2016.jl", "model_Crauste_CellSystems2017.jl", 
+    "model_Elowitz_Nature2000.jl", "model_Fiedler_BMC2016.jl", "model_Fujita_SciSignal2010.jl", "model_Giordano_Nature2020.jl", 
+    "model_Isensee_JCB2018.jl", "model_Laske_PLOSComputBiol2019.jl", "model_Lucarelli_CellSystems2018.jl", "model_Okuonghae_ChaosSolitonsFractals2020.jl", 
+    "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", "model_Raimundez_PCB2020.jl", 
+    "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
 
-main(modelFiles=["model_Beer_MolBioSystems2014.jl"], modelsExclude=["model_Chen_MSB2009.jl"])
+main(modelFiles=modelList, modelsExclude=["model_Chen_MSB2009.jl"])
