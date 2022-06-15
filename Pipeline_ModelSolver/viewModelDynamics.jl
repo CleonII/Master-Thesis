@@ -55,15 +55,7 @@ function modelSolver(modelFunction, modelName, solver, tol)
     solArray, success = solveOdeModelAllCond(prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, solver)
     println("Success = ", success)
 
-    local sqDiff=Float64
-    try
-        sqDiff = calcSqErr(prob, changeToCondUse!, solArray, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-12, RadauIIA3())
-    catch 
-        sqDiff = Inf
-    end
-    #sqDiff = calcSqErr(prob, changeToCondUse!, solArray, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-9, Rodas4P())
-
-    return prob, sys, solArray, firstExpIds, sqDiff
+    return prob, sys, solArray, firstExpIds, shiftExpIds
 end
 
 # TODO: Succesfull integration on terminated
@@ -77,7 +69,7 @@ modelList = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model
     "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", "model_Raimundez_PCB2020.jl", 
     "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
 
-prob, sys, solArray, firstExpId, sqErr = viewModelDynamics("model_Beer_MolBioSystems2014.jl", Rodas4P(), 1e-9)
+prob, sys, solArray, firstExpIds, shiftExpIds = viewModelDynamics("model_Beer_MolBioSystems2014.jl", Rodas4P(), 1e-9)
 sol = solArray[end]
 a = 1
 
