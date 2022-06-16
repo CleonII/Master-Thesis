@@ -23,14 +23,23 @@ function calcUnscaledObservable_forwAD_proto_model_Boehm_JProteomeRes2014(dynPar
 
     observedAIFCO = experimentalData.observedAtIndexForCondObs
     optParIOI = modelData.parameterInObservableIndices
+    
+    termAdd::Float64 = 0.0
+    for odeSol in sols[iCond]
+        if odeSol.retcode != :Success 
+            termAdd = Inf
+        else
+            termAdd = 0.0
+        end
+    end
 
     h_barFCO[iCond, 1] = ( (100 * sol[Symbol("pApB(t)")] + 200 * sol[Symbol("pApA(t)")] * dynParVector[optParIOI[1]] ) ./ 
-            ( sol[Symbol("pApB(t)")] + sol[Symbol("STAT5A(t)")] * dynParVector[optParIOI[1]] + 2 * sol[Symbol("pApA(t)")] * dynParVector[optParIOI[1]]) )[observedAIFCO[iCond, 1]]
+            ( sol[Symbol("pApB(t)")] + sol[Symbol("STAT5A(t)")] * dynParVector[optParIOI[1]] + 2 * sol[Symbol("pApA(t)")] * dynParVector[optParIOI[1]]) )[observedAIFCO[iCond, 1]] .+ termAdd
     h_barFCO[iCond, 2] = ( -1 * ( 100 * sol[Symbol("pApB(t)")] - 200 * sol[Symbol("pBpB(t)")] * (dynParVector[optParIOI[1]] - 1) ) ./ 
-            ( sol[Symbol("STAT5B(t)")] * (dynParVector[optParIOI[1]] - 1) - sol[Symbol("pApB(t)")] + 2 * sol[Symbol("pBpB(t)")] * (dynParVector[optParIOI[1]] - 1) ) )[observedAIFCO[iCond, 2]]
+            ( sol[Symbol("STAT5B(t)")] * (dynParVector[optParIOI[1]] - 1) - sol[Symbol("pApB(t)")] + 2 * sol[Symbol("pBpB(t)")] * (dynParVector[optParIOI[1]] - 1) ) )[observedAIFCO[iCond, 2]] .+ termAdd
     h_barFCO[iCond, 3] = ( ( 100 * sol[Symbol("pApB(t)")] + 100 * sol[Symbol("STAT5A(t)")] * dynParVector[optParIOI[1]] + 200 * sol[Symbol("pApA(t)")] * dynParVector[optParIOI[1]] ) ./ 
             (2 * sol[Symbol("pApB(t)")] + sol[Symbol("STAT5A(t)")] * dynParVector[optParIOI[1]] + 2 * sol[Symbol("pApA(t)")] * dynParVector[optParIOI[1]] - 
-            sol[Symbol("STAT5B(t)")] * (dynParVector[optParIOI[1]] - 1) - 2 * sol[Symbol("pBpB(t)")] * (dynParVector[optParIOI[1]] - 1)) )[observedAIFCO[iCond, 3]]
+            sol[Symbol("STAT5B(t)")] * (dynParVector[optParIOI[1]] - 1) - 2 * sol[Symbol("pBpB(t)")] * (dynParVector[optParIOI[1]] - 1)) )[observedAIFCO[iCond, 3]] .+ termAdd
 
     nothing
 end
@@ -196,14 +205,14 @@ function f_hessian_forwAD_proto_model_Boehm_JProteomeRes2014(hess, result::DiffR
 end
 
 
-function forwardAutomaticDifferentiation_proto_model_Boehm_JProteomeRes2014(modelFunction::Function, iStartPar::Int64, optAlg::Symbol, solver,
-        timeEnd::AbstractFloat, experimentalConditions::DataFrame, measurementData::DataFrame, observables::DataFrame, parameterBounds::DataFrame)
+function forwardAutomaticDifferentiation_hessian_proto_model_Boehm_JProteomeRes2014(modelFunction::Function, solver,
+        experimentalConditions::DataFrame, measurementData::DataFrame, observables::DataFrame, parameterBounds::DataFrame)
 
     sys, initialSpeciesValues, trueParameterValues = modelFunction()
     new_sys = ode_order_lowering(sys)
     u0 = initialSpeciesValues
     pars = trueParameterValues 
-    tspan = (0.0, timeEnd)
+    tspan = (0.0, 100.0)
     prob = ODEProblem(new_sys,u0,tspan,pars,jac=true)
 
     initVariableNames = ["STAT5A", "STAT5B"]
@@ -236,8 +245,7 @@ function forwardAutomaticDifferentiation_proto_model_Boehm_JProteomeRes2014(mode
     end
 
     # Getting start values
-
-    allStartParameters = getSamples(numAllStartParameters, lowerBounds, upperBounds, iStartPar)
+    allStartParameters = zeros(Float64, numAllStartParameters)
 
     # Initialize functions
     # General
@@ -264,56 +272,15 @@ function forwardAutomaticDifferentiation_proto_model_Boehm_JProteomeRes2014(mode
     result_grad = DiffResults.GradientResult(allStartParameters::Vector{Float64})
     f_grad = (grad, p_tuple...) -> f_grad_forwAD_proto_model_Boehm_JProteomeRes2014(grad, result_grad, allConditionsCost_dual, cfg_grad, parameterSpace, modelParameters, modelOutput_dual, p_tuple...)
 
-    cost = f(allStartParameters...)
-    println(cost)
-    grad = zeros(numAllStartParameters)
-    f_grad(grad, allStartParameters...)
-    println(grad)
-
     result_hess = DiffResults.HessianResult(allStartParameters::Vector{Float64})
     cfg_hess = ForwardDiff.HessianConfig(allConditionsCost_dual, result_hess, allStartParameters, Chunk{numAllStartParameters}())
     
     f_hess = (hess, p...) -> f_hessian_forwAD_proto_model_Boehm_JProteomeRes2014(hess, result_hess, allConditionsCost_dual, cfg_hess, parameterSpace, 
             modelParameters, modelOutput_dual, p...)
 
-    hess = zeros(numAllStartParameters, numAllStartParameters)
-    f_hess(hess, allStartParameters...)
-    println(hess)
-
-
-    if optAlg == :Ipopt
-        model = Model(Ipopt.Optimizer)
-        set_optimizer_attribute(model, "print_level", 0)
-        set_optimizer_attribute(model, "max_iter", 500)
-        set_optimizer_attribute(model, "hessian_approximation", "limited-memory")
-        set_optimizer_attribute(model, "tol", 1e-6)
-        set_optimizer_attribute(model, "acceptable_tol", 1e-4)
-
-    else
-        model = Model(NLopt.Optimizer)
-        #model.moi_backend.optimizer.model.options
-        set_optimizer_attribute(model, "algorithm", optAlg)
-        set_optimizer_attribute(model, "maxeval", 500)
-        set_optimizer_attribute(model, "ftol_rel", 1e-6)
-        set_optimizer_attribute(model, "xtol_rel", 1e-4)
-    end
-
-    #JuMP.register(model::Model, s::Symbol, dimension::Integer, f::Function, ∇f::Function, ∇²f::Function)
-    register(model, :f, numAllStartParameters, f, f_grad)
-
-    @variable(model, lowerBounds[i] <= p[i = 1:numAllStartParameters] <= upperBounds[i]) # fix lower and upper bounds
-    for i in 1:numAllStartParameters
-        set_start_value(p[i], allStartParameters[i])
-    end
-    @NLobjective(model, Min, f(p...))
-
-    return model, p, parameterSpace.doLogSearch
-
+    return f, f_grad, f_hess, lowerBounds, upperBounds
 end
 
-
-forwardAutomaticDifferentiation_proto_model_Boehm_JProteomeRes2014(usedModelFunction, 1, :Ipopt, QNDF(),
-        timeEnd, experimentalConditions, measurementData, observables, parameterBounds)
 
 # cost = 4.84858095419511e6
 # grad = [-1.1126285781895082e7, -37423.589107106935, -221.234057192666, -8.005741701395443e-10, -4.557051303245403e-11, -4.669236946001506e-12, 8.366385806615513e-11, -2.0928875208997618e-15, -3.4398312033081646e-13, -11.055986833432552, -25.917687434590214]
