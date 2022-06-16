@@ -176,7 +176,13 @@ function includeAllMethods(readPaths)
     methodFunctionArray = Array{Function, 2}(undef, length(readPaths), 3)
     for (i, readPath) in enumerate(readPaths)
         methods = readdir(readPath)
+        methods = methods[methods .!= "forwardAutomaticDifferentiation_with_hessian.jl"] # Ugly fix, revise later 
+        println("methods = ", methods)
         for (j, method) in enumerate(methods)
+
+            if method == "forwardAutomaticDifferentiation_with_hessian.jl"
+                continue
+            end
             func = include(joinpath(readPath, method))
             methodFunctionArray[i, j] = func
         end
