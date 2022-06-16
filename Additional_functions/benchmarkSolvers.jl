@@ -189,7 +189,8 @@ function solveOdeModelAllCond(prob::ODEProblem,
                               firstExpIds, 
                               shiftExpIds, 
                               tol::Float64, 
-                              solver)
+                              solver;
+                              nTSave::Int64=0)
 
     local solArray
     local sucess = true
@@ -203,7 +204,7 @@ function solveOdeModelAllCond(prob::ODEProblem,
                 firstExpId = firstExpIds[i]
                 shiftExpId = shiftExpIds[i][j]
                 t_max_ss = getTimeMax(measurementData, shiftExpId)
-                solArray[k] = solveOdeSS(prob, changeToCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver)
+                solArray[k] = solveOdeSS(prob, changeToCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, nTSave=nTSave)
                 
                 if solArray[k].retcode != :Success
                     sucess = false
@@ -221,7 +222,7 @@ function solveOdeModelAllCond(prob::ODEProblem,
         for i in eachindex(firstExpIds)
             firstExpId = firstExpIds[i]
             t_max = getTimeMax(measurementData, firstExpId)
-            solArray[i] = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max)
+            solArray[i] = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max, nTSave=nTSave)
 
             if !(solArray[i].retcode == :Success || solArray[i].retcode == :Terminated)
                 sucess = false
@@ -242,15 +243,25 @@ function solveOdeSS(prob::ODEProblem,
                       tol::Float64, 
                       t_max_ss,
                       solver;
-                      tSave=Float64[])
+                      tSave=Float64[], 
+                      nTSave=0)
+
+    # Check that for no clash between number of data-points to save tSave (only one can be activate)    
+    if length(tSave) != 0 && nTSave != 0
+        println("Error : Can only provide tSave (vector to save at) or nTSave as saveat argument to solvers")
+    elseif nTSave != 0
+        saveAtVec = collect(LinRange(0.0, t_max_ss, nTSave))
+    else
+        saveAtVec = tSave
+    end
 
     # Check wheter a solver or alg-hint is provided 
     if typeof(solver) <: Vector{Symbol} # In case an Alg-hint is provided 
         solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState())
-        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol)
+        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec)
     else
         solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState())
-        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol)
+        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec)
     end
 
     changeToCondUse!(prob.p, prob.u0, firstExpId)
@@ -275,20 +286,29 @@ function solveOdeSS(prob::ODEProblem,
 end
 # For an experimental condition solve the where first a pre-simulation is not performed. 
 # Ultimately, if provided by the user the solution can be saved at the points tSave. 
-function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64, solver, t_max::Float64; tSave=Float64[])
+function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64, solver, t_max::Float64; tSave=Float64[], nTSave::Int64=0)
 
     changeToCondUse!(prob.p, prob.u0, firstExpId)
     prob = remake(prob, tspan=(0.0, t_max))
     t_max = prob.tspan[2]
 
+    # Check that for no clash between number of data-points to save tSave (only one can be activate)    
+    if length(tSave) != 0 && nTSave != 0
+        println("Error : Can only provide tSave (vector to save at) or nTSave as saveat argument to solvers")
+    elseif nTSave != 0
+        saveAtVec = collect(LinRange(0.0, t_max, nTSave))
+    else
+        saveAtVec = tSave
+    end
+
     if typeof(solver) <: Vector{Symbol} && isinf(t_max)
         solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true)
     elseif typeof(solver) <: Vector{Symbol} && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol)
+        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec)
     elseif !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
         solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true)
     elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol)
+        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec)
     else
         println("Error : Solver option does not exist")        
     end
@@ -316,7 +336,6 @@ function calcSqErr(prob::ODEProblem,
                    tol::Float64, 
                    solver)
 
-    
     local solArraySolver
     local couldSolve = true
     if simulateSS == true

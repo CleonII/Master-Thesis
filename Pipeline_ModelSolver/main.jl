@@ -38,9 +38,9 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     local hiAccSolArr
     local successHighAcc
     try 
-        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, nonStiffHiAccSolver)
+        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, nonStiffHiAccSolver, nTSave=100)
     catch 
-        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver)
+        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver, nTSave=100)
     end
 
     if successHighAcc != true
@@ -54,7 +54,7 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     end
 
     alg_solvers, alg_hints = solvers
-    alg_solvers = []
+    alg_solvers = [Rosenbrock23()]
     for alg_solver in alg_solvers
         println("Alg_solver = ", alg_solver)
         if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) # Crashes 
@@ -93,7 +93,6 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
                 else
                     CSV.write(writefile, data)
                 end
-                GC.gc()
             end
         else
             for tol in Tols
@@ -107,8 +106,8 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
                 end
             end
         end
+        GC.gc()
     end
-    GC.gc()
 
     for alg_hint in alg_hints
         println("Alg_hint = ", alg_hint[1])
@@ -119,15 +118,12 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
                 benchAllocs = Vector{Float64}(undef, iterations)
                 sqDiff = Float64
                 success = true
-
-                sqDiff = calcSqErr(prob, changeToCondUse!, hiAccSolArr, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, alg_hint)
-                #=
+                
                 try
                     sqDiff = calcSqErr(prob, changeToCondUse!, hiAccSolArr, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, alg_hint)
                 catch 
                     sqDiff = Inf
                 end
-                =#
                 success = isinf(sqDiff) ? false : true
 
                 if success
@@ -204,7 +200,7 @@ function main(; modelFiles=["all"], modelsExclude=[""], writefile::String="")
     tolList = getTolerances(onlyMaxTol = false) # Get tolerances = [1e-6, 1e-9, 1e-12]
     iterations = 3
     
-    modelSolverIterator(usedModelFunctionVector, modelFiles, solvers, hiAccSolvers, tolList, iterations, writefile)
+    return modelSolverIterator(usedModelFunctionVector, modelFiles, solvers, hiAccSolvers, tolList, iterations, writefile)
 end
 
 dirSave = pwd() * "/Intermediate/ODESolvers/"
@@ -213,7 +209,16 @@ if !isdir(dirSave)
 end
 fileSave = dirSave * "Benchmark1.csv"
 
-modelListUse = ["model_Alkan_SciSignal2018.jl", "model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model_Schwen_PONE2014.jl", "model_Bachmann_MSB2011.jl", "model_Bertozzi_PNAS2020.jl", "model_Blasi_CellSystems2016.jl", "model_Boehm_JProteomeRes2014.jl", "model_Borghans_BiophysChem1997.jl", "model_Brannmark_JBC2010.jl", "model_Bruno_JExpBot2016.jl", "model_Crauste_CellSystems2017.jl", "model_Elowitz_Nature2000.jl", "model_Fiedler_BMC2016.jl", "model_Fujita_SciSignal2010.jl", "model_Giordano_Nature2020.jl", "model_Isensee_JCB2018.jl", "model_Laske_PLOSComputBiol2019.jl", "model_Lucarelli_CellSystems2018.jl", "model_Okuonghae_ChaosSolitonsFractals2020.jl", "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", "model_Raimundez_PCB2020.jl", "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
+modelListUse = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model_Schwen_PONE2014.jl", "model_Alkan_SciSignal2018.jl", 
+    "model_Bachmann_MSB2011.jl", "model_Bertozzi_PNAS2020.jl", "model_Blasi_CellSystems2016.jl", "model_Boehm_JProteomeRes2014.jl", 
+    "model_Borghans_BiophysChem1997.jl", "model_Brannmark_JBC2010.jl", "model_Bruno_JExpBot2016.jl", "model_Crauste_CellSystems2017.jl", 
+    "model_Elowitz_Nature2000.jl", "model_Fiedler_BMC2016.jl", "model_Fujita_SciSignal2010.jl", "model_Giordano_Nature2020.jl", 
+    "model_Isensee_JCB2018.jl", "model_Laske_PLOSComputBiol2019.jl", "model_Lucarelli_CellSystems2018.jl", "model_Okuonghae_ChaosSolitonsFractals2020.jl", 
+    "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", "model_Raimundez_PCB2020.jl", 
+    "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
+
+modelListUse = ["model_Alkan_SciSignal2018.jl"]
+
 for i in eachindex(modelListUse)
     println("Starting with a new model")
     main(modelFiles=[modelListUse[i]], modelsExclude=["model_Chen_MSB2009.jl"], writefile=fileSave)
