@@ -244,10 +244,19 @@ function solveOdeSS(prob::ODEProblem,
                       solver;
                       tSave=Float64[])
 
+    # Check wheter a solver or alg-hint is provided 
+    if typeof(solver) <: Vector{Symbol} # In case an Alg-hint is provided 
+        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState())
+        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol)
+    else
+        solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState())
+        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol)
+    end
+
     changeToCondUse!(prob.p, prob.u0, firstExpId)
     u0_pre = deepcopy(prob.u0)
     prob = remake(prob, tspan = (0.0, 1e6))
-    sol_pre = solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState())
+    sol_pre = solveCallPre(prob)
     # In case a steady state was not reached 
     if sol_pre.retcode != :Terminated
         return sol_pre
@@ -260,24 +269,31 @@ function solveOdeSS(prob::ODEProblem,
     prob.u0[has_not_changed] .= sol_pre.u[end][has_not_changed]
     
     prob = remake(prob, tspan = (0.0, t_max_ss))
-    sol = solve(prob, solver, abstol=tol, reltol=tol, saveat=tSave)
+    sol = solveCallPost(prob)
 
     return sol
 end
 # For an experimental condition solve the where first a pre-simulation is not performed. 
 # Ultimately, if provided by the user the solution can be saved at the points tSave. 
 function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64, solver, t_max::Float64; tSave=Float64[])
-    
+
     changeToCondUse!(prob.p, prob.u0, firstExpId)
     prob = remake(prob, tspan=(0.0, t_max))
     t_max = prob.tspan[2]
-    if isinf(t_max) 
-        # Is case the model is simulated to and matched against steady state data (not standard)
-        sol = solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true)
-    else
-        sol = solve(prob, solver, abstol=tol, reltol=tol, saveat=tSave)
-    end
 
+    if typeof(solver) <: Vector{Symbol} && isinf(t_max)
+        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true)
+    elseif typeof(solver) <: Vector{Symbol} && !isinf(t_max)
+        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol)
+    elseif !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
+        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true)
+    elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
+        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol)
+    else
+        println("Error : Solver option does not exist")        
+    end
+    
+    sol = solveCall(prob)
     return sol
 end
 
