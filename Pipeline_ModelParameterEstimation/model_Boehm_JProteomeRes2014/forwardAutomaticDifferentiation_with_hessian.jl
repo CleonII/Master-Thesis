@@ -1,15 +1,17 @@
 
 
 function solveODESystem_forwAD_proto_model_Boehm_JProteomeRes2014(prob::ODEProblem, solver, dynParVector::Vector{T1}, u0Vector::Vector{T2}, modelData::ModelData, 
-    modelOutput::ModelOutput, iCond::Int64)::Nothing where {T1 <: Union{ForwardDiff.Dual, Float64}, T2 <: Union{ForwardDiff.Dual, Float64}}
+    modelOutput::ModelOutput, iCond::Int64, experimentalData::ExperimentalData)::Nothing where {T1 <: Union{ForwardDiff.Dual, Float64}, T2 <: Union{ForwardDiff.Dual, Float64}}
 
     initVariable = modelData.initVariableIndices
     parameterInU0Indices = modelData.parameterInU0Indices
     u0Vector[initVariable[1]] = 207.6 * dynParVector[parameterInU0Indices[1]]
     u0Vector[initVariable[2]] = 207.6 - 207.6 * dynParVector[parameterInU0Indices[1]]
 
+    timeSteps = experimentalData.timeStepsForCond[iCond]
+
     _prob = remake(prob, u0 = u0Vector, p = dynParVector)
-    modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, solver, reltol=1e-9, abstol=1e-9)
+    modelOutput.sols[iCond] = OrdinaryDiffEq.solve(_prob, solver, reltol=1e-9, abstol=1e-9, dense=true)
 
     nothing
 end
@@ -253,7 +255,7 @@ function forwardAutomaticDifferentiation_hessian_proto_model_Boehm_JProteomeRes2
     updateAllDualParameterVectors = (p) -> updateAllDualParameterVectors_proto(modelParameters, dualModelParameters, modelData, p)
 
     # For cost calc
-    solveODESystem_float = (iCond) -> solveODESystem_forwAD_proto_model_Boehm_JProteomeRes2014(prob, solver, modelParameters.dynamicParametersVector, modelParameters.u0Vector, modelData, modelOutput_float, iCond)
+    solveODESystem_float = (iCond) -> solveODESystem_forwAD_proto_model_Boehm_JProteomeRes2014(prob, solver, modelParameters.dynamicParametersVector, modelParameters.u0Vector, modelData, modelOutput_float, iCond, experimentalData)
     calcUnscaledObservable_float = (iCond) -> calcUnscaledObservable_forwAD_proto_model_Boehm_JProteomeRes2014(modelParameters.dynamicParametersVector, modelOutput_float.sols, modelOutput_float.h_barForCondObs, modelData, experimentalData, iCond)
     calcScaledObservable_float = (iCond) -> calcScaledObservable_forwAD_proto_model_Boehm_JProteomeRes2014(modelParameters.scaleVector, modelParameters.offsetVector, modelOutput_float.h_barForCondObs, modelOutput_float.h_hatForCondObs, modelParameters, modelData, experimentalData, iCond)
     calcCost_float = (iCond) -> calcCost_forwAD_proto_model_Boehm_JProteomeRes2014(modelParameters.varianceVector, modelOutput_float.h_hatForCondObs, modelOutput_float.costForCondObs, modelParameters, experimentalData, iCond)

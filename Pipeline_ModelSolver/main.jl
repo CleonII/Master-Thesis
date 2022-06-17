@@ -5,6 +5,7 @@ include(joinpath(pwd(), "Pipeline_ModelSolver", "BigFloatODEProblem.jl"))
 include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
 include(joinpath(pwd(), "Additional_functions", "Solver_info.jl"))
 include(joinpath(pwd(), "Additional_functions", "benchmarkSolvers.jl"))
+include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters", "LatinHyperCubeSampledParameters.jl"))
 
 allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")), 
         joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels"))
@@ -20,14 +21,15 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     # Read experimental conditions and set up simulation conditions 
     modelName = replace.(modelFile, ".jl" => "")
     experimentalConditions, measurementData, parameterBounds = readDataFiles(modelName)
+    paramData = processParameterData(parameterBounds) # Model parameter data in a convenient struct
     stateMap = initialSpeciesValues
     paramMap = trueParameterValues     
     # Set stateMap and paramMap non condition parameter to the nominal reporeted values n parameter-files
-    setParamToParamFileVal!(paramMap, stateMap, parameterBounds) 
+    setParamToParamFileVal!(paramMap, stateMap, paramData) 
     # Get data on experimental conditions 
     firstExpIds, shiftExpIds, simulateSS, parameterNames, stateNames = getSimulationInfo(measurementData, sys)
     # Set up for first experimental condtition 
-    changeToCondUse! = (pVec, u0Vec, expID) -> changeToCond!(pVec, u0Vec, expID, parameterBounds, experimentalConditions, parameterNames, stateNames, paramMap, stateMap)
+    changeToCondUse! = (pVec, u0Vec, expID) -> changeToCond!(pVec, u0Vec, expID, paramData, experimentalConditions, parameterNames, stateNames, paramMap, stateMap)
     prob = ODEProblem(new_sys, stateMap, (0.0, 5e3), paramMap, jac=true)
     prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0)) # Ensure everything is of proper data type (Float64)
 
@@ -43,6 +45,15 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
         hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver, nTSave=100)
     end
 
+    # In cases the non-stiff solver just fails 
+    if successHighAcc != true
+        try 
+            hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver, nTSave=100)
+        catch
+            successHighAcc = false
+        end
+    end
+
     if successHighAcc != true
         println("High accuracy solver failed for $modelFile")
         open(joinpath(pwd(), "Pipeline_ModelSolver", "Log.txt"), "a") do io
@@ -54,7 +65,6 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     end
 
     alg_solvers, alg_hints = solvers
-    alg_solvers = [Rosenbrock23()]
     for alg_solver in alg_solvers
         println("Alg_solver = ", alg_solver)
         if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) # Crashes 
@@ -175,6 +185,55 @@ function modelSolverIterator(modelFunctionVector, modelFiles, solvers, hiAccSolv
 end
 
 
+function canSolveODE(paramVec, paramData, prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, solver)
+    
+    paramData.paramVal[paramData.shouldEst] .= paramVec
+    solArr, success = solveOdeModelAllCond(prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-12, solver)
+    if success != true
+        return Inf
+    else
+        return 0.0
+    end
+end
+
+
+function createCubeODESolver(nSamples, modelFile; solver=Rodas4P())
+
+    readPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
+    allModelFiles = getModelFiles(readPath)
+    usedModelFunction = allModelFunctionVector[allModelFiles .== modelFile][1]
+
+    sys, initialSpeciesValues, trueParameterValues = usedModelFunction()
+    new_sys = ode_order_lowering(sys)
+    # Read experimental conditions and set up simulation conditions 
+    modelName = replace.(modelFile, ".jl" => "")
+    experimentalConditions, measurementData, parameterBounds = readDataFiles(modelName)
+    paramData = processParameterData(parameterBounds) # Model parameter data in a convenient struct
+    stateMap = initialSpeciesValues
+    paramMap = trueParameterValues     
+    # Set stateMap and paramMap non condition parameter to the nominal reporeted values n parameter-files
+    setParamToParamFileVal!(paramMap, stateMap, paramData) 
+    # Get data on experimental conditions 
+    firstExpIds, shiftExpIds, simulateSS, parameterNames, stateNames = getSimulationInfo(measurementData, sys)
+    # Set up for first experimental condtition 
+    changeToCondUse! = (pVec, u0Vec, expID) -> changeToCond!(pVec, u0Vec, expID, paramData, experimentalConditions, parameterNames, stateNames, paramMap, stateMap)
+    prob = ODEProblem(new_sys, stateMap, (0.0, 5e3), paramMap, jac=true)
+    prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0)) 
+
+    # Function to provide to the Cube 
+    dirSave = pwd() * "/Intermediate/" * modelName * "/"
+    if !isdir(dirSave)
+        println("Dir-save = $dirSave does not exist, will create:")
+        mkpath(dirSave)
+    end
+    fileSave = dirSave * "CubeSolver.csv"
+    
+    shouldEst = paramData.shouldEst
+    fCube = (paramVec) -> canSolveODE(paramVec, paramData, prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, solver)
+    createCube(nSamples, paramData.lowerBounds[shouldEst], paramData.upperBounds[shouldEst], fileSave, fCube)
+end
+
+
 function main(; modelFiles=["all"], modelsExclude=[""], writefile::String="")
     readPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
     writePath = joinpath(pwd(), "Pipeline_ModelSolver", "IntermediaryResults")
@@ -203,12 +262,8 @@ function main(; modelFiles=["all"], modelsExclude=[""], writefile::String="")
     return modelSolverIterator(usedModelFunctionVector, modelFiles, solvers, hiAccSolvers, tolList, iterations, writefile)
 end
 
-dirSave = pwd() * "/Intermediate/ODESolvers/"
-if !isdir(dirSave)
-    mkpath(dirSave)
-end
-fileSave = dirSave * "Benchmark1.csv"
 
+#=
 modelListUse = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model_Schwen_PONE2014.jl", "model_Alkan_SciSignal2018.jl", 
     "model_Bachmann_MSB2011.jl", "model_Bertozzi_PNAS2020.jl", "model_Blasi_CellSystems2016.jl", "model_Boehm_JProteomeRes2014.jl", 
     "model_Borghans_BiophysChem1997.jl", "model_Brannmark_JBC2010.jl", "model_Bruno_JExpBot2016.jl", "model_Crauste_CellSystems2017.jl", 
@@ -216,9 +271,24 @@ modelListUse = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "mo
     "model_Isensee_JCB2018.jl", "model_Laske_PLOSComputBiol2019.jl", "model_Lucarelli_CellSystems2018.jl", "model_Okuonghae_ChaosSolitonsFractals2020.jl", 
     "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", "model_Raimundez_PCB2020.jl", 
     "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
+for modelFile in modelListUse
+    createCubeODESolver(10, modelFile; solver=Rodas4P())
+end
+=#
 
-modelListUse = ["model_Alkan_SciSignal2018.jl"]
 
+dirSave = pwd() * "/Intermediate/ODESolvers/"
+if !isdir(dirSave)
+    mkpath(dirSave)
+end
+fileSave = dirSave * "Benchmark1.csv"
+modelListUse = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model_Schwen_PONE2014.jl", "model_Alkan_SciSignal2018.jl", 
+    "model_Bachmann_MSB2011.jl", "model_Bertozzi_PNAS2020.jl", "model_Blasi_CellSystems2016.jl", "model_Boehm_JProteomeRes2014.jl", 
+    "model_Borghans_BiophysChem1997.jl", "model_Brannmark_JBC2010.jl", "model_Bruno_JExpBot2016.jl", "model_Crauste_CellSystems2017.jl", 
+    "model_Elowitz_Nature2000.jl", "model_Fiedler_BMC2016.jl", "model_Fujita_SciSignal2010.jl", "model_Giordano_Nature2020.jl", 
+    "model_Isensee_JCB2018.jl", "model_Laske_PLOSComputBiol2019.jl", "model_Lucarelli_CellSystems2018.jl", "model_Okuonghae_ChaosSolitonsFractals2020.jl", 
+    "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", "model_Raimundez_PCB2020.jl", 
+    "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
 for i in eachindex(modelListUse)
     println("Starting with a new model")
     main(modelFiles=[modelListUse[i]], modelsExclude=["model_Chen_MSB2009.jl"], writefile=fileSave)

@@ -1,3 +1,53 @@
+struct ParamData{T1<:Array{<:AbstractFloat}, 
+                 T2<:Array{<:String, 1}, 
+                 T3<:Array{Bool, 1}, 
+                 T4<:Signed}
+
+    paramVal::T1
+    lowerBounds::T1
+    upperBounds::T1
+    parameterID::T2
+    logScale::T3
+    shouldEst::T3
+    nParamEst::T4
+end
+
+
+# Create paramData from parameter data. Putting everything into a struct 
+# will make subsequent simulations more efficient. 
+function processParameterData(parameterData::DataFrame)
+
+    nParam = length(parameterData[!, "estimate"])
+    lb::Array{Float64, 1} = zeros(Float64, nParam) 
+    ub::Array{Float64, 1} = zeros(Float64, nParam)
+    paramVal::Array{Float64, 1} = zeros(Float64, nParam)
+    logScale::Array{Bool, 1} = Array{Bool, 1}(undef, nParam)
+    paramId::Array{String, 1} = Array{String, 1}(undef, nParam)
+    shouldEst::Array{Bool, 1} = Array{Bool, 1}(undef, nParam)
+
+    for i in eachindex(shouldEst)
+        if ismissing(parameterData[i, "lowerBound"])
+            lb[i] = -Inf
+        else
+            lb[i] = parameterData[i, "lowerBound"]
+        end
+        if ismissing(parameterData[i, "upperBound"])
+            ub[i] = Inf
+        else
+            ub[i] = parameterData[i, "upperBound"]
+        end
+        paramVal[i] = parameterData[i, "nominalValue"]
+        paramId[i] = parameterData[i, "parameterId"]
+        logScale[i] = parameterData[i, "parameterScale"] == "log10" ? true : false
+        shouldEst[i] = parameterData[i, "estimate"] == 1 ? true : false
+    end
+    nParamEst::Int = Int(sum(shouldEst))
+
+    return ParamData(paramVal, lb, ub, paramId, logScale, shouldEst, nParamEst)
+end
+
+
+
 # In a DataFrame data with colSearch find which row of colSearch 
 # has the value ExpId. Helper function to navigate experimentalCondition 
 # files. 
@@ -15,7 +65,7 @@ end
 # Change ODE parameter, paramVec, and initial values, stateVec, to the input 
 # parameters for expID. In case the values experimentalConditions cannot be 
 # be found in experimentalConditions file will search for the values 
-# in the parameterBounds (parameter values) file. To ensure that the parameter 
+# in the paramData (parameter values) struct. To ensure that the parameter 
 # values are mapped correctly parameterNames = parameters(odeSys) and 
 # stateNames = states(odeSys) is combined paramMap and stateMap (parameters in 
 # ModellingToolkit format) to ensuare a correct mapping. 
@@ -25,7 +75,7 @@ end
 function changeToCond!(paramVec, 
                        stateVec, 
                        expID, 
-                       parameterBounds::DataFrame,
+                       paramData::ParamData,
                        experimentalConditions::DataFrame,
                        parameterNames, 
                        stateNames, 
@@ -53,9 +103,9 @@ function changeToCond!(paramVec,
         valChangeTo::Float64 = 0.0
         if isNumber(valsChangeTo[i])
             valChangeTo = parse(Float64, valsChangeTo[i])
-        elseif getRowExpId(valsChangeTo[i], parameterBounds, colSearch="parameterId") != nothing
-            iRow = getRowExpId(valsChangeTo[i], parameterBounds, colSearch="parameterId") 
-            valChangeTo = parameterBounds[iRow, "nominalValue"]
+        elseif findfirst(x -> x == valsChangeTo[i], paramData.parameterID) != nothing
+            iVal = findfirst(x -> x == valsChangeTo[i], paramData.parameterID)
+            valChangeTo = paramData.paramVal[iVal]
         else
             println("Error : Simulation parameter not found for experimental condition $expID")
             println("valsChangeTo[i] = ", valsChangeTo[i])
@@ -150,15 +200,15 @@ end
 # Set the values in paramMap and stateMap to the nominal values in the parametersFile. 
 # This allows constant values to be set correctly when mapping paramMap and stateMap 
 # to the ODE-problem.  
-function setParamToParamFileVal!(paramMap, stateMap, parameterBounds::DataFrame)
+function setParamToParamFileVal!(paramMap, stateMap, paramData::ParamData)
 
-    parameterNames = parameterBounds[!, "parameterId"]
+    parameterNames = paramData.parameterID
     parameterNamesStr = string.([paramMap[i].first for i in eachindex(paramMap)])
     stateNamesStr = replace.(string.([stateMap[i].first for i in eachindex(stateMap)]), "(t)" => "")
     for i in eachindex(parameterNames)
         
         parameterName = parameterNames[i]
-        valChangeTo = parameterBounds[i, "nominalValue"]
+        valChangeTo = paramData.paramVal[i]
         
         # Check for value to change to in parameter file 
         i_param = findfirst(x -> x == parameterName, parameterNamesStr)
@@ -258,10 +308,10 @@ function solveOdeSS(prob::ODEProblem,
     # Check wheter a solver or alg-hint is provided 
     if typeof(solver) <: Vector{Symbol} # In case an Alg-hint is provided 
         solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState())
-        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec)
+        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec)
     else
         solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState())
-        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec)
+        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec)
     end
 
     changeToCondUse!(prob.p, prob.u0, firstExpId)
@@ -304,11 +354,11 @@ function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64
     if typeof(solver) <: Vector{Symbol} && isinf(t_max)
         solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true)
     elseif typeof(solver) <: Vector{Symbol} && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec)
+        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec)
     elseif !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
         solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true)
     elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec)
+        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec)
     else
         println("Error : Solver option does not exist")        
     end

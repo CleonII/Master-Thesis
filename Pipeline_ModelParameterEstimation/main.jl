@@ -1,4 +1,5 @@
 using ModelingToolkit, DifferentialEquations, DataFrames, CSV, Random
+using Sundials
 using JuMP, NLopt, Ipopt, LinearAlgebra, DiffEqSensitivity, ForwardDiff
 using ModelingToolkit: varmap_to_vars
 using ForwardDiff: GradientConfig, Chunk
@@ -247,12 +248,34 @@ function testOptimizerHessian(modelName, dirSave, solver, nEvals)
     end
 end
 
+
+function genIpoptHess(modelName, solver)
+
+    # Set up paths for data files 
+    modelPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
+    modelNameShort = modelName[7:end]
+    modelFile = modelName * ".jl" 
+    methodPath = joinpath(pwd(), "Pipeline_ModelParameterEstimation", modelName)
+    # Reading data for model
+    readDataPath = joinpath(pwd(), "Pipeline_ModelParameterEstimation", "Data", modelName)
+    dataEnding = modelNameShort * ".tsv"
+    experimentalConditions = CSV.read(joinpath(readDataPath, "experimentalCondition_" * dataEnding), DataFrame)
+    measurementData = CSV.read(joinpath(readDataPath, "measurementData_" * dataEnding), DataFrame)
+    observables = CSV.read(joinpath(readDataPath, "observables_" * dataEnding), DataFrame)
+    parameterBounds = CSV.read(joinpath(readDataPath, "parameters_" * dataEnding), DataFrame)
+    allModelFiles = getModelFiles(modelPath)
+    usedModelFunction = allModelFunctionVector[[allModelFile in [modelFile] for allModelFile in allModelFiles]][1]
+
+    # Generate a cost function, inplace gradient function, in place hessian and lower and upper bounds 
+    fPre, fGradPre, fHessPre, lowerBounds, upperBounds = forwardAutomaticDifferentiation_hessian_proto_model_Boehm_JProteomeRes2014(usedModelFunction, solver, experimentalConditions, measurementData, observables, parameterBounds)
+    nParam = length(lowerBounds)
+
+    ipoptProb, iterArr = createIpoptProb(fPre, fGradPre, fHessPre, lowerBounds, upperBounds)
+    return ipoptProb, iterArr
+end
+
+
 dirSave = pwd() * "/Intermediate/Bohem/"
 modelName = "model_Boehm_JProteomeRes2014"
 solver = QNDF()
-testOptimizerHessian(modelName, dirSave, solver, 500)
-
-
-#main(modelName = "model_Boehm_JProteomeRes2014", method = "forwardAutomaticDifferentiation")
-#optAlgs = [:LD_MMA, :LD_LBFGS, :Ipopt]
-#methods = ["adjointSensitivities", "forwardAutomaticDifferentiation", "forwardGradient", "all"]
+testOptimizerHessian(modelName, dirSave, solver, 2)
