@@ -38,24 +38,29 @@ function modelSolver(modelFunction, modelName, solver, tol)
     modelPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
     modelFile = modelName * ".jl" 
     experimentalConditions, measurementData, parameterBounds = readDataFiles(modelName)
+    paramData = processParameterData(parameterBounds) # Model data in convient structure 
     # Set stateMap and paramMap non condition parameter to the nominal reporeted values n parameter-files
     stateMap = initialSpeciesValues
     paramMap = trueParameterValues     
-    setParamToParamFileVal!(paramMap, stateMap, parameterBounds)
+    setParamToParamFileVal!(paramMap, stateMap, paramData)
 
     # Get data on experimental conditions 
     firstExpIds, shiftExpIds, simulateSS, parameterNames, stateNames = getSimulationInfo(measurementData, sys)
     
     # Set up for first experimental condtition 
-    changeToCondUse! = (pVec, u0Vec, expID) -> changeToCond!(pVec, u0Vec, expID, parameterBounds, experimentalConditions, parameterNames, stateNames, paramMap, stateMap)
+    changeToCondUse! = (pVec, u0Vec, expID) -> changeToCond!(pVec, u0Vec, expID, paramData, experimentalConditions, parameterNames, stateNames, paramMap, stateMap)
     prob = ODEProblem(new_sys, stateMap, (0.0, 5e3), paramMap, jac=true)
     prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
     
     # Base soluation on wheter or not steady state pre simulatioln occurs 
-    solArray, success = solveOdeModelAllCond(prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, solver)
+    solArray, success = solveOdeModelAllCond(prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, solver, nTSave=100)
     println("Success = ", success)
 
-    return prob, sys, solArray, firstExpIds, shiftExpIds
+    sqErr = calcSqErr(prob, changeToCondUse!, solArray, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, Rosenbrock23())
+
+    GC.gc()    
+        
+    return prob, sys, solArray, firstExpIds, shiftExpIds, sqErr
 end
 
 # TODO: Succesfull integration on terminated
@@ -69,7 +74,7 @@ modelList = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model
     "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", "model_Raimundez_PCB2020.jl", 
     "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
 
-prob, sys, solArray, firstExpIds, shiftExpIds = viewModelDynamics("model_Beer_MolBioSystems2014.jl", Rodas4P(), 1e-9)
-sol = solArray[end]
+prob, sys, solArray, firstExpIds, shiftExpIds, sqErr = viewModelDynamics("model_Blasi_CellSystems2016.jl", Rodas4P(), 1e-9)
+
 a = 1
 

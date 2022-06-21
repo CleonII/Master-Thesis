@@ -390,6 +390,7 @@ function calcSqErr(prob::ODEProblem,
     local couldSolve = true
     if simulateSS == true
         nShiftId = Int(sum([length(shiftExpIds[i]) for i in eachindex(shiftExpIds)]))
+        tMaxArray = Array{Float64, 1}(undef, nShiftId)
         solArraySolver = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nShiftId)
         k = 1
 
@@ -398,6 +399,7 @@ function calcSqErr(prob::ODEProblem,
                 firstExpId = firstExpIds[i]
                 shiftExpId = shiftExpIds[i][j]
                 t_max_ss = getTimeMax(measurementData, shiftExpId)
+                tMaxArray[k] = t_max_ss
                 solArraySolver[k] = solveOdeSS(prob, changeToCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, tSave=solArray[k].t)
                 
                 if solArraySolver[k].retcode != :Success && solArraySolver[i].t[end] != solArray[i].t[end]
@@ -411,14 +413,20 @@ function calcSqErr(prob::ODEProblem,
 
     elseif simulateSS == false
         nExperimentalCond = Int64(length(firstExpIds))
+        tMaxArray = Array{Float64, 1}(undef, nExperimentalCond)
         solArraySolver = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nExperimentalCond)
 
         for i in eachindex(firstExpIds)
             firstExpId = firstExpIds[i]
             t_max = getTimeMax(measurementData, firstExpId)
+            tMaxArray[i] = t_max
             solArraySolver[i] = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max, tSave=solArray[i].t)
 
-            if !(solArraySolver[i].retcode == :Success || solArraySolver[i].retcode == :Terminated) || solArraySolver[i].t[end] != solArray[i].t[end]
+            if isinf(t_max) && solArraySolver[i].retcode != :Terminated
+                couldSolve = false
+                break
+            end
+            if !isinf(t_max) && !(solArraySolver[i].retcode == :Success && solArraySolver[i].t[end] == solArray[i].t[end])
                 couldSolve = false
                 break 
             end
@@ -434,7 +442,11 @@ function calcSqErr(prob::ODEProblem,
         solI = solArraySolver[i]
         solIHigh = solArray[i]
 
-        if length(solI.t) != length(solIHigh.t)
+        if isinf(tMaxArray[i])
+            # Only match end point when data i matched against steady state value 
+            # TODO : Fix if some data points for experiment are not inf 
+            sqErrI = sum((solIHigh.u[end] .- solI.u[end]).^2)
+        elseif length(solI.t) != length(solIHigh.t)
             # This likelly happens due to events in the solution 
             sqErrI = sum((Array(solI(solIHigh.t)) - Array(solIHigh)).^2)
             sqErrI -= sum((Array(solIHigh(solIHigh.t)) - Array(solIHigh)).^2) # Protect against interpolation errors with events 
