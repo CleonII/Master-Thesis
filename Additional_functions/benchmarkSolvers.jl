@@ -386,6 +386,12 @@ function calcSqErr(prob::ODEProblem,
                    tol::Float64, 
                    solver)
 
+    # Check if model can be solved (without using forced stops for integrator)
+    solArrayTmp, sucess = solveOdeModelAllCond(prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, solver)
+    if sucess == false
+        return Inf 
+    end
+
     local solArraySolver
     local couldSolve = true
     if simulateSS == true
