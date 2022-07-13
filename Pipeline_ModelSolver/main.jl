@@ -44,6 +44,7 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     catch 
         hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver, nTSave=100)
     end
+    GC.gc()
 
     # In cases the non-stiff solver just fails 
     if successHighAcc != true
@@ -65,7 +66,7 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     end
 
     alg_solvers, alg_hints = solvers
-    alg_solvers = [AutoVern9(Rodas4P())]
+    alg_solvers = [DP5()]
     for alg_solver in alg_solvers
         println("Alg_solver = ", alg_solver)
         if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) # Crashes 
@@ -75,7 +76,6 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
                 benchMemory = Vector{Float64}(undef, iterations)
                 benchAllocs = Vector{Float64}(undef, iterations)
                 local sqDiff = Float64
-
                 try
                     sqDiff = calcSqErr(prob, changeToCondUse!, hiAccSolArr, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, alg_solver)
                 catch 
@@ -85,7 +85,7 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
                     
                 if success
                     for i in 1:iterations
-                        b = @benchmark solveOdeModelAllCond($prob, $changeToCondUse!, $simulateSS, $measurementData, $firstExpIds, $shiftExpIds, $tol, $alg_solver) samples=1 evals=1
+                        b = @benchmark solveOdeModelAllCond($prob, $changeToCondUse!, $simulateSS, $measurementData, $firstExpIds, $shiftExpIds, $tol, $alg_solver, denseArg=false) samples=1 evals=1
                         bMin = minimum(b)
                         benchRunTime[i] = bMin.time # microsecond
                         benchMemory[i] = bMin.memory # bytes
@@ -139,7 +139,7 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
 
                 if success
                     for i in 1:iterations
-                        b = @benchmark solveOdeModelAllCond($prob, $changeToCondUse!, $simulateSS, $measurementData, $firstExpIds, $shiftExpIds, $tol, $alg_hint) samples=1 evals=1
+                        b = @benchmark solveOdeModelAllCond($prob, $changeToCondUse!, $simulateSS, $measurementData, $firstExpIds, $shiftExpIds, $tol, $alg_hint, denseArg=false) samples=1 evals=1
                         bMin = minimum(b)
                         benchRunTime[i] = bMin.time # microsecond
                         benchMemory[i] = bMin.memory # bytes
@@ -282,7 +282,7 @@ dirSave = pwd() * "/Intermediate/ODESolvers/"
 if !isdir(dirSave)
     mkpath(dirSave)
 end
-fileSave = dirSave * "Benchmark_test.csv"
+fileSave = dirSave * "Benchmark_no_dense.csv"
 modelListUse = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model_Schwen_PONE2014.jl", "model_Alkan_SciSignal2018.jl", 
     "model_Bachmann_MSB2011.jl", "model_Bertozzi_PNAS2020.jl", "model_Blasi_CellSystems2016.jl", "model_Boehm_JProteomeRes2014.jl", 
     "model_Borghans_BiophysChem1997.jl", "model_Brannmark_JBC2010.jl", "model_Bruno_JExpBot2016.jl", "model_Crauste_CellSystems2017.jl", 

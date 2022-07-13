@@ -240,7 +240,8 @@ function solveOdeModelAllCond(prob::ODEProblem,
                               shiftExpIds, 
                               tol::Float64, 
                               solver;
-                              nTSave::Int64=0)
+                              nTSave::Int64=0, 
+                              denseArg=true)
 
     local solArray
     local sucess = true
@@ -254,7 +255,7 @@ function solveOdeModelAllCond(prob::ODEProblem,
                 firstExpId = firstExpIds[i]
                 shiftExpId = shiftExpIds[i][j]
                 t_max_ss = getTimeMax(measurementData, shiftExpId)
-                solArray[k] = solveOdeSS(prob, changeToCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, nTSave=nTSave)
+                solArray[k] = solveOdeSS(prob, changeToCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, nTSave=nTSave, denseArg=denseArg)
                 
                 if solArray[k].retcode != :Success
                     sucess = false
@@ -272,7 +273,7 @@ function solveOdeModelAllCond(prob::ODEProblem,
         for i in eachindex(firstExpIds)
             firstExpId = firstExpIds[i]
             t_max = getTimeMax(measurementData, firstExpId)
-            solArray[i] = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max, nTSave=nTSave)
+            solArray[i] = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max, nTSave=nTSave, denseArg=denseArg)
 
             if !(solArray[i].retcode == :Success || solArray[i].retcode == :Terminated)
                 sucess = false
@@ -294,7 +295,8 @@ function solveOdeSS(prob::ODEProblem,
                       t_max_ss,
                       solver;
                       tSave=Float64[], 
-                      nTSave=0)
+                      nTSave=0, 
+                      denseArg=true)
 
     # Check that for no clash between number of data-points to save tSave (only one can be activate)    
     if length(tSave) != 0 && nTSave != 0
@@ -305,13 +307,20 @@ function solveOdeSS(prob::ODEProblem,
         saveAtVec = tSave
     end
 
+    # Whether or not producing a dense soluation 
+    if (isempty(tSave) && nTSave == 0) && denseArg == true
+        dense = true
+    else
+        dense = false
+    end
+    
     # Check wheter a solver or alg-hint is provided 
     if typeof(solver) <: Vector{Symbol} # In case an Alg-hint is provided 
-        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState())
-        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec)
+        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), dense=false)
+        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec, dense=dense)
     else
-        solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState())
-        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec)
+        solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), dense=false)
+        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec, dense=dense)
     end
 
     changeToCondUse!(prob.p, prob.u0, firstExpId)
@@ -336,7 +345,7 @@ function solveOdeSS(prob::ODEProblem,
 end
 # For an experimental condition solve the where first a pre-simulation is not performed. 
 # Ultimately, if provided by the user the solution can be saved at the points tSave. 
-function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64, solver, t_max::Float64; tSave=Float64[], nTSave::Int64=0)
+function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64, solver, t_max::Float64; tSave=Float64[], nTSave::Int64=0, denseArg=denseArg)
 
     changeToCondUse!(prob.p, prob.u0, firstExpId)
     prob = remake(prob, tspan=(0.0, t_max))
@@ -351,20 +360,49 @@ function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64
         saveAtVec = tSave
     end
 
+    # Whether or not producing a dense soluation 
+    # Whether or not producing a dense soluation 
+    if (isempty(tSave) && nTSave == 0) && denseArg == true
+        dense = true
+    else
+        dense = false
+    end
+
     if typeof(solver) <: Vector{Symbol} && isinf(t_max)
-        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true)
+        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
     elseif typeof(solver) <: Vector{Symbol} && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec)
+        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec, dense=dense)
     elseif !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
-        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true)
+        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
     elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec)
+        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec, dense=dense)
     else
         println("Error : Solver option does not exist")        
     end
     
     sol = solveCall(prob)
     return sol
+end
+
+
+function calcSqErrVal(solHigh, solCompare, t_max)
+
+    sqErr::Float64 = 0.0
+    
+    if isinf(t_max)
+        # Only match end point when data i matched against steady state value 
+        # TODO : Fix if some data points for experiment are not inf 
+        sqErr = sum((solHigh.u[end] .- solCompare.u[end]).^2)
+    elseif length(solHigh.t) != length(solCompare.t)
+        # This likelly happens due to events in the solution 
+        sqErr = sum((Array(solCompare(solHigh.t)) - Array(solHigh)).^2)
+        sqErr -= sum((Array(solHigh(solHigh.t)) - Array(solHigh)).^2) # Protect against interpolation errors with events 
+    else
+        sqErr = sum((solCompare[:,:] - solHigh[:,:]).^2)
+        sqErr -= sum((Array(solHigh(solHigh.t)) - Array(solHigh)).^2) # Protect against interpolation errors with events 
+    end
+
+    return sqErr
 end
 
 
@@ -387,17 +425,17 @@ function calcSqErr(prob::ODEProblem,
                    solver)
 
     # Check if model can be solved (without using forced stops for integrator)
-    solArrayTmp, sucess = solveOdeModelAllCond(prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, solver)
+    solArrayTmp, sucess = solveOdeModelAllCond(prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, solver, denseArg=false)
+    solArrayTmp = 0
+    GC.gc(); GC.gc(); GC.gc(); GC.gc()
     if sucess == false
         return Inf 
     end
 
-    local solArraySolver
+    sqErr::Float64 = 0.0
     local couldSolve = true
     if simulateSS == true
         nShiftId = Int(sum([length(shiftExpIds[i]) for i in eachindex(shiftExpIds)]))
-        tMaxArray = Array{Float64, 1}(undef, nShiftId)
-        solArraySolver = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nShiftId)
         k = 1
 
         for i in eachindex(firstExpIds)
@@ -405,63 +443,42 @@ function calcSqErr(prob::ODEProblem,
                 firstExpId = firstExpIds[i]
                 shiftExpId = shiftExpIds[i][j]
                 t_max_ss = getTimeMax(measurementData, shiftExpId)
-                tMaxArray[k] = t_max_ss
-                solArraySolver[k] = solveOdeSS(prob, changeToCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, tSave=solArray[k].t)
+                solCompare = solveOdeSS(prob, changeToCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, tSave=solArray[k].t)
                 
-                if solArraySolver[k].retcode != :Success && solArraySolver[i].t[end] != solArray[i].t[end]
+                if solCompare.retcode != :Success && solCompare.t[end] != solArray[k].t[end]
                     couldSolve = false
                     break 
                 end
 
+                sqErr += calcSqErrVal(solArray[k], solCompare, t_max_ss)
                 k += 1
+                GC.gc(); GC.gc(); GC.gc()
             end
         end
 
     elseif simulateSS == false
         nExperimentalCond = Int64(length(firstExpIds))
-        tMaxArray = Array{Float64, 1}(undef, nExperimentalCond)
-        solArraySolver = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nExperimentalCond)
 
         for i in eachindex(firstExpIds)
             firstExpId = firstExpIds[i]
             t_max = getTimeMax(measurementData, firstExpId)
-            tMaxArray[i] = t_max
-            solArraySolver[i] = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max, tSave=solArray[i].t)
+            solCompare = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max, tSave=solArray[i].t)
 
-            if isinf(t_max) && solArraySolver[i].retcode != :Terminated
+            if isinf(t_max) && solCompare.retcode != :Terminated
                 couldSolve = false
                 break
             end
-            if !isinf(t_max) && !(solArraySolver[i].retcode == :Success && solArraySolver[i].t[end] == solArray[i].t[end])
+            if !isinf(t_max) && !(solCompare[i].retcode == :Success && solCompare[i].t[end] == solArray[i].t[end])
                 couldSolve = false
                 break 
             end
+
+            sqErr += calcSqErrVal(solArray[i], solCompare, t_max)
         end
     end
 
     if couldSolve == false
         return Inf
-    end
-
-    sqErr::Float64 = 0.0
-    for i in eachindex(solArray)
-        solI = solArraySolver[i]
-        solIHigh = solArray[i]
-
-        if isinf(tMaxArray[i])
-            # Only match end point when data i matched against steady state value 
-            # TODO : Fix if some data points for experiment are not inf 
-            sqErrI = sum((solIHigh.u[end] .- solI.u[end]).^2)
-        elseif length(solI.t) != length(solIHigh.t)
-            # This likelly happens due to events in the solution 
-            sqErrI = sum((Array(solI(solIHigh.t)) - Array(solIHigh)).^2)
-            sqErrI -= sum((Array(solIHigh(solIHigh.t)) - Array(solIHigh)).^2) # Protect against interpolation errors with events 
-        else
-            sqErrI = sum((solI[:,:] - solIHigh[:,:]).^2)
-            sqErrI -= sum((Array(solIHigh(solIHigh.t)) - Array(solIHigh)).^2) # Protect against interpolation errors with events 
-        end
-
-        sqErr += sqErrI
     end
 
     return sqErr
