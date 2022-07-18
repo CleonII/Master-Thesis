@@ -1,3 +1,5 @@
+# Evaluate hessian for Ipopt. Notice, the calc_hess function requires input on the 
+# format (hessian, inputVec). 
 function eval_h(x_arg::Vector{Float64}, 
                 rows::Vector{Int32}, 
                 cols::Vector{Int32}, 
@@ -32,6 +34,7 @@ function eval_h(x_arg::Vector{Float64},
     end
     return
 end
+# In case user does not want to employ a hessian 
 function eval_h_empty(x_arg::Vector{Float64}, 
                       rows::Vector{Int32}, 
                       cols::Vector{Int32}, 
@@ -46,7 +49,7 @@ end
 function eval_g(x::Vector{Float64}, g::Vector{Float64})
     return 
 end
-# Callback for Ipopt 
+# Callback for Ipopt allowing the number of iterations to be extracted from the solver
 function intermediate(alg_mod::Cint,
                       iter_count::Cint,
                       obj_value::Float64,
@@ -65,6 +68,8 @@ function intermediate(alg_mod::Cint,
 end
 
 
+# Create an ipopt struct to run Ipopt with provided lower and upper bounds for the parameters. 
+# Furthermore, decide whether or not to have a user provided hessian.
 function createIpoptProb(fPre::Function, fGradPre::Function, fHessPre::Function, lowerBounds, upperBounds; emptyH::Bool=false)
 
     nParam = length(lowerBounds)
@@ -83,10 +88,36 @@ function createIpoptProb(fPre::Function, fGradPre::Function, fHessPre::Function,
 
     m = 0
     nParamHess = Int(nParam*(nParam + 1) / 2)
+    # No inequality constraints assumed 
     g_L = Float64[]
-    g_U = Float64[]
+    g_U = Float64[] 
     prob = Ipopt.CreateIpoptProblem(nParam, lowerBounds, upperBounds, m, g_L, g_U, 0, nParamHess, fUse, eval_g, fGradUse, eval_jac_g, evalHUse)
     Ipopt.SetIntermediateCallback(prob, intermediateUse) # Allow iterations to be retrevied 
+
+    return prob, iterArr
+end
+
+function createIpoptProbNew(fPre, fGradPre, fHessPre, lowerBounds, upperBounds; emptyH::Bool=false)
+
+    nParam = length(lowerBounds)
+    if emptyH == false
+        evalHUse = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, fHessPre)
+    else
+        evalHUse = eval_h_empty
+    end
+
+    iterArr = ones(Int64, 1) .* 20
+    intermediateUse = (alg_mod, iter_count, obj_value, inf_pr, inf_du, mu, d_norm, regularization_size, alpha_du, alpha_pr, ls_trials) -> intermediate(alg_mod, iter_count, obj_value, inf_pr, inf_du, mu, d_norm, regularization_size, alpha_du, alpha_pr, ls_trials, iterArr)
+
+    m = 0
+    nParamHess = Int(nParam*(nParam + 1) / 2)
+    # No inequality constraints assumed 
+    g_L = Float64[]
+    g_U = Float64[] 
+    prob = Ipopt.CreateIpoptProblem(nParam, lowerBounds, upperBounds, m, g_L, g_U, 0, nParamHess, fPre, eval_g, fGradPre, eval_jac_g, evalHUse)
+    Ipopt.SetIntermediateCallback(prob, intermediateUse) # Allow iterations to be retrevied 
+
+    println("Hello")
 
     return prob, iterArr
 end
