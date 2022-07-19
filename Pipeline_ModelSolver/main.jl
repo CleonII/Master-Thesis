@@ -11,6 +11,8 @@ allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipelin
         joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels"))
 
 
+Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
+
 function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile)
     
     nonStiffHiAccSolver, stiffHiAccSolver = hiAccSolvers
@@ -66,7 +68,7 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     end
 
     alg_solvers, alg_hints = solvers
-    alg_solvers = [DP5()]
+    alg_solvers = [Rodas4P()]
     for alg_solver in alg_solvers
         println("Alg_solver = ", alg_solver)
         if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) # Crashes 
@@ -277,7 +279,6 @@ for modelFile in modelListUse
 end
 =#
 
-
 dirSave = pwd() * "/Intermediate/ODESolvers/"
 if !isdir(dirSave)
     mkpath(dirSave)
@@ -290,6 +291,7 @@ modelListUse = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "mo
     "model_Isensee_JCB2018.jl", "model_Laske_PLOSComputBiol2019.jl", "model_Lucarelli_CellSystems2018.jl", "model_Okuonghae_ChaosSolitonsFractals2020.jl", 
     "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", "model_Raimundez_PCB2020.jl", 
     "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
+
 
 for i in eachindex(modelListUse)
     println("Starting with a new model")

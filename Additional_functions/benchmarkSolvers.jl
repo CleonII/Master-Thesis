@@ -558,10 +558,10 @@ function solveOdeSS(prob::ODEProblem,
     # Check wheter a solver or alg-hint is provided 
     if typeof(solver) <: Vector{Symbol} # In case an Alg-hint is provided 
         solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), dense=false)
-        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec, dense=dense)
+        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
     else
         solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), dense=false)
-        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec, dense=dense)
+        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
     end
 
     changeToCondUse!(prob.p, prob.u0, firstExpId)
@@ -586,11 +586,11 @@ function solveOdeSS(prob::ODEProblem,
 end
 # For an experimental condition solve the where first a pre-simulation is not performed. 
 # Ultimately, if provided by the user the solution can be saved at the points tSave. 
-function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64, solver, t_max::Float64; tSave=Float64[], nTSave::Int64=0, denseArg=denseArg)
+function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64, solver, t_max::Float64; tSave=Float64[], nTSave::Int64=0, denseArg=true)
 
     changeToCondUse!(prob.p, prob.u0, firstExpId)
-    prob = remake(prob, tspan=(0.0, t_max))
-    t_max = prob.tspan[2]
+    probUse = remake(prob, tspan=(0.0, t_max))
+    t_max = probUse.tspan[2]
 
     # Check that for no clash between number of data-points to save tSave (only one can be activate)    
     if length(tSave) != 0 && nTSave != 0
@@ -612,16 +612,16 @@ function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64
     if typeof(solver) <: Vector{Symbol} && isinf(t_max)
         solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
     elseif typeof(solver) <: Vector{Symbol} && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec, dense=dense)
+        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
     elseif !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
         solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
     elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, tstops=saveAtVec, saveat=saveAtVec, dense=dense)
+        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
     else
         println("Error : Solver option does not exist")        
     end
-    
-    sol = solveCall(prob)
+
+    sol = solveCall(probUse)
     return sol
 end
 
@@ -668,7 +668,6 @@ function calcSqErr(prob::ODEProblem,
     # Check if model can be solved (without using forced stops for integrator)
     solArrayTmp, sucess = solveOdeModelAllCond(prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, solver, denseArg=false)
     solArrayTmp = 0
-    GC.gc(); GC.gc(); GC.gc(); GC.gc()
     if sucess == false
         return Inf 
     end
@@ -693,7 +692,6 @@ function calcSqErr(prob::ODEProblem,
 
                 sqErr += calcSqErrVal(solArray[k], solCompare, t_max_ss)
                 k += 1
-                GC.gc(); GC.gc(); GC.gc()
             end
         end
 
@@ -709,7 +707,7 @@ function calcSqErr(prob::ODEProblem,
                 couldSolve = false
                 break
             end
-            if !isinf(t_max) && !(solCompare[i].retcode == :Success && solCompare[i].t[end] == solArray[i].t[end])
+            if !isinf(t_max) && !(solCompare.retcode == :Success && solCompare.t[end] == solArray[i].t[end])
                 couldSolve = false
                 break 
             end
