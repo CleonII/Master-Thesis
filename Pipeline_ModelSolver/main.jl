@@ -13,7 +13,7 @@ allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipelin
 
 Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
 
-function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile)
+function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile, solverList)
     
     nonStiffHiAccSolver, stiffHiAccSolver = hiAccSolvers
     println(modelFile)
@@ -42,7 +42,7 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     local hiAccSolArr
     local successHighAcc
     try 
-        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, nonStiffHiAccSolver, nTSave=100)
+        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver, nTSave=100)
     catch 
         hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver, nTSave=100)
     end
@@ -67,8 +67,13 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
         println("Done with high accuracy solver")
     end
 
-    alg_solvers, alg_hints = solvers
-    alg_solvers = [Rodas4P()]
+    if isempty(solverList)
+        alg_solvers, alg_hints = solvers
+    else
+        alg_solvers = solverList
+        alg_hints = []
+    end
+    
     for alg_solver in alg_solvers
         println("Alg_solver = ", alg_solver)
         if ~((modelFile == "model_Crauste_CellSystems2017.jl") && alg_solver == AutoTsit5(Rosenbrock23())) # Crashes 
@@ -180,10 +185,10 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
 end
 
 
-function modelSolverIterator(modelFunctionVector, modelFiles, solvers, hiAccSolvers, Tols, iterations, writefile)
+function modelSolverIterator(modelFunctionVector, modelFiles, solvers, hiAccSolvers, Tols, iterations, writefile, solverList)
     for (i, modelFile) in enumerate(modelFiles)
         modelFunction = modelFunctionVector[i]
-        return modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile)
+        return modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile, solverList)
     end
 end
 
@@ -237,7 +242,7 @@ function createCubeODESolver(nSamples, modelFile; solver=Rodas4P())
 end
 
 
-function main(; modelFiles=["all"], modelsExclude=[""], writefile::String="")
+function main(; modelFiles=["all"], modelsExclude=[""], writefile::String="", solverList=[])
     readPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
     writePath = joinpath(pwd(), "Pipeline_ModelSolver", "IntermediaryResults")
 
@@ -262,7 +267,7 @@ function main(; modelFiles=["all"], modelsExclude=[""], writefile::String="")
     tolList = getTolerances(onlyMaxTol = false) # Get tolerances = [1e-6, 1e-9, 1e-12]
     iterations = 3
     
-    return modelSolverIterator(usedModelFunctionVector, modelFiles, solvers, hiAccSolvers, tolList, iterations, writefile)
+    return modelSolverIterator(usedModelFunctionVector, modelFiles, solvers, hiAccSolvers, tolList, iterations, writefile, solverList)
 end
 
 
@@ -284,18 +289,27 @@ if !isdir(dirSave)
     mkpath(dirSave)
 end
 fileSave = dirSave * "Benchmark_no_dense.csv"
+
 modelListUse = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model_Schwen_PONE2014.jl", "model_Alkan_SciSignal2018.jl", 
     "model_Bachmann_MSB2011.jl", "model_Bertozzi_PNAS2020.jl", "model_Blasi_CellSystems2016.jl", "model_Boehm_JProteomeRes2014.jl", 
     "model_Borghans_BiophysChem1997.jl", "model_Brannmark_JBC2010.jl", "model_Bruno_JExpBot2016.jl", "model_Crauste_CellSystems2017.jl", 
     "model_Elowitz_Nature2000.jl", "model_Fiedler_BMC2016.jl", "model_Fujita_SciSignal2010.jl", "model_Giordano_Nature2020.jl", 
     "model_Isensee_JCB2018.jl", "model_Laske_PLOSComputBiol2019.jl", "model_Lucarelli_CellSystems2018.jl", "model_Okuonghae_ChaosSolitonsFractals2020.jl", 
-    "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", "model_Raimundez_PCB2020.jl", 
+    "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", 
     "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
 
+# "model_Raimundez_PCB2020.jl", 
+
+solverList = [ImplicitDeuflhardExtrapolation(threading = OrdinaryDiffEq.PolyesterThreads()), 
+              ImplicitHairerWannerExtrapolation(threading = OrdinaryDiffEq.PolyesterThreads()), 
+              ImplicitEulerExtrapolation(threading = OrdinaryDiffEq.PolyesterThreads()), 
+              ImplicitDeuflhardExtrapolation(), 
+              ImplicitHairerWannerExtrapolation(), 
+              ImplicitEulerExtrapolation()]
 
 for i in eachindex(modelListUse)
     println("Starting with a new model")
-    main(modelFiles=[modelListUse[i]], modelsExclude=["model_Chen_MSB2009.jl"], writefile=fileSave)
+    main(modelFiles=[modelListUse[i]], modelsExclude=["model_Chen_MSB2009.jl"], writefile=fileSave, solverList=solverList)
     GC.gc()
 end
 a = 1
