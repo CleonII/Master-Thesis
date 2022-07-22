@@ -13,7 +13,7 @@ allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipelin
 
 Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
 
-function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile, solverList)
+function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile, solverList, sparse::Bool)
     
     nonStiffHiAccSolver, stiffHiAccSolver = hiAccSolvers
     println(modelFile)
@@ -32,7 +32,7 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     firstExpIds, shiftExpIds, simulateSS, parameterNames, stateNames = getSimulationInfo(measurementData, sys)
     # Set up for first experimental condtition 
     changeToCondUse! = (pVec, u0Vec, expID) -> changeToCond!(pVec, u0Vec, expID, paramData, experimentalConditions, parameterNames, stateNames, paramMap, stateMap)
-    prob = ODEProblem(new_sys, stateMap, (0.0, 5e3), paramMap, jac=true)
+    prob = ODEProblem(new_sys, stateMap, (0.0, 5e3), paramMap, jac=true, sparse=sparse)
     prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0)) # Ensure everything is of proper data type (Float64)
 
     # Estimate ground truth
@@ -42,7 +42,7 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
     local hiAccSolArr
     local successHighAcc
     try 
-        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver, nTSave=100)
+        hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, nonStiffHiAccSolver, nTSave=100)
     catch 
         hiAccSolArr, successHighAcc = solveOdeModelAllCond(bfProb, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, 1e-15, stiffHiAccSolver, nTSave=100)
     end
@@ -185,10 +185,10 @@ function modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iter
 end
 
 
-function modelSolverIterator(modelFunctionVector, modelFiles, solvers, hiAccSolvers, Tols, iterations, writefile, solverList)
+function modelSolverIterator(modelFunctionVector, modelFiles, solvers, hiAccSolvers, Tols, iterations, writefile, solverList, sparse::Bool)
     for (i, modelFile) in enumerate(modelFiles)
         modelFunction = modelFunctionVector[i]
-        return modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile, solverList)
+        return modelSolver(modelFunction, modelFile, solvers, hiAccSolvers, Tols, iterations, writefile, solverList, sparse)
     end
 end
 
@@ -242,7 +242,7 @@ function createCubeODESolver(nSamples, modelFile; solver=Rodas4P())
 end
 
 
-function main(; modelFiles=["all"], modelsExclude=[""], writefile::String="", solverList=[])
+function main(; modelFiles=["all"], modelsExclude=[""], writefile::String="", solverList=[], sparse=false)
     readPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
     writePath = joinpath(pwd(), "Pipeline_ModelSolver", "IntermediaryResults")
 
@@ -267,7 +267,7 @@ function main(; modelFiles=["all"], modelsExclude=[""], writefile::String="", so
     tolList = getTolerances(onlyMaxTol = false) # Get tolerances = [1e-6, 1e-9, 1e-12]
     iterations = 3
     
-    return modelSolverIterator(usedModelFunctionVector, modelFiles, solvers, hiAccSolvers, tolList, iterations, writefile, solverList)
+    return modelSolverIterator(usedModelFunctionVector, modelFiles, solvers, hiAccSolvers, tolList, iterations, writefile, solverList, sparse)
 end
 
 
@@ -288,7 +288,6 @@ dirSave = pwd() * "/Intermediate/ODESolvers/"
 if !isdir(dirSave)
     mkpath(dirSave)
 end
-fileSave = dirSave * "Benchmark_no_dense.csv"
 
 modelListUse = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "model_Schwen_PONE2014.jl", "model_Alkan_SciSignal2018.jl", 
     "model_Bachmann_MSB2011.jl", "model_Bertozzi_PNAS2020.jl", "model_Blasi_CellSystems2016.jl", "model_Boehm_JProteomeRes2014.jl", 
@@ -298,18 +297,69 @@ modelListUse = ["model_Beer_MolBioSystems2014.jl", "model_Weber_BMC2015.jl", "mo
     "model_Oliveira_NatCommun2021.jl", "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl", 
     "model_SalazarCavazos_MBoC2020.jl", "model_Sneyd_PNAS2002.jl", "model_Zhao_QuantBiol2020.jl", "model_Zheng_PNAS2012.jl"]
 
-# "model_Raimundez_PCB2020.jl", 
 
-solverList = [ImplicitDeuflhardExtrapolation(threading = OrdinaryDiffEq.PolyesterThreads()), 
-              ImplicitHairerWannerExtrapolation(threading = OrdinaryDiffEq.PolyesterThreads()), 
-              ImplicitEulerExtrapolation(threading = OrdinaryDiffEq.PolyesterThreads()), 
-              ImplicitDeuflhardExtrapolation(), 
-              ImplicitHairerWannerExtrapolation(), 
-              ImplicitEulerExtrapolation()]
+if ARGS[1] == "Test_linsolve"
 
-for i in eachindex(modelListUse)
-    println("Starting with a new model")
-    main(modelFiles=[modelListUse[i]], modelsExclude=["model_Chen_MSB2009.jl"], writefile=fileSave, solverList=solverList)
-    GC.gc()
+    println("Starting testing different lin-solvers")
+
+    lSolver1 = RFLUFactorization()
+    lSolver2 = FastLUFactorization()
+    lSolver3 = KrylovJL_GMRES()
+
+    solverList1 = [RadauIIA5(), Rodas5(), Rodas4P(), QNDF(), CVODE_BDF(linear_solver=:Dense), CVODE_BDF(linear_solver=:GMRES), 
+                RadauIIA5(linsolve=lSolver1), Rodas5(linsolve=lSolver1), Rodas4P(linsolve=lSolver1), QNDF(linsolve=lSolver1),
+                RadauIIA5(linsolve=lSolver2), Rodas5(linsolve=lSolver2), Rodas4P(linsolve=lSolver2), QNDF(linsolve=lSolver2),
+                RadauIIA5(linsolve=lSolver3), Rodas5(linsolve=lSolver3), Rodas4P(linsolve=lSolver3), QNDF(linsolve=lSolver3)]
+    solverList2 = [ImplicitDeuflhardExtrapolation(threading = true), ImplicitHairerWannerExtrapolation(threading = true), ImplicitEulerExtrapolation(threading = true),
+                ImplicitDeuflhardExtrapolation(threading = false), ImplicitHairerWannerExtrapolation(threading = false), ImplicitEulerExtrapolation(threading = false),
+                ImplicitDeuflhardExtrapolation(threading = true, linsolve=lSolver2), ImplicitHairerWannerExtrapolation(threading = true, linsolve=lSolver2), ImplicitEulerExtrapolation(threading = true, linsolve=lSolver2),
+                ImplicitDeuflhardExtrapolation(threading = true, linsolve=lSolver3), ImplicitHairerWannerExtrapolation(threading = true, linsolve=lSolver3), ImplicitEulerExtrapolation(threading = true, linsolve=lSolver3), 
+                ImplicitDeuflhardExtrapolation(threading = false, linsolve=lSolver2), ImplicitHairerWannerExtrapolation(threading = false, linsolve=lSolver2), ImplicitEulerExtrapolation(threading = false, linsolve=lSolver2),
+                ImplicitDeuflhardExtrapolation(threading = false, linsolve=lSolver3), ImplicitHairerWannerExtrapolation(threading = false, linsolve=lSolver3), ImplicitEulerExtrapolation(threading = false, linsolve=lSolver3)]
+    solverList = vcat(solverList1, solverList2)
+
+    fileSave = dirSave * "Benchmark_linsolve.csv"
+    for i in eachindex(modelListUse)
+        println("Starting with a new model")
+        main(modelFiles=[modelListUse[i]], modelsExclude=["model_Chen_MSB2009.jl"], writefile=fileSave, solverList=solverList)
+        GC.gc()
+    end    
+
+    println("Done with linsolve benchmark")
 end
-a = 1
+
+
+if ARGS[1] == "Test_linsolve_sparse"
+
+    lSolver1 = KLUFactorization()
+    lSolver2 = KrylovJL_GMRES()
+
+    solverList = [RadauIIA5(), Rodas5(), Rodas4P(), QNDF(), CVODE_BDF(linear_solver=:GMRES), CVODE_BDF(linear_solver=:KLU),
+                RadauIIA5(linsolve=lSolver1), Rodas5(linsolve=lSolver1), Rodas4P(linsolve=lSolver1), QNDF(linsolve=lSolver1),
+                RadauIIA5(linsolve=lSolver2), Rodas5(linsolve=lSolver2), Rodas4P(linsolve=lSolver2), QNDF(linsolve=lSolver2)]
+
+    fileSave = dirSave * "Benchmark_linsolve_sparse.csv"
+    for i in eachindex(modelListUse)
+        println("Starting with a new model")
+        main(modelFiles=[modelListUse[i]], modelsExclude=["model_Chen_MSB2009.jl"], writefile=fileSave, solverList=solverList, sparse=true)
+        GC.gc()
+    end    
+
+    println("Done with linsolve sparse benchmark")
+
+end
+
+
+if ARGS[1] == "Standard_run"
+
+    fileSave = dirSave * "Benchmark_standard.csv"
+    for i in eachindex(modelListUse)
+        println("Starting with a new model")
+        main(modelFiles=[modelListUse[i]], modelsExclude=["model_Chen_MSB2009.jl"], writefile=fileSave, solverList=solverList, sparse=true)
+        GC.gc()
+    end    
+
+    println("Done with linsolve sparse benchmark")
+
+end
+
