@@ -54,18 +54,17 @@ gradUseF(p0, grad2)
 
 println(exp10.(p0))
 
-p0 .= paramVecEstTmp .+ 0.1
-
-evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVecEstTmp)) end
+evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
 hess = zeros(9, 9)
 hessApprox = zeros(9, 9)
 evalH(hess, p0)
 evalHessianApproxF(hessApprox, p0)
 
-#=
+
 ipoptProb, iterVec = createIpoptProbNew(evalF, evalGradF, evalH, lowerBounds, upperBounds)
 
-
+Random.seed!(12356)
+p0 = [rand(Uniform(lowerBounds[i], upperBounds[i])) for i in eachindex(lowerBounds)]
 Ipopt.AddIpoptStrOption(ipoptProb, "hessian_approximation", "exact")
 Ipopt.AddIpoptIntOption(ipoptProb, "print_level", 5)
 Ipopt.AddIpoptIntOption(ipoptProb, "max_iter", 500)
@@ -73,7 +72,7 @@ ipoptProb.x .= deepcopy(p0)
 cost = ipoptProb.eval_f(p0)
 sol_opt = Ipopt.IpoptSolve(ipoptProb)
 
-=#
+
 
 # For Bachman model 
 #=
