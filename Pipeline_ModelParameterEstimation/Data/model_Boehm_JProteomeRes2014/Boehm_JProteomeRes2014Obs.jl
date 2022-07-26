@@ -1,4 +1,4 @@
-function Boehm_JProteomeRes2014(u, t, dynPar, obsPar, paramData, observableId) 
+function Boehm_JProteomeRes2014(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
 
 	STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable= u 
 	Epo_degradation_BaF3, k_exp_hetero, k_exp_homo, k_imp_hetero, k_imp_homo, k_phos = dynPar 
@@ -35,4 +35,29 @@ function Boehm_JProteomeRes2014_t0!(u0Vec, paramVec)
 	dummyVariable = 0.0 
 
 	u0Vec .= STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable
+end
+
+function Boehm_JProteomeRes2014_sd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+
+	STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable= u 
+	Epo_degradation_BaF3, k_exp_hetero, k_exp_homo, k_imp_hetero, k_imp_homo, k_phos = dynPar 
+	ratio_C = paramData.paramVal[7] 
+	specC17_C = paramData.paramVal[11] 
+
+	if observableId == "pSTAT5A_rel" 
+		noiseParameter1_pSTAT5A_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		sdMod = noiseParameter1_pSTAT5A_rel 
+	end
+
+	if observableId == "pSTAT5B_rel" 
+		noiseParameter1_pSTAT5B_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		sdMod = noiseParameter1_pSTAT5B_rel 
+	end
+
+	if observableId == "rSTAT5A_rel" 
+		noiseParameter1_rSTAT5A_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		sdMod = noiseParameter1_rSTAT5A_rel 
+	end
+
+	return sdMod
 end

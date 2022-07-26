@@ -33,12 +33,12 @@ function crateFilesModel(modelName::String)
     sys, initialSpeciesValues, trueParameterValues = usedModelFunctionVector()
 
     # Read data on experimental conditions and parameter values 
-    experimentalConditions, measurementData, parameterBounds = readDataFiles(modelName)
+    experimentalConditions, measurementData, parameterBounds, observableData = readDataFiles(modelName, readObs=true)
     paramData = processParameterData(parameterBounds) # Model data in convient structure 
     firstExpIds, shiftExpIds, simulateSS, parameterNames, stateNames = getSimulationInfo(measurementData, sys)
 
     # Read file with observed values and put into struct 
-    obsData = processObsData(measurementData)
+    obsData = processObsData(measurementData, observableData)
     
     # Set up a stateMap and paramMap to map parameter correctly to the ODE model via ModellingToolkit
     paramMap = trueParameterValues    
@@ -46,14 +46,57 @@ function crateFilesModel(modelName::String)
     paramNames = [string(paramMap[i].first) for i in eachindex(paramMap)]
 
     # Set up to bookeeping of indices between observed and noise parameters in the large input vector 
-    isSd = [paramData.parameterID[i] in obsData.sdParamId for i in eachindex(paramData.parameterID)]
-    isDynamic = (paramData.shouldEst .&& .!isSd)
-    idParamDyn = paramData.parameterID[isDynamic]
-    idParamSd = paramData.parameterID[isSd]
+    iDynPar, iSdPar, iObsPar, idParamDyn, idSdParam, idObsParam = getIndicesParam(paramData, obsData)
     
     createObservebleFile(modelNameShort, readDataPath, stateNames, paramData, idParamDyn)
+
+    println("Done with observation file")
+    println("")
     
     createU0File(modelNameShort, readDataPath, paramData, string.(parameterNames), stateMap)
+
+    println("Done with u0 observation file")
+    println("")
+
+    createSdFile(modelNameShort, readDataPath, paramData, stateNames, idParamDyn)
+
+    println("Done with sd observation file")
+    println("")
+end
+
+
+# Helper function to identify all words with observable in a formula string 
+function getObsParamStr(measurmentFormula)
+    
+    # Find all words on the form observableParameter
+    obsWords = [ match.match for match in eachmatch(r"observableParameter[0-9]_\w+", measurmentFormula) ]
+    obsWordStr = ""
+    for i in eachindex(obsWords)
+        if i != length(obsWords) 
+            obsWordStr *= obsWords[i] * ", "
+        else
+            obsWordStr *= obsWords[i] 
+        end
+    end
+
+    return obsWordStr
+end
+
+
+function getNoiseParamStr(measurmentFormula)
+    
+    # Find all words on the form observableParameter
+    sdWords = [ match.match for match in eachmatch(r"noiseParameter[0-9]_\w+", measurmentFormula) ]
+    sdWordStr = ""
+    for i in eachindex(sdWords)
+        if i != length(sdWords) 
+            sdWordStr *= sdWords[i] * ", "
+        else
+            sdWordStr *= sdWords[i] 
+        end
+    end
+
+    return sdWordStr
 end
 
 
@@ -65,7 +108,7 @@ function createObservebleFile(modelNameShort, readDataPath, stateNames, paramDat
     io = open(readDataPath * "/" * modelNameShort * "Obs.jl", "w")
     
     # Write funciton header 
-    write(io, "function " * modelNameShort * "(u, t, dynPar, obsPar, paramData, observableId) \n")
+    write(io, "function " * modelNameShort * "(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) \n")
 
     # Construct string to extract states
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
@@ -104,6 +147,13 @@ function createObservebleFile(modelNameShort, readDataPath, stateNames, paramDat
         # Each observebleID falls below its own if-statement 
         strObserveble *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
         tmpFormula = filter(x -> !isspace(x), String(observableDatas[i, "observableFormula"]))
+
+        # Extract observable parameters 
+        obsParam = getObsParamStr(tmpFormula)
+        if !isempty(obsParam)
+            strObserveble *= "\t\t" * obsParam * " = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)\n" 
+        end 
+
         juliaFormula = obsFormulaToJulia(tmpFormula, stateNames, paramData, idParamDyn)
         strObserveble *= "\t\t" * "yMod = " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
@@ -139,7 +189,7 @@ function createU0File(modelNameShort, readDataPath, paramData::ParamData, idPara
     for i in eachindex(stateMap)
         stateName = stateNames[i]
         stateExp = replace(string(stateMap[i].second), " " => "")
-        stateFormula = obsFormulaToJulia(stateExp, stateNames, paramData, paramData.parameterID)
+        stateFormula = obsFormulaToJulia(stateExp, stateNames, paramData, idParam)
         stateExpWrite *= "\t" * stateName * " = " * stateFormula * "\n"
     end
     write(io, stateExpWrite * "\n")
@@ -154,6 +204,73 @@ function createU0File(modelNameShort, readDataPath, paramData::ParamData, idPara
 
     # Close file 
     strClose = "\nend"
+    write(io, strClose)
+    close(io)
+end
+
+
+# Create a function for any noise parameters 
+function createSdFile(modelNameShort, readDataPath, paramData::ParamData, stateNames, idParamDyn)
+
+    observableDatas = CSV.read(joinpath(readDataPath, "observables_" * modelNameShort * ".tsv"), DataFrame)
+
+    io = open(readDataPath * "/" * modelNameShort * "Obs.jl", "a")
+
+    # Write funciton header 
+    write(io, "\n\nfunction " * modelNameShort * "_sd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) \n")
+
+    # Construct string to extract states
+    stateNamesShort = replace.(string.(stateNames), "(t)" => "")
+    stateStr = "\n\t"
+    for i in eachindex(stateNamesShort)
+        stateStr *= stateNamesShort[i] * ", "
+    end
+    stateStr = stateStr[1:end-2]
+    stateStr *= "= u \n"
+    write(io, stateStr)
+
+    # Construct string extracting dynPar (dynamic parameter to be estimated)
+    paramDynStr = "\t"
+    for i in eachindex(idParamDyn)
+        paramDynStr *= idParamDyn[i] * ", "
+    end
+    paramDynStr = paramDynStr[1:end-2]
+    paramDynStr *= " = dynPar \n"
+    write(io, paramDynStr)
+
+    # String to extract constant parameters. To prevent cluttering only the constant parameters 
+    # are extracted in the file. 
+    paramConstStr = ""
+    for i in eachindex(paramData.parameterID)
+        if paramData.shouldEst[i] == false
+            paramConstStr *= "\t" * paramData.parameterID[i] * "_C = paramData.paramVal[" * string(i) *"] \n" 
+        end
+    end
+    paramConstStr *= "\n"
+    write(io, paramConstStr)
+
+    # Fix the observeble formulas 
+    observableIDs = String.(observableDatas[!, "observableId"])
+    strObserveble = ""
+    for i in eachindex(observableIDs)
+        # Each observebleID falls below its own if-statement 
+        strObserveble *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
+        tmpFormula = filter(x -> !isspace(x), String(observableDatas[i, "noiseFormula"]))
+
+        # Extract noise parameters 
+        noiseParam = getNoiseParamStr(tmpFormula)
+        if !isempty(noiseParam)
+            strObserveble *= "\t\t" * noiseParam * " = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)\n" 
+        end 
+
+        juliaFormula = obsFormulaToJulia(tmpFormula, stateNames, paramData, idParamDyn)
+        strObserveble *= "\t\t" * "sdMod = " * juliaFormula * "\n"
+        strObserveble *= "\tend\n\n"
+    end
+    write(io, strObserveble)
+
+    # Close file 
+    strClose = "\treturn sdMod\nend"
     write(io, strClose)
     close(io)
 end
@@ -184,8 +301,15 @@ function translateTermObsFunc(termTranslate::String,
     if termTranslate in listOperations
         strAdd *= listOperations[termTranslate .== listOperations]
     end
+    if length(termTranslate) >= 19 && termTranslate[1:19] == "observableParameter"
+        strAdd *= termTranslate
+    end
+    if length(termTranslate) >= 14 && termTranslate[1:14] == "noiseParameter"
+        strAdd *= termTranslate
+    end
 
     if isempty(strAdd)
+        println(idParamDyn)
         println("Warning : When creating observation function $termTranslate could not be processed")
     end
 
@@ -207,8 +331,6 @@ function getWord(str, iStart, charListTerm)
     # If the first character is a numberic the termination occurs when 
     # the first non-numeric character (or not dot) is reached. 
     isNumericStart = isnumeric(str[i])
-
-    println("str = $str")
 
     while i <= length(str)
         if !(str[i] in charListTerm) 
@@ -252,50 +374,10 @@ function obsFormulaToJulia(formulaObs::String, stateNames, paramData::ParamData,
     return strFormula
 end
 
+
+# "model_Bachmann_MSB2011"
+# "model_Boehm_JProteomeRes2014"
 crateFilesModel("model_Boehm_JProteomeRes2014")
 
 
 
-
-#=
-function Boehm_JProteomeRes2014(u, t, dynPar, obsPar, paramData, observableId) 
-
-	STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable= u 
-	Epo_degradation_BaF3, k_exp_hetero, k_exp_homo, k_imp_hetero, k_imp_homo, k_phos= dynPar 
-	ratio_C = paramData.paramVal[7] 
-	specC17_C = paramData.paramVal[11] 
-
-	if observableId == "pSTAT5A_rel" 
-		yMod = ( 100 * pApB + 200 * pApA * specC17_C ) / ( pApB + STAT5A * specC17_C + 2 * pApA * specC17_C ) 
-	end
-
-	if observableId == "pSTAT5B_rel" 
-		yMod = - ( 100 * pApB - 200 * pBpB * ( specC17_C - 1 ) ) / ( ( STAT5B * ( specC17_C - 1 ) - pApB ) + 2 * pBpB * ( specC17_C - 1 ) ) 
-	end
-
-	if observableId == "rSTAT5A_rel" 
-		yMod = ( 100 * pApB + 100 * STAT5A * specC17_C + 200 * pApA * specC17_C ) / ( 2 * pApB + STAT5A * specC17_C + 2 * pApA * specC17_C - STAT5B * ( specC17_C - 1 ) - 2 * pBpB * ( specC17_C - 1 ) ) 
-	end
-
-	return yMod
-end
-
-
-function Boehm_JProteomeRes2014_t0!(u0Vec, paramVec) 
-
-	k_exp_hetero, Epo_degradation_BaF3, k_exp_homo, k_phos, k_imp_homo, k_imp_hetero, specC17, ratio = paramVec
-
-	STAT5A = 207.6 * ratio
-    pApA = 0.0
-    nucpApB = 0.0
-    nucpBpB = 0.0
-    STAT5B = 207.6 - 207.6 * ratio
-    pApB = 0.0
-    nucpApA = 0.0
-    pBpB = 0.0
-    dummyVariable = 0.0
-		
-	u0Vec .= STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable
-end
-
-=#

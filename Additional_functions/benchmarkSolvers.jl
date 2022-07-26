@@ -16,18 +16,19 @@ end
 struct ObservedData{T1<:Array{<:AbstractFloat, 1}, 
                     T2<:Array{<:String, 1}, 
                     T3<:Array{<:Symbol, 1}}
+                    
 
     yObs::T1
-    noiseObs::T1
     tObs::T1
     observebleDd::T2
     conditionId::T2  # Sum of pre-eq + simulation-cond id 
-    sdParamId::T2
+    sdParams::T2
     transformData::T3 # Only done once 
+    obsParam::T2
 end
 
 
-function processObsData(measurementData::DataFrame)::ObservedData
+function processObsData(measurementData::DataFrame, observableData::DataFrame)::ObservedData
 
     # Process measurment data 
     yObs::Array{Float64, 1} = convert(Array{Float64, 1}, measurementData[!, "measurement"])
@@ -49,29 +50,41 @@ function processObsData(measurementData::DataFrame)::ObservedData
 
     # Noise parameters are either mapped to have a parameter ID, or set directly to their value if known.
     sdObs = String.(measurementData[!, "noiseParameters"])
-    sdId::Array{String, 1} = Array{String, 1}(undef, nObs)
-    sdVal::Array{Float64, 1} = Array{Float64, 1}(undef, nObs)
+    sdParams::Array{String, 1} = Array{String, 1}(undef, nObs)
     for i in eachindex(sdObs)
-        if isNumber(sdObs[i])
-            sdVal[i] = parse(Float64, sdObs[i])
-            sdId[i] = ""
+        if ismissing(sdObs[i])
+            sdParams[i] = ""
         else
-            sdVal[i] = 0.0
-            sdId[i] = sdObs[i]
+            sdParams[i] = sdObs[i]
+        end
+    end
+
+    # Handle observeble parameters (e.g scale, offset parmeters)
+    obsParamFile = measurementData[!, "observableParameters"]
+    obsParam = Array{String, 1}(undef, nObs)
+    for i in 1:nObs
+        if ismissing(obsParamFile[i])
+            obsParam[i] = ""
+        else
+            obsParam[i] = obsParamFile[i]
         end
     end
 
     # Whether or not data should be transformed or not 
-    if !("observableTransformation" in names(measurementData))
-        transformArr = [:lin for i in 1:nObs]
+    transformArr = Array{Symbol, 1}(undef, nObs)
+    if !("observableTransformation" in names(observableData))
+        transformArr .= [:lin for i in 1:nObs]
     else
-        transformArr = [Symbol(measurementData[i, "observableTransformation"]) for i in 1:nObs]
+        for i in 1:nObs
+            iRow = findfirst(x -> x == obsID[i], observableData[!, "observableId"])
+            transformArr[i] = Symbol(observableData[iRow, "observableTransformation"]) 
+        end
     end
 
     # Transform measurment data if given 
     transformObsOrDataArr!(yObs, transformArr)
 
-    return ObservedData(yObs, sdVal, tObs, obsID, conditionId, sdId, transformArr)
+    return ObservedData(yObs, tObs, obsID, conditionId, sdParams, transformArr, obsParam)
 end
 
 # Create paramData from parameter data. Putting everything into a struct 
@@ -138,6 +151,9 @@ end
 
 # Check if a string is a number. 
 function isNumber(a::String)
+    return tryparse(Float64, a) !== nothing
+end
+function isNumber(a::SubString{String})
     return tryparse(Float64, a) !== nothing
 end
 
@@ -224,7 +240,8 @@ function changeModelParam!(paramVec,
                            paramIdChange::Array{String, 1},
                            paramData::ParamData,
                            parameterNames, 
-                           paramMap)
+                           paramMap, 
+                           evalU0::Function)
 
     # Allow the code to propegate dual numbers for gradients 
     paramMapUse = convert.(Pair{Num, eltype(paramVec)}, paramMap)
@@ -234,17 +251,7 @@ function changeModelParam!(paramVec,
     for i in eachindex(paramIdChange)
         param = paramIdChange[i]
 
-        # Get value to change to 
-        valChangeTo= 0.0
-        
-        if findfirst(x -> x == paramIdChange[i], paramData.parameterID) != nothing
-            iVal = findfirst(x -> x == paramIdChange[i], paramData.parameterID)
-            valChangeTo = paramEstVec[iVal]
-        else
-            println("Error : Could not find the correct model parameter to change")
-            println("paramIdChange[i] = ", paramIdChange[i])
-        end
-
+        valChangeTo = paramEstVec[i]
         # Check for value to change to in parameter file 
         i_param = findfirst(x -> x == param, parameterNamesStr)
 
@@ -259,7 +266,7 @@ function changeModelParam!(paramVec,
     paramVec .= newVal
 
     # Update stateVec according to mapping in availble file 
-    Boehm_JProteomeRes2014_t0!(stateVec, paramVec) 
+    evalU0(stateVec, paramVec) 
     
     return nothing
 end
@@ -269,7 +276,8 @@ function changeToCondEst!(paramVec,
                           paramData::ParamData,
                           experimentalConditions::DataFrame,
                           parameterNames, 
-                          paramMap)
+                          paramMap, 
+                          evalU0::Function)
 
     # Allow the code to propegate dual numbers for gradients 
     paramMapUse = convert.(Pair{Num, eltype(paramVec)}, paramMap)
@@ -287,8 +295,10 @@ function changeToCondEst!(paramVec,
     parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
 
     # Change parameters (and states)
+    iParamChange = Array{Int64, 1}(undef, length(stateParamChange))
     for i in eachindex(stateParamChange)
         param = stateParamChange[i]
+        iParamChange[i] = findfirst(x -> x == param, string.(parameterNames))
 
         # Get value to change to 
         valChangeTo::Float64 = 0.0
@@ -313,8 +323,10 @@ function changeToCondEst!(paramVec,
     end
 
     newVal = ModelingToolkit.varmap_to_vars(paramMapUse, parameterNames)
-    paramVec .= newVal
-    Boehm_JProteomeRes2014_t0!(stateVec, paramVec) 
+    # To avoid a reset of parameter values only change the parameters that gouvern the behaviour of 
+    # an experimental state. 
+    paramVec[iParamChange] .= newVal[iParamChange]
+    evalU0(stateVec, paramVec) 
 
     return nothing
 end
@@ -323,7 +335,7 @@ end
 
 # Given a model name, e.g model_Beer_MolBioSystems2014.jl, read the associated PeTab files 
 # for the measurements, parameters and experimental conditions. 
-function readDataFiles(modelName)
+function readDataFiles(modelName; readObs::Bool=false)
 
     # Reading data for model
     modelNameShort = modelName[7:end]
@@ -333,7 +345,12 @@ function readDataFiles(modelName)
     measurementData = CSV.read(joinpath(readDataPath, "measurementData_" * dataEnding), DataFrame)
     parameterData = CSV.read(joinpath(readDataPath, "parameters_" * dataEnding), DataFrame)
 
-    return experimentalConditions, measurementData, parameterData
+    if readObs == true
+        observableData = CSV.read(joinpath(readDataPath, "observables_" * modelNameShort * ".tsv"), DataFrame)
+        return experimentalConditions, measurementData, parameterData, observableData
+    else
+        return experimentalConditions, measurementData, parameterData
+    end
 end
 
 
@@ -723,3 +740,116 @@ function calcSqErr(prob::ODEProblem,
     return sqErr
 end
     
+
+# For a model extract the relevant observeble parameters or sd-parameter for a given 
+# observation-id, simulation-condition and time-point.
+function getObsOrSdParam(vecParam,
+                         paramData::ParamData, 
+                         obsData::ObservedData, 
+                         observableId::String,
+                         simulationConditionId::String,
+                         t::Float64;
+                         getObsPar::Bool=true)
+
+    if getObsPar == true
+        idVec = getIdEst(obsData.obsParam, paramData)
+    else
+        idVec = getIdEst(obsData.sdParams, paramData)
+    end
+
+    nObs = length(obsData.tObs)
+    # Acquire which observation is being handled (for really large parameter files smarter data structs might be needed)
+    iUse = findfirst(x -> obsData.observebleDd[x] == observableId && obsData.conditionId[x] == simulationConditionId && obsData.tObs[x] == t, 1:nObs)
+    if isnothing(iUse)
+        println("Warning : Cannot identify an observation in getObsParam ")
+    end
+    if getObsPar == true && isempty(obsData.obsParam[iUse])
+        return nothing
+    elseif getObsPar == false && isempty(obsData.sdParams[iUse])
+        return nothing
+    end
+
+    if getObsPar == true
+        paramsRet = split(obsData.obsParam[iUse], ';')
+    else
+        paramsRet = split(obsData.sdParams[iUse], ';')
+    end
+
+    output = Array{eltype(vecParam), 1}(undef, length(paramsRet))
+    for i in eachindex(paramsRet)
+        # Hard coded constant number 
+        if isNumber(paramsRet[i])
+            output[i] = parse(Float64, paramsRet[i])
+
+        # Parameter to be estimated 
+        elseif paramsRet[i] in idVec
+            output[i] = vecParam[findfirst(x -> x == paramsRet[i], idVec)]
+        
+        # Constant parameter 
+        elseif paramsRet[i] in paramData.parameterID
+            output[i] = paramData.paramVal[findfirst(x -> x == paramsRet[i], paramData.parameterID)]
+        else
+            println("Warning : cannot find matching for ", paramsRet[i])
+        end
+    end
+
+    if length(output) == 1
+        return output[1]
+    else
+        return output
+    end
+end
+
+
+# Get the id of the obs-param which should be estimated (not treated as constants)
+function getIdEst(idsInStr::Array{String, 1}, paramData::ParamData)
+    idVec = String[]
+
+    for i in eachindex(idsInStr)
+        if isempty(idsInStr[i])
+            continue
+        else
+            idsInStrSplit = split(idsInStr[i], ';')
+            for idInStr in idsInStrSplit
+
+                # Disregard Id if parameters should not be estimated, or 
+                iParam = findfirst(x -> x == idInStr, paramData.parameterID)
+                if isNumber(idInStr)
+                    continue
+                elseif isnothing(iParam)                    
+                    println("Warning : param $idInStr could not be found in parameter file")
+                elseif idInStr in idVec
+                    continue
+                elseif paramData.shouldEst[iParam] == false
+                    continue
+                else
+                    idVec = vcat(idVec, idInStr)
+                end
+            end
+        end
+    end
+
+    return idVec
+end
+
+
+# Create indices for dynamic, observed and sd parameters 
+function getIndicesParam(paramData::ParamData, obsData::ObservedData)
+
+    idObsParam = getIdEst(obsData.obsParam, paramData)
+    isObsParam = [paramData.parameterID[i] in idObsParam for i in eachindex(paramData.parameterID)]
+
+    # Set up to bookeeping of indices between observed and noise parameters in the large input vector 
+    idSdParam = getIdEst(obsData.sdParams, paramData)
+    isSd = [paramData.parameterID[i] in idSdParam for i in eachindex(paramData.parameterID)]
+
+    isDynamic = (paramData.shouldEst .&& .!isSd .&& .!isObsParam)
+    idParamDyn = paramData.parameterID[isDynamic]
+    
+    # Index vector for the dynamic and sd parameters 
+    iDynPar = 1:length(idParamDyn)
+    iSdPar = (length(idParamDyn)+1):(length(idParamDyn) + length(idSdParam))
+    iObsPar = (length(idParamDyn) + length(idSdParam) + 1):(length(idParamDyn) + length(idSdParam) + length(idObsParam))
+
+    return iDynPar, iSdPar, iObsPar, idParamDyn, idSdParam, idObsParam
+end
