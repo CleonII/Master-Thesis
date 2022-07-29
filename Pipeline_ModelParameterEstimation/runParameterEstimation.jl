@@ -26,8 +26,8 @@ include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "CommonParameterEst
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "PeTabImporter.jl"))
 
 # Observation function, needs to be generalised 
-include("/home/sebpe/Dropbox/PhD/Projects/Master-Thesis/Pipeline_ModelParameterEstimation/Data/model_Boehm_JProteomeRes2014/Boehm_JProteomeRes2014Obs.jl")
-include("/home/sebpe/Dropbox/PhD/Projects/Master-Thesis/Pipeline_ModelParameterEstimation/Data/model_Bachmann_MSB2011/Bachmann_MSB2011Obs.jl")
+include(pwd() * "/Pipeline_ModelParameterEstimation/Data/model_Boehm_JProteomeRes2014/Boehm_JProteomeRes2014Obs.jl")
+include(pwd() * "/Pipeline_ModelParameterEstimation/Data/model_Bachmann_MSB2011/Bachmann_MSB2011Obs.jl")
 
 allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")), 
         joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels"))

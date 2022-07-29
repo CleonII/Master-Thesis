@@ -435,3 +435,50 @@ function calcLogLikNotSolveODE(dynamicParamEst,
 end
 
 
+# Calculate an approximation of the hessian where the interaction terms between observeble and 
+# dynamic parameters is assumed to be zero. 
+function calcHessianApprox!(hessian, 
+                            paramVecEst, 
+                            prob::ODEProblem,  
+                            solArray::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
+                            conditionIdSol::Array{String, 1},
+                            changeModelParamUse!::Function,
+                            solveOdeModelAllCondUse!::Function,
+                            obsData::ObservedData,
+                            iDynPar, 
+                            iSdPar, 
+                            iObsPar,
+                            idParamDyn, 
+                            paramData::ParamData, 
+                            idParamSd::Array{String, 1}, 
+                            idParamObs, 
+                            evalObs, 
+                            evalSd)
+
+    # Avoid incorrect non-zero values 
+    hessian .= 0.0
+
+    dynamicParamEst = paramVecEst[iDynPar]
+    obsPar = paramVecEst[iObsPar]
+    sdParamEst = paramVecEst[iSdPar]
+
+    nonDynPar = vcat(sdParamEst, obsPar)
+    iSdUse = 1:length(sdParamEst)
+    iObsUse = (length(sdParamEst)+1):(length(sdParamEst) + length(obsPar))
+
+    calcCostDyn = (x) -> calcLogLikSolveOdeGrad(x, sdParamEst, obsPar, prob, solArray, conditionIdSol, obsData, solveOdeModelAllCondUse!, paramData, changeModelParamUse!, idParamDyn, idParamSd, idParamObs, evalObs, evalSd)
+    hessian[iDynPar, iDynPar] .= ForwardDiff.hessian(calcCostDyn, dynamicParamEst)
+
+    # To get types correct a reasonable solArray is needed, could in future create specific solArray from cost function evaluation and another for gradient 
+    dynParamSolve = deepcopy(dynamicParamEst)
+    transformVector!(dynParamSolve, idParamDyn, paramData)
+    probUse = remake(prob, p = convert.(eltype(dynParamSolve), prob.p), u0 = convert.(eltype(dynParamSolve), prob.u0))
+    changeModelParamUse!(probUse.p, probUse.u0, dynParamSolve, idParamDyn)
+    solveOdeModelAllCondUse!(solArray, conditionIdSol, probUse)
+
+    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], solArray, conditionIdSol, obsData, paramData, idParamSd, idParamDyn, idParamObs, evalObs, evalSd, calcObsGrad=false)
+    hessian[vcat(iSdPar, iObsPar), vcat(iSdPar, iObsPar)] .= ForwardDiff.hessian(calcCostNonDyn, nonDynPar)
+
+end
+
+
