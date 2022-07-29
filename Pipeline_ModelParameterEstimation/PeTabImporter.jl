@@ -13,6 +13,27 @@ function transformVector!(parameterVec, parameterId::Array{String, 1}, paramData
         end
     end
 end
+function transformVector(parameterVec, parameterId::Array{String, 1}, paramData::ParamData; revTransform::Bool=false)
+    
+    shouldTransform = zeros(Float64, length(parameterVec))
+    shouldNotTransform = ones(Float64, length(parameterVec))
+    for i in eachindex(parameterVec)
+        iParam = findfirst(x -> x == parameterId[i], paramData.parameterID)
+        if isnothing(iParam)
+            println("Warning : Could not find paramID for $parameterId")
+        end
+        if paramData.logScale[iParam]
+            shouldTransform[i] = 1.0
+            shouldNotTransform[i] = 0.0
+        end
+    end
+
+    if revTransform == false
+        return exp10.(parameterVec) .* shouldTransform .+ parameterVec .* shouldNotTransform
+    else
+        return log10.(parameterVec) .* shouldTransform .+ parameterVec .* shouldNotTransform
+    end
+end
 
 
 # TODO : Add support for obsPar (parameters that aren't noise parameter but present in observation function)
@@ -190,7 +211,7 @@ function calcLogLik(dynamicParamEst,
 
     # Setup yMod and fill each location 
     nStates = length(solArray[1].prob.u0)   
-    if !isempty(obsPar) && typeof(obsPar[1]) <: ForwardDiff.Dual
+    if !isempty(obsPar) && !(typeof(obsPar[1]) <: AbstractFloat)
         yMod = Array{eltype(obsPar), 1}(undef, length(obsData.yObs))
     else
         yMod = Array{eltype(dynamicParamEst), 1}(undef, length(obsData.yObs))
@@ -198,18 +219,10 @@ function calcLogLik(dynamicParamEst,
     for i in eachindex(yMod)
         whichForwardSol = findfirst(x -> x == obsData.conditionId[i], conditionIdSol)
         t = obsData.tObs[i]
-
-        # Allow the code to correctly propagate dual numbers for gradients
-        if calcObsGrad == true
-            simVal = [solArray[whichForwardSol](t)[i].value for i in 1:nStates]
-            if typeof(simVal[1]) <: ForwardDiff.Dual
-                simVal = [solArray[whichForwardSol](t)[i].value for i in 1:nStates]
-            end
-        else
-            simVal = solArray[whichForwardSol](t)
-        end
+        simVal = solArray[whichForwardSol](t)
         yMod[i] = evalObs(simVal, t, dynamicParamEst, obsPar, paramData, obsData, obsData.observebleDd[i], obsData.conditionId[i]) 
     end
+
     # Transform model output if required
     transformObsOrDataArr!(yMod, obsData.transformData)
 
@@ -338,7 +351,7 @@ function calcGradCost!(grad,
     iObsUse = (length(sdParamEst)+1):(length(sdParamEst) + length(obsPar))
 
     calcCostDyn = (x) -> calcLogLikSolveOdeGrad(x, sdParamEst, obsPar, prob, solArray, conditionIdSol, obsData, solveOdeModelAllCondUse!, paramData, changeModelParamUse!, idParamDyn, idParamSd, idParamObs, evalObs, evalSd)
-    grad[iDynPar] .= ForwardDiff.gradient(calcCostDyn, dynamicParamEst)
+    @views ForwardDiff.gradient!(grad[iDynPar], calcCostDyn, dynamicParamEst)
 
     # Correctly transform parameters beofe generating the soluation arrary 
     dynParamSolve = deepcopy(dynamicParamEst)
@@ -348,7 +361,7 @@ function calcGradCost!(grad,
     solveOdeModelAllCondUse!(solArray, conditionIdSol, probUse)
 
     calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], solArray, conditionIdSol, obsData, paramData, idParamSd, idParamDyn, idParamObs, evalObs, evalSd, calcObsGrad=false)
-    grad[vcat(iSdPar, iObsPar)] .= ForwardDiff.gradient(calcCostNonDyn, nonDynPar)
+    @views ReverseDiff.gradient!(grad[vcat(iSdPar, iObsPar)], calcCostNonDyn, nonDynPar)
 end
 
 
@@ -376,7 +389,7 @@ function calcLogLikSolveOdeGrad(dynamicParamEst,
     obsParamEstUse = obsPar[:]
 
     # Correctly transform parameters within AD part of code 
-    transformVector!(dynamicParamEstUse, idParamDyn, paramData)
+    dynamicParamEstUse = transformVector(dynamicParamEstUse, idParamDyn, paramData)
     transformVector!(sdParamEstUse, idParamSd, paramData)
     transformVector!(obsParamEstUse, idParamObs, paramData)
 
@@ -413,190 +426,12 @@ function calcLogLikNotSolveODE(dynamicParamEst,
 
     # Correctly transform parameters within AD part of code 
     transformVector!(dynamicParamEstUse, idParamDyn, paramData)
-    transformVector!(sdParamEstUse, idParamSd, paramData)
-    transformVector!(obsParamEstUse, idParamObs, paramData)
+    sdParamEstUse = transformVector(sdParamEstUse, idParamSd, paramData)
+    obsParamEstUse = transformVector(obsParamEstUse, idParamObs, paramData)
 
     logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParamEstUse, solArray, conditionIdSol, obsData, paramData, idParamSd, evalObs, evalSd, calcObsGrad=calcObsGrad)
 
     return logLik
 end
 
-
-# Calculate an approximation of the hessian where the interaction terms between observeble and 
-# dynamic parameters is assumed to be zero. 
-function calcHessianApprox!(hessian, 
-                            paramVecEst, 
-                            prob::ODEProblem,  
-                            solArray::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
-                            conditionIdSol::Array{String, 1},
-                            changeModelParamUse!::Function,
-                            solveOdeModelAllCondUse!::Function,
-                            obsData::ObservedData,
-                            iDynPar, 
-                            iSdPar, 
-                            iObsPar,
-                            idParamDyn, 
-                            paramData::ParamData, 
-                            idParamSd::Array{String, 1}, 
-                            idParamObs, 
-                            evalObs, 
-                            evalSd)
-
-    # Avoid incorrect non-zero values 
-    hessian .= 0.0
-
-    dynamicParamEst = paramVecEst[iDynPar]
-    obsPar = paramVecEst[iObsPar]
-    sdParamEst = paramVecEst[iSdPar]
-
-    nonDynPar = vcat(sdParamEst, obsPar)
-    iSdUse = 1:length(sdParamEst)
-    iObsUse = (length(sdParamEst)+1):(length(sdParamEst) + length(obsPar))
-
-    calcCostDyn = (x) -> calcLogLikSolveOdeGrad(x, sdParamEst, obsPar, prob, solArray, conditionIdSol, obsData, solveOdeModelAllCondUse!, paramData, changeModelParamUse!, idParamDyn, idParamSd, idParamObs, evalObs, evalSd)
-    hessian[iDynPar, iDynPar] .= ForwardDiff.hessian(calcCostDyn, dynamicParamEst)
-    
-    # To get types correct a reasonable solArray is needed, could in future create specific solArray from cost function evaluation and another for gradient 
-    dynParamSolve = deepcopy(dynamicParamEst)
-    transformVector!(dynParamSolve, idParamDyn, paramData)
-    probUse = remake(prob, p = convert.(eltype(dynParamSolve), prob.p), u0 = convert.(eltype(dynParamSolve), prob.u0))
-    changeModelParamUse!(probUse.p, probUse.u0, dynParamSolve, idParamDyn)
-    solveOdeModelAllCondUse!(solArray, conditionIdSol, probUse)
-
-    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], solArray, conditionIdSol, obsData, paramData, idParamSd, idParamDyn, idParamObs, evalObs, evalSd, calcObsGrad=false)
-    hessian[vcat(iSdPar, iObsPar), vcat(iSdPar, iObsPar)] .= ForwardDiff.hessian(calcCostNonDyn, nonDynPar)
-
-end
-
-
-function testOptimizerHessian(modelName, dirSave, solver, nEvals)
-
-
-    # Set up directory where to save results 
-    if !isdir(dirSave)
-        mkpath(dirSave)
-    end
-
-    # Set up paths for data files 
-    modelPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
-    modelNameShort = modelName[7:end]
-    modelFile = modelName * ".jl" 
-    methodPath = joinpath(pwd(), "Pipeline_ModelParameterEstimation", modelName)
-    # Reading data for model
-    readDataPath = joinpath(pwd(), "Pipeline_ModelParameterEstimation", "Data", modelName)
-    dataEnding = modelNameShort * ".tsv"
-    experimentalConditions = CSV.read(joinpath(readDataPath, "experimentalCondition_" * dataEnding), DataFrame)
-    measurementData = CSV.read(joinpath(readDataPath, "measurementData_" * dataEnding), DataFrame)
-    observables = CSV.read(joinpath(readDataPath, "observables_" * dataEnding), DataFrame)
-    parameterBounds = CSV.read(joinpath(readDataPath, "parameters_" * dataEnding), DataFrame)
-    allModelFiles = getModelFiles(modelPath)
-    usedModelFunction = allModelFunctionVector[[allModelFile in [modelFile] for allModelFile in allModelFiles]][1]
-
-    # Generate a cost function, inplace gradient function, in place hessian and lower and upper bounds 
-    fPre, fGradPre, fHessPre, lowerBounds, upperBounds = forwardAutomaticDifferentiation_hessian_proto_model_Boehm_JProteomeRes2014(usedModelFunction, solver, experimentalConditions, measurementData, observables, parameterBounds)
-    nParam = length(lowerBounds)
-
-    # Set up functions into a usable format for hupercube and get start-guesses
-    fCube = (x) -> fPre(x...)
-    fileSaveCube = dirSave * "Cube.csv"
-    createCube(1000, lowerBounds, upperBounds, fileSaveCube, fCube)
-    # Read cube 
-    cube = Matrix(CSV.read(fileSaveCube, DataFrame))
-
-    # Ipopt and Optim problem 
-    ipoptProb, iterArr = createIpoptProb(fPre, fGradPre, fHessPre, lowerBounds, upperBounds)
-    Ipopt.AddIpoptIntOption(ipoptProb, "print_level", 0)
-    Ipopt.AddIpoptIntOption(ipoptProb, "max_iter", 1000)
-    dfOpt, dfcOpt = createOptimProb(fPre, fGradPre, fHessPre, lowerBounds, upperBounds)
-
-    # Evaluate gradient + hessian (allow precompilation)
-    dfOpt.f(cube[1, :])
-    dfOpt.df(zeros(nParam), cube[1, :])
-    dfOpt.h(zeros(nParam, nParam), cube[1, :])
-
-    # Where to save results 
-    # Optim 
-    costOptim = zeros(Float64, nEvals)
-    nIterOptim = zeros(Int, nEvals)
-    retCodeOptim = Array{Any, 1}(undef, nEvals)
-    runTimeOptim = Array{Any, 1}(undef, nEvals)
-    # Ipopt 
-    costIpopt = zeros(Float64, nEvals)
-    nIterIpopt = zeros(Int, nEvals)
-    retCodeIpopt = Array{Any, 1}(undef, nEvals)
-    runTimeIpopt = Array{Any, 1}(undef, nEvals)
-    # Ipopt no hessian 
-    costIpoptBFGS = zeros(Float64, nEvals)
-    nIterIpoptBFGS = zeros(Int, nEvals)
-    retCodeIpoptBFGS = Array{Any, 1}(undef, nEvals)
-    runTimeIpoptBFGS = Array{Any, 1}(undef, nEvals)
-
-    fileSave = dirSave * "OptRes.csv"
-    for i in 1:nEvals
-
-        println("I = $i of $nEvals")
-
-        p0 = cube[i, :] # Sample from hypercube 
-        # Ipopt with hessian 
-        Ipopt.AddIpoptStrOption(ipoptProb, "hessian_approximation", "exact")
-        ipoptProb.x = deepcopy(p0)
-        benchRunTime = @elapsed  sol_opt = Ipopt.IpoptSolve(ipoptProb)
-        # Save relevant values 
-        costIpopt[i] = ipoptProb.obj_val
-        nIterIpopt[i] = iterArr[1]
-        retCodeIpopt[i] = ipoptProb.status
-        runTimeIpopt[i] = benchRunTime
-
-        # Ipopt without hessian 
-        Ipopt.AddIpoptStrOption(ipoptProb, "hessian_approximation", "limited-memory")
-        ipoptProb.x = deepcopy(p0)
-        benchRunTime = @elapsed  sol_opt = Ipopt.IpoptSolve(ipoptProb)
-        # Save relevant values 
-        costIpoptBFGS[i] = ipoptProb.obj_val
-        nIterIpoptBFGS[i] = iterArr[1]
-        retCodeIpoptBFGS[i] = ipoptProb.status
-        runTimeIpoptBFGS[i] = benchRunTime
-
-        # Optim with Hessian 
-        res = Optim.optimize(dfOpt, dfcOpt, p0, IPNewton(), Optim.Options(iterations = 1000, show_trace = false))
-        costOptim[i] = res.minimum
-        nIterOptim[i] = res.iterations
-        retCodeOptim[i] = res.f_converged
-        runTimeOptim[i] = res.time_run
-
-        # Save after each iteration (do not loose data)
-        dataSave = ["IpoptHess" costIpopt[i] runTimeIpopt[i] retCodeIpopt[i] nIterIpopt[i] i;
-                "IpoptBGFS" costIpoptBFGS[i] runTimeIpoptBFGS[i] retCodeIpoptBFGS[i] nIterIpoptBFGS[i] i;
-                "OptimInt" costOptim[i] runTimeOptim[i] retCodeOptim[i] nIterOptim[i] i]
-        dataSave = DataFrame(dataSave, ["Alg", "Cost", "Run_time", "Ret_code", "N_iter", "Start_guess"])
-        shouldAppend = isfile(fileSave) ? true : false
-        CSV.write(fileSave, dataSave, append=shouldAppend)
-    end
-end
-
-
-function genIpoptHess(modelName, solver)
-
-    # Set up paths for data files 
-    modelPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
-    modelNameShort = modelName[7:end]
-    modelFile = modelName * ".jl" 
-    methodPath = joinpath(pwd(), "Pipeline_ModelParameterEstimation", modelName)
-    # Reading data for model
-    readDataPath = joinpath(pwd(), "Pipeline_ModelParameterEstimation", "Data", modelName)
-    dataEnding = modelNameShort * ".tsv"
-    experimentalConditions = CSV.read(joinpath(readDataPath, "experimentalCondition_" * dataEnding), DataFrame)
-    measurementData = CSV.read(joinpath(readDataPath, "measurementData_" * dataEnding), DataFrame)
-    observables = CSV.read(joinpath(readDataPath, "observables_" * dataEnding), DataFrame)
-    parameterBounds = CSV.read(joinpath(readDataPath, "parameters_" * dataEnding), DataFrame)
-    allModelFiles = getModelFiles(modelPath)
-    usedModelFunction = allModelFunctionVector[[allModelFile in [modelFile] for allModelFile in allModelFiles]][1]
-
-    # Generate a cost function, inplace gradient function, in place hessian and lower and upper bounds 
-    fPre, fGradPre, fHessPre, lowerBounds, upperBounds = forwardAutomaticDifferentiation_hessian_proto_model_Boehm_JProteomeRes2014(usedModelFunction, solver, experimentalConditions, measurementData, observables, parameterBounds)
-    nParam = length(lowerBounds)
-
-    ipoptProb, iterArr = createIpoptProb(fPre, fGradPre, fHessPre, lowerBounds, upperBounds)
-    return ipoptProb, iterArr
-end
 

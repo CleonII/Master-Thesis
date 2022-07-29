@@ -41,7 +41,7 @@ function eval_h_empty(x_arg::Vector{Float64},
                       obj_factor::Float64, 
                       lambda::Vector{Float64}, 
                       values::Union{Nothing,Vector{Float64}})    
-    return
+    return nothing
 end
 function eval_jac_g(x::Vector{Float64}, rows::Vector{Int32}, cols::Vector{Int32}, values::Union{Nothing,Vector{Float64}})
     return 
@@ -68,36 +68,12 @@ function intermediate(alg_mod::Cint,
 end
 
 
-# Create an ipopt struct to run Ipopt with provided lower and upper bounds for the parameters. 
-# Furthermore, decide whether or not to have a user provided hessian.
-function createIpoptProb(fPre::Function, fGradPre::Function, fHessPre::Function, lowerBounds, upperBounds; emptyH::Bool=false)
-
-    nParam = length(lowerBounds)
-    fUse = (x) -> begin cost = fPre(x...); return cost end
-    fGradUse = (x, grad) -> begin fGradPre(grad, x...); return end
-    fHessUse = (hess, x) -> fHessPre(hess, x...)
-
-    if emptyH == false
-        evalHUse = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, fHessUse)
-    else
-        evalHUse = eval_h_empty
-    end
-
-    iterArr = ones(Int64, 1) .* 20
-    intermediateUse = (alg_mod, iter_count, obj_value, inf_pr, inf_du, mu, d_norm, regularization_size, alpha_du, alpha_pr, ls_trials) -> intermediate(alg_mod, iter_count, obj_value, inf_pr, inf_du, mu, d_norm, regularization_size, alpha_du, alpha_pr, ls_trials, iterArr)
-
-    m = 0
-    nParamHess = Int(nParam*(nParam + 1) / 2)
-    # No inequality constraints assumed 
-    g_L = Float64[]
-    g_U = Float64[] 
-    prob = Ipopt.CreateIpoptProblem(nParam, lowerBounds, upperBounds, m, g_L, g_U, 0, nParamHess, fUse, eval_g, fGradUse, eval_jac_g, evalHUse)
-    Ipopt.SetIntermediateCallback(prob, intermediateUse) # Allow iterations to be retrevied 
-
-    return prob, iterArr
-end
-
-function createIpoptProbNew(fPre, fGradPre, fHessPre, lowerBounds, upperBounds; emptyH::Bool=false)
+function createIpoptProbNew(fPre::Function, 
+                            fGradPre::Function, 
+                            fHessPre::Function, 
+                            lowerBounds::Array{<:AbstractFloat, 1}, 
+                            upperBounds::Array{<:AbstractFloat, 1}; 
+                            emptyH::Bool=false)
 
     nParam = length(lowerBounds)
     if emptyH == false
@@ -117,7 +93,30 @@ function createIpoptProbNew(fPre, fGradPre, fHessPre, lowerBounds, upperBounds; 
     prob = Ipopt.CreateIpoptProblem(nParam, lowerBounds, upperBounds, m, g_L, g_U, 0, nParamHess, fPre, eval_g, fGradPre, eval_jac_g, evalHUse)
     Ipopt.SetIntermediateCallback(prob, intermediateUse) # Allow iterations to be retrevied 
 
-    println("Hello")
+    if emptyH == true
+        Ipopt.AddIpoptStrOption(prob, "hessian_approximation", "limited-memory")
+    end 
+    Ipopt.AddIpoptIntOption(prob, "print_level", 0)
+    Ipopt.AddIpoptIntOption(prob, "max_iter", 1000)
 
     return prob, iterArr
+end
+
+
+function createOptimProb(fPre::Function, 
+                         fGradPre::Function, 
+                         fHessPre::Function, 
+                         lowerBounds::Array{<:AbstractFloat, 1}, 
+                         upperBounds::Array{<:AbstractFloat}; 
+                         showTrace::Bool=false)
+    
+    x0 = zeros(Float64, length(lowerBounds))
+    fGradUse = (grad, x) -> fGradPre(x, grad)
+    fHessUse = (hess, x) -> fHessPre(hess, x)
+    df = TwiceDifferentiable(fPre, fGradUse, fHessUse, x0)
+    dfc = TwiceDifferentiableConstraints(lowerBounds .- 0.01, upperBounds .+ 0.01)
+
+    evalOptim = (p0) -> Optim.optimize(df, dfc, p0, IPNewton(), Optim.Options(iterations = 1000, show_trace = showTrace))
+
+    return evalOptim
 end

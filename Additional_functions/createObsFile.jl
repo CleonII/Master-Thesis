@@ -155,7 +155,7 @@ function createObservebleFile(modelNameShort, readDataPath, stateNames, paramDat
         end 
 
         juliaFormula = obsFormulaToJulia(tmpFormula, stateNames, paramData, idParamDyn)
-        strObserveble *= "\t\t" * "yMod = " * juliaFormula * "\n"
+        strObserveble *= "\t\t" * "return " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
     end
     write(io, strObserveble)
@@ -377,7 +377,7 @@ end
 
 # "model_Bachmann_MSB2011"
 # "model_Boehm_JProteomeRes2014"
-crateFilesModel("model_Boehm_JProteomeRes2014")
+crateFilesModel("model_Bachmann_MSB2011")
 
 
 
