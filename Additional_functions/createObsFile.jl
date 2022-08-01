@@ -161,7 +161,7 @@ function createObservebleFile(modelNameShort, readDataPath, stateNames, paramDat
     write(io, strObserveble)
 
     # Close file 
-    strClose = "\treturn yMod\nend"
+    strClose = "end"
     write(io, strClose)
     close(io)
 end
@@ -264,13 +264,13 @@ function createSdFile(modelNameShort, readDataPath, paramData::ParamData, stateN
         end 
 
         juliaFormula = obsFormulaToJulia(tmpFormula, stateNames, paramData, idParamDyn)
-        strObserveble *= "\t\t" * "sdMod = " * juliaFormula * "\n"
+        strObserveble *= "\t\t" * "return " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
     end
     write(io, strObserveble)
 
     # Close file 
-    strClose = "\treturn sdMod\nend"
+    strClose = "end"
     write(io, strClose)
     close(io)
 end
