@@ -3,6 +3,10 @@
 # Number of species: 7
 function getODEModel_model_Weber_BMC2015()
 
+    ### Define constant parameters
+    cyt = 1.0
+    u2 = 0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t CERTERa(t) PI4K3B(t) CERT(t) CERTTGNa(t) PKDDAGa(t) PKD(t) PI4K3Ba(t)
 
@@ -13,7 +17,7 @@ function getODEModel_model_Weber_BMC2015()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters a21 m33 kb_NB142_70_dose a22 kb_NB142_70_time p12 p33 s31 PdBu_dose a12 p22 a33 p13 cyt pu5 pu2 p31 pu4 PdBu_time s12 m11 m31 u2 Ect_Expr_PI4K3beta_flag a11 p32 p21 pu6 s21 pu3 m22 p11 Ect_Expr_CERT_flag a31 a32
+    ModelingToolkit.@parameters a21 m33 kb_NB142_70_dose a22 kb_NB142_70_time p12 p33 s31 PdBu_dose a12 p22 a33 p13 pu5 pu2 p31 pu4 PdBu_time s12 m11 m31 Ect_Expr_PI4K3beta_flag a11 p32 p21 pu6 s21 pu3 m22 p11 Ect_Expr_CERT_flag a31 a32
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -25,13 +29,13 @@ function getODEModel_model_Weber_BMC2015()
 
     ### Derivatives ###
     eqs = [
-    D(CERTERa) ~ -1.0 * (cyt * (CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))+1.0 * (cyt * CERT * p32)+1.0 * (cyt * s31)+1.0 * (cyt * pu4 * u4)-1.0 * (cyt * CERTERa * a31),
-    D(PI4K3B) ~ +1.0 * (cyt * PI4K3Ba * p21)-1.0 * (cyt * (PI4K3B * PKDDAGa * p22 / (PKDDAGa + m22)))+1.0 * (cyt * s21)+1.0 * (cyt * pu3 * u3)-1.0 * (cyt * PI4K3B * a21),
-    D(CERT) ~ -1.0 * (cyt * CERT * p32)+1.0 * (cyt * (CERTTGNa * PKDDAGa * p33 / (PKDDAGa + m33)))-1.0 * (cyt * CERT * a32),
-    D(CERTTGNa) ~ +1.0 * (cyt * (CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))-1.0 * (cyt * (CERTTGNa * PKDDAGa * p33 / (PKDDAGa + m33)))-1.0 * (cyt * CERTTGNa * a33),
-    D(PKDDAGa) ~ +1.0 * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))+1.0 * (cyt * PKD * p12 * (pu5 * u5 + 1))-1.0 * (cyt * PKDDAGa * p13 * (pu6 * (kb_NB142_70_dose * (1 + (t - kb_NB142_70_time < 0) * ((0) - (1)))) + 1))-1.0 * (cyt * PKDDAGa * a12),
-    D(PKD) ~ -1.0 * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))-1.0 * (cyt * PKD * p12 * (pu5 * u5 + 1))+1.0 * (cyt * PKDDAGa * p13 * (pu6 * (kb_NB142_70_dose * (1 + (t - kb_NB142_70_time < 0) * ((0) - (1)))) + 1))+1.0 * (cyt * s12)+1.0 * (cyt * pu2 * u2)-1.0 * (cyt * PKD * a11),
-    D(PI4K3Ba) ~ -1.0 * (cyt * PI4K3Ba * p21)+1.0 * (cyt * (PI4K3B * PKDDAGa * p22 / (PKDDAGa + m22)))-1.0 * (cyt * PI4K3Ba * a22),
+    D(CERTERa) ~ -1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))+1.0 * ( 1 /cyt ) * (cyt * CERT * p32)+1.0 * ( 1 /cyt ) * (cyt * s31)+1.0 * ( 1 /cyt ) * (cyt * pu4 * u4)-1.0 * ( 1 /cyt ) * (cyt * CERTERa * a31),
+    D(PI4K3B) ~ +1.0 * ( 1 /cyt ) * (cyt * PI4K3Ba * p21)-1.0 * ( 1 /cyt ) * (cyt * (PI4K3B * PKDDAGa * p22 / (PKDDAGa + m22)))+1.0 * ( 1 /cyt ) * (cyt * s21)+1.0 * ( 1 /cyt ) * (cyt * pu3 * u3)-1.0 * ( 1 /cyt ) * (cyt * PI4K3B * a21),
+    D(CERT) ~ -1.0 * ( 1 /cyt ) * (cyt * CERT * p32)+1.0 * ( 1 /cyt ) * (cyt * (CERTTGNa * PKDDAGa * p33 / (PKDDAGa + m33)))-1.0 * ( 1 /cyt ) * (cyt * CERT * a32),
+    D(CERTTGNa) ~ +1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))-1.0 * ( 1 /cyt ) * (cyt * (CERTTGNa * PKDDAGa * p33 / (PKDDAGa + m33)))-1.0 * ( 1 /cyt ) * (cyt * CERTTGNa * a33),
+    D(PKDDAGa) ~ +1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))+1.0 * ( 1 /cyt ) * (cyt * PKD * p12 * (pu5 * u5 + 1))-1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * p13 * (pu6 * (kb_NB142_70_dose * (1 + (t - kb_NB142_70_time < 0) * ((0) - (1)))) + 1))-1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * a12),
+    D(PKD) ~ -1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))-1.0 * ( 1 /cyt ) * (cyt * PKD * p12 * (pu5 * u5 + 1))+1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * p13 * (pu6 * (kb_NB142_70_dose * (1 + (t - kb_NB142_70_time < 0) * ((0) - (1)))) + 1))+1.0 * ( 1 /cyt ) * (cyt * s12)+1.0 * ( 1 /cyt ) * (cyt * pu2 * u2)-1.0 * ( 1 /cyt ) * (cyt * PKD * a11),
+    D(PI4K3Ba) ~ -1.0 * ( 1 /cyt ) * (cyt * PI4K3Ba * p21)+1.0 * ( 1 /cyt ) * (cyt * (PI4K3B * PKDDAGa * p22 / (PKDDAGa + m22)))-1.0 * ( 1 /cyt ) * (cyt * PI4K3Ba * a22),
     D(u4) ~ 0,
     D(u3) ~ 0,
     D(u5) ~ 0,
@@ -69,7 +73,6 @@ function getODEModel_model_Weber_BMC2015()
     p22 => 21.3989931197985,
     a33 => 0.00010000000000001,
     p13 => 0.00183182922741504,
-    cyt => 1.0,
     pu5 => 33.7869036338953,
     pu2 => 1.0,
     p31 => 2428.01870197136,
@@ -78,7 +81,6 @@ function getODEModel_model_Weber_BMC2015()
     s12 => 88884.6918603076,
     m11 => 9.99999999999902e9,
     m31 => 9.98783985509162e9,
-    u2 => 0,
     Ect_Expr_PI4K3beta_flag => 0.0,
     a11 => 0.183516872816456,
     p32 => 17.1128427194665,

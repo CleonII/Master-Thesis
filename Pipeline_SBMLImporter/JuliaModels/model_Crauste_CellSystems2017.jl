@@ -3,6 +3,9 @@
 # Number of species: 5
 function getODEModel_model_Crauste_CellSystems2017()
 
+    ### Define constant parameters
+    default = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t Naive(t) Pathogen(t) LateEffector(t) EarlyEffector(t) Memory(t)
 
@@ -11,7 +14,7 @@ function getODEModel_model_Crauste_CellSystems2017()
     ### Define dummy variable
 
     ### Define parameters
-    ModelingToolkit.@parameters mu_LL delta_NE mu_PE mu_P mu_PL delta_EL mu_EE default mu_N rho_E delta_LM rho_P mu_LE
+    ModelingToolkit.@parameters mu_LL delta_NE mu_PE mu_P mu_PL delta_EL mu_EE mu_N rho_E delta_LM rho_P mu_LE
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -20,11 +23,11 @@ function getODEModel_model_Crauste_CellSystems2017()
 
     ### Derivatives ###
     eqs = [
-    D(Naive) ~ -1.0 * (Naive * mu_N)-1.0 * (Naive * Pathogen * delta_NE),
-    D(Pathogen) ~ +1.0 * ((Pathogen)^(2) * rho_P)-1.0 * (EarlyEffector * Pathogen * mu_PE)-1.0 * (LateEffector * Pathogen * mu_PL)-1.0 * (Pathogen * mu_P),
-    D(LateEffector) ~ +1.0 * (EarlyEffector * delta_EL)-1.0 * ((LateEffector)^(2) * mu_LL)-1.0 * (EarlyEffector * LateEffector * mu_LE)-1.0 * (LateEffector * delta_LM),
-    D(EarlyEffector) ~ +1.0 * (Naive * Pathogen * delta_NE)+1.0 * (EarlyEffector * Pathogen * rho_E)-1.0 * ((EarlyEffector)^(2) * mu_EE)-1.0 * (EarlyEffector * delta_EL),
-    D(Memory) ~ +1.0 * (LateEffector * delta_LM)    ]
+    D(Naive) ~ -1.0 * ( 1 /default ) * (Naive * mu_N)-1.0 * ( 1 /default ) * (Naive * Pathogen * delta_NE),
+    D(Pathogen) ~ +1.0 * ( 1 /default ) * ((Pathogen)^(2) * rho_P)-1.0 * ( 1 /default ) * (EarlyEffector * Pathogen * mu_PE)-1.0 * ( 1 /default ) * (LateEffector * Pathogen * mu_PL)-1.0 * ( 1 /default ) * (Pathogen * mu_P),
+    D(LateEffector) ~ +1.0 * ( 1 /default ) * (EarlyEffector * delta_EL)-1.0 * ( 1 /default ) * ((LateEffector)^(2) * mu_LL)-1.0 * ( 1 /default ) * (EarlyEffector * LateEffector * mu_LE)-1.0 * ( 1 /default ) * (LateEffector * delta_LM),
+    D(EarlyEffector) ~ +1.0 * ( 1 /default ) * (Naive * Pathogen * delta_NE)+1.0 * ( 1 /default ) * (EarlyEffector * Pathogen * rho_E)-1.0 * ( 1 /default ) * ((EarlyEffector)^(2) * mu_EE)-1.0 * ( 1 /default ) * (EarlyEffector * delta_EL),
+    D(Memory) ~ +1.0 * ( 1 /default ) * (LateEffector * delta_LM)    ]
 
     @named sys = ODESystem(eqs)
 
@@ -45,7 +48,6 @@ function getODEModel_model_Crauste_CellSystems2017()
     mu_PL => 3.6340308186265e-5,
     delta_EL => 0.51794597529254,
     mu_EE => 3.91359322673521e-5,
-    default => 1.0,
     mu_N => 0.739907308603256,
     rho_E => 0.507415703707752,
     delta_LM => 0.0225806365892933,

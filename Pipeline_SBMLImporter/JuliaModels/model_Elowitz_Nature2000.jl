@@ -3,6 +3,9 @@
 # Number of species: 8
 function getODEModel_model_Elowitz_Nature2000()
 
+    ### Define constant parameters
+    cell = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t X_protein(t) GFP_mRNA(t) Y_mRNA(t) X_mRNA(t) Z_mRNA(t) Z_protein(t) Y_protein(t) GFP(t)
 
@@ -12,7 +15,7 @@ function getODEModel_model_Elowitz_Nature2000()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters tau_mRNA tps_repr init_GFP n_Hill init_Y_mRNA init_Z_mRNA init_X_protein init_Y_protein tau_mRNA_GFP eff init_Z_protein tau_prot_GFP eff_GFP tps_active init_GFP_mRNA KM init_X_mRNA tau_prot cell
+    ModelingToolkit.@parameters tau_mRNA tps_repr init_GFP n_Hill init_Y_mRNA init_Z_mRNA init_X_protein init_Y_protein tau_mRNA_GFP eff init_Z_protein tau_prot_GFP eff_GFP tps_active init_GFP_mRNA KM init_X_mRNA tau_prot
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -21,14 +24,14 @@ function getODEModel_model_Elowitz_Nature2000()
 
     ### Derivatives ###
     eqs = [
-    D(X_protein) ~ +1.0 * (cell * (X_mRNA * eff / tau_mRNA))-1.0 * (cell * (X_protein * log(2) / tau_prot)),
-    D(GFP_mRNA) ~ -1.0 * (cell * (GFP_mRNA * log(2) / tau_mRNA_GFP)),
-    D(Y_mRNA) ~ -1.0 * (cell * (Y_mRNA * log(2) / tau_mRNA))+1.0 * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (X_protein)^(n_Hill)))),
-    D(X_mRNA) ~ -1.0 * (cell * (X_mRNA * log(2) / tau_mRNA))+1.0 * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (Z_protein)^(n_Hill)))),
-    D(Z_mRNA) ~ -1.0 * (cell * (Z_mRNA * log(2) / tau_mRNA))+1.0 * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (Y_protein)^(n_Hill)))),
-    D(Z_protein) ~ +1.0 * (cell * (Z_mRNA * eff / tau_mRNA))-1.0 * (cell * (Z_protein * log(2) / tau_prot)),
-    D(Y_protein) ~ +1.0 * (cell * (Y_mRNA * eff / tau_mRNA))-1.0 * (cell * (Y_protein * log(2) / tau_prot)),
-    D(GFP) ~ +1.0 * (cell * (GFP_mRNA * eff_GFP / tau_mRNA_GFP))-1.0 * (cell * (GFP * log(2) / tau_prot_GFP))+1.0 * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (X_protein)^(n_Hill)))),
+    D(X_protein) ~ +1.0 * ( 1 /cell ) * (cell * (X_mRNA * eff / tau_mRNA))-1.0 * ( 1 /cell ) * (cell * (X_protein * log(2) / tau_prot)),
+    D(GFP_mRNA) ~ -1.0 * ( 1 /cell ) * (cell * (GFP_mRNA * log(2) / tau_mRNA_GFP)),
+    D(Y_mRNA) ~ -1.0 * ( 1 /cell ) * (cell * (Y_mRNA * log(2) / tau_mRNA))+1.0 * ( 1 /cell ) * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (X_protein)^(n_Hill)))),
+    D(X_mRNA) ~ -1.0 * ( 1 /cell ) * (cell * (X_mRNA * log(2) / tau_mRNA))+1.0 * ( 1 /cell ) * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (Z_protein)^(n_Hill)))),
+    D(Z_mRNA) ~ -1.0 * ( 1 /cell ) * (cell * (Z_mRNA * log(2) / tau_mRNA))+1.0 * ( 1 /cell ) * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (Y_protein)^(n_Hill)))),
+    D(Z_protein) ~ +1.0 * ( 1 /cell ) * (cell * (Z_mRNA * eff / tau_mRNA))-1.0 * ( 1 /cell ) * (cell * (Z_protein * log(2) / tau_prot)),
+    D(Y_protein) ~ +1.0 * ( 1 /cell ) * (cell * (Y_mRNA * eff / tau_mRNA))-1.0 * ( 1 /cell ) * (cell * (Y_protein * log(2) / tau_prot)),
+    D(GFP) ~ +1.0 * ( 1 /cell ) * (cell * (GFP_mRNA * eff_GFP / tau_mRNA_GFP))-1.0 * ( 1 /cell ) * (cell * (GFP * log(2) / tau_prot_GFP))+1.0 * ( 1 /cell ) * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (X_protein)^(n_Hill)))),
     D(dummyVariable) ~ +init_X_protein+init_GFP+init_GFP_mRNA+init_Y_mRNA+init_Y_protein+init_Z_protein+init_X_mRNA+init_Z_mRNA
     ]
 
@@ -65,8 +68,7 @@ function getODEModel_model_Elowitz_Nature2000()
     init_GFP_mRNA => 131.435737789559,
     KM => 1.00013184764194e-5,
     init_X_mRNA => 2.55665758135759,
-    tau_prot => 5.35926527470063,
-    cell => 1.0]
+    tau_prot => 5.35926527470063]
 
     return sys, initialSpeciesValues, trueParameterValues
 

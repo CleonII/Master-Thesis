@@ -3,6 +3,9 @@
 # Number of species: 11
 function getODEModel_model_Schwen_PONE2014()
 
+    ### Define constant parameters
+    ExtracellularMedium = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t IR2(t) IR2in(t) Rec2(t) IR1in(t) Uptake1(t) Uptake2(t) InsulinFragments(t) IR1(t) Rec1(t) Ins(t) BoundUnspec(t)
 
@@ -12,7 +15,7 @@ function getODEModel_model_Schwen_PONE2014()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters ka1 ini_R2fold kout ini_R1 kout_frag koff_unspec kin ka2fold kin2 kd1 kon_unspec init_Ins kd2fold ExtracellularMedium kout2
+    ModelingToolkit.@parameters ka1 ini_R2fold kout ini_R1 kout_frag koff_unspec kin ka2fold kin2 kd1 kon_unspec init_Ins kd2fold kout2
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -21,17 +24,17 @@ function getODEModel_model_Schwen_PONE2014()
 
     ### Derivatives ###
     eqs = [
-    D(IR2) ~ +1.0 * (ExtracellularMedium * Ins * Rec2 * ka1 * ka2fold)-1.0 * (ExtracellularMedium * IR2 * kd1 * kd2fold)-1.0 * (ExtracellularMedium * IR2 * kin2)+1.0 * (ExtracellularMedium * IR2in * kout2),
-    D(IR2in) ~ +1.0 * (ExtracellularMedium * IR2 * kin2)-1.0 * (ExtracellularMedium * IR2in * kout2)-1.0 * (ExtracellularMedium * IR2in * kout_frag),
-    D(Rec2) ~ -1.0 * (ExtracellularMedium * Ins * Rec2 * ka1 * ka2fold)+1.0 * (ExtracellularMedium * IR2 * kd1 * kd2fold)+1.0 * (ExtracellularMedium * IR2in * kout_frag),
-    D(IR1in) ~ +1.0 * (ExtracellularMedium * IR1 * kin)-1.0 * (ExtracellularMedium * IR1in * kout)-1.0 * (ExtracellularMedium * IR1in * kout_frag),
-    D(Uptake1) ~ +1.0 * (ExtracellularMedium * (Ins * Rec1 * ka1 - IR1 * kd1)),
-    D(Uptake2) ~ +1.0 * (ExtracellularMedium * (Ins * Rec2 * ka1 * ka2fold - IR2 * kd1 * kd2fold)),
-    D(InsulinFragments) ~ +1.0 * (ExtracellularMedium * IR1in * kout_frag)+1.0 * (ExtracellularMedium * IR2in * kout_frag),
-    D(IR1) ~ +1.0 * (ExtracellularMedium * Ins * Rec1 * ka1)-1.0 * (ExtracellularMedium * IR1 * kd1)-1.0 * (ExtracellularMedium * IR1 * kin)+1.0 * (ExtracellularMedium * IR1in * kout),
-    D(Rec1) ~ -1.0 * (ExtracellularMedium * Ins * Rec1 * ka1)+1.0 * (ExtracellularMedium * IR1 * kd1)+1.0 * (ExtracellularMedium * IR1in * kout_frag),
-    D(Ins) ~ -1.0 * (ExtracellularMedium * Ins * Rec1 * ka1)-1.0 * (ExtracellularMedium * Ins * Rec2 * ka1 * ka2fold)-1.0 * (ExtracellularMedium * Ins * kon_unspec)+1.0 * (ExtracellularMedium * BoundUnspec * koff_unspec)+1.0 * (ExtracellularMedium * IR1 * kd1)+1.0 * (ExtracellularMedium * IR2 * kd1 * kd2fold),
-    D(BoundUnspec) ~ +1.0 * (ExtracellularMedium * Ins * kon_unspec)-1.0 * (ExtracellularMedium * BoundUnspec * koff_unspec),
+    D(IR2) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec2 * ka1 * ka2fold)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2 * kd1 * kd2fold)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2 * kin2)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2in * kout2),
+    D(IR2in) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2 * kin2)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2in * kout2)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2in * kout_frag),
+    D(Rec2) ~ -1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec2 * ka1 * ka2fold)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2 * kd1 * kd2fold)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2in * kout_frag),
+    D(IR1in) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kin)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1in * kout)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1in * kout_frag),
+    D(Uptake1) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * (Ins * Rec1 * ka1 - IR1 * kd1)),
+    D(Uptake2) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * (Ins * Rec2 * ka1 * ka2fold - IR2 * kd1 * kd2fold)),
+    D(InsulinFragments) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1in * kout_frag)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2in * kout_frag),
+    D(IR1) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec1 * ka1)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kd1)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kin)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1in * kout),
+    D(Rec1) ~ -1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec1 * ka1)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kd1)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1in * kout_frag),
+    D(Ins) ~ -1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec1 * ka1)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec2 * ka1 * ka2fold)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * kon_unspec)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * BoundUnspec * koff_unspec)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kd1)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2 * kd1 * kd2fold),
+    D(BoundUnspec) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * kon_unspec)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * BoundUnspec * koff_unspec),
     D(dummyVariable) ~ +init_Ins+ini_R2fold+ini_R1
     ]
 
@@ -67,7 +70,6 @@ function getODEModel_model_Schwen_PONE2014()
     kon_unspec => 19.941427249128,
     init_Ins => 0.0,
     kd2fold => 9.61850107655493,
-    ExtracellularMedium => 1.0,
     kout2 => 0.0529079560976487]
 
     return sys, initialSpeciesValues, trueParameterValues

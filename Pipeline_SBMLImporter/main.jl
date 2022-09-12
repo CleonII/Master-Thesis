@@ -26,6 +26,7 @@ function main(; usedFiles = ["all"]::Vector{String}, useData = false, wrapped = 
     else
         files = usedFiles .* ".xml"
     end
+    files = files[files .!= "model_Chen_MSB2009.xml"]
 
     if useData
         for file in files
@@ -51,4 +52,4 @@ function main(; usedFiles = ["all"]::Vector{String}, useData = false, wrapped = 
     end
 end
 
-main(usedFiles = ["model_Boehm_JProteomeRes2014"], useData = true, wrapped = true)
+main(usedFiles = ["all"], useData = true, wrapped = true)

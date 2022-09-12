@@ -1,6 +1,3 @@
-
-
-
 # Splits strings by a given delimiter, but only if the delimiter is not inside a function / parenthesis.
 function splitBetween(stringToSplit, delimiter)
     parts = Vector{SubString{String}}(undef, length(stringToSplit))
@@ -28,6 +25,7 @@ function splitBetween(stringToSplit, delimiter)
     parts = parts[1:numParts]
 end
 
+
 # Finds the ending parenthesis of an argument and returns its position. 
 function findEndOffunction(functionAsString, iStart)
     inParenthesis = 1
@@ -47,6 +45,7 @@ function findEndOffunction(functionAsString, iStart)
     end
     return endIndex
 end
+
 
 # Extracts the argument from a function.
 # If a dictionary (with functions) is supplied, will also check if there are nested functions and will 
@@ -109,6 +108,7 @@ function getArguments(functionAsString, dictionary::Dict, baseFunctions::Dict)
     end
     return [argumentString, includesFunction]
 end
+
 
 # replaces a word, "toReplace" in functions with another word, "replacer. 
 # Often used to change "time" to "t"
@@ -900,10 +900,12 @@ function writeODEModelToFile(libsbml, model, modelName, path, useData, wrapped; 
         reactants = [(r[:species], r[:getStoichiometry]()) for r in reac[:getListOfReactants]()]
         formula = rewriteDerivatives(formula, dicts)
         for (rName, rStoich) in reactants
-            dus[rName] = dus[rName] * "-" * string(rStoich) * " * (" * formula * ")"
+            rComp = model[:getSpecies](rName)[:getCompartment]()
+            dus[rName] = dus[rName] * "-" * string(rStoich) * " * ( 1 /" * rComp * " ) * (" * formula * ")"
         end
         for (pName, pStoich) in products
-            dus[pName] = dus[pName] * "+" * string(pStoich) * " * (" * formula * ")"
+            pComp = model[:getSpecies](pName)[:getCompartment]()
+            dus[pName] = dus[pName] * "+" * string(pStoich) * " * ( 1 /" * pComp * " ) * (" * formula * ")"
         end
     end
 

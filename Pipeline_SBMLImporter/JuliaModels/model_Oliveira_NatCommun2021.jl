@@ -3,6 +3,9 @@
 # Number of species: 9
 function getODEModel_model_Oliveira_NatCommun2021()
 
+    ### Define constant parameters
+    Interior = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t Hospital(t) Symptomatic(t) Cumulative_cases(t) Asymptomatic(t) Exposed(t) ICU(t) Recovered(t) Deaths(t) Susceptible(t)
 
@@ -12,7 +15,7 @@ function getODEModel_model_Oliveira_NatCommun2021()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters asymptomatic_init_concentration beta_2_multiplier t_2 gamma_u exposed_init_concentration omega_u kappa h_hosp_rate xi delta_ t_1 beta_0 symptomatic_init_concentration Interior mu_u omega_h mu_h beta_2 beta_1 population p_symp_rate gamma_s gamma_h gamma_a
+    ModelingToolkit.@parameters asymptomatic_init_concentration beta_2_multiplier t_2 gamma_u exposed_init_concentration omega_u kappa h_hosp_rate xi delta_ t_1 beta_0 symptomatic_init_concentration mu_u omega_h mu_h beta_2 beta_1 population p_symp_rate gamma_s gamma_h gamma_a
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -21,15 +24,15 @@ function getODEModel_model_Oliveira_NatCommun2021()
 
     ### Derivatives ###
     eqs = [
-    D(Hospital) ~ +1.0 * (Interior * (h_hosp_rate * xi * gamma_s) * Symptomatic)-1.0 * (Interior * ((1 - omega_h) * (1 - mu_h) * gamma_h) * Hospital)-1.0 * (Interior * (omega_h * gamma_h) * Hospital)+1.0 * (Interior * (gamma_u * ICU * (1 - mu_u + omega_u * mu_u)))-1.0 * (Interior * ((1 - omega_h) * mu_h * gamma_h) * Hospital),
-    D(Symptomatic) ~ +1.0 * (Interior * (kappa * p_symp_rate) * Exposed)-1.0 * (Interior * ((1 - h_hosp_rate) * gamma_s) * Symptomatic)-1.0 * (Interior * (h_hosp_rate * xi * gamma_s) * Symptomatic)-1.0 * (Interior * (h_hosp_rate * (1 - xi) * gamma_s) * Symptomatic),
+    D(Hospital) ~ +1.0 * ( 1 /Interior ) * (Interior * (h_hosp_rate * xi * gamma_s) * Symptomatic)-1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * (1 - mu_h) * gamma_h) * Hospital)-1.0 * ( 1 /Interior ) * (Interior * (omega_h * gamma_h) * Hospital)+1.0 * ( 1 /Interior ) * (Interior * (gamma_u * ICU * (1 - mu_u + omega_u * mu_u)))-1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * mu_h * gamma_h) * Hospital),
+    D(Symptomatic) ~ +1.0 * ( 1 /Interior ) * (Interior * (kappa * p_symp_rate) * Exposed)-1.0 * ( 1 /Interior ) * (Interior * ((1 - h_hosp_rate) * gamma_s) * Symptomatic)-1.0 * ( 1 /Interior ) * (Interior * (h_hosp_rate * xi * gamma_s) * Symptomatic)-1.0 * ( 1 /Interior ) * (Interior * (h_hosp_rate * (1 - xi) * gamma_s) * Symptomatic),
     D(Cumulative_cases) ~ (kappa * p_symp_rate) * Exposed * Interior,
-    D(Asymptomatic) ~ +1.0 * (Interior * (kappa * (1 - p_symp_rate)) * Exposed)-1.0 * (Interior * gamma_a * Asymptomatic),
-    D(Exposed) ~ +1.0 * (Interior * ((((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))) + (t < t_1) * ((beta_0) - ((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))))))) * Susceptible * (Symptomatic + delta_ * Asymptomatic) / population))-1.0 * (Interior * (kappa * (1 - p_symp_rate)) * Exposed)-1.0 * (Interior * (kappa * p_symp_rate) * Exposed),
-    D(ICU) ~ +1.0 * (Interior * (h_hosp_rate * (1 - xi) * gamma_s) * Symptomatic)+1.0 * (Interior * (omega_h * gamma_h) * Hospital)-1.0 * (Interior * (gamma_u * ICU * (1 - mu_u + omega_u * mu_u)))-1.0 * (Interior * ((1 - omega_u) * mu_u * gamma_u) * ICU),
-    D(Recovered) ~ +1.0 * (Interior * gamma_a * Asymptomatic)+1.0 * (Interior * ((1 - h_hosp_rate) * gamma_s) * Symptomatic)+1.0 * (Interior * ((1 - omega_h) * (1 - mu_h) * gamma_h) * Hospital),
-    D(Deaths) ~ +1.0 * (Interior * ((1 - omega_h) * mu_h * gamma_h) * Hospital)+1.0 * (Interior * ((1 - omega_u) * mu_u * gamma_u) * ICU),
-    D(Susceptible) ~ -1.0 * (Interior * ((((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))) + (t < t_1) * ((beta_0) - ((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))))))) * Susceptible * (Symptomatic + delta_ * Asymptomatic) / population)),
+    D(Asymptomatic) ~ +1.0 * ( 1 /Interior ) * (Interior * (kappa * (1 - p_symp_rate)) * Exposed)-1.0 * ( 1 /Interior ) * (Interior * gamma_a * Asymptomatic),
+    D(Exposed) ~ +1.0 * ( 1 /Interior ) * (Interior * ((((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))) + (t < t_1) * ((beta_0) - ((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))))))) * Susceptible * (Symptomatic + delta_ * Asymptomatic) / population))-1.0 * ( 1 /Interior ) * (Interior * (kappa * (1 - p_symp_rate)) * Exposed)-1.0 * ( 1 /Interior ) * (Interior * (kappa * p_symp_rate) * Exposed),
+    D(ICU) ~ +1.0 * ( 1 /Interior ) * (Interior * (h_hosp_rate * (1 - xi) * gamma_s) * Symptomatic)+1.0 * ( 1 /Interior ) * (Interior * (omega_h * gamma_h) * Hospital)-1.0 * ( 1 /Interior ) * (Interior * (gamma_u * ICU * (1 - mu_u + omega_u * mu_u)))-1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_u) * mu_u * gamma_u) * ICU),
+    D(Recovered) ~ +1.0 * ( 1 /Interior ) * (Interior * gamma_a * Asymptomatic)+1.0 * ( 1 /Interior ) * (Interior * ((1 - h_hosp_rate) * gamma_s) * Symptomatic)+1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * (1 - mu_h) * gamma_h) * Hospital),
+    D(Deaths) ~ +1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * mu_h * gamma_h) * Hospital)+1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_u) * mu_u * gamma_u) * ICU),
+    D(Susceptible) ~ -1.0 * ( 1 /Interior ) * (Interior * ((((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))) + (t < t_1) * ((beta_0) - ((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))))))) * Susceptible * (Symptomatic + delta_ * Asymptomatic) / population)),
     D(dummyVariable) ~ +asymptomatic_init_concentration+symptomatic_init_concentration+exposed_init_concentration+population
     ]
 
@@ -63,7 +66,6 @@ function getODEModel_model_Oliveira_NatCommun2021()
     t_1 => 23.4530530945,
     beta_0 => 0.807194090959563,
     symptomatic_init_concentration => 1.99259135560373e-6,
-    Interior => 1.0,
     mu_u => 0.4,
     omega_h => 0.14,
     mu_h => 0.15,
