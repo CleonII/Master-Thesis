@@ -34,9 +34,21 @@ function main(; usedFiles = ["all"]::Vector{String}, useData = false, wrapped = 
             modelNameShort = modelName[7:end]
             dataEnding = modelNameShort * ".tsv"
             readDataPath = joinpath(pwd(), "Pipeline_ModelParameterEstimation", "Data", modelName)
-            experimentalConditions = CSV.read(joinpath(readDataPath, "experimentalCondition_" * dataEnding), DataFrame)
-            parameterBounds = CSV.read(joinpath(readDataPath, "parameters_" * dataEnding), DataFrame)
 
+            # Check for experimental conditions file and parameter bounds (why?)
+            pathExpCond = joinpath(readDataPath, "experimentalCondition_" * dataEnding)
+            if isfile(pathExpCond)
+                experimentalConditions = CSV.read(pathExpCond, DataFrame)
+            else
+                experimentalConditions = []
+            end
+            pathBounds = joinpath(readDataPath, "parameters_" * dataEnding)
+            if isfile(pathBounds) 
+                parameterBounds = CSV.read(pathBounds, DataFrame)
+            else
+                parameterBounds = []
+                useData = false
+            end
             document = reader[:readSBML](joinpath(pwd(), "Pipeline_SBMLImporter", "SBML", file))
             model = document[:getModel]() # Get the model
             writeODEModelToFile(libsbml, model, modelName, writePath, useData, wrapped, experimentalConditions = experimentalConditions, parameterBounds = parameterBounds)
