@@ -85,7 +85,7 @@ function compareAgainstPyPesto(solver, tol; printRes::Bool=false)
 end
 
 
-passTest = compareAgainstPyPesto(Rodas4P(), 1e-12, printRes=true)
+passTest = compareAgainstPyPesto(Rodas4P(), 1e-12, printRes=false)
 if passTest == true
     @printf("Passed test Boehm against PyPesto\n")
 else

@@ -6,23 +6,22 @@ function Boehm_JProteomeRes2014(u, t, dynPar, obsPar, paramData, obsData, observ
 	specC17_C = paramData.paramVal[11] 
 
 	if observableId == "pSTAT5A_rel" 
-		yMod = ( 100 * pApB + 200 * pApA * specC17_C ) / ( pApB + STAT5A * specC17_C + 2 * pApA * specC17_C ) 
+		return ( 100 * pApB + 200 * pApA * specC17_C ) / ( pApB + STAT5A * specC17_C + 2 * pApA * specC17_C ) 
 	end
 
 	if observableId == "pSTAT5B_rel" 
-		yMod = - ( 100 * pApB - 200 * pBpB * ( specC17_C - 1 ) ) / ( ( STAT5B * ( specC17_C - 1 ) - pApB ) + 2 * pBpB * ( specC17_C - 1 ) ) 
+		return - ( 100 * pApB - 200 * pBpB * ( specC17_C - 1 ) ) / ( ( STAT5B * ( specC17_C - 1 ) - pApB ) + 2 * pBpB * ( specC17_C - 1 ) ) 
 	end
 
 	if observableId == "rSTAT5A_rel" 
-		yMod = ( 100 * pApB + 100 * STAT5A * specC17_C + 200 * pApA * specC17_C ) / ( 2 * pApB + STAT5A * specC17_C + 2 * pApA * specC17_C - STAT5B * ( specC17_C - 1 ) - 2 * pBpB * ( specC17_C - 1 ) ) 
+		return ( 100 * pApB + 100 * STAT5A * specC17_C + 200 * pApA * specC17_C ) / ( 2 * pApB + STAT5A * specC17_C + 2 * pApA * specC17_C - STAT5B * ( specC17_C - 1 ) - 2 * pBpB * ( specC17_C - 1 ) ) 
 	end
 
-	return yMod
 end
 
 function Boehm_JProteomeRes2014_t0!(u0Vec, paramVec) 
 
-	k_exp_hetero, Epo_degradation_BaF3, k_exp_homo, k_phos, k_imp_homo, k_imp_hetero, specC17, ratio = paramVec 
+	nuc, Epo_degradation_BaF3, cyt, k_exp_homo, k_phos, k_exp_hetero, k_imp_homo, k_imp_hetero, specC17, ratio = paramVec 
 
 	STAT5A = 207.6 * ratio 
 	pApA = 0.0 
@@ -46,18 +45,17 @@ function Boehm_JProteomeRes2014_sd!(u, t, sdPar, dynPar, paramData, obsData, obs
 
 	if observableId == "pSTAT5A_rel" 
 		noiseParameter1_pSTAT5A_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_pSTAT5A_rel 
+		return noiseParameter1_pSTAT5A_rel 
 	end
 
 	if observableId == "pSTAT5B_rel" 
 		noiseParameter1_pSTAT5B_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_pSTAT5B_rel 
+		return noiseParameter1_pSTAT5B_rel 
 	end
 
 	if observableId == "rSTAT5A_rel" 
 		noiseParameter1_rSTAT5A_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_rSTAT5A_rel 
+		return noiseParameter1_rSTAT5A_rel 
 	end
 
-	return sdMod
 end
