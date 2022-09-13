@@ -3,10 +3,6 @@
 # Number of species: 9
 function getODEModel_model_Brannmark_JBC2010()
 
-    ### Define constant parameters
-    default = 1.0
-    cyt = 1.0
-
     ### Define independent and dependent variables
     ModelingToolkit.@variables t IRp(t) IR(t) IRins(t) IRiP(t) IRS(t) X(t) IRi(t) IRSiP(t) Xp(t)
 
@@ -16,7 +12,7 @@ function getODEModel_model_Brannmark_JBC2010()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters k1c k21 k1g insulin_dose_2 k1a insulin_dose_1 k1aBasic k1d insulin_time_1 insulin_time_2 k22 k1r k1f k1b k3 km2 k1e k_IRSiP_DosR km3
+    ModelingToolkit.@parameters k1c k21 k1g insulin_dose_2 k1a insulin_dose_1 k1aBasic k1d insulin_time_1 insulin_time_2 cyt k22 default k1r k1f k1b k3 km2 k1e k_IRSiP_DosR km3
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -34,7 +30,7 @@ function getODEModel_model_Brannmark_JBC2010()
     D(IRi) ~ +1.0 * ( 1 /cyt ) * (cyt * IRiP * (k1e + Xp * k1f / (Xp + 1)))-1.0 * ( 1 /cyt ) * (cyt * IRi * k1r),
     D(IRSiP) ~ +1.0 * ( 1 /cyt ) * (cyt * IRS * k21 * (IRp + IRiP * k22))-1.0 * ( 1 /cyt ) * (cyt * IRSiP * km2),
     D(Xp) ~ +1.0 * ( 1 /cyt ) * (cyt * IRSiP * X * k3)-1.0 * ( 1 /cyt ) * (cyt * Xp * km3),
-    D(dummyVariable) ~ +k_IRSiP_DosR
+    D(dummyVariable) ~ +default+k_IRSiP_DosR
     ]
 
     @named sys = ODESystem(eqs)
@@ -64,7 +60,9 @@ function getODEModel_model_Brannmark_JBC2010()
     k1d => 499999.999999974,
     insulin_time_1 => 0.0,
     insulin_time_2 => 1000.0,
+    cyt => 1.0,
     k22 => 658.762927786248,
+    default => 1.0,
     k1r => 0.0266983879216281,
     k1f => 499999.990737798,
     k1b => 0.174529566448397,

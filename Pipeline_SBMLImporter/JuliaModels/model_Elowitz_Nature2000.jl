@@ -3,9 +3,6 @@
 # Number of species: 8
 function getODEModel_model_Elowitz_Nature2000()
 
-    ### Define constant parameters
-    cell = 1.0
-
     ### Define independent and dependent variables
     ModelingToolkit.@variables t X_protein(t) GFP_mRNA(t) Y_mRNA(t) X_mRNA(t) Z_mRNA(t) Z_protein(t) Y_protein(t) GFP(t)
 
@@ -15,7 +12,7 @@ function getODEModel_model_Elowitz_Nature2000()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters tau_mRNA tps_repr init_GFP n_Hill init_Y_mRNA init_Z_mRNA init_X_protein init_Y_protein tau_mRNA_GFP eff init_Z_protein tau_prot_GFP eff_GFP tps_active init_GFP_mRNA KM init_X_mRNA tau_prot
+    ModelingToolkit.@parameters tau_mRNA tps_repr init_GFP n_Hill init_Y_mRNA init_Z_mRNA init_X_protein init_Y_protein tau_mRNA_GFP eff init_Z_protein tau_prot_GFP eff_GFP tps_active init_GFP_mRNA KM init_X_mRNA tau_prot cell
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -68,7 +65,8 @@ function getODEModel_model_Elowitz_Nature2000()
     init_GFP_mRNA => 131.435737789559,
     KM => 1.00013184764194e-5,
     init_X_mRNA => 2.55665758135759,
-    tau_prot => 5.35926527470063]
+    tau_prot => 5.35926527470063,
+    cell => 1.0]
 
     return sys, initialSpeciesValues, trueParameterValues
 

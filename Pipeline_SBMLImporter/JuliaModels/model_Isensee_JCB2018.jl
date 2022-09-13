@@ -3,11 +3,6 @@
 # Number of species: 25
 function getODEModel_model_Isensee_JCB2018()
 
-    ### Define constant parameters
-    default = 1.0
-    cyt = 1.0
-    nuc = 1.0
-
     ### Define independent and dependent variables
     ModelingToolkit.@variables t pAC(t) Rp8_Br_cAMPS(t) Rp8_pCPT_cAMPS(t) PDE(t) Rp_cAMPS(t) RII_2(t) RIIp_Rp8_Br_cAMPS_C_2(t) cAMP(t) RIIp_Sp8_Br_cAMPS_C_2(t) IBMX(t) AC_Fsk(t) RIIp_C_2(t) Sp8_Br_cAMPS(t) RII_C_2(t) RIIp_Sp8_Br_cAMPS_2(t) Csub(t) Csub_H89(t) AC(t) RIIp_cAMP_2(t) pAC_Fsk(t) RIIp_Rp8_pCPT_cAMPS_C_2(t) pPDE(t) RIIp_Rp_cAMPS_C_2(t) RIIp_2(t) RIIp_cAMP_C_2(t)
 
@@ -17,7 +12,7 @@ function getODEModel_model_Isensee_JCB2018()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters ki_Rp8_pCPT_cAMPS_pAB xi_b_Rp_cAMPS RII2_total H89_level fourABnOH_incubation_time KD_Fsk kdeg_cAMP_free Rp8_Br_cAMPS_pAB_level xi_KD_Rp8_Br_cAMPS kf_PDE_Csub Sp8_Br_cAMPS_AM_level xi_kf_RII_C_2__RII_2 kf_RIIp_2__RII_2 kf_cAMP IBMX_time Rp_cAMPS_pAB_incubation_time kf_H89 kf_RII_C_2__RII_2 kf_RII_C_2__RIIp_C_2 xi_i_Rp8_pCPT_cAMPS_pAB xi_pAC fourABnOH_level ki_Sp8_Br_cAMPS_AM xi_b_Sp8_Br_cAMPS xi_b_Rp8_Br_cAMPS H89_time kdeg_cAMP xi_AC_cAMP_Fsk xi_b_Rp8_pCPT_cAMPS ki_Rp_cAMPS_pAB xi_i_Rp_cAMPS_pAB KD_PDE_Csub ki_IBMX Fsk_time Rp8_pCPT_cAMPS_pAB_incubation_time PDE_total ki_Rp8_Br_cAMPS_pAB xi_kf_RII_2__RII_C_2 xi_i_Rp8_Br_cAMPS_pAB Sp8_Br_cAMPS_AM_time xi_KD_Rp8_pCPT_cAMPS kp_AC xi_pPDE xi_KD_Rp_cAMPS Rp8_Br_cAMPS_pAB_incubation_time AC_total kf_RIIp_C_2__RII_C_2 xi_KD_Sp8_Br_cAMPS kf_RIIp_cAMP_C_2__RIIp_2 KD_cAMP KD_IBMX kf_Fsk xi_i_Sp8_Br_cAMPS_AM KD_H89 ks_AC_cAMP Rp8_pCPT_cAMPS_pAB_level Rp_cAMPS_pAB_level kf_RII_2__RII_C_2 Fsk_level kdp_AC IBMX_level
+    ModelingToolkit.@parameters ki_Rp8_pCPT_cAMPS_pAB xi_b_Rp_cAMPS RII2_total H89_level fourABnOH_incubation_time KD_Fsk kdeg_cAMP_free Rp8_Br_cAMPS_pAB_level xi_KD_Rp8_Br_cAMPS kf_PDE_Csub Sp8_Br_cAMPS_AM_level xi_kf_RII_C_2__RII_2 kf_RIIp_2__RII_2 kf_cAMP IBMX_time Rp_cAMPS_pAB_incubation_time kf_H89 kf_RII_C_2__RII_2 kf_RII_C_2__RIIp_C_2 xi_i_Rp8_pCPT_cAMPS_pAB xi_pAC fourABnOH_level ki_Sp8_Br_cAMPS_AM xi_b_Sp8_Br_cAMPS xi_b_Rp8_Br_cAMPS H89_time kdeg_cAMP xi_AC_cAMP_Fsk xi_b_Rp8_pCPT_cAMPS ki_Rp_cAMPS_pAB xi_i_Rp_cAMPS_pAB KD_PDE_Csub ki_IBMX Fsk_time Rp8_pCPT_cAMPS_pAB_incubation_time PDE_total ki_Rp8_Br_cAMPS_pAB xi_kf_RII_2__RII_C_2 default xi_i_Rp8_Br_cAMPS_pAB Sp8_Br_cAMPS_AM_time xi_KD_Rp8_pCPT_cAMPS kp_AC xi_pPDE xi_KD_Rp_cAMPS Rp8_Br_cAMPS_pAB_incubation_time AC_total kf_RIIp_C_2__RII_C_2 xi_KD_Sp8_Br_cAMPS nuc kf_RIIp_cAMP_C_2__RIIp_2 KD_cAMP KD_IBMX kf_Fsk xi_i_Sp8_Br_cAMPS_AM cyt KD_H89 ks_AC_cAMP Rp8_pCPT_cAMPS_pAB_level Rp_cAMPS_pAB_level kf_RII_2__RII_C_2 Fsk_level kdp_AC IBMX_level
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -51,7 +46,7 @@ function getODEModel_model_Isensee_JCB2018()
     D(RIIp_Rp_cAMPS_C_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Rp_cAMPS * kf_cAMP * xi_b_Rp_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Rp_cAMPS_C_2 * kf_cAMP * xi_b_Rp_cAMPS * xi_KD_Rp_cAMPS),
     D(RIIp_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * kf_RII_C_2__RII_2 * xi_kf_RII_C_2__RII_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * RIIp_2 * kf_RII_2__RII_C_2 * xi_kf_RII_2__RII_C_2)-1.0 * ( 1 /cyt ) * (cyt * RIIp_2 * kf_RIIp_2__RII_2)+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_cAMP_2 * kf_cAMP)+1.0 * ( 1 /cyt ) * (cyt * (KD_IBMX * RIIp_cAMP_2 * kdeg_cAMP * (PDE + pPDE * xi_pPDE) / (IBMX + KD_IBMX)))+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Sp8_Br_cAMPS_2 * kf_cAMP * xi_b_Sp8_Br_cAMPS * xi_KD_Sp8_Br_cAMPS),
     D(RIIp_cAMP_C_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * cAMP * kf_cAMP)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_cAMP_C_2 * kf_cAMP)-1.0 * ( 1 /cyt ) * (cyt * (KD_IBMX * RIIp_cAMP_C_2 * kdeg_cAMP * (PDE + pPDE * xi_pPDE) / (IBMX + KD_IBMX)))-1.0 * ( 1 /cyt ) * (cyt * RIIp_cAMP_C_2 * kf_RIIp_cAMP_C_2__RIIp_2),
-    D(dummyVariable) ~ +fourABnOH_level+AC_total+RII2_total+fourABnOH_incubation_time+PDE_total
+    D(dummyVariable) ~ +fourABnOH_level+default+AC_total+nuc+RII2_total+fourABnOH_incubation_time+PDE_total
     ]
 
     @named sys = ODESystem(eqs)
@@ -125,6 +120,7 @@ function getODEModel_model_Isensee_JCB2018()
     PDE_total => 1.0,
     ki_Rp8_Br_cAMPS_pAB => 6.39991617125844,
     xi_kf_RII_2__RII_C_2 => 0.0189295042137343,
+    default => 1.0,
     xi_i_Rp8_Br_cAMPS_pAB => 1.0,
     Sp8_Br_cAMPS_AM_time => 0.0,
     xi_KD_Rp8_pCPT_cAMPS => 0.194630402579553,
@@ -135,11 +131,13 @@ function getODEModel_model_Isensee_JCB2018()
     AC_total => 1.0,
     kf_RIIp_C_2__RII_C_2 => 0.0256808704479994,
     xi_KD_Sp8_Br_cAMPS => 0.222276461349335,
+    nuc => 1.0,
     kf_RIIp_cAMP_C_2__RIIp_2 => 0.104924782853171,
     KD_cAMP => 2.84986906175302,
     KD_IBMX => 11.9768989891142,
     kf_Fsk => 999.991987450139,
     xi_i_Sp8_Br_cAMPS_AM => 1.0,
+    cyt => 1.0,
     KD_H89 => 0.0480736009761681,
     ks_AC_cAMP => 0.423299046028554,
     Rp8_pCPT_cAMPS_pAB_level => 0.0,

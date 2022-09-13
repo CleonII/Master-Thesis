@@ -3,10 +3,6 @@
 # Number of species: 8
 function getODEModel_model_Boehm_JProteomeRes2014()
 
-    ### Define constant parameters
-    cyt = 1.4
-    nuc = 0.45
-
     ### Define independent and dependent variables
     ModelingToolkit.@variables t STAT5A(t) pApA(t) nucpApB(t) nucpBpB(t) STAT5B(t) pApB(t) nucpApA(t) pBpB(t)
 
@@ -16,7 +12,7 @@ function getODEModel_model_Boehm_JProteomeRes2014()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters ratio k_imp_homo k_exp_hetero k_phos specC17 Epo_degradation_BaF3 k_exp_homo k_imp_hetero
+    ModelingToolkit.@parameters ratio k_imp_homo k_exp_hetero cyt k_phos specC17 Epo_degradation_BaF3 k_exp_homo nuc k_imp_hetero
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -55,10 +51,12 @@ function getODEModel_model_Boehm_JProteomeRes2014()
     ratio => 0.693,
     k_imp_homo => 96945.5391768823,
     k_exp_hetero => 1.00094251286741e-5,
+    cyt => 1.4,
     k_phos => 15766.8336642826,
     specC17 => 0.107,
     Epo_degradation_BaF3 => 0.0269738286367359,
     k_exp_homo => 0.00617193081581346,
+    nuc => 0.45,
     k_imp_hetero => 0.0163708512310568]
 
     return sys, initialSpeciesValues, trueParameterValues

@@ -3,9 +3,6 @@
 # Number of species: 7
 function getODEModel_model_Bruno_JExpBot2016()
 
-    ### Define constant parameters
-    cyt = 1.0
-
     ### Define independent and dependent variables
     ModelingToolkit.@variables t b10(t) bio(t) ohbio(t) zea(t) bcry(t) ohb10(t) bcar(t)
 
@@ -15,7 +12,7 @@ function getODEModel_model_Bruno_JExpBot2016()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters kc2_multiplier init_zea kc4_multiplier k5_multiplier kc1_multiplier init_b10 init_bcry kb1_multiplier kb2_multiplier kc1 kc4 init_ohb10 init_bcar kc2 kb2 k5 kb1
+    ModelingToolkit.@parameters kc2_multiplier init_zea kc4_multiplier cyt k5_multiplier kc1_multiplier init_b10 init_bcry kb1_multiplier kb2_multiplier kc1 kc4 init_ohb10 init_bcar kc2 kb2 k5 kb1
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -52,6 +49,7 @@ function getODEModel_model_Bruno_JExpBot2016()
     kc2_multiplier => 0.521817105884857,
     init_zea => 3.25673310603827,
     kc4_multiplier => 0.521817105884857,
+    cyt => 1.0,
     k5_multiplier => 0.521817105884857,
     kc1_multiplier => 0.521817105884857,
     init_b10 => 3.25673310603827,

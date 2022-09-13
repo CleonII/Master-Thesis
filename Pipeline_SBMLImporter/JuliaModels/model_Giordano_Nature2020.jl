@@ -3,10 +3,6 @@
 # Number of species: 13
 function getODEModel_model_Giordano_Nature2020()
 
-    ### Define constant parameters
-    initalTimeManual = 0.0
-    Italy = 1.0
-
     ### Define independent and dependent variables
     ModelingToolkit.@variables t CumulativeDiagnosed(t) Infected(t) Extinct(t) Diagnosed(t) DiagnosedHealed(t) Ailing(t) Healed(t) Recognized(t) Susceptible(t) Threatened(t)
 
@@ -15,7 +11,7 @@ function getODEModel_model_Giordano_Nature2020()
     ### Define dummy variable
 
     ### Define parameters
-    ModelingToolkit.@parameters rho_22 nu_0 delta_4 beta_22 zeta_50 rho_38 gamma_28 xi_22 kappa_0 epsilon_50 nu_22 alpha_0 xi_0 mu_22 eta_22 xi_50 beta_4 lam_22 xi_38 epsilon_12 epsilon_38 sigma_38 epsilon_0 delta_50 mu_50 eta_38 lam_50 kappa_50 kappa_38 gamma_50 tau alpha_28 mu_0 theta zeta_22 kappa_22 rho_0 gamma_0 sigma_22 eta_50 delta_22 eta_0 zeta_0 zeta_38 alpha_4 rho_50 alpha_50 sigma_50 nu_50 gamma_4 beta_0 lam_0 beta_50 alpha_22 delta_0 gamma_22 sigma_0
+    ModelingToolkit.@parameters rho_22 nu_0 delta_4 beta_22 zeta_50 rho_38 gamma_28 xi_22 kappa_0 epsilon_50 nu_22 alpha_0 xi_0 mu_22 eta_22 xi_50 beta_4 lam_22 initalTimeManual xi_38 epsilon_12 epsilon_38 sigma_38 epsilon_0 delta_50 Italy mu_50 eta_38 lam_50 kappa_50 kappa_38 gamma_50 tau alpha_28 mu_0 theta zeta_22 kappa_22 rho_0 gamma_0 sigma_22 eta_50 delta_22 eta_0 zeta_0 zeta_38 alpha_4 rho_50 alpha_50 sigma_50 nu_50 gamma_4 beta_0 lam_0 beta_50 alpha_22 delta_0 gamma_22 sigma_0
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -70,12 +66,14 @@ function getODEModel_model_Giordano_Nature2020()
     xi_50 => 0.02,
     beta_4 => 0.0057,
     lam_22 => 0.08,
+    initalTimeManual => 0.0,
     xi_38 => 0.02,
     epsilon_12 => 0.143,
     epsilon_38 => 0.2,
     sigma_38 => 0.01,
     epsilon_0 => 0.171,
     delta_50 => 0.005,
+    Italy => 1.0,
     mu_50 => 0.008,
     eta_38 => 0.025,
     lam_50 => 0.08,

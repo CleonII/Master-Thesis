@@ -3,9 +3,6 @@
 # Number of species: 6
 function getODEModel_model_Fiedler_BMC2016()
 
-    ### Define constant parameters
-    cyt = 1.0
-
     ### Define independent and dependent variables
     ModelingToolkit.@variables t RAF(t) MEK(t) pMEK(t) pERK(t) pRAF(t) ERK(t)
 
@@ -15,7 +12,7 @@ function getODEModel_model_Fiedler_BMC2016()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters ERK_total UO126 k10 RAF_total K_3 k4 Sorafenib K_2 k6 k11 tau1 MEK_total K_1 k3 tau2 k5 k2
+    ModelingToolkit.@parameters ERK_total UO126 k10 RAF_total K_3 cyt k4 Sorafenib K_2 k6 k11 tau1 MEK_total K_1 k3 tau2 k5 k2
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -52,6 +49,7 @@ function getODEModel_model_Fiedler_BMC2016()
     k10 => 0.0233013569106142,
     RAF_total => 1.0,
     K_3 => 0.961738099369118,
+    cyt => 1.0,
     k4 => 2.90831656859387,
     Sorafenib => 0.0,
     K_2 => 1.51138632474898,

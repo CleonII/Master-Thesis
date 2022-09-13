@@ -3,12 +3,6 @@
 # Number of species: 5
 function getODEModel_model_Zhao_QuantBiol2020()
 
-    ### Define constant parameters
-    Total_Pop_Hubei = 4.8e7
-    Total_Pop_Wuhan = 9.01e6
-    Total_Pop_China = 1.335e9
-    China = 1.0
-
     ### Define independent and dependent variables
     ModelingToolkit.@variables t Quarantined_Infected(t) Confirmed_Infected(t) Susceptible(t) Unquarantined_Infected(t)
 
@@ -18,7 +12,7 @@ function getODEModel_model_Zhao_QuantBiol2020()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters R_Stage_I_Wuhan gamma_2_Stage_III_Wuhan Trigger_Wuhan gamma_1_Stage_I_China gamma_1_Stage_I_Hubei sigma R_Stage_II_Wuhan R_Stage_II_China gamma_1_Stage_I_Wuhan gamma_2_Stage_II_Wuhan Trigger_China gamma_2_Stage_II_China R_Stage_III_Wuhan Trigger_Stage_I gamma_2_Stage_I_Wuhan R_Stage_I_China Trigger_Stage_III gamma_1_Stage_II_China gamma_1_Stage_III_Wuhan gamma_2_Stage_I_China Trigger_Stage_II R_Stage_II_Hubei gamma_1_Stage_II_Wuhan gamma_2_Stage_I_Hubei R_Stage_I_Hubei gamma_1_Stage_II_Hubei Trigger_Hubei gamma_2_Stage_II_Hubei
+    ModelingToolkit.@parameters Total_Pop_Hubei R_Stage_I_Wuhan gamma_2_Stage_III_Wuhan Total_Pop_China Trigger_Wuhan gamma_1_Stage_I_China gamma_1_Stage_I_Hubei sigma R_Stage_II_Wuhan R_Stage_II_China gamma_1_Stage_I_Wuhan gamma_2_Stage_II_Wuhan Trigger_China gamma_2_Stage_II_China R_Stage_III_Wuhan Trigger_Stage_I gamma_2_Stage_I_Wuhan R_Stage_I_China Trigger_Stage_III gamma_1_Stage_II_China gamma_1_Stage_III_Wuhan gamma_2_Stage_I_China Trigger_Stage_II R_Stage_II_Hubei Total_Pop_Wuhan gamma_1_Stage_II_Wuhan gamma_2_Stage_I_Hubei R_Stage_I_Hubei gamma_1_Stage_II_Hubei Trigger_Hubei gamma_2_Stage_II_Hubei China
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -46,8 +40,10 @@ function getODEModel_model_Zhao_QuantBiol2020()
 
     ### True parameter values ###
     trueParameterValues = [
+    Total_Pop_Hubei => 4.8e7,
     R_Stage_I_Wuhan => 4.7092,
     gamma_2_Stage_III_Wuhan => 0.322,
+    Total_Pop_China => 1.335e9,
     Trigger_Wuhan => 1.0,
     gamma_1_Stage_I_China => 0.1941,
     gamma_1_Stage_I_Hubei => 0.05,
@@ -68,12 +64,14 @@ function getODEModel_model_Zhao_QuantBiol2020()
     gamma_2_Stage_I_China => 0.05,
     Trigger_Stage_II => 0.0,
     R_Stage_II_Hubei => 0.6079,
+    Total_Pop_Wuhan => 9.01e6,
     gamma_1_Stage_II_Wuhan => 0.3917,
     gamma_2_Stage_I_Hubei => 0.05,
     R_Stage_I_Hubei => 5.934,
     gamma_1_Stage_II_Hubei => 0.488,
     Trigger_Hubei => 0.0,
-    gamma_2_Stage_II_Hubei => 0.1914]
+    gamma_2_Stage_II_Hubei => 0.1914,
+    China => 1.0]
 
     return sys, initialSpeciesValues, trueParameterValues
 
