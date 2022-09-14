@@ -7,106 +7,106 @@ function Bachmann_MSB2011(u, t, dynPar, obsPar, paramData, obsData, observableId
 
 	if observableId == "observable_CISRNA_foldA" 
 		observableParameter1_observable_CISRNA_foldA = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = CISRNA * observableParameter1_observable_CISRNA_foldA / CISRNAEqc_C + 1 
+		return CISRNA * observableParameter1_observable_CISRNA_foldA / CISRNAEqc_C + 1 
 	end
 
 	if observableId == "observable_CISRNA_foldB" 
 		observableParameter1_observable_CISRNA_foldB = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = CISRNA * observableParameter1_observable_CISRNA_foldB / CISRNAEqc_C + 1 
+		return CISRNA * observableParameter1_observable_CISRNA_foldB / CISRNAEqc_C + 1 
 	end
 
 	if observableId == "observable_CISRNA_foldC" 
 		observableParameter1_observable_CISRNA_foldC = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = CISRNA * observableParameter1_observable_CISRNA_foldC / CISRNAEqc_C + 1 
+		return CISRNA * observableParameter1_observable_CISRNA_foldC / CISRNAEqc_C + 1 
 	end
 
 	if observableId == "observable_CIS_abs" 
-		yMod = CIS 
+		return CIS 
 	end
 
 	if observableId == "observable_CIS_au" 
 		observableParameter1_observable_CIS_au, observableParameter2_observable_CIS_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = observableParameter1_observable_CIS_au + CIS * observableParameter2_observable_CIS_au / CISEqc 
+		return observableParameter1_observable_CIS_au + CIS * observableParameter2_observable_CIS_au / CISEqc 
 	end
 
 	if observableId == "observable_CIS_au1" 
 		observableParameter1_observable_CIS_au1 = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = CIS * observableParameter1_observable_CIS_au1 / CISEqc 
+		return CIS * observableParameter1_observable_CIS_au1 / CISEqc 
 	end
 
 	if observableId == "observable_CIS_au2" 
 		observableParameter1_observable_CIS_au2 = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = CIS * observableParameter1_observable_CIS_au2 / CISEqc 
+		return CIS * observableParameter1_observable_CIS_au2 / CISEqc 
 	end
 
 	if observableId == "observable_SHP1_abs" 
-		yMod = SHP1 + SHP1Act 
+		return SHP1 + SHP1Act 
 	end
 
 	if observableId == "observable_SOCS3RNA_foldA" 
 		observableParameter1_observable_SOCS3RNA_foldA = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = SOCS3RNA * observableParameter1_observable_SOCS3RNA_foldA / SOCS3RNAEqc_C + 1 
+		return SOCS3RNA * observableParameter1_observable_SOCS3RNA_foldA / SOCS3RNAEqc_C + 1 
 	end
 
 	if observableId == "observable_SOCS3RNA_foldB" 
 		observableParameter1_observable_SOCS3RNA_foldB = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = SOCS3RNA * observableParameter1_observable_SOCS3RNA_foldB / SOCS3RNAEqc_C + 1 
+		return SOCS3RNA * observableParameter1_observable_SOCS3RNA_foldB / SOCS3RNAEqc_C + 1 
 	end
 
 	if observableId == "observable_SOCS3RNA_foldC" 
 		observableParameter1_observable_SOCS3RNA_foldC = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = SOCS3RNA * observableParameter1_observable_SOCS3RNA_foldC / SOCS3RNAEqc_C + 1 
+		return SOCS3RNA * observableParameter1_observable_SOCS3RNA_foldC / SOCS3RNAEqc_C + 1 
 	end
 
 	if observableId == "observable_SOCS3_abs" 
-		yMod = SOCS3 
+		return SOCS3 
 	end
 
 	if observableId == "observable_SOCS3_au" 
 		observableParameter1_observable_SOCS3_au, observableParameter2_observable_SOCS3_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = observableParameter1_observable_SOCS3_au + SOCS3 * observableParameter2_observable_SOCS3_au / SOCS3Eqc 
+		return observableParameter1_observable_SOCS3_au + SOCS3 * observableParameter2_observable_SOCS3_au / SOCS3Eqc 
 	end
 
 	if observableId == "observable_STAT5_abs" 
-		yMod = STAT5 
+		return STAT5 
 	end
 
 	if observableId == "observable_pEpoR_au" 
 		observableParameter1_observable_pEpoR_au, observableParameter2_observable_pEpoR_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = observableParameter1_observable_pEpoR_au + observableParameter2_observable_pEpoR_au * ( 16 * p12EpoRpJAK2 + 16 * p1EpoRpJAK2 + 16 * p2EpoRpJAK2 ) / init_EpoRJAK2 
+		return observableParameter1_observable_pEpoR_au + observableParameter2_observable_pEpoR_au * ( 16 * p12EpoRpJAK2 + 16 * p1EpoRpJAK2 + 16 * p2EpoRpJAK2 ) / init_EpoRJAK2 
 	end
 
 	if observableId == "observable_pJAK2_au" 
 		observableParameter1_observable_pJAK2_au, observableParameter2_observable_pJAK2_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = observableParameter1_observable_pJAK2_au + observableParameter2_observable_pJAK2_au * ( 2 * EpoRpJAK2 + 2 * p12EpoRpJAK2 + 2 * p1EpoRpJAK2 + 2 * p2EpoRpJAK2 ) / init_EpoRJAK2 
+		return observableParameter1_observable_pJAK2_au + observableParameter2_observable_pJAK2_au * ( 2 * EpoRpJAK2 + 2 * p12EpoRpJAK2 + 2 * p1EpoRpJAK2 + 2 * p2EpoRpJAK2 ) / init_EpoRJAK2 
 	end
 
 	if observableId == "observable_pSTAT5B_rel" 
 		observableParameter1_observable_pSTAT5B_rel = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = observableParameter1_observable_pSTAT5B_rel + 100 * pSTAT5 / ( STAT5 + pSTAT5 ) 
+		println("t = $t and STAT5 = $STAT5")
+		return observableParameter1_observable_pSTAT5B_rel + 100 * pSTAT5 / ( STAT5 + pSTAT5 ) 
 	end
 
 	if observableId == "observable_pSTAT5_au" 
 		observableParameter1_observable_pSTAT5_au, observableParameter2_observable_pSTAT5_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = observableParameter1_observable_pSTAT5_au + pSTAT5 * observableParameter2_observable_pSTAT5_au / init_STAT5 
+		return observableParameter1_observable_pSTAT5_au + pSTAT5 * observableParameter2_observable_pSTAT5_au / init_STAT5 
 	end
 
 	if observableId == "observable_tSHP1_au" 
 		observableParameter1_observable_tSHP1_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = observableParameter1_observable_tSHP1_au * ( SHP1 + SHP1Act ) / init_SHP1 
+		return observableParameter1_observable_tSHP1_au * ( SHP1 + SHP1Act ) / init_SHP1 
 	end
 
 	if observableId == "observable_tSTAT5_au" 
 		observableParameter1_observable_tSTAT5_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		yMod = observableParameter1_observable_tSTAT5_au * ( STAT5 + pSTAT5 ) / init_STAT5 
+		return observableParameter1_observable_tSTAT5_au * ( STAT5 + pSTAT5 ) / init_STAT5 
 	end
 
-	return yMod
 end
 
 function Bachmann_MSB2011_t0!(u0Vec, paramVec) 
 
-	init_SHP1, EpoRCISInh, EpoRActJAK2, SOCS3Eqc, SOCS3Inh, JAK2EpoRDeaSHP1, init_EpoRJAK2, STAT5Imp, STAT5ActJAK2, CISEqc, STAT5ActEpoR, CISInh, EpoRCISRemove, SOCS3RNADelay, SOCS3RNATurn, SHP1Dea, SHP1ActEpoR, STAT5Exp, JAK2ActEpo, Epo, CISRNAEqc, CISRNATurn, CISRNADelay, init_STAT5, ActD, SOCS3RNAEqc, SOCS3Turn, SOCS3EqcOE, SOCS3oe, CISEqcOE, CISTurn, CISoe, init_SOCS3_multiplier, SHP1ProOE, init_EpoRJAK2_CIS, init_SHP1_multiplier, init_CIS_multiplier = paramVec 
+	init_SHP1, EpoRCISInh, EpoRActJAK2, SOCS3Eqc, SOCS3Inh, JAK2EpoRDeaSHP1, init_EpoRJAK2, STAT5Imp, STAT5ActJAK2, CISEqc, STAT5ActEpoR, CISInh, EpoRCISRemove, SOCS3RNADelay, nuc, cyt, SOCS3RNATurn, SHP1Dea, SHP1ActEpoR, STAT5Exp, JAK2ActEpo, Epo, CISRNAEqc, CISRNATurn, CISRNADelay, init_STAT5, ActD, SOCS3RNAEqc, SOCS3Turn, SOCS3EqcOE, SOCS3oe, CISEqcOE, CISTurn, CISoe, init_SOCS3_multiplier, SHP1ProOE, init_EpoRJAK2_CIS, init_SHP1_multiplier, init_CIS_multiplier = paramVec 
 
 	p1EpoRpJAK2 = 0.0 
 	pSTAT5 = 0.0 
@@ -147,103 +147,102 @@ function Bachmann_MSB2011_sd!(u, t, sdPar, dynPar, paramData, obsData, observabl
 
 	if observableId == "observable_CISRNA_foldA" 
 		noiseParameter1_observable_CISRNA_foldA = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_CISRNA_foldA 
+		return noiseParameter1_observable_CISRNA_foldA 
 	end
 
 	if observableId == "observable_CISRNA_foldB" 
 		noiseParameter1_observable_CISRNA_foldB = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_CISRNA_foldB 
+		return noiseParameter1_observable_CISRNA_foldB 
 	end
 
 	if observableId == "observable_CISRNA_foldC" 
 		noiseParameter1_observable_CISRNA_foldC = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_CISRNA_foldC 
+		return noiseParameter1_observable_CISRNA_foldC 
 	end
 
 	if observableId == "observable_CIS_abs" 
 		noiseParameter1_observable_CIS_abs = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_CIS_abs 
+		return noiseParameter1_observable_CIS_abs 
 	end
 
 	if observableId == "observable_CIS_au" 
 		noiseParameter1_observable_CIS_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_CIS_au 
+		return noiseParameter1_observable_CIS_au 
 	end
 
 	if observableId == "observable_CIS_au1" 
 		noiseParameter1_observable_CIS_au1 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_CIS_au1 
+		return noiseParameter1_observable_CIS_au1 
 	end
 
 	if observableId == "observable_CIS_au2" 
 		noiseParameter1_observable_CIS_au2 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_CIS_au2 
+		return noiseParameter1_observable_CIS_au2 
 	end
 
 	if observableId == "observable_SHP1_abs" 
 		noiseParameter1_observable_SHP1_abs = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_SHP1_abs 
+		return noiseParameter1_observable_SHP1_abs 
 	end
 
 	if observableId == "observable_SOCS3RNA_foldA" 
 		noiseParameter1_observable_SOCS3RNA_foldA = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_SOCS3RNA_foldA 
+		return noiseParameter1_observable_SOCS3RNA_foldA 
 	end
 
 	if observableId == "observable_SOCS3RNA_foldB" 
 		noiseParameter1_observable_SOCS3RNA_foldB = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_SOCS3RNA_foldB 
+		return noiseParameter1_observable_SOCS3RNA_foldB 
 	end
 
 	if observableId == "observable_SOCS3RNA_foldC" 
 		noiseParameter1_observable_SOCS3RNA_foldC = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_SOCS3RNA_foldC 
+		return noiseParameter1_observable_SOCS3RNA_foldC 
 	end
 
 	if observableId == "observable_SOCS3_abs" 
 		noiseParameter1_observable_SOCS3_abs = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_SOCS3_abs 
+		return noiseParameter1_observable_SOCS3_abs 
 	end
 
 	if observableId == "observable_SOCS3_au" 
 		noiseParameter1_observable_SOCS3_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_SOCS3_au 
+		return noiseParameter1_observable_SOCS3_au 
 	end
 
 	if observableId == "observable_STAT5_abs" 
 		noiseParameter1_observable_STAT5_abs = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_STAT5_abs 
+		return noiseParameter1_observable_STAT5_abs 
 	end
 
 	if observableId == "observable_pEpoR_au" 
 		noiseParameter1_observable_pEpoR_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_pEpoR_au 
+		return noiseParameter1_observable_pEpoR_au 
 	end
 
 	if observableId == "observable_pJAK2_au" 
 		noiseParameter1_observable_pJAK2_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_pJAK2_au 
+		return noiseParameter1_observable_pJAK2_au 
 	end
 
 	if observableId == "observable_pSTAT5B_rel" 
 		noiseParameter1_observable_pSTAT5B_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_pSTAT5B_rel 
+		return noiseParameter1_observable_pSTAT5B_rel 
 	end
 
 	if observableId == "observable_pSTAT5_au" 
 		noiseParameter1_observable_pSTAT5_au, noiseParameter2_observable_pSTAT5_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_pSTAT5_au + noiseParameter2_observable_pSTAT5_au 
+		return noiseParameter1_observable_pSTAT5_au + noiseParameter2_observable_pSTAT5_au 
 	end
 
 	if observableId == "observable_tSHP1_au" 
 		noiseParameter1_observable_tSHP1_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_tSHP1_au 
+		return noiseParameter1_observable_tSHP1_au 
 	end
 
 	if observableId == "observable_tSTAT5_au" 
 		noiseParameter1_observable_tSTAT5_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_observable_tSTAT5_au 
+		return noiseParameter1_observable_tSTAT5_au 
 	end
 
-	return sdMod
 end
