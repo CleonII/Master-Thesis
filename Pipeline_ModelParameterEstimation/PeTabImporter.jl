@@ -220,6 +220,7 @@ function calcLogLik(dynamicParamEst,
         whichForwardSol = findfirst(x -> x == obsData.conditionId[i], conditionIdSol)
         t = obsData.tObs[i]
         simVal = solArray[whichForwardSol](t)
+
         yMod[i] = evalObs(simVal, t, dynamicParamEst, obsPar, paramData, obsData, obsData.observebleDd[i], obsData.conditionId[i]) 
     end
 
@@ -245,7 +246,8 @@ function calcLogLik(dynamicParamEst,
         if obsData.transformData[i] == :lin
             logLik += log(sdVal[i]) + 0.5*log(2*pi) + 0.5*((yMod[i] - obsData.yObs[i]) / sdVal[i])^2
         elseif obsData.transformData[i] == :log10
-            logLik += log(sdVal[i] * exp10(yMod[i]) * log(10)) + 0.5*log(2*pi) + 0.5*((yMod[i] - obsData.yObs[i]) / sdVal[i])^2
+            #logLik += log(sdVal[i] * exp10(yMod[i]) * log(10)) + 0.5*log(2*pi) + 0.5*((yMod[i] - obsData.yObs[i]) / sdVal[i])^2
+            logLik += log(sdVal[i]) + 0.5*log(2*pi) + 0.5*((yMod[i] - obsData.yObs[i]) / sdVal[i])^2
         else
             println("Transformation ", obsData.transformData[i], "not yet supported.")
         end

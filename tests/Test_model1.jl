@@ -7,6 +7,7 @@
 
 using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
 using ForwardDiff
+using ReverseDiff
 using StatsBase
 using Random
 using LinearAlgebra

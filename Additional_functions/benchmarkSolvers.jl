@@ -217,8 +217,12 @@ function changeToCond!(paramVec,
 
         if !isnothing(i_param)
             paramMapUse[i_param] = Pair(paramMapUse[i_param].first, valChangeTo) 
+            # Ensure that reference paramMap is keept up-to-date 
+            paramMap[i_param] = Pair(paramMap[i_param].first, valChangeTo)
         elseif !isnothing(i_state)
             stateMapUse[i_state] = Pair(stateMapUse[i_state].first, valChangeTo)
+            # Keep reference stateMap up-to-date 
+            stateMap[i_state] = Pair(stateMap[i_state].first, valChangeTo)
         else
             println("Error : Simulation parameter to change not found for experimental condition $expID")
         end
@@ -252,11 +256,16 @@ function changeModelParam!(paramVec,
         param = paramIdChange[i]
 
         valChangeTo = paramEstVec[i]
+        valChangeToFloat = typeof(valChangeTo) <: Union{ForwardDiff.Dual, ForwardDiff.Dual{<:ForwardDiff.Dual}} ? valChangeTo.value : valChangeTo
         # Check for value to change to in parameter file 
         i_param = findfirst(x -> x == param, parameterNamesStr)
 
         if !isnothing(i_param)
             paramMapUse[i_param] = Pair(paramMapUse[i_param].first, valChangeTo) 
+            # Update reference paramMap 
+            if typeof(valChangeToFloat) <: AbstractFloat
+                paramMap[i_param] = Pair(paramMap[i_param].first, valChangeToFloat) 
+            end
         else
             println("Error : Simulation parameter to change not found for experimental condition $expID")
         end
@@ -476,7 +485,7 @@ function solveOdeModelAllCond(prob::ODEProblem,
         solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nExperimentalCond)
 
         for i in eachindex(firstExpIds)
-            firstExpId = firstExpIds[i]
+            firstExpId = firstExpIds[i]            
             t_max = getTimeMax(measurementData, firstExpId)
             solArray[i] = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max, nTSave=nTSave, denseArg=denseArg)
 
@@ -627,18 +636,19 @@ function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64
     end
 
     if typeof(solver) <: Vector{Symbol} && isinf(t_max)
-        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
+        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
     elseif typeof(solver) <: Vector{Symbol} && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
+        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
     elseif !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
-        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
+        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
     elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
-        solveCall = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
+        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
     else
         println("Error : Solver option does not exist")        
     end
 
     sol = solveCall(probUse)
+
     return sol
 end
 
