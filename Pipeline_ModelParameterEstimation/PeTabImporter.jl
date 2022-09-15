@@ -246,8 +246,9 @@ function calcLogLik(dynamicParamEst,
         if obsData.transformData[i] == :lin
             logLik += log(sdVal[i]) + 0.5*log(2*pi) + 0.5*((yMod[i] - obsData.yObs[i]) / sdVal[i])^2
         elseif obsData.transformData[i] == :log10
+            logLik += log(sdVal[i]) + 0.5*log(2*pi) + log(log(10)) + log(exp10(obsData.yObs[i])) + 0.5*( ( log(exp10(yMod[i])) - log(exp10(obsData.yObs[i])) ) / (log(10)*sdVal[i]))^2
             #logLik += log(sdVal[i] * exp10(yMod[i]) * log(10)) + 0.5*log(2*pi) + 0.5*((yMod[i] - obsData.yObs[i]) / sdVal[i])^2
-            logLik += log(sdVal[i]) + 0.5*log(2*pi) + 0.5*((yMod[i] - obsData.yObs[i]) / sdVal[i])^2
+            #logLik += log(sdVal[i]) + 0.5*log(2*pi) + 0.5*((yMod[i] - obsData.yObs[i]) / sdVal[i])^2
         else
             println("Transformation ", obsData.transformData[i], "not yet supported.")
         end
