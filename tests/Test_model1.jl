@@ -148,24 +148,29 @@ function calcCostAnalytic(paramVec)
     # Extract correct parameter for observation i and compute logLik
     logLik = 0.0
     for i in 1:nrow(measurementData)
-        
+
         # Specs for observation i
         obsID = measurementData[i, :observableId]
         noiseID = measurementData[i, :noiseParameters]
         yObs = measurementData[i, :measurement]
         t = measurementData[i, :time]
+        expId = measurementData[i, :simulationConditionId]
+
         # Extract correct sigma 
-        if noiseID == "sd_sebastian_rel"
+        if noiseID == "sd_sebastian_new"
             sigma = paramVec[5]
-        elseif noiseID == "sd_damiano_rel"
-            sigma = paramVec[6]
-        elseif noiseID == "sd_sebastian_new"
-            sigma = paramVec[7]
         elseif noiseID == "sd_damiano_new"
-            sigma = paramVec[8]
+            sigma = paramVec[6]
         end
 
-        sol = solveOde2x2Lin(t, u0, alpha, beta, gamma, delta)
+        # Consider experimental conditions 
+        if expId == "model1_data1"
+            alpha_use = alpha * 0.5
+        else
+            alpha_use = alpha * 1.0
+        end
+
+        sol = solveOde2x2Lin(t, u0, alpha_use, beta, gamma, delta)
         if obsID == "sebastian_measurement"
             yMod = sol[1]
         elseif obsID == "damiano_measurement"
@@ -209,8 +214,8 @@ function testCostGradHess(solver, tol; printRes::Bool=false)
         paramVec = cube[i, :]
 
         # Evaluate cost 
-        costPeTab = evalF(paramVec)
-        costAnalytic = calcCostAnalytic(paramVec)
+        costPeTab = evalF(paramVecEstTmp)
+        costAnalytic = calcCostAnalytic(paramVecEstTmp)
         sqDiffCost = (costPeTab - costAnalytic)^2
         if sqDiffCost > 1e-8
             @printf("sqDiffCost = %.3e\n", sqDiffCost)

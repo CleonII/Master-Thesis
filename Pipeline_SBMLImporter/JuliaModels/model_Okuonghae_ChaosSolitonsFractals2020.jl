@@ -3,6 +3,9 @@
 # Number of species: 9
 function getODEModel_model_Okuonghae_ChaosSolitonsFractals2020()
 
+    ### Define constant parameters
+    Lagos = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t detected_cumulative(t) symptomatic(t) asymptomatic(t) detected(t) exposed(t) deceased(t) recovered(t) susceptible(t)
 
@@ -12,7 +15,7 @@ function getODEModel_model_Okuonghae_ChaosSolitonsFractals2020()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters psi nu gamma_i asymptomatic_start delta symptomatic_start sigma theta Lagos alpha d_0 transmission_rate_effective eps exposed_start gamma_0 d_D gamma_a
+    ModelingToolkit.@parameters psi nu gamma_i asymptomatic_start delta symptomatic_start sigma theta alpha d_0 transmission_rate_effective eps exposed_start gamma_0 d_D gamma_a
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -56,7 +59,6 @@ function getODEModel_model_Okuonghae_ChaosSolitonsFractals2020()
     symptomatic_start => 212.0,
     sigma => 1 / 5.2,
     theta => 1.8999 * (10)^(-12),
-    Lagos => 1.0,
     alpha => 0.5,
     d_0 => 0.015,
     transmission_rate_effective => 0.4236,

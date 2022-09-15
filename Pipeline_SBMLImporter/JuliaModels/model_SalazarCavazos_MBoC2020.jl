@@ -3,6 +3,45 @@
 # Number of species: 75
 function getODEModel_model_SalazarCavazos_MBoC2020()
 
+    ### Define constant parameters
+    volMedia = 0.01
+    c1 = 1.0
+    f = 1.0
+    onrate_f = 1.0
+    Kd_EGF__ = 2.0e-9
+    kon__ = 5.0e6
+    kdephosY1173_f = 1.0
+    ratio_kdephosY1173 = 1.0
+    kp_SE = 8.30269638367756e-6
+    kon_EGF__ = 8.0e6
+    Kd_EGF = 1.204428e6
+    km_SE = 3.0
+    NA = 6.02214e23
+    km_GE = 3.0
+    EGFR_total = 770000.0
+    ratio_kphosY1173 = 1.0
+    KD_dim = 38500.0
+    Vc = 1.0e-12
+    offrate_f = 1.0
+    GRB2_f = 1.0
+    km_dim_L_L = 0.273
+    km_EGF = 0.016
+    kon_EGF = 8.0e6
+    ratio_kphos_receiver = 0.7
+    kp_dim_L_L_pre = 7.09090909090909e-6
+    numCells = 1.0e7
+    kp_dim_L_L = 7.09090909090909e-6
+    Vextra = 1.0e-9
+    _rateLaw1 = 3.54545454545454e-6
+    kp_EGF = 1.32843142138841e-8
+    kphos_f = 1.0
+    Kd_GE = 361328.4
+    km_dim_L_L_pre = 0.273
+    kp_GE = 8.30269638367756e-6
+    kon = 5.0e6
+    Kd_SE = 361328.4
+    kdephosY1068_f = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t species_61(t) species_10(t) species_21(t) species_47(t) species_17(t) species_1(t) species_43(t) species_52(t) species_45(t) species_20(t) species_49(t) species_12(t) species_35(t) species_16(t) species_26(t) species_73(t) species_59(t) species_13(t) species_27(t) species_71(t) species_74(t) species_58(t) species_4(t) species_28(t) species_44(t) species_3(t) species_68(t) species_22(t) species_72(t) species_7(t) species_14(t) species_66(t) species_25(t) species_60(t) species_6(t) species_30(t) species_75(t) species_36(t) species_50(t) species_19(t) species_5(t) species_64(t) species_33(t) species_69(t) species_39(t) species_55(t) species_24(t) species_48(t) species_62(t) species_53(t) species_41(t) species_51(t) species_54(t) species_18(t) species_67(t) species_57(t) species_63(t) species_23(t) species_56(t) species_37(t) species_42(t) species_32(t) species_2(t) species_46(t) species_65(t) species_31(t) species_29(t) species_40(t) species_38(t) species_8(t) species_34(t) species_9(t) species_15(t) species_11(t) species_70(t)
 
@@ -12,7 +51,7 @@ function getODEModel_model_SalazarCavazos_MBoC2020()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters volMedia SHC1_total__FREE kp_SE kon_EGF__ km_GE km_dim_L_L kon_EGF ratio_kphos_receiver kp_EGF kphos_f kp_GE kon c1 ratio_kpkd_YN__FREE onrate_f kon__ ratio_kpkd_Y1068__FREE Kd_EGF km_SE EGFR_total ratio_kphosY1173 offrate_f kp_dim_L_L_pre numCells Vextra EGFconc GRB2_total__FREE kdephosY1068_f f Kd_EGF__ kdephosYN__FREE NA GRB2_f km_EGF Kd_GE km_dim_L_L_pre kdephosY1068__FREE kdephosY1173_f ratio_kdephosY1173 KD_dim Vc kp_dim_L_L _rateLaw1 Kd_SE
+    ModelingToolkit.@parameters SHC1_total__FREE ratio_kpkd_YN__FREE ratio_kpkd_Y1068__FREE EGFconc GRB2_total__FREE kdephosYN__FREE kdephosY1068__FREE
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -96,7 +135,7 @@ function getODEModel_model_SalazarCavazos_MBoC2020()
     D(species_15) ~ +1.0 * ( 1 /c1 ) * (km_dim_L_L * species_9)+1.0 * ( 1 /c1 ) * (km_dim_L_L * species_12)-1.0 * ( 1 /c1 ) * (km_EGF * species_15)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_5 * species_15)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_15)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_5 * species_15)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_15)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_15)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_15)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_16)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_16)-1.0 * ( 1 /c1 ) * (kdephosY1068__FREE * kdephosY1173_f * ratio_kdephosY1173 * species_15)-1.0 * ( 1 /c1 ) * (kp_SE * species_4 * species_15)+1.0 * ( 1 /c1 ) * (kp_EGF * species_1 * species_28)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_30)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_31)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_32)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_33)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_34)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_30)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_31)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_32)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_33)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_34)+1.0 * ( 1 /c1 ) * (kdephosY1068__FREE * kdephosY1068_f * species_30)+1.0 * ( 1 /c1 ) * (kdephosYN__FREE * species_32)+1.0 * ( 1 /c1 ) * (km_SE * species_34)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_50)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_51)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_52)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_53)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_54)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_50)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_51)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_52)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_53)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_54)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_66)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_67)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_68)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_66)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_67)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_68)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_74)-1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_74),
     D(species_11) ~ +1.0 * ( 1 /c1 ) * (kdephosY1068__FREE * kphos_f * ratio_kphos_receiver * ratio_kpkd_Y1068__FREE * species_7)-1.0 * ( 1 /c1 ) * (km_dim_L_L * species_11)-1.0 * ( 1 /c1 ) * (kdephosY1068__FREE * kphos_f * ratio_kphosY1173 * ratio_kphos_receiver * ratio_kpkd_Y1068__FREE * species_11)-1.0 * ( 1 /c1 ) * (kdephosYN__FREE * kphos_f * ratio_kphos_receiver * ratio_kpkd_YN__FREE * species_11)-1.0 * ( 1 /c1 ) * (kdephosY1068__FREE * kdephosY1068_f * species_11)-1.0 * ( 1 /c1 ) * (kp_GE * species_3 * species_11)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_5 * species_14)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_14)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_15)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_16)+1.0 * ( 1 /c1 ) * (kdephosY1068__FREE * kdephosY1173_f * ratio_kdephosY1173 * species_20)+1.0 * ( 1 /c1 ) * (kdephosYN__FREE * species_21)+1.0 * ( 1 /c1 ) * (km_GE * species_24)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_30)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_31)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_32)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_33)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_34)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_50)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_51)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_52)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_53)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_54)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_66)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_67)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_68)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_74),
     D(species_70) ~ +1.0 * ( 1 /c1 ) * (kdephosYN__FREE * kphos_f * ratio_kphos_receiver * ratio_kpkd_YN__FREE * species_60)+1.0 * ( 1 /c1 ) * (kp_GE * species_3 * species_57)+1.0 * ( 1 /c1 ) * (kp_SE * species_4 * species_58)-1.0 * ( 1 /c1 ) * (km_dim_L_L * species_70)-1.0 * ( 1 /c1 ) * (kdephosYN__FREE * species_70)-1.0 * ( 1 /c1 ) * (km_GE * species_70)-1.0 * ( 1 /c1 ) * (km_SE * species_70)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_5 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_14 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_15 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_16 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_30 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_31 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_32 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_33 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_34 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_50 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_51 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_52 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_53 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_54 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_66 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_67 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_68 * species_74)+1.0 * ( 1 /c1 ) * (_rateLaw1 * species_74 * species_74),
-    D(dummyVariable) ~ +volMedia+f+c1+onrate_f+Kd_EGF__+kon__+SHC1_total__FREE+kon_EGF__+Kd_EGF+NA+EGFR_total+KD_dim+Vc+offrate_f+GRB2_f+kon_EGF+kp_dim_L_L+kp_dim_L_L_pre+numCells+Vextra+Kd_GE+EGFconc+km_dim_L_L_pre+GRB2_total__FREE+kon+Kd_SE
+    D(dummyVariable) ~ +GRB2_f+f+EGFconc+NA+Vextra+EGFR_total+GRB2_total__FREE+SHC1_total__FREE
     ]
 
     @named sys = ODESystem(eqs)
@@ -182,50 +221,13 @@ function getODEModel_model_SalazarCavazos_MBoC2020()
 
     ### True parameter values ###
     trueParameterValues = [
-    volMedia => 0.01,
     SHC1_total__FREE => 649425.601209904,
-    kp_SE => 8.30269638367756e-6,
-    kon_EGF__ => 8.0e6,
-    km_GE => 3.0,
-    km_dim_L_L => 0.273,
-    kon_EGF => 8.0e6,
-    ratio_kphos_receiver => 0.7,
-    kp_EGF => 1.32843142138841e-8,
-    kphos_f => 1.0,
-    kp_GE => 8.30269638367756e-6,
-    kon => 5.0e6,
-    c1 => 1.0,
     ratio_kpkd_YN__FREE => 0.444763568711772,
-    onrate_f => 1.0,
-    kon__ => 5.0e6,
     ratio_kpkd_Y1068__FREE => 0.157545857345931,
-    Kd_EGF => 1.204428e6,
-    km_SE => 3.0,
-    EGFR_total => 770000.0,
-    ratio_kphosY1173 => 1.0,
-    offrate_f => 1.0,
-    kp_dim_L_L_pre => 7.09090909090909e-6,
-    numCells => 1.0e7,
-    Vextra => 1.0e-9,
     EGFconc => 2.5e-8,
     GRB2_total__FREE => 169853.194222305,
-    kdephosY1068_f => 1.0,
-    f => 1.0,
-    Kd_EGF__ => 2.0e-9,
     kdephosYN__FREE => 0.0171818697984827,
-    NA => 6.02214e23,
-    GRB2_f => 1.0,
-    km_EGF => 0.016,
-    Kd_GE => 361328.4,
-    km_dim_L_L_pre => 0.273,
-    kdephosY1068__FREE => 1.65881421368777,
-    kdephosY1173_f => 1.0,
-    ratio_kdephosY1173 => 1.0,
-    KD_dim => 38500.0,
-    Vc => 1.0e-12,
-    kp_dim_L_L => 7.09090909090909e-6,
-    _rateLaw1 => 3.54545454545454e-6,
-    Kd_SE => 361328.4]
+    kdephosY1068__FREE => 1.65881421368777]
 
     return sys, initialSpeciesValues, trueParameterValues
 

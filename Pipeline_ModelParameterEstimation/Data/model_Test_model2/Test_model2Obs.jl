@@ -1,6 +1,6 @@
 function Test_model2(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
 
-	sebastian, damiano, dummyVariable= u 
+	sebastian, damiano= u 
 	alpha, beta = dynPar 
 
 	if observableId == "sebastian_measurement" 
@@ -11,34 +11,31 @@ function Test_model2(u, t, dynPar, obsPar, paramData, obsData, observableId, sim
 		return damiano 
 	end
 
-	return yMod
 end
 
 function Test_model2_t0!(u0Vec, paramVec) 
 
-	alpha, default, beta = paramVec 
+	alpha, beta = paramVec 
 
-	sebastian = 8.0 
-	damiano = 4.0 
-	dummyVariable = 0.0 
+	sebastian = 8 
+	damiano = 4 
 
-	u0Vec .= sebastian, damiano, dummyVariable
+	u0Vec .= sebastian, damiano
 end
 
 function Test_model2_sd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
 
-	sebastian, damiano, dummyVariable= u 
+	sebastian, damiano= u 
 	alpha, beta = dynPar 
 
 	if observableId == "sebastian_measurement" 
 		noiseParameter1_sebastian_measurement = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_sebastian_measurement 
+		return noiseParameter1_sebastian_measurement 
 	end
 
 	if observableId == "damiano_measurement" 
 		noiseParameter1_damiano_measurement = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
-		sdMod = noiseParameter1_damiano_measurement 
+		return noiseParameter1_damiano_measurement 
 	end
 
-	return sdMod
 end

@@ -3,6 +3,9 @@
 # Number of species: 9
 function getODEModel_model_Fujita_SciSignal2010()
 
+    ### Define constant parameters
+    Cell = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t pAkt_S6(t) pAkt(t) pS6(t) EGFR(t) pEGFR_Akt(t) pEGFR(t) Akt(t) S6(t) EGF_EGFR(t)
 
@@ -13,7 +16,7 @@ function getODEModel_model_Fujita_SciSignal2010()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters EGF_end reaction_5_k1 reaction_2_k2 init_AKT init_EGFR EGF_rate EGFR_turnover reaction_1_k1 reaction_1_k2 reaction_8_k1 reaction_4_k1 reaction_6_k1 reaction_2_k1 init_S6 reaction_7_k1 reaction_9_k1 reaction_3_k1 reaction_5_k2 Cell EGF_0
+    ModelingToolkit.@parameters EGF_end reaction_5_k1 reaction_2_k2 init_AKT init_EGFR EGF_rate EGFR_turnover reaction_1_k1 reaction_1_k2 reaction_8_k1 reaction_4_k1 reaction_6_k1 reaction_2_k1 init_S6 reaction_7_k1 reaction_9_k1 reaction_3_k1 reaction_5_k2 EGF_0
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -74,7 +77,6 @@ function getODEModel_model_Fujita_SciSignal2010()
     reaction_9_k1 => 0.0273281571867514,
     reaction_3_k1 => 0.454840577578597,
     reaction_5_k2 => 0.000404055756190126,
-    Cell => 1.0,
     EGF_0 => 0.0]
 
     return sys, initialSpeciesValues, trueParameterValues

@@ -3,6 +3,10 @@
 # Number of species: 25
 function getODEModel_model_Bachmann_MSB2011()
 
+    ### Define constant parameters
+    cyt = 0.4
+    nuc = 0.275
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t p1EpoRpJAK2(t) pSTAT5(t) EpoRJAK2_CIS(t) SOCS3nRNA4(t) SOCS3RNA(t) SHP1(t) STAT5(t) EpoRJAK2(t) CISnRNA1(t) SOCS3nRNA1(t) SOCS3nRNA2(t) CISnRNA3(t) CISnRNA4(t) SOCS3(t) CISnRNA5(t) SOCS3nRNA5(t) SOCS3nRNA3(t) SHP1Act(t) npSTAT5(t) p12EpoRpJAK2(t) p2EpoRpJAK2(t) CIS(t) EpoRpJAK2(t) CISnRNA2(t) CISRNA(t)
 
@@ -12,7 +16,7 @@ function getODEModel_model_Bachmann_MSB2011()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters STAT5Exp STAT5Imp init_SOCS3_multiplier EpoRCISRemove STAT5ActEpoR SHP1ActEpoR JAK2EpoRDeaSHP1 CISTurn SOCS3Turn init_EpoRJAK2_CIS SOCS3Inh ActD init_CIS_multiplier cyt CISRNAEqc JAK2ActEpo Epo SOCS3oe CISInh SHP1Dea SOCS3EqcOE CISRNADelay init_SHP1 CISEqcOE EpoRActJAK2 SOCS3RNAEqc CISEqc SHP1ProOE SOCS3RNADelay init_STAT5 CISoe CISRNATurn init_SHP1_multiplier init_EpoRJAK2 nuc EpoRCISInh STAT5ActJAK2 SOCS3RNATurn SOCS3Eqc
+    ModelingToolkit.@parameters STAT5Exp STAT5Imp init_SOCS3_multiplier EpoRCISRemove STAT5ActEpoR SHP1ActEpoR JAK2EpoRDeaSHP1 CISTurn SOCS3Turn init_EpoRJAK2_CIS SOCS3Inh ActD init_CIS_multiplier CISRNAEqc JAK2ActEpo Epo SOCS3oe CISInh SHP1Dea SOCS3EqcOE CISRNADelay init_SHP1 CISEqcOE EpoRActJAK2 SOCS3RNAEqc CISEqc SHP1ProOE SOCS3RNADelay init_STAT5 CISoe CISRNATurn init_SHP1_multiplier init_EpoRJAK2 EpoRCISInh STAT5ActJAK2 SOCS3RNATurn SOCS3Eqc
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -95,7 +99,6 @@ function getODEModel_model_Bachmann_MSB2011()
     SOCS3Inh => 10.4078649133666,
     ActD => 1.25e-7,
     init_CIS_multiplier => 0.0,
-    cyt => 0.4,
     CISRNAEqc => 1.0,
     JAK2ActEpo => 633167.430600806,
     Epo => 1.25e-7,
@@ -116,7 +119,6 @@ function getODEModel_model_Bachmann_MSB2011()
     CISRNATurn => 999.999999999946,
     init_SHP1_multiplier => 1.0,
     init_EpoRJAK2 => 3.97622369384192,
-    nuc => 0.275,
     EpoRCISInh => 999999.999999912,
     STAT5ActJAK2 => 0.0781068855795467,
     SOCS3RNATurn => 0.00830917643120369,

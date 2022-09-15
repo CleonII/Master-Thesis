@@ -1,7 +1,10 @@
-# Model name: Test_model1
-# Number of parameters: 4
+# Model name: model_Test_model1
+# Number of parameters: 5
 # Number of species: 2
-function getODEModel_Test_model1()
+function getODEModel_model_Test_model1()
+
+    ### Define constant parameters
+    default = 1.0
 
     ### Define independent and dependent variables
     ModelingToolkit.@variables t sebastian(t) damiano(t)
@@ -12,7 +15,7 @@ function getODEModel_Test_model1()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters default alpha gamma delta beta
+    ModelingToolkit.@parameters alpha gamma delta beta alpha_scale
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -21,9 +24,9 @@ function getODEModel_Test_model1()
 
     ### Derivatives ###
     eqs = [
-    D(sebastian) ~ +1.0 * ( 1 /default ) * (alpha * sebastian + beta * damiano),
+    D(sebastian) ~ +1.0 * ( 1 /default ) * (alpha*alpha_scale * sebastian + beta * damiano),
     D(damiano) ~ +1.0 * ( 1 /default ) * (gamma * sebastian + delta * damiano),
-    D(dummyVariable) ~ +default
+    D(dummyVariable) ~ +alpha
     ]
 
     @named sys = ODESystem(eqs)
@@ -36,11 +39,11 @@ function getODEModel_Test_model1()
 
     ### True parameter values ###
     trueParameterValues = [
-    default => 1.0,
     alpha => 5.0,
     gamma => 3.0,
     delta => 5.0,
-    beta => 3.0]
+    beta => 3.0, 
+    alpha_scale => 1.0]
 
     return sys, initialSpeciesValues, trueParameterValues
 

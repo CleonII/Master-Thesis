@@ -3,6 +3,9 @@
 # Number of species: 33
 function getODEModel_model_Lucarelli_CellSystems2018()
 
+    ### Define constant parameters
+    cell = 13.17
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t ppS3_ppS3_ppS3(t) ppS3_S4_S4(t) geneH(t) geneI(t) geneJ(t) TGFb_pRec(t) geneE(t) S4(t) ppS2_ppS2_ppS2(t) geneK(t) pS2(t) pS3(t) geneC(t) ppS2_ppS2_ppS3(t) geneF(t) S4_S4_S4(t) TGFb(t) S3(t) S2(t) S2_S4_S4(t) ppS3_ppS3_S4(t) geneB(t) ppS3(t) geneA(t) geneD(t) ppS2_S4_S4(t) geneL(t) ppS2_ppS3_S4(t) geneG(t) Rec(t) ppS2_ppS2_S4(t) ppS2_ppS3_ppS3(t) ppS2(t)
 
@@ -12,7 +15,7 @@ function getODEModel_model_Lucarelli_CellSystems2018()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters geneC_inh3 geneJ_act1 geneG_inh1 init_Rec geneC_act3 geneA_inh2 geneK_turn geneA_act3 geneI_act2 geneA_act2 geneD_inh2 k_223 k_233 geneB_act1 S_dephosphos geneG_act1 geneH_inh2 geneI_act1 geneB_inh3 geneI_inh2 geneC_turn geneJ_inh1 geneK_act3 geneJ_inh3 geneG_inh3 geneC_act2 init_TGFb geneL_inh1 geneE_inh3 geneF_act3 cell geneF_inh1 geneD_act3 geneE_act2 geneD_inh3 k_234 geneH_act2 geneA_turn geneL_act1 geneH_act1 geneL_inh2 geneB_turn init_S4 geneL_inh3 khomo2 geneK_act2 geneA_inh3 geneJ_act2 geneI_inh3 geneD_act1 geneJ_turn geneG_act3 geneL_act2 Rec_act geneI_act3 k_224 pRec_degind geneE_inh2 geneF_inh2 geneC_act1 geneD_inh1 k_344 init_S3 geneI_inh1 geneL_turn geneF_act2 k_on_u geneE_inh1 geneH_act3 geneH_inh1 geneK_inh3 geneE_act1 geneA_inh1 geneB_inh1 geneH_inh3 geneD_turn S_dephos geneL_act3 S_phos geneG_turn geneA_act1 geneI_turn khomo3 geneC_inh1 geneG_act2 init_S2 geneK_inh2 k_334 geneB_inh2 geneH_turn geneJ_inh2 khomo4 geneB_act2 geneF_turn geneJ_act3 geneK_inh1 geneB_act3 geneK_act1 geneE_turn geneE_act3 geneG_inh2 kdiss_SS k_244 geneD_act2 geneF_inh3 geneF_act1 geneC_inh2
+    ModelingToolkit.@parameters geneC_inh3 geneJ_act1 geneG_inh1 init_Rec geneC_act3 geneA_inh2 geneK_turn geneA_act3 geneI_act2 geneA_act2 geneD_inh2 k_223 k_233 geneB_act1 S_dephosphos geneG_act1 geneH_inh2 geneI_act1 geneB_inh3 geneI_inh2 geneC_turn geneJ_inh1 geneK_act3 geneJ_inh3 geneG_inh3 geneC_act2 init_TGFb geneL_inh1 geneE_inh3 geneF_act3 geneF_inh1 geneD_act3 geneE_act2 geneD_inh3 k_234 geneH_act2 geneA_turn geneL_act1 geneH_act1 geneL_inh2 geneB_turn init_S4 geneL_inh3 khomo2 geneK_act2 geneA_inh3 geneJ_act2 geneI_inh3 geneD_act1 geneJ_turn geneG_act3 geneL_act2 Rec_act geneI_act3 k_224 pRec_degind geneE_inh2 geneF_inh2 geneC_act1 geneD_inh1 k_344 init_S3 geneI_inh1 geneL_turn geneF_act2 k_on_u geneE_inh1 geneH_act3 geneH_inh1 geneK_inh3 geneE_act1 geneA_inh1 geneB_inh1 geneH_inh3 geneD_turn S_dephos geneL_act3 S_phos geneG_turn geneA_act1 geneI_turn khomo3 geneC_inh1 geneG_act2 init_S2 geneK_inh2 k_334 geneB_inh2 geneH_turn geneJ_inh2 khomo4 geneB_act2 geneF_turn geneJ_act3 geneK_inh1 geneB_act3 geneK_act1 geneE_turn geneE_act3 geneG_inh2 kdiss_SS k_244 geneD_act2 geneF_inh3 geneF_act1 geneC_inh2
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -128,7 +131,6 @@ function getODEModel_model_Lucarelli_CellSystems2018()
     geneL_inh1 => 1.29976503414042,
     geneE_inh3 => 9.67035015330535,
     geneF_act3 => 20.6442242166861,
-    cell => 13.17,
     geneF_inh1 => 3.63157061548523,
     geneD_act3 => 0.0,
     geneE_act2 => 1.03661055568903,

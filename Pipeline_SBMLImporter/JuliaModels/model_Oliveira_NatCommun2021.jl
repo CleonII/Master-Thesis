@@ -3,6 +3,9 @@
 # Number of species: 9
 function getODEModel_model_Oliveira_NatCommun2021()
 
+    ### Define constant parameters
+    Interior = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t Hospital(t) Symptomatic(t) Cumulative_cases(t) Asymptomatic(t) Exposed(t) ICU(t) Recovered(t) Deaths(t) Susceptible(t)
 
@@ -12,7 +15,7 @@ function getODEModel_model_Oliveira_NatCommun2021()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters asymptomatic_init_concentration beta_2_multiplier t_2 gamma_u exposed_init_concentration omega_u kappa h_hosp_rate xi delta_ t_1 beta_0 symptomatic_init_concentration Interior mu_u omega_h mu_h beta_2 beta_1 population p_symp_rate gamma_s gamma_h gamma_a
+    ModelingToolkit.@parameters asymptomatic_init_concentration beta_2_multiplier t_2 gamma_u exposed_init_concentration omega_u kappa h_hosp_rate xi delta_ t_1 beta_0 symptomatic_init_concentration mu_u omega_h mu_h beta_2 beta_1 population p_symp_rate gamma_s gamma_h gamma_a
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -63,7 +66,6 @@ function getODEModel_model_Oliveira_NatCommun2021()
     t_1 => 23.4530530945,
     beta_0 => 0.807194090959563,
     symptomatic_init_concentration => 1.99259135560373e-6,
-    Interior => 1.0,
     mu_u => 0.4,
     omega_h => 0.14,
     mu_h => 0.15,

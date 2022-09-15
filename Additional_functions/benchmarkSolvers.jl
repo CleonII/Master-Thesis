@@ -544,6 +544,7 @@ function solveOdeModelAllCond!(solArray::Array{Union{OrdinaryDiffEq.ODEComposite
                 sucess = false
                 break 
             end
+
         end
     end
 
@@ -592,7 +593,7 @@ function solveOdeSS(prob::ODEProblem,
 
     changeToCondUse!(prob.p, prob.u0, firstExpId)
     u0_pre = deepcopy(prob.u0)
-    prob = remake(prob, tspan = (0.0, 1e6))
+    prob = remake(prob, tspan = (0.0, 1e6), p = prob.p[:], u0 = prob.u0[:])
     sol_pre = solveCallPre(prob)
     # In case a steady state was not reached 
     if sol_pre.retcode != :Terminated
@@ -615,7 +616,7 @@ end
 function solveOdeNoSS(prob, changeToCondUse!::Function, firstExpId, tol::Float64, solver, t_max::Float64; tSave=Float64[], nTSave::Int64=0, denseArg=true)
 
     changeToCondUse!(prob.p, prob.u0, firstExpId)
-    probUse = remake(prob, tspan=(0.0, t_max))
+    probUse = remake(prob, tspan=(0.0, t_max), u0 = prob.u0[:], p = prob.p[:])
     t_max = probUse.tspan[2]
 
     # Check that for no clash between number of data-points to save tSave (only one can be activate)    

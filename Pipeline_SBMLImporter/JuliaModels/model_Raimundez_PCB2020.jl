@@ -3,6 +3,9 @@
 # Number of species: 22
 function getODEModel_model_Raimundez_PCB2020()
 
+    ### Define constant parameters
+    cyt = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t EGFR(t) pPI3K(t) MMET_METinh_2(t) pMAPK(t) MMET_2(t) pEGFR_EGF_2(t) pEGFR_EGF_2_i(t) pMPI3K(t) EGFR_EGF_2(t) MMET(t) pMMET_2(t) RAS_GTP(t) pMMET_2_i(t) pMMET_pEGFR_i(t) MMET_MMET_METinh(t) pAKT(t) EGFR_EGF(t) MMET_METinh(t) MMET_EGFR(t) EGFR_CET(t) pMMET_pEGFR(t) EGFR_MMET_METinh(t)
 
@@ -12,7 +15,7 @@ function getODEModel_model_Raimundez_PCB2020()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters d_ksyn_EGFR__fm_2_hm xi_kexp_pMMET_2_i d_ka_RAS__pEGFR_EGF_2__MKN1_2_HS746T d_ka_MAPK__MKN1_2_HS746T ki_RAS__MKN1 d_ka_AKT__MKN1_2_HS746T KD_EGFR_CET xi_ka_PI3K_pMMET_2 d_MAPKtotal__fm_2_hm d_ksyn_MMET__fm_2_hm ka_PI3K__basal d_kimp_pEGFR_EGF_2__MKN1_2_HS746T d_AKTtotal__fm_2_hm KD_METinh xi_ki_MPI3K d_kexp_pEGFR_EGF_2_i__MKN1_2_HS746T d_ksyn_EGFR__MKN1_2_HS746T d_MPI3Ktotal__fm_2_hm d_kdeg_membran__MKN1_2_HS746T MPI3Ktotal__MKN1_fm KD_EGFR_EGF kexp_pEGFR_EGF_2_i__MKN1 CET_level kbin_EGFR_EGF ksyn_EGFR__MKN1_fm xi_kdeg_pMMET_pEGFR_i d_ki_PI3K__MKN1_2_HS746T xi_kpho_MMET_EGFR MAPKtotal__MKN1_fm xi_kexp_pMMET_pEGFR_i d_RAStotal__MKN1_2_HS746T kpho_EGFR_EGF ka_MAPK__MKN1 kpho_MMET_EGFR full_medium xi_ka_RAS_pMMET_2 xi_kimp_pMMET_pEGFR xi_kdeg_pMMET_2_i ka_RAS__basal__MKN1 d_RAStotal__fm_2_hm kdim_MMET MKN1 ksyn_MMET__HS746T_fm kdim_MMET_EGFR ka_PI3K__pEGFR_EGF_2 kdeg_membran__MKN1 HS746T d_ki_RAS__MKN1_2_HS746T EGF_level kdim_EGFR_EGF kbin_EGFR_CET ka_AKT__MKN1 d_ki_AKT__MKN1_2_HS746T PI3Ktotal__HS746T_fm ki_PI3K__MKN1 kpho_MMET AKTtotal__MKN1_fm xi_kimp_pMMET_2 relative_ksyn_EGFR ka_RAS__pEGFR_EGF_2__MKN1 ki_MAPK cyt kimp_pEGFR_EGF_2__MKN1 d_AKTtotal__MKN1_2_HS746T ki_AKT__MKN1 RAStotal__MKN1_fm d_PI3Ktotal__fm_2_hm xi_ka_PI3K_pMMET_pEGFR xi_kdim_MMET_EGFR xi_kpho_MMET METinh_level kdim_MMETinh d_MAPKtotal__MKN1_2_HS746T xi_ka_RAS_pMMET_pEGFR kdeg_pEGFR_EGF_2_i__MKN1 xi_kdim_MMET d_kdeg_pEGFR_EGF_2_i__MKN1_2_HS746T d_ka_RAS__basal__MKN1_2_HS746T hunger_medium
+    ModelingToolkit.@parameters d_ksyn_EGFR__fm_2_hm xi_kexp_pMMET_2_i d_ka_RAS__pEGFR_EGF_2__MKN1_2_HS746T d_ka_MAPK__MKN1_2_HS746T ki_RAS__MKN1 d_ka_AKT__MKN1_2_HS746T KD_EGFR_CET xi_ka_PI3K_pMMET_2 d_MAPKtotal__fm_2_hm d_ksyn_MMET__fm_2_hm ka_PI3K__basal d_kimp_pEGFR_EGF_2__MKN1_2_HS746T d_AKTtotal__fm_2_hm KD_METinh xi_ki_MPI3K d_kexp_pEGFR_EGF_2_i__MKN1_2_HS746T d_ksyn_EGFR__MKN1_2_HS746T d_MPI3Ktotal__fm_2_hm d_kdeg_membran__MKN1_2_HS746T MPI3Ktotal__MKN1_fm KD_EGFR_EGF kexp_pEGFR_EGF_2_i__MKN1 CET_level kbin_EGFR_EGF ksyn_EGFR__MKN1_fm xi_kdeg_pMMET_pEGFR_i d_ki_PI3K__MKN1_2_HS746T xi_kpho_MMET_EGFR MAPKtotal__MKN1_fm xi_kexp_pMMET_pEGFR_i d_RAStotal__MKN1_2_HS746T kpho_EGFR_EGF ka_MAPK__MKN1 kpho_MMET_EGFR full_medium xi_ka_RAS_pMMET_2 xi_kimp_pMMET_pEGFR xi_kdeg_pMMET_2_i ka_RAS__basal__MKN1 d_RAStotal__fm_2_hm kdim_MMET MKN1 ksyn_MMET__HS746T_fm kdim_MMET_EGFR ka_PI3K__pEGFR_EGF_2 kdeg_membran__MKN1 HS746T d_ki_RAS__MKN1_2_HS746T EGF_level kdim_EGFR_EGF kbin_EGFR_CET ka_AKT__MKN1 d_ki_AKT__MKN1_2_HS746T PI3Ktotal__HS746T_fm ki_PI3K__MKN1 kpho_MMET AKTtotal__MKN1_fm xi_kimp_pMMET_2 relative_ksyn_EGFR ka_RAS__pEGFR_EGF_2__MKN1 ki_MAPK kimp_pEGFR_EGF_2__MKN1 d_AKTtotal__MKN1_2_HS746T ki_AKT__MKN1 RAStotal__MKN1_fm d_PI3Ktotal__fm_2_hm xi_ka_PI3K_pMMET_pEGFR xi_kdim_MMET_EGFR xi_kpho_MMET METinh_level kdim_MMETinh d_MAPKtotal__MKN1_2_HS746T xi_ka_RAS_pMMET_pEGFR kdeg_pEGFR_EGF_2_i__MKN1 xi_kdim_MMET d_kdeg_pEGFR_EGF_2_i__MKN1_2_HS746T d_ka_RAS__basal__MKN1_2_HS746T hunger_medium
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -137,7 +140,6 @@ function getODEModel_model_Raimundez_PCB2020()
     relative_ksyn_EGFR => 1.0,
     ka_RAS__pEGFR_EGF_2__MKN1 => 1.46548915399828e-5,
     ki_MAPK => 2.17715931380425,
-    cyt => 1.0,
     kimp_pEGFR_EGF_2__MKN1 => 0.746870204508838,
     d_AKTtotal__MKN1_2_HS746T => 0.0,
     ki_AKT__MKN1 => 18.4692967396058,

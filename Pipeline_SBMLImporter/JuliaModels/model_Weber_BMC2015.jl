@@ -3,6 +3,10 @@
 # Number of species: 7
 function getODEModel_model_Weber_BMC2015()
 
+    ### Define constant parameters
+    cyt = 1.0
+    u2 = 0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t CERTERa(t) PI4K3B(t) CERT(t) CERTTGNa(t) PKDDAGa(t) PKD(t) PI4K3Ba(t)
 
@@ -13,7 +17,7 @@ function getODEModel_model_Weber_BMC2015()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters a21 m33 kb_NB142_70_dose a22 kb_NB142_70_time p12 p33 s31 PdBu_dose a12 p22 a33 p13 cyt pu5 pu2 p31 pu4 PdBu_time s12 m11 m31 u2 Ect_Expr_PI4K3beta_flag a11 p32 p21 pu6 s21 pu3 m22 p11 Ect_Expr_CERT_flag a31 a32
+    ModelingToolkit.@parameters a21 m33 kb_NB142_70_dose a22 kb_NB142_70_time p12 p33 s31 PdBu_dose a12 p22 a33 p13 pu5 pu2 p31 pu4 PdBu_time s12 m11 m31 Ect_Expr_PI4K3beta_flag a11 p32 p21 pu6 s21 pu3 m22 p11 Ect_Expr_CERT_flag a31 a32
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -69,7 +73,6 @@ function getODEModel_model_Weber_BMC2015()
     p22 => 21.3989931197985,
     a33 => 0.00010000000000001,
     p13 => 0.00183182922741504,
-    cyt => 1.0,
     pu5 => 33.7869036338953,
     pu2 => 1.0,
     p31 => 2428.01870197136,
@@ -78,7 +81,6 @@ function getODEModel_model_Weber_BMC2015()
     s12 => 88884.6918603076,
     m11 => 9.99999999999902e9,
     m31 => 9.98783985509162e9,
-    u2 => 0,
     Ect_Expr_PI4K3beta_flag => 0.0,
     a11 => 0.183516872816456,
     p32 => 17.1128427194665,

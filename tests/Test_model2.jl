@@ -189,7 +189,7 @@ function testCostGradHess(solver, tol; printRes::Bool=false)
         gradAnalytic = ForwardDiff.gradient(calcCostAnalytic, paramVec)
         gradNumeric = zeros(nParam); evalGradF(paramVec, gradNumeric)
         sqDiffGrad = sum((gradAnalytic - gradNumeric).^2)
-        if sqDiffGrad > 1e-6
+        if sqDiffGrad > 1e-4
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("Does not pass test on gradient\n")
             return false
@@ -199,7 +199,7 @@ function testCostGradHess(solver, tol; printRes::Bool=false)
         hessAnalytic = ForwardDiff.hessian(calcCostAnalytic, paramVec)
         hessNumeric = zeros(nParam, nParam); evalH(hessNumeric, paramVec)
         sqDiffHess = sum((hessAnalytic - hessNumeric).^2)
-        if sqDiffHess > 1e-4
+        if sqDiffHess > 1e-3
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
             @printf("Does not pass test on hessian\n")
             return false

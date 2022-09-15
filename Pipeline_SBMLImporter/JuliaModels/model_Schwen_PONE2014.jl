@@ -3,6 +3,9 @@
 # Number of species: 11
 function getODEModel_model_Schwen_PONE2014()
 
+    ### Define constant parameters
+    ExtracellularMedium = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t IR2(t) IR2in(t) Rec2(t) IR1in(t) Uptake1(t) Uptake2(t) InsulinFragments(t) IR1(t) Rec1(t) Ins(t) BoundUnspec(t)
 
@@ -12,7 +15,7 @@ function getODEModel_model_Schwen_PONE2014()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters ka1 ini_R2fold kout ini_R1 kout_frag koff_unspec kin ka2fold kin2 kd1 kon_unspec init_Ins kd2fold ExtracellularMedium kout2
+    ModelingToolkit.@parameters ka1 ini_R2fold kout ini_R1 kout_frag koff_unspec kin ka2fold kin2 kd1 kon_unspec init_Ins kd2fold kout2
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -67,7 +70,6 @@ function getODEModel_model_Schwen_PONE2014()
     kon_unspec => 19.941427249128,
     init_Ins => 0.0,
     kd2fold => 9.61850107655493,
-    ExtracellularMedium => 1.0,
     kout2 => 0.0529079560976487]
 
     return sys, initialSpeciesValues, trueParameterValues

@@ -3,6 +3,9 @@
 # Number of species: 4
 function getODEModel_model_Beer_MolBioSystems2014()
 
+    ### Define constant parameters
+    medium = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t Glu(t) cGlu(t) Ind(t) Bac(t)
 
@@ -13,7 +16,7 @@ function getODEModel_model_Beer_MolBioSystems2014()
     ModelingToolkit.@variables dummyVariable(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters kdegi medium Bacmax ksyn kdim tau init_Bac beta
+    ModelingToolkit.@parameters kdegi Bacmax ksyn kdim tau init_Bac beta
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -47,7 +50,6 @@ function getODEModel_model_Beer_MolBioSystems2014()
     ### True parameter values ###
     trueParameterValues = [
     kdegi => 1.0,
-    medium => 1.0,
     Bacmax => 1.0,
     ksyn => 1.0,
     kdim => 1.0,

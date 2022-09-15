@@ -3,6 +3,9 @@
 # Number of species: 15
 function getODEModel_model_Zheng_PNAS2012()
 
+    ### Define constant parameters
+    default = 1.0
+
     ### Define independent and dependent variables
     ModelingToolkit.@variables t K27me0K36me0(t) K27me2K36me3(t) K27me2K36me0(t) K27me0K36me1(t) K27me2K36me1(t) K27me0K36me2(t) K27me1K36me2(t) K27me3K36me2(t) K27me1K36me1(t) K27me1K36me3(t) K27me2K36me2(t) K27me0K36me3(t) K27me3K36me1(t) K27me3K36me0(t) K27me1K36me0(t)
 
@@ -11,7 +14,7 @@ function getODEModel_model_Zheng_PNAS2012()
     ### Define dummy variable
 
     ### Define parameters
-    ModelingToolkit.@parameters k20_10 k11_12 k22_32 k21_11 k13_12 k01_00 k11_01 k22_21 k22_12 k11_10 k12_11 k21_31 k02_12 k30_20 dilution k31_21 k23_22 k02_01 k03_13 k10_11 k21_20 k10_00 k30_31 k20_30 k20_21 k00_10 k12_13 k01_11 k02_03 k00_01 k03_02 k23_13 k32_31 default k13_03 k31_30 k12_02 k31_32 k01_02 k13_23 k21_22 k12_22 k11_21 k22_23 k10_20 inflowp k32_22
+    ModelingToolkit.@parameters k20_10 k11_12 k22_32 k21_11 k13_12 k01_00 k11_01 k22_21 k22_12 k11_10 k12_11 k21_31 k02_12 k30_20 dilution k31_21 k23_22 k02_01 k03_13 k10_11 k21_20 k10_00 k30_31 k20_30 k20_21 k00_10 k12_13 k01_11 k02_03 k00_01 k03_02 k23_13 k32_31 k13_03 k31_30 k12_02 k31_32 k01_02 k13_23 k21_22 k12_22 k11_21 k22_23 k10_20 inflowp k32_22
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -91,7 +94,6 @@ function getODEModel_model_Zheng_PNAS2012()
     k03_02 => 1.00000000000008e-5,
     k23_13 => 0.249204587936977,
     k32_31 => 1.00000009388004e-5,
-    default => 1.0,
     k13_03 => 1.00000000000723e-5,
     k31_30 => 1.00000000152072e-5,
     k12_02 => 1.00000000000008e-5,
