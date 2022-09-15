@@ -21,7 +21,7 @@ end
 
 function Boehm_JProteomeRes2014_t0!(u0Vec, paramVec) 
 
-	nuc, Epo_degradation_BaF3, cyt, k_exp_homo, k_phos, k_exp_hetero, k_imp_homo, k_imp_hetero, specC17, ratio = paramVec 
+	k_exp_hetero, Epo_degradation_BaF3, k_exp_homo, k_phos, k_imp_homo, k_imp_hetero, specC17, ratio = paramVec 
 
 	STAT5A = 207.6 * ratio 
 	pApA = 0.0 

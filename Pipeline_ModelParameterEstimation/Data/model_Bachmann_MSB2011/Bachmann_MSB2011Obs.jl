@@ -83,7 +83,6 @@ function Bachmann_MSB2011(u, t, dynPar, obsPar, paramData, obsData, observableId
 
 	if observableId == "observable_pSTAT5B_rel" 
 		observableParameter1_observable_pSTAT5B_rel = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
-		println("t = $t and STAT5 = $STAT5")
 		return observableParameter1_observable_pSTAT5B_rel + 100 * pSTAT5 / ( STAT5 + pSTAT5 ) 
 	end
 
@@ -106,7 +105,7 @@ end
 
 function Bachmann_MSB2011_t0!(u0Vec, paramVec) 
 
-	init_SHP1, EpoRCISInh, EpoRActJAK2, SOCS3Eqc, SOCS3Inh, JAK2EpoRDeaSHP1, init_EpoRJAK2, STAT5Imp, STAT5ActJAK2, CISEqc, STAT5ActEpoR, CISInh, EpoRCISRemove, SOCS3RNADelay, nuc, cyt, SOCS3RNATurn, SHP1Dea, SHP1ActEpoR, STAT5Exp, JAK2ActEpo, Epo, CISRNAEqc, CISRNATurn, CISRNADelay, init_STAT5, ActD, SOCS3RNAEqc, SOCS3Turn, SOCS3EqcOE, SOCS3oe, CISEqcOE, CISTurn, CISoe, init_SOCS3_multiplier, SHP1ProOE, init_EpoRJAK2_CIS, init_SHP1_multiplier, init_CIS_multiplier = paramVec 
+	init_SHP1, EpoRCISInh, EpoRActJAK2, SOCS3Eqc, SOCS3Inh, JAK2EpoRDeaSHP1, init_EpoRJAK2, STAT5Imp, STAT5ActJAK2, CISEqc, STAT5ActEpoR, CISInh, EpoRCISRemove, SOCS3RNADelay, SOCS3RNATurn, SHP1Dea, SHP1ActEpoR, STAT5Exp, JAK2ActEpo, Epo, CISRNAEqc, CISRNATurn, CISRNADelay, init_STAT5, ActD, SOCS3RNAEqc, SOCS3Turn, SOCS3EqcOE, SOCS3oe, CISEqcOE, CISTurn, CISoe, init_SOCS3_multiplier, SHP1ProOE, init_EpoRJAK2_CIS, init_SHP1_multiplier, init_CIS_multiplier = paramVec 
 
 	p1EpoRpJAK2 = 0.0 
 	pSTAT5 = 0.0 

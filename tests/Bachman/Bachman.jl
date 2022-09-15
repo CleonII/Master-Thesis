@@ -29,39 +29,72 @@ allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipelin
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters", "LatinHyperCubeSampledParameters.jl"))
 
 
-solver, tol = Rodas4P(), 1e-9
-modelName = "model_Bachmann_MSB2011"
-evalObs = Bachmann_MSB2011
-evalU0 = Bachmann_MSB2011_t0!
-evalSd = Bachmann_MSB2011_sd!
+"""
+    testCostGradHess(solver, tol; printRes::Bool=false)
 
-paramVals = CSV.read(pwd() * "/tests/Bachman/Params.csv", DataFrame)
-paramMat = paramVals[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
+    Compare cost and gradient for Julia PeTab importer against the cost and 
+    gradient computed in PyPesto for Bachman model. 
+"""
+function compareAgainstPyPesto(solver, tol; printRes::Bool=false)
 
+        modelName = "model_Bachmann_MSB2011"
+        evalObs = Bachmann_MSB2011
+        evalU0 = Bachmann_MSB2011_t0!
+        evalSd = Bachmann_MSB2011_sd!
 
-evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostFunc(modelName, evalObs, evalU0, evalSd, solver, tol)
-# "Exact" hessian via autodiff (should only be used for smaller models)
-evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
-a = 1
-#cost = evalF(paramVecEstTmp)
+        # Parameter values to test gradient at 
+        paramVals = CSV.read(pwd() * "/tests/Bachman/Params.csv", DataFrame)
+        paramMat = paramVals[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
 
-p0 = collect(paramMat[1, :])
-cost = evalF(p0)
-
-
-
-
-experimentalConditions, measurementData, parameterBounds, observableData = readDataFiles(modelName, readObs=true)
-
-# Read file with observed values and put into struct 
-obsData = processObsData(measurementData, observableData)
-
-i_relevant = findall(x -> x == "observable_pSTAT5B_rel", obsData.observebleDd)
-print(obsData.yObs[i_relevant])
+        # PyPesto gradient and cost values 
+        costPython = (CSV.read(pwd() * "/tests/Bachman/Cost.csv", DataFrame))[!, :Cost]
+        gradPythonMat = CSV.read(pwd() * "/tests/Bachman/Grad.csv", DataFrame)
+        gradPythonMat = gradPythonMat[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
 
 
-# Error is in paramMap, I always copy from the reference paramMap so changes are not captured accurately 
-# when going between conditions. 
+        evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostFunc(modelName, evalObs, evalU0, evalSd, solver, tol)
+        # "Exact" hessian via autodiff (should only be used for smaller models)
+        evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
+
+        # For correct indexing when comparing gradient 
+        iUse = [findfirst(x -> x == idParam[i], names(paramMat)) for i in eachindex(idParam)]
+
+        for i in 1:nrow(paramMat)
+
+                paramVec = collect(paramMat[i, :])
+
+                # Test cost 
+                costJulia = evalF(paramVec)
+                sqDiffCost = (costJulia - costPython[i])^2
+                if sqDiffCost > 1e-5
+                @printf("sqDiffCost = %.3e\n", sqDiffCost)
+                @printf("Does not pass test on cost\n")
+                return false
+                end
+
+                grad = zeros(length(paramVec))
+                gradPython = collect(gradPythonMat[i, :])
+                evalGradF(paramVec, grad)
+                sqDiffGrad = sum((grad - gradPython[iUse]).^2)
+                if sqDiffGrad > 1e-5
+                @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+                @printf("Does not pass test on grad\n")
+                return false
+                end
+
+                if printRes == true
+                @printf("sqDiffCost = %.3e\n", sqDiffCost)
+                @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+                end
+        end
+
+        return true
+end
 
 
-#conditionIdSol = ["model1_data2", "model1_data1", "model1_data11", "model1_data12", "model1_data13", "model1_data14", "model1_data4", "model1_data5", "model1_data7", "model1_data8", "model1_data38", "model1_data39", "model1_data40", "model1_data41", "model1_data42", "model1_data3", "model1_data10", "model1_data15", "model1_data16", "model1_data17", "model1_data18", "model1_data19", "model1_data20", "model1_data21", "model1_data22", "model1_data23", "model1_data24", "model1_data25", "model1_data6", "model1_data9", "model1_data26", "model1_data27", "model1_data30", "model1_data31", "model1_data32", "model1_data33"]
+passTest = compareAgainstPyPesto(Rodas4P(), 1e-12, printRes=false)
+if passTest == true
+    @printf("Passed test Boehm against PyPesto\n")
+else
+    @printf("Did not pass test Boehm against PyPesto\n")
+end
