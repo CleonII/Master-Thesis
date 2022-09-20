@@ -64,4 +64,17 @@ function main(; usedFiles = ["all"]::Vector{String}, useData = false, wrapped = 
     end
 end
 
-main(usedFiles = ["all"], useData = true, wrapped = true)
+
+function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::String)
+
+    libsbml = pyimport("libsbml")
+    reader = libsbml.SBMLReader()
+
+    pathSave = dirModel * modelName * ".jl"
+    document = reader[:readSBML](pathXml)
+    model = document[:getModel]() # Get the model
+    writeODEModelToFile(libsbml, model, modelName, dirModel, false, true)
+
+end
+
+#main(usedFiles = ["model_Bachmann_MSB2011"], useData = true, wrapped = true)

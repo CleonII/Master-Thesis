@@ -1,6 +1,5 @@
 using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
 
-include(joinpath(pwd(), "Pipeline_ModelSolver", "BigFloatODEProblem.jl"))
 include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
 include(joinpath(pwd(), "Additional_functions", "Solver_info.jl"))
 include(joinpath(pwd(), "Additional_functions", "benchmarkSolvers.jl"))
@@ -11,55 +10,40 @@ include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "CommonParameterEst
 # PeTab importer 
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "PeTabImporter.jl"))
 
-allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")), 
-        joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels"))
-
-
 # Create a file with a function for the initial values and the observation function for a model. 
 # Must extend to observeble parameters appearing only in the observation function, and that aren't 
 # scale and offset parameters. 
-function crateFilesModel(modelName::String)
+function createFilesModel(modelName::String, 
+                          dirModel::String, 
+                          odeSys::ODESystem, 
+                          paramMap, 
+                          stateMap)
     
-    modelFile = modelName * ".jl"
-    modelNameShort = modelName[7:end]
-    readPath = joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")
-    readDataPath = joinpath(pwd(), "Pipeline_ModelParameterEstimation", "Data", modelName)
-
-    # Extract relevant model file (ode-system)
-    allModelFiles = getModelFiles(readPath)    
-    usedModelFunctionVector = allModelFunctionVector[[allModelFile .== modelFile for allModelFile in allModelFiles]][1]
-    
-    # Create an ODE-system and run via ModellingToolkit
-    sys, initialSpeciesValues, trueParameterValues = usedModelFunctionVector()
+    # For correct mapping of parameter and states when building related functions 
+    parameterNames = parameters(odeSys)
+    stateNames = states(odeSys)
 
     # Read data on experimental conditions and parameter values 
-    experimentalConditions, measurementData, parameterBounds, observableData = readDataFiles(modelName, readObs=true)
-    paramData = processParameterData(parameterBounds) # Model data in convient structure 
-    firstExpIds, shiftExpIds, simulateSS, parameterNames, stateNames = getSimulationInfo(measurementData, sys)
-
-    # Read file with observed values and put into struct 
-    obsData = processObsData(measurementData, observableData)
+    experimentalConditionsFile, measurementDataFile, parameterBoundsFile, observablesDataFile = readDataFiles(dirModel, readObs=true)
+    paramData = processParameterData(parameterBoundsFile) # Model data in convient structure 
+    simulationInfo = getSimulationInfo(measurementDataFile, peTabModel.odeSystem)
+    measurementData = processObsData(measurementDataFile, observablesDataFile) 
     
     # Set up a stateMap and paramMap to map parameter correctly to the ODE model via ModellingToolkit
-    paramMap = trueParameterValues    
-    stateMap = initialSpeciesValues 
     paramNames = [string(paramMap[i].first) for i in eachindex(paramMap)]
 
-    # Set up to bookeeping of indices between observed and noise parameters in the large input vector 
-    iDynPar, iSdPar, iObsPar, idParamDyn, idSdParam, idObsParam = getIndicesParam(paramData, obsData)
+    # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
+    paramIndices = getIndicesParam(paramData, measurementData)
     
-    createObservebleFile(modelNameShort, readDataPath, stateNames, paramData, idParamDyn)
-
+    createObservebleFile(modelName, dirModel, stateNames, paramData, paramIndices.namesDynParam, observablesDataFile)
     println("Done with observation file")
     println("")
     
-    createU0File(modelNameShort, readDataPath, paramData, string.(parameterNames), stateMap)
-
+    createU0File(modelName, dirModel, paramData, string.(parameterNames), stateMap)
     println("Done with u0 observation file")
     println("")
 
-    createSdFile(modelNameShort, readDataPath, paramData, stateNames, idParamDyn)
-
+    createSdFile(modelName, dirModel, paramData, stateNames, paramIndices.namesDynParam, observablesDataFile)
     println("Done with sd observation file")
     println("")
 end
@@ -101,14 +85,17 @@ end
 
 
 # Create a Julia file with the observeble format provided in the PeTab files. 
-function createObservebleFile(modelNameShort, readDataPath, stateNames, paramData::ParamData, idParamDyn::Array{String, 1})
+function createObservebleFile(modelName::String, 
+                              dirModel::String, 
+                              stateNames, 
+                              paramData::ParamData, 
+                              idParamDyn::Array{String, 1}, 
+                              observablesData::DataFrame)
 
-    observableDatas = CSV.read(joinpath(readDataPath, "observables_" * modelNameShort * ".tsv"), DataFrame)
-
-    io = open(readDataPath * "/" * modelNameShort * "Obs.jl", "w")
+    io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "w")
     
     # Write funciton header 
-    write(io, "function " * modelNameShort * "(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) \n")
+    write(io, "function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) \n")
 
     # Construct string to extract states
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
@@ -141,12 +128,12 @@ function createObservebleFile(modelNameShort, readDataPath, stateNames, paramDat
     write(io, paramConstStr)
 
     # Fix the observeble formulas 
-    observableIDs = String.(observableDatas[!, "observableId"])
+    observableIDs = String.(observablesData[!, "observableId"])
     strObserveble = ""
     for i in eachindex(observableIDs)
         # Each observebleID falls below its own if-statement 
         strObserveble *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
-        tmpFormula = filter(x -> !isspace(x), String(observableDatas[i, "observableFormula"]))
+        tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
 
         # Extract observable parameters 
         obsParam = getObsParamStr(tmpFormula)
@@ -161,18 +148,22 @@ function createObservebleFile(modelNameShort, readDataPath, stateNames, paramDat
     write(io, strObserveble)
 
     # Close file 
-    strClose = "\treturn yMod\nend"
+    strClose = "end"
     write(io, strClose)
     close(io)
 end
 
 
-function createU0File(modelNameShort, readDataPath, paramData::ParamData, idParam, stateMap)
+function createU0File(modelName::String, 
+                      dirModel::String, 
+                      paramData::ParamData, 
+                      idParam, 
+                      stateMap)
 
-    io = open(readDataPath * "/" * modelNameShort * "Obs.jl", "a")
+    io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "a")
 
     # Write funciton header 
-    write(io, "\n\nfunction " * modelNameShort * "_t0!(u0Vec, paramVec) \n\n")
+    write(io, "\n\nfunction evalU0!(u0Vec, paramVec) \n\n")
 
     # Extract model parameters 
     paramDynStr = "\t"
@@ -210,14 +201,18 @@ end
 
 
 # Create a function for any noise parameters 
-function createSdFile(modelNameShort, readDataPath, paramData::ParamData, stateNames, idParamDyn)
+function createSdFile(modelName::String, 
+                      dirModel::String, 
+                      paramData::ParamData, 
+                      stateNames, 
+                      idParamDyn, 
+                      observablesData::DataFrame)
 
-    observableDatas = CSV.read(joinpath(readDataPath, "observables_" * modelNameShort * ".tsv"), DataFrame)
 
-    io = open(readDataPath * "/" * modelNameShort * "Obs.jl", "a")
+    io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "a")
 
     # Write funciton header 
-    write(io, "\n\nfunction " * modelNameShort * "_sd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) \n")
+    write(io, "\n\nfunction evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) \n")
 
     # Construct string to extract states
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
@@ -250,12 +245,12 @@ function createSdFile(modelNameShort, readDataPath, paramData::ParamData, stateN
     write(io, paramConstStr)
 
     # Fix the observeble formulas 
-    observableIDs = String.(observableDatas[!, "observableId"])
+    observableIDs = String.(observablesData[!, "observableId"])
     strObserveble = ""
     for i in eachindex(observableIDs)
         # Each observebleID falls below its own if-statement 
         strObserveble *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
-        tmpFormula = filter(x -> !isspace(x), String(observableDatas[i, "noiseFormula"]))
+        tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
 
         # Extract noise parameters 
         noiseParam = getNoiseParamStr(tmpFormula)
@@ -264,13 +259,13 @@ function createSdFile(modelNameShort, readDataPath, paramData::ParamData, stateN
         end 
 
         juliaFormula = obsFormulaToJulia(tmpFormula, stateNames, paramData, idParamDyn)
-        strObserveble *= "\t\t" * "sdMod = " * juliaFormula * "\n"
+        strObserveble *= "\t\t" * "return " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
     end
     write(io, strObserveble)
 
     # Close file 
-    strClose = "\treturn sdMod\nend"
+    strClose = "end"
     write(io, strClose)
     close(io)
 end
@@ -375,9 +370,6 @@ function obsFormulaToJulia(formulaObs::String, stateNames, paramData::ParamData,
 end
 
 
-# "model_Bachmann_MSB2011"
-# "model_Boehm_JProteomeRes2014"
-crateFilesModel("model_Bachmann_MSB2011")
 
 
 

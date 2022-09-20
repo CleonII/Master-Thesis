@@ -1,3 +1,24 @@
+struct PeTabModel{T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}}, 
+                  T2<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}},
+                  T3<:Vector{Sym{Real, Base.ImmutableDict{DataType, Any}}}, 
+                  T4<:Vector{Any}}
+    modelName::String
+    evalYmod::Function 
+    evalU0!::Function
+    evalSd!::Function
+    odeSystem::ODESystem 
+    paramMap::T1
+    stateMap::T2
+    paramNames::T3
+    stateNames::T4
+    dirModel::String
+    pathMeasurementData::String
+    pathExperimentalConditions::String
+    pathObservables::String
+    pathParameters::String
+end
+
+
 struct ParamData{T1<:Array{<:AbstractFloat}, 
                  T2<:Array{<:String, 1}, 
                  T3<:Array{Bool, 1}, 
@@ -25,6 +46,16 @@ struct ObservedData{T1<:Array{<:AbstractFloat, 1},
     sdParams::T2
     transformData::T3 # Only done once 
     obsParam::T2
+end
+
+struct SimulationInfo{T1<:Array{<:String, 1}, 
+                      T2<:Bool,
+                      T3<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}}
+    firstExpIds::T1
+    shiftExpIds::T1
+    conditionIdSol::T1
+    simulateSS::T2
+    solArray::T3
 end
 
 
@@ -168,21 +199,18 @@ end
 # As the function currently rounds values, e.g does not allow for different 
 # parameters for different conditions, a bit of tweaking is required to make 
 # it compatible with parameter estimation. 
-function changeToCond!(paramVec, 
-                       stateVec, 
-                       expID, 
-                       paramData::ParamData,
-                       experimentalConditions::DataFrame,
-                       parameterNames, 
-                       stateNames, 
-                       paramMap, 
-                       stateMap)
+function changeExperimentalCond!(paramVec, 
+                                 stateVec, 
+                                 expID, 
+                                 parameterData::ParamData,
+                                 experimentalConditions::DataFrame,
+                                 peTabModel::PeTabModel)
 
     # Allow the code to propegate dual numbers for gradients 
-    paramMapUse = convert.(Pair{Num, eltype(paramVec)}, paramMap)
-    stateMapUse = convert.(Pair{Num, Num}, stateMap)
+    paramMapUse = convert.(Pair{Num, eltype(paramVec)}, peTabModel.paramMap)
 
     # Set up simulation conditions (add to build SS-sim funciton)
+    # TODO : Process experimental conditions into Julia struct 
     colNames = names(experimentalConditions)
     i_start = "conditionName" in colNames ? 3 : 2
     stateParamChange = colNames[i_start:end]
@@ -192,46 +220,45 @@ function changeToCond!(paramVec,
     valsChangeTo = Vector(experimentalConditions[getRowExpId(expID, experimentalConditions), i_start:end])
     valsChangeTo = string.(valsChangeTo)
 
+    # Parameter and state names in string-format for easier comparisons 
     parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
-    stateNamesStr = replace.(string.([stateMapUse[i].first for i in eachindex(stateMapUse)]), "(t)" => "")
-
+    
     # Change parameters (and states)
+    iParamChange = Array{Int64, 1}(undef, length(stateParamChange))
     for i in eachindex(stateParamChange)
         param = stateParamChange[i]
+        iParamChange[i] = findfirst(x -> x == param, string.(peTabModel.paramNames))
 
         # Get value to change to 
         valChangeTo::Float64 = 0.0
         if isNumber(valsChangeTo[i])
             valChangeTo = parse(Float64, valsChangeTo[i])
-        elseif findfirst(x -> x == valsChangeTo[i], paramData.parameterID) != nothing
-            iVal = findfirst(x -> x == valsChangeTo[i], paramData.parameterID)
-            valChangeTo = paramData.paramVal[iVal]
+        elseif findfirst(x -> x == valsChangeTo[i], parameterData.parameterID) != nothing
+            iVal = findfirst(x -> x == valsChangeTo[i], parameterData.parameterID)
+            valChangeTo = parameterData.paramVal[iVal]
         else
             println("Error : Simulation parameter not found for experimental condition $expID")
             println("valsChangeTo[i] = ", valsChangeTo[i])
         end
 
+        # Propegate dual numbers correctly. In the reference paramMap want to have floats (not duals)
+        valChangeToFloat = typeof(valChangeTo) <: Union{ForwardDiff.Dual, ForwardDiff.Dual{<:ForwardDiff.Dual}} ? valChangeTo.value : valChangeTo
+
         # Check for value to change to in parameter file 
         i_param = findfirst(x -> x == param, parameterNamesStr)
-        i_state = findfirst(x -> x == param, stateNamesStr)
 
         if !isnothing(i_param)
             paramMapUse[i_param] = Pair(paramMapUse[i_param].first, valChangeTo) 
-            # Ensure that reference paramMap is keept up-to-date 
-            paramMap[i_param] = Pair(paramMap[i_param].first, valChangeTo)
-        elseif !isnothing(i_state)
-            stateMapUse[i_state] = Pair(stateMapUse[i_state].first, valChangeTo)
-            # Keep reference stateMap up-to-date 
-            stateMap[i_state] = Pair(stateMap[i_state].first, valChangeTo)
+            peTabModel.paramMap[i_param] = Pair(peTabModel.paramMap[i_param].first, valChangeToFloat) 
         else
             println("Error : Simulation parameter to change not found for experimental condition $expID")
         end
     end
 
-    n_states = length(stateNames)
-    newVal = ModelingToolkit.varmap_to_vars(vcat(stateMapUse, paramMapUse), vcat(stateNames, parameterNames))
-    stateVec .-= (stateVec - newVal[1:n_states])
-    paramVec .-= (paramVec - newVal[(n_states+1):end])
+    # To avoid a reset of parameter values only change the parameters that gouvern the behaviour of an experimental state. 
+    newVal = ModelingToolkit.varmap_to_vars(paramMapUse, peTabModel.paramNames)
+    paramVec[iParamChange] .= newVal[iParamChange]
+    peTabModel.evalU0!(stateVec, paramVec) 
 
     return nothing
 end
@@ -240,122 +267,62 @@ end
 # Change the model parameters that should be estimated 
 function changeModelParam!(paramVec, 
                            stateVec,
-                           paramEstVec,
-                           paramIdChange::Array{String, 1},
+                           paramEst,
+                           paramEstNames::Array{String, 1},
                            paramData::ParamData,
-                           parameterNames, 
-                           paramMap, 
-                           evalU0::Function)
+                           peTabModel::PeTabModel)
 
     # Allow the code to propegate dual numbers for gradients 
-    paramMapUse = convert.(Pair{Num, eltype(paramVec)}, paramMap)
+    paramMapUse = convert.(Pair{Num, eltype(paramVec)}, peTabModel.paramMap)
+    # TODO: Precompute this step 
     parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
 
-    # Change parameters (and states)
-    for i in eachindex(paramIdChange)
-        param = paramIdChange[i]
-
-        valChangeTo = paramEstVec[i]
+    # Change parameters (and states) to current iterations in parameter estimation vector 
+    for i in eachindex(paramEstNames)
+        
+        paramChangeName = paramEstNames[i]
+        valChangeTo = paramEst[i]
+        # Propegate dual numbers correctly. In the reference paramMap want to have floats (not duals)
         valChangeToFloat = typeof(valChangeTo) <: Union{ForwardDiff.Dual, ForwardDiff.Dual{<:ForwardDiff.Dual}} ? valChangeTo.value : valChangeTo
-        # Check for value to change to in parameter file 
-        i_param = findfirst(x -> x == param, parameterNamesStr)
-
+        
+        i_param = findfirst(x -> x == paramChangeName, parameterNamesStr)
         if !isnothing(i_param)
             paramMapUse[i_param] = Pair(paramMapUse[i_param].first, valChangeTo) 
             # Update reference paramMap 
             if typeof(valChangeToFloat) <: AbstractFloat
-                paramMap[i_param] = Pair(paramMap[i_param].first, valChangeToFloat) 
+                peTabModel.paramMap[i_param] = Pair(peTabModel.paramMap[i_param].first, valChangeToFloat) 
             end
         else
             println("Error : Simulation parameter to change not found for experimental condition $expID")
         end
     end
 
-    newVal = ModelingToolkit.varmap_to_vars(paramMapUse, parameterNames)
+    # Use ModellingToolkit and u0 function to correctly map parameters to ODE-system 
+    newVal = ModelingToolkit.varmap_to_vars(paramMapUse, peTabModel.paramNames)
     paramVec .= newVal
-
-    # Update stateVec according to mapping in availble file 
-    evalU0(stateVec, paramVec) 
+    peTabModel.evalU0!(stateVec, paramVec) 
     
     return nothing
 end
-function changeToCondEst!(paramVec, 
-                          stateVec, 
-                          expID, 
-                          paramData::ParamData,
-                          experimentalConditions::DataFrame,
-                          parameterNames, 
-                          paramMap, 
-                          evalU0::Function)
-
-    # Allow the code to propegate dual numbers for gradients 
-    paramMapUse = convert.(Pair{Num, eltype(paramVec)}, paramMap)
-
-    # Set up simulation conditions (add to build SS-sim funciton)
-    colNames = names(experimentalConditions)
-    i_start = "conditionName" in colNames ? 3 : 2
-    stateParamChange = colNames[i_start:end]
-    if isempty(stateParamChange)
-        return 
-    end
-    valsChangeTo = Vector(experimentalConditions[getRowExpId(expID, experimentalConditions), i_start:end])
-    valsChangeTo = string.(valsChangeTo)
-
-    parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
-
-    # Change parameters (and states)
-    iParamChange = Array{Int64, 1}(undef, length(stateParamChange))
-    for i in eachindex(stateParamChange)
-        param = stateParamChange[i]
-        iParamChange[i] = findfirst(x -> x == param, string.(parameterNames))
-
-        # Get value to change to 
-        valChangeTo::Float64 = 0.0
-        if isNumber(valsChangeTo[i])
-            valChangeTo = parse(Float64, valsChangeTo[i])
-        elseif findfirst(x -> x == valsChangeTo[i], paramData.parameterID) != nothing
-            iVal = findfirst(x -> x == valsChangeTo[i], paramData.parameterID)
-            valChangeTo = paramData.paramVal[iVal]
-        else
-            println("Error : Simulation parameter not found for experimental condition $expID")
-            println("valsChangeTo[i] = ", valsChangeTo[i])
-        end
-
-        # Check for value to change to in parameter file 
-        i_param = findfirst(x -> x == param, parameterNamesStr)
-
-        if !isnothing(i_param)
-            paramMapUse[i_param] = Pair(paramMapUse[i_param].first, valChangeTo) 
-        else
-            println("Error : Simulation parameter to change not found for experimental condition $expID")
-        end
-    end
-
-    newVal = ModelingToolkit.varmap_to_vars(paramMapUse, parameterNames)
-    # To avoid a reset of parameter values only change the parameters that gouvern the behaviour of 
-    # an experimental state. 
-    paramVec[iParamChange] .= newVal[iParamChange]
-    evalU0(stateVec, paramVec) 
-
-    return nothing
-end
-
 
 
 # Given a model name, e.g model_Beer_MolBioSystems2014.jl, read the associated PeTab files 
 # for the measurements, parameters and experimental conditions. 
-function readDataFiles(modelName; readObs::Bool=false)
+function readDataFiles(dirModel; readObs::Bool=false)
+
+    # Extract PeTab-files 
+    pathMeasurementData = checkForPeTabFile("measurementData", dirModel)
+    pathExperimentalCond = checkForPeTabFile("experimentalCondition", dirModel)
+    pathParameters = checkForPeTabFile("parameters", dirModel)
+    pathObservables = checkForPeTabFile("observables", dirModel)
 
     # Reading data for model
-    modelNameShort = modelName[7:end]
-    readDataPath = joinpath(pwd(), "Pipeline_ModelParameterEstimation", "Data", modelName)
-    dataEnding = modelNameShort * ".tsv"
-    experimentalConditions = CSV.read(joinpath(readDataPath, "experimentalCondition_" * dataEnding), DataFrame)
-    measurementData = CSV.read(joinpath(readDataPath, "measurementData_" * dataEnding), DataFrame)
-    parameterData = CSV.read(joinpath(readDataPath, "parameters_" * dataEnding), DataFrame)
+    experimentalConditions = CSV.read(pathExperimentalCond, DataFrame)
+    measurementData = CSV.read(pathMeasurementData, DataFrame)
+    parameterData = CSV.read(pathParameters, DataFrame)
 
     if readObs == true
-        observableData = CSV.read(joinpath(readDataPath, "observables_" * modelNameShort * ".tsv"), DataFrame)
+        observableData = CSV.read(pathObservables, DataFrame)
         return experimentalConditions, measurementData, parameterData, observableData
     else
         return experimentalConditions, measurementData, parameterData
@@ -371,14 +338,14 @@ end
 # If the model is not simulated to a steady state shiftExp is empty, and the experimental 
 # id:s are stored firstExpIds. 
 function getSimulationInfo(measurementData::DataFrame, 
-                           odeSystem::ODESystem)
+                           odeSystem::ODESystem)::SimulationInfo
 
     # Check if model first should be simulated to a steady state 
     colNames = names(measurementData)
     if !("preequilibrationConditionId" in colNames)
-        preEqIDs = []
+        preEqIDs = Array{String, 1}(undef, 0)
     else
-        preEqIDs = unique(filter(x -> !ismissing(x), measurementData[!, "preequilibrationConditionId"]))
+        preEqIDs = convert(Array{String, 1}, unique(filter(x -> !ismissing(x), measurementData[!, "preequilibrationConditionId"])))
     end
     simulateSS = length(preEqIDs) > 0
 
@@ -391,22 +358,36 @@ function getSimulationInfo(measurementData::DataFrame,
             shiftExpId = unique(measurementData[iRows, "simulationConditionId"])
             push!(shiftExpIds, shiftExpId)
         end
+        shiftExpIds = convert(Array{String, 1}, shiftExpIds)
     end
 
     if simulateSS == false
-        firstExpIds = unique(measurementData[!, "simulationConditionId"])
-        shiftExpIds = nothing
+        firstExpIds = convert(Array{String, 1}, unique(measurementData[!, "simulationConditionId"]))
+        shiftExpIds = Array{String, 1}(undef, 0)
     end
 
-    parameterNames = parameters(odeSystem)
-    stateNames = states(odeSystem)
+    # Obtain number of forward simulations to perform 
+    if simulateSS == true
+        nForwardSol = Int64(sum([length(shiftExpIds[i]) for i in eachindex(shiftExpIds)]))
+    else
+        nForwardSol = Int64(length(firstExpIds))
+    end
+    # Array with conition-ID for a specific forward simulation 
+    conditionIdSol = Array{String, 1}(undef, nForwardSol)
+    # Foward ODE-solutions array 
+    solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
 
-    return firstExpIds, shiftExpIds, simulateSS, parameterNames, stateNames
+    simulationInfo = SimulationInfo(firstExpIds, 
+                                    shiftExpIds, 
+                                    conditionIdSol, 
+                                    simulateSS,
+                                    solArray)
+    return simulationInfo
 end
 
 
 # For a simulationConditionId (expId) get the end-time to simulate to from the measurementData
-function getTimeMax(measurementData::DataFrame, expId)
+function getTimeMax(measurementData::DataFrame, expId)::Float64
     return Float64(maximum(measurementData[findall(x -> x == expId, measurementData[!, "simulationConditionId"]), "time"]))
 end
 
@@ -447,98 +428,73 @@ end
 # and succes::Bool. If the solver did not return Succesfull retcode 
 # succes is returned as false. 
 function solveOdeModelAllCond(prob::ODEProblem, 
-                              changeToCondUse!::Function, 
-                              simulateSS::Bool, 
+                              changeToExperimentalCondUse!::Function, 
                               measurementData::DataFrame,
-                              firstExpIds, 
-                              shiftExpIds, 
-                              tol::Float64, 
-                              solver;
+                              simulationInfo::SimulationInfo,
+                              solver, 
+                              tol::Float64;
                               nTSave::Int64=0, 
                               denseArg=true)
 
     local solArray
-    local sucess = true
-    if simulateSS == true
-        nShiftId = Int(sum([length(shiftExpIds[i]) for i in eachindex(shiftExpIds)]))
+    if simulationInfo.simulateSS == true
+        nShiftId = Int(sum([length(simulationInfo.shiftExpIds[i]) for i in eachindex(simulationInfo.shiftExpIds)]))
         solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nShiftId)
-        k = 1
-
-        for i in eachindex(firstExpIds)
-            for j in eachindex(shiftExpIds[i])
-                firstExpId = firstExpIds[i]
-                shiftExpId = shiftExpIds[i][j]
-                t_max_ss = getTimeMax(measurementData, shiftExpId)
-                solArray[k] = solveOdeSS(prob, changeToCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, nTSave=nTSave, denseArg=denseArg)
-                
-                if solArray[k].retcode != :Success
-                    sucess = false
-                    break 
-                end
-
-                k += 1
-            end
-        end
-
-    elseif simulateSS == false
-        nExperimentalCond = Int64(length(firstExpIds))
+    else
+        nExperimentalCond = Int64(length(simulationInfo.firstExpIds))
         solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nExperimentalCond)
-
-        for i in eachindex(firstExpIds)
-            firstExpId = firstExpIds[i]            
-            t_max = getTimeMax(measurementData, firstExpId)
-            solArray[i] = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max, nTSave=nTSave, denseArg=denseArg)
-
-            if !(solArray[i].retcode == :Success || solArray[i].retcode == :Terminated)
-                sucess = false
-                break 
-            end
-        end
     end
+        
+    success = solveOdeModelAllCond!(solArray, 
+                                    prob, 
+                                    changeToExperimentalCondUse!, 
+                                    measurementData, 
+                                    simulationInfo, 
+                                    solver, 
+                                    tol, 
+                                    nTSave=nTSave, 
+                                    denseArg=denseArg)
 
-    return solArray, sucess
+    return solArray, success
 end
 function solveOdeModelAllCond!(solArray::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
-                              conditionId::Array{String, 1},
-                              prob::ODEProblem, 
-                              changeToCondUse!::Function, 
-                              simulateSS::Bool, 
-                              measurementData::DataFrame,
-                              firstExpIds, 
-                              shiftExpIds, 
-                              tol::Float64, 
-                              solver;
-                              nTSave::Int64=0, 
-                              denseArg=true)
+                               prob::ODEProblem, 
+                               changeToExperimentalCondUse!::Function, 
+                               measurementData::DataFrame,
+                               simulationInfo::SimulationInfo,
+                               solver,
+                               tol::Float64;
+                               nTSave::Int64=0, 
+                               denseArg=true)
 
     local sucess = true
-    if simulateSS == true
+    if simulationInfo.simulateSS == true
         k = 1
-        for i in eachindex(firstExpIds)
-            for j in eachindex(shiftExpIds[i])
-                firstExpId = firstExpIds[i]
-                shiftExpId = shiftExpIds[i][j]
+        for i in eachindex(simulationInfo.firstExpIds)
+            for j in eachindex(simulationInfo.shiftExpIds[i])
+                firstExpId = simulationInfo.firstExpIds[i]
+                shiftExpId = simulationInfo.shiftExpIds[i][j]
                 t_max_ss = getTimeMax(measurementData, shiftExpId)
-                solArray[k] = solveOdeSS(prob, changeToCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, nTSave=nTSave, denseArg=denseArg)
+                solArray[k] = solveOdeSS(prob, changeToExperimentalCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, nTSave=nTSave, denseArg=denseArg)
                 
                 if solArray[k].retcode != :Success
                     sucess = false
                     break 
                 end
 
-                conditionId[k] = firstExpId * shiftExpId
+                simulationInfo.conditionIdSol[k] = firstExpId * shiftExpId
 
                 k += 1
             end
         end
 
-    elseif simulateSS == false
-        for i in eachindex(firstExpIds)
-            firstExpId = firstExpIds[i]
+    elseif simulationInfo.simulateSS == false
+        for i in eachindex(simulationInfo.firstExpIds)
+            firstExpId = simulationInfo.firstExpIds[i]
             t_max = getTimeMax(measurementData, firstExpId)
-            solArray[i] = solveOdeNoSS(prob, changeToCondUse!, firstExpId, tol, solver, t_max, nTSave=nTSave, denseArg=denseArg)
+            solArray[i] = solveOdeNoSS(prob, changeToExperimentalCondUse!, firstExpId, tol, solver, t_max, nTSave=nTSave, denseArg=denseArg)
 
-            conditionId[i] = firstExpId
+            simulationInfo.conditionIdSol[i] = firstExpId
 
             if !(solArray[i].retcode == :Success || solArray[i].retcode == :Terminated)
                 sucess = false
@@ -844,23 +800,46 @@ function getIdEst(idsInStr::Array{String, 1}, paramData::ParamData)
 end
 
 
+struct ParameterIndices{T1<:Array{<:Integer, 1}, 
+                        T2<:Array{<:String, 1}}
+
+    iDynParam::T1
+    iObsParam::T1
+    iSdParam::T1
+    namesDynParam::T2
+    namesObsParam::T2
+    namesSdParam::T2
+    namesParamEst::T2
+end
+
+
 # Create indices for dynamic, observed and sd parameters 
-function getIndicesParam(paramData::ParamData, obsData::ObservedData)
+function getIndicesParam(paramData::ParamData, obsData::ObservedData)::ParameterIndices
 
     idObsParam = getIdEst(obsData.obsParam, paramData)
     isObsParam = [paramData.parameterID[i] in idObsParam for i in eachindex(paramData.parameterID)]
 
     # Set up to bookeeping of indices between observed and noise parameters in the large input vector 
     idSdParam = getIdEst(obsData.sdParams, paramData)
+    
     isSd = [paramData.parameterID[i] in idSdParam for i in eachindex(paramData.parameterID)]
 
     isDynamic = (paramData.shouldEst .&& .!isSd .&& .!isObsParam)
     idParamDyn = paramData.parameterID[isDynamic]
     
-    # Index vector for the dynamic and sd parameters 
-    iDynPar = 1:length(idParamDyn)
-    iSdPar = (length(idParamDyn)+1):(length(idParamDyn) + length(idSdParam))
-    iObsPar = (length(idParamDyn) + length(idSdParam) + 1):(length(idParamDyn) + length(idSdParam) + length(idObsParam))
+    # Index vector for the dynamic and sd parameters as UInt32 vectors 
+    iDynPar::Array{UInt32, 1} = convert(Array{UInt32, 1}, collect(1:length(idParamDyn)))
+    iSdPar::Array{UInt32, 1} = convert(Array{UInt32, 1}, collect((length(idParamDyn)+1):(length(idParamDyn) + length(idSdParam))))
+    iObsPar::Array{UInt32, 1} = convert(Array{UInt32, 1}, collect((length(idParamDyn) + length(idSdParam) + 1):(length(idParamDyn) + length(idSdParam) + length(idObsParam))))
+    namesParamEst::Array{String, 1} = string.(vcat(string.(idParamDyn), string.(idSdParam), string.(idObsParam)))
 
-    return iDynPar, iSdPar, iObsPar, idParamDyn, idSdParam, idObsParam
+    paramIndicies = ParameterIndices(iDynPar, 
+                                     iObsPar, 
+                                     iSdPar, 
+                                     string.(idParamDyn), 
+                                     string.(idObsParam), 
+                                     string.(idSdParam),
+                                     namesParamEst)
+
+    return paramIndicies
 end

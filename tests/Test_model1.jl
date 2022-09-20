@@ -5,14 +5,12 @@
 # The measurment data is avaible in TODO:Fix folders.
 
 
-using ModelingToolkit, DifferentialEquations, BenchmarkTools, DataFrames, CSV, LSODA, Sundials, ODEInterface, ODEInterfaceDiffEq
+using ModelingToolkit, DifferentialEquations, DataFrames, CSV 
 using ForwardDiff
 using ReverseDiff
 using StatsBase
 using Random
 using LinearAlgebra
-using Ipopt
-using Optim
 using Distributions
 using Printf
 
@@ -26,21 +24,17 @@ include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "CommonParameterEst
 # PeTab importer 
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "PeTabImporter.jl"))
 
-# Observation function, needs to be generalised 
-include(pwd() * "/Pipeline_ModelParameterEstimation/Data/model_Test_model1/Test_model1Obs.jl")
-
-# Include relevant ODE functions 
-include(pwd() * "/Pipeline_SBMLImporter/JuliaModels/model_Test_model1.jl")
-
 # Additional functions for ODE solver 
 include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters", "LatinHyperCubeSampledParameters.jl"))
 
-# TODO: Remove this dependence 
-allModelFunctionVector = includeAllModels(getModelFiles(joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels")), 
-        joinpath(pwd(), "Pipeline_SBMLImporter", "JuliaModels"))
+# For converting to SBML 
+include(joinpath(pwd(), "Pipeline_SBMLImporter", "main.jl"))
+
+# For building observable 
+include(joinpath(pwd(), "Additional_functions", "createObsFile.jl"))
 
 
 """
@@ -77,21 +71,15 @@ end
     tolerance tol for the Test_model1.
     Returns true if passes test (sqDiff less than 1e-8) else returns false. 
 """
-function testOdeSol(solver, tol; printRes=false)
-
-    # Read ODE-system 
-    sys, initialSpeciesValues, trueParameterValues = getODEModel_Test_model1()
-    new_sys = ode_order_lowering(sys)
+function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
 
     # Set values to PeTab file values 
-    experimentalConditions, measurementData, parameterBounds = readDataFiles("model_Test_model1")
-    paramData = processParameterData(parameterBounds) 
-    stateMap = initialSpeciesValues
-    paramMap = trueParameterValues     
-    setParamToParamFileVal!(paramMap, stateMap, paramData)
+    experimentalConditionsFile, measurementDataFile, parameterBoundsFile = readDataFiles(peTabModel.dirModel)
+    paramData = processParameterData(parameterBoundsFile) 
+    setParamToParamFileVal!(peTabModel.paramMap, peTabModel.stateMap, paramData)
     
     # Extract experimental conditions for simulations 
-    firstExpIds, shiftExpIds, simulateSS, parameterNames, stateNames = getSimulationInfo(measurementData, sys)
+    simulationInfo = getSimulationInfo(measurementDataFile, peTabModel.odeSystem)
 
     # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
     u0 = [8.0, 4.0]
@@ -105,22 +93,22 @@ function testOdeSol(solver, tol; printRes=false)
         alpha, beta, gamma, delta = paramMat[:, i]
         
         # Set parameter values for ODE
-        paramMap[2] = Pair(paramMap[2].first, alpha)
-        paramMap[3] = Pair(paramMap[3].first, gamma)
-        paramMap[4] = Pair(paramMap[4].first, delta)
-        paramMap[5] = Pair(paramMap[5].first, beta)
-        prob = ODEProblem(new_sys, stateMap, (0.0, 5e3), paramMap, jac=true, sparse=true)
+        peTabModel.paramMap[2] = Pair(peTabModel.paramMap[2].first, alpha)
+        peTabModel.paramMap[4] = Pair(peTabModel.paramMap[4].first, gamma)
+        peTabModel.paramMap[5] = Pair(peTabModel.paramMap[5].first, delta)
+        peTabModel.paramMap[6] = Pair(peTabModel.paramMap[6].first, beta)
+        prob = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true)
         prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
-        changeToCondUse! = (pVec, u0Vec, expID) -> changeToCond!(pVec, u0Vec, expID, paramData, experimentalConditions, parameterNames, stateNames, paramMap, stateMap)
+        changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, paramData, experimentalConditionsFile, peTabModel)
         
         # Solve ODE system 
-        solArray, success = solveOdeModelAllCond(prob, changeToCondUse!, simulateSS, measurementData, firstExpIds, shiftExpIds, tol, solver)
+        solArray, success = solveOdeModelAllCond(prob, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol)
         solNumeric = solArray[1]
         
         # Compare against analytical solution 
         sqDiff = 0.0
         for t in solNumeric.t
-            solAnalytic = solveOde2x2Lin(t, u0, alpha, beta, gamma, delta)
+            solAnalytic = solveOde2x2Lin(t, u0, alpha*0.5, beta, gamma, delta)
             sqDiff += sum((solNumeric(t)[1:2] - solAnalytic).^2)
         end
 
@@ -143,7 +131,7 @@ function calcCostAnalytic(paramVec)
 
     u0 = [8.0, 4.0]
     alpha, beta, gamma, delta = paramVec[1:4]
-    measurementData = CSV.read(pwd() * "/Pipeline_ModelParameterEstimation/Data/model_Test_model1/measurementData_Test_model1.tsv", DataFrame)
+    measurementData = CSV.read(pwd() * "/tests/Test_model1/measurementData_Test_model1.tsv", DataFrame)
 
     # Extract correct parameter for observation i and compute logLik
     logLik = 0.0
@@ -192,32 +180,27 @@ end
     parameter vectors for Test_model1. For the analytical solution the gradient 
     and hessian are computed via ForwardDiff.
 """
-function testCostGradHess(solver, tol; printRes::Bool=false)
+function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    # Current (clumsy) way to hold entire model
-    modelName = "model_Test_model1"
-    evalObs = Test_model1
-    evalU0 = Test_model1_t0!
-    evalSd = Test_model1_sd!
-
-    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostFunc(modelName, evalObs, evalU0, evalSd, solver, tol)
+    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostFunc(peTabModel, solver, tol)
     # "Exact" hessian via autodiff 
     evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
 
     Random.seed!(123)
-    fileSaveCube = pwd() * "/tests/CubeTestModel1.csv"
+    fileSaveCube = pwd() * "/tests/Test_model1/CubeTestModel1.csv"
     createCube(5, lowerBounds, upperBounds, fileSaveCube, evalF)
     cube = Matrix(CSV.read(fileSaveCube, DataFrame))
     nParam = size(cube)[2]
 
     for i in 1:5
+
         paramVec = cube[i, :]
 
         # Evaluate cost 
-        costPeTab = evalF(paramVecEstTmp)
-        costAnalytic = calcCostAnalytic(paramVecEstTmp)
+        costPeTab = evalF(paramVec)
+        costAnalytic = calcCostAnalytic(paramVec)
         sqDiffCost = (costPeTab - costAnalytic)^2
-        if sqDiffCost > 1e-8
+        if sqDiffCost > 1e-6
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("Does not pass test on cost\n")
             return false
@@ -227,7 +210,7 @@ function testCostGradHess(solver, tol; printRes::Bool=false)
         gradAnalytic = ForwardDiff.gradient(calcCostAnalytic, paramVec)
         gradNumeric = zeros(nParam); evalGradF(paramVec, gradNumeric)
         sqDiffGrad = sum((gradAnalytic - gradNumeric).^2)
-        if sqDiffGrad > 1e-8
+        if sqDiffGrad > 1e-6
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("Does not pass test on gradient\n")
             return false
@@ -237,7 +220,7 @@ function testCostGradHess(solver, tol; printRes::Bool=false)
         hessAnalytic = ForwardDiff.hessian(calcCostAnalytic, paramVec)
         hessNumeric = zeros(nParam, nParam); evalH(hessNumeric, paramVec)
         sqDiffHess = sum((hessAnalytic - hessNumeric).^2)
-        if sqDiffHess > 1e-8
+        if sqDiffHess > 1e-4
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
             @printf("Does not pass test on hessian\n")
             return false
@@ -254,14 +237,16 @@ function testCostGradHess(solver, tol; printRes::Bool=false)
 end
 
 
-passTest = testOdeSol(Vern9(), 1e-9, printRes=false)
+peTabModel = setUpPeTabModel("Test_model1", pwd() * "/tests/Test_model1/")
+
+passTest = testOdeSol(peTabModel, Vern9(), 1e-9, printRes=true)
 if passTest == true
     @printf("Passed test for ODE solution\n")
 else
     @printf("Did not pass test for ODE solution\n")
 end
 
-passTest = testCostGradHess(Vern9(), 1e-12, printRes=false)
+passTest = testCostGradHess(peTabModel, Vern9(), 1e-12, printRes=true)
 if passTest == true
     @printf("Passed test for cost, gradient and hessian\n")
 else
