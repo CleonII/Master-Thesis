@@ -6,7 +6,10 @@
 # The accuracy of the optimizers is further checked.
 
 
-using ModelingToolkit, DifferentialEquations, DataFrames, CSV 
+using ModelingToolkit 
+using DifferentialEquations
+using DataFrames
+using CSV 
 using ForwardDiff
 using ReverseDiff
 using StatsBase
@@ -18,26 +21,24 @@ using Ipopt
 using Optim
 
 
+# Relevant PeTab structs for compuations 
+include(joinpath(pwd(), "src", "PeTab_structs.jl"))
+
 # Functions for solving ODE system 
-include(joinpath(pwd(), "Additional_functions", "benchmarkSolvers.jl"))
+include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
 
-# Ipopt wrapper 
-include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "CommonParameterEstimationMethods", "CreateIpoptProb.jl"))
-
-# PeTab importer 
-include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "PeTabImporter.jl"))
-
-# Additional functions for ODE solver 
-include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
+# PeTab importer to get cost, grad etc 
+include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
 
 # HyperCube sampling 
-include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters", "LatinHyperCubeSampledParameters.jl"))
+include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 
 # For converting to SBML 
-include(joinpath(pwd(), "Pipeline_SBMLImporter", "main.jl"))
+include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
-# For building observable 
-include(joinpath(pwd(), "Additional_functions", "createObsFile.jl"))
+# Optimizers 
+include(joinpath(pwd(), "src", "Optimizers", "Set_up_Ipopt.jl"))
+include(joinpath(pwd(), "src", "Optimizers", "Set_up_optim.jl"))
 
 
 """
@@ -52,10 +53,10 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
     # Set values to PeTab file values 
     experimentalConditionsFile, measurementDataFile, parameterBoundsFile = readDataFiles(peTabModel.dirModel)
     paramData = processParameterData(parameterBoundsFile) 
-    setParamToParamFileVal!(peTabModel.paramMap, peTabModel.stateMap, paramData)
+    setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
     
     # Extract experimental conditions for simulations 
-    simulationInfo = getSimulationInfo(measurementDataFile, peTabModel.odeSystem)
+    simulationInfo = getSimulationInfo(measurementDataFile)
 
     # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
     u0 = [8.0, 4.0]
@@ -66,7 +67,7 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
                         0.01, 0.02], (2, 5))
 
     for i in 1:5
-        i = 1
+
         alpha, beta = paramMat[:, i]        
         # Set parameter values for ODE
         peTabModel.paramMap[2] = Pair(peTabModel.paramMap[2].first, alpha)
@@ -76,7 +77,7 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, paramData, experimentalConditionsFile, peTabModel)
         
         # Solve ODE system 
-        solArray, success = solveOdeModelAllCond(prob, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol)
+        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol)
         solNumeric = solArray[1]
         
         # Compare against analytical solution 
@@ -147,7 +148,7 @@ end
 """
 function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
     
-    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostFunc(peTabModel, solver, tol)
+    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostGradHess(peTabModel, solver, tol)
     # "Exact" hessian via autodiff 
     evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
 
@@ -158,7 +159,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
     nParam = size(cube)[2]
 
     for i in 1:5
-        i = 1
+
         paramVec = cube[i, :]
 
         # Evaluate cost 
@@ -211,7 +212,7 @@ end
 """
 function testOptimizer(peTabModel::PeTabModel, solver, tol)
 
-    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostFunc(peTabModel, solver, tol)
+    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostGradHess(peTabModel, solver, tol)
     # "Exact" hessian via autodiff 
     evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
 
@@ -292,7 +293,7 @@ else
     @printf("Did not pass test for ODE solution\n")
 end
 
-passTest = testCostGradHess(peTabModel, Vern9(), 1e-15, printRes=false)
+passTest = testCostGradHess(peTabModel, Vern9(), 1e-15, printRes=true)
 if passTest == true
     @printf("Passed test for cost, gradient and hessian\n")
 else

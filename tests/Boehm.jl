@@ -1,4 +1,7 @@
-using ModelingToolkit, DifferentialEquations, DataFrames, CSV 
+using ModelingToolkit 
+using DifferentialEquations
+using DataFrames
+using CSV 
 using ForwardDiff
 using ReverseDiff
 using StatsBase
@@ -8,26 +11,20 @@ using Distributions
 using Printf
 
 
+# Relevant PeTab structs for compuations 
+include(joinpath(pwd(), "src", "PeTab_structs.jl"))
+
 # Functions for solving ODE system 
-include(joinpath(pwd(), "Additional_functions", "benchmarkSolvers.jl"))
+include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
 
-# Ipopt wrapper 
-include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "CommonParameterEstimationMethods", "CreateIpoptProb.jl"))
-
-# PeTab importer 
-include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "PeTabImporter.jl"))
-
-# Additional functions for ODE solver 
-include(joinpath(pwd(), "Additional_functions", "additional_tools.jl"))
+# PeTab importer to get cost, grad etc 
+include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
 
 # HyperCube sampling 
-include(joinpath(pwd(), "Pipeline_ModelParameterEstimation", "LatinHyperCubeParameters", "LatinHyperCubeSampledParameters.jl"))
+include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 
 # For converting to SBML 
-include(joinpath(pwd(), "Pipeline_SBMLImporter", "main.jl"))
-
-# For building observable 
-include(joinpath(pwd(), "Additional_functions", "createObsFile.jl"))
+include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
 
 """
@@ -38,7 +35,7 @@ include(joinpath(pwd(), "Additional_functions", "createObsFile.jl"))
 """
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostFunc(peTabModel, solver, tol)
+    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostGradHess(peTabModel, solver, tol)
     # "Exact" hessian via autodiff 
     evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
 
