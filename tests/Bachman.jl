@@ -47,12 +47,12 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
     gradPythonMat = CSV.read(pwd() * "/tests/Bachman/Grad.csv", DataFrame)
     gradPythonMat = gradPythonMat[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
 
-    # For correct indexing when comparing gradient 
+    # For correct indexing when comparing gradient or when inputing PyPesto vector to Julia 
     iUse = [findfirst(x -> x == idParam[i], names(paramMat)) for i in eachindex(idParam)]
 
     for i in 1:nrow(paramMat)
         
-        paramVec = collect(paramMat[i, :])
+        paramVec = collect(paramMat[i, :])[iUse]
 
         # Test cost 
         costJulia = evalF(paramVec)
