@@ -327,6 +327,23 @@ function getWord(str::String, iStart::Int, charListTerm::Array{Char, 1})
 
     while iEnd <= length(str)
         if !(str[iEnd] in charListTerm) 
+
+            # Parase sciencetific notation for number 
+            if isNumericStart == true && str[iEnd] == 'e'
+                if length(str) > iEnd && (str[iEnd+1] == '-' || isnumeric(str[iEnd+1]))
+                    if str[iEnd+1] == '-'
+                        iEnd += 2
+                        wordStr *= "e-"
+                    else
+                        iEnd += 1
+                        wordStr *= "e"
+                    end
+
+                else
+                    break 
+                end
+            end
+
             if isNumericStart == true && !(isnumeric(str[iEnd]) || str[iEnd] == '.')
                 break
             end

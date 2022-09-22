@@ -162,7 +162,11 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     # In case of preequilibration simulation the condition ID is stored in a single-string as the 
     # concatenation of the pre and post equlibration ID:s.
     conditionId::Array{String, 1} = Array{String, 1}(undef, nObs)
-    preEq = measurementData[!, "preequilibrationConditionId"]
+    if !("preequilibrationConditionId" in names(measurementData))
+        preEq = [missing for i in 1:nObs]
+    else
+        preEq = measurementData[!, "preequilibrationConditionId"]
+    end
     simCond = measurementData[!, "simulationConditionId"]
     for i in eachindex(conditionId)
         if ismissing(preEq[i])
@@ -173,12 +177,16 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     end
 
     # PeTab observable ID for each measurment 
-    obsID::Array{String, 1} = String.(measurementData[!, "observableId"])
+    obsID::Array{String, 1} = string.(measurementData[!, "observableId"])
 
     # Noise parameters in the PeTab file either have a parameter ID, or they have 
     # a value (fixed). Here regardless the values are mapped to the sdParams vector 
     # as string. If sdObs[i] is numeric is the parsed before computing the cost. 
-    sdObs = String.(measurementData[!, "noiseParameters"])
+    if !("noiseParameters" in names(measurementData))
+        sdObs = [missing for i in 1:nObs]
+    else
+        sdObs = string.(measurementData[!, "noiseParameters"])
+    end
     sdParams::Array{String, 1} = Array{String, 1}(undef, nObs)
     for i in eachindex(sdObs)
         if ismissing(sdObs[i])
@@ -190,7 +198,11 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
 
     # obsParamFile[i] can store more than one parameter. This is parsed
     # when computing the likelihood. 
-    obsParamFile = measurementData[!, "observableParameters"]
+    if !("observableParameters" in names(measurementData))
+        obsParamFile = [missing for i in 1:nObs]
+    else
+        obsParamFile = measurementData[!, "observableParameters"]
+    end
     obsParam = Array{String, 1}(undef, nObs)
     for i in 1:nObs
         if ismissing(obsParamFile[i])
@@ -252,13 +264,13 @@ function getSimulationInfo(measurementData::DataFrame)::SimulationInfo
             shiftExpId = unique(measurementData[iRows, "simulationConditionId"])
             push!(shiftExpIds, shiftExpId)
         end
-        shiftExpIds = convert(Array{String, 1}, shiftExpIds)
+        shiftExpIds = convert(Vector{Vector{String}}, shiftExpIds)
     end
 
     # In case the the model is mpt simulated to steday state store experimental condition in firstExpIds
     if simulateSS == false
         firstExpIds = convert(Array{String, 1}, unique(measurementData[!, "simulationConditionId"]))
-        shiftExpIds = Array{String, 1}(undef, 0)
+        shiftExpIds = Array{Array{String, 1}, 1}(undef, 0)
     end
 
     # Compute number of foward simulations to cover all experimental conditions and allocate array for them

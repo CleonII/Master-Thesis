@@ -105,13 +105,14 @@ end
     See also: [`getSimulationInfo`]
 """
 struct SimulationInfo{T1<:Array{<:String, 1}, 
-                      T2<:Bool,
-                      T3<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}}
+                      T2<:Vector{<:Vector{String}},
+                      T3<:Bool,
+                      T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}}
     firstExpIds::T1
-    shiftExpIds::T1
+    shiftExpIds::T2
     conditionIdSol::T1
-    simulateSS::T2
-    solArray::T3
+    simulateSS::T3
+    solArray::T4
 end
 
 

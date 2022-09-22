@@ -1,7 +1,38 @@
 # Functions for solving a PeTab ODE-system for all experimental conditions. Can handle models with and without 
 # a preequilibration-criteria (where the model must be simulated to a steady state).
-
 # TODO: Pre-compute better with indices and when extracting the t-max value.
+
+
+"""
+    solveOdeModelAtFileValues(peTabModel::PeTabModel)
+
+    For a peTab model solve the ODE:s at the values in the parameters-PeTab-file 
+    using a specific solver with absTol=relTol=tol. Returns an array with the 
+    solution for each experimenta condition along with a vector with the condition 
+    name for each solution 
+"""
+function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64)
+
+    # Process PeTab files into type-stable Julia structs 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
+    parameterData = processParameterData(parameterDataFile)
+    simulationInfo = getSimulationInfo(measurementDataFile)
+    
+    # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
+    setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
+
+    # The time-span 5e3 is overwritten when performing actual forward simulations 
+    odeProb = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true)
+    odeProb = remake(odeProb, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
+
+    # Functions to map experimental conditions and parameters correctly to the ODE model 
+    changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, parameterData, experimentalConditionsFile, peTabModel)
+
+    # Set up function which solves the ODE model for all conditions and stores result 
+    solArray, status = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol)
+
+    return solArray, simulationInfo
+end
 
 
 """
@@ -206,7 +237,7 @@ function solveOdeSS(prob::ODEProblem,
     # Change to parameters for the preequilibration simulations 
     changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
     u0_pre = deepcopy(prob.u0)
-    prob = remake(prob, tspan = (0.0, 1e6), p = prob.p[:], u0 = prob.u0[:])
+    prob = remake(prob, tspan = (0.0, 1e8), p = prob.p[:], u0 = prob.u0[:])
 
     # Terminate if a steady state was not reached in preequilibration simulations 
     sol_pre = solveCallPre(prob)
@@ -220,7 +251,7 @@ function solveOdeSS(prob::ODEProblem,
     # whose value was changed in the preequilibration-simulation. The experimentaCondition
     # value is prioritized by only changing u0 to the steady state value for those states  
     # that were not affected by change to shiftExpId.
-    has_not_changed = prob.u0 .== u0_pre
+    has_not_changed = (prob.u0 .== u0_pre)
     prob.u0[has_not_changed] .= sol_pre.u[end][has_not_changed]
     prob = remake(prob, tspan = (0.0, t_max_ss))
     
@@ -335,8 +366,8 @@ function changeExperimentalCond!(paramVec,
     # Extract names of parameters to change for specific experimental condition 
     colNames = names(experimentalConditions)
     i_start = "conditionName" in colNames ? 3 : 2
-    paramChange = colNames[i_start:end]
-    if isempty(paramChange)
+    paramStateChange = colNames[i_start:end]
+    if isempty(paramStateChange)
         return 
     end
 
@@ -345,14 +376,35 @@ function changeExperimentalCond!(paramVec,
     
     # To help with mapping extract parameter names as string
     parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
+    stateNamesStr = replace.(string.(peTabModel.stateNames), "(t)" => "")
     
-    # Keep tab of which parameters are changed.
-    iParamChange = Array{Int64, 1}(undef, length(paramChange))
-
-    for i in eachindex(paramChange)
+    # Get number of states and parameters to change 
+    nParamChange = length(intersect(paramStateChange, parameterNamesStr))
+    nStateChange = length(intersect(paramStateChange, stateNamesStr))
         
-        param = paramChange[i]
-        iParamChange[i] = findfirst(x -> x == param, string.(peTabModel.paramNames)) # Can be precomputed but is not expansive
+    # Keep tab of which parameters are changed.
+    iParamChange = Array{Int64, 1}(undef, nParamChange)
+    iStateChange = Array{Int64, 1}(undef, nStateChange)
+    valChangeU0 = Array{Float64, 1}(undef, nStateChange)
+    iP, iS = 1, 1
+    changeParam::Bool = true
+    for i in eachindex(paramStateChange)
+        
+        variable = paramStateChange[i]
+        # If param is a model parameter change said parameter. If param is one state according to PeTab 
+        # standard the initial value for said state should be changed. 
+        iChangeP = findfirst(x -> x == variable, string.(parameters(peTabModel.odeSystem))) # Do not change to map correctly to ODE-sys
+        iChangeS = findfirst(x -> x == variable, stateNamesStr) # Can be precomputed but is not expansive
+        if !isnothing(iChangeP)
+            iParamChange[iP] = iChangeP
+            changeParam = true
+            iP += 1
+        elseif !isnothing(iChangeS)
+            iStateChange[iS] = iChangeS
+            changeParam = false
+        else
+            println("Error : $variable cannot be mapped to experimental condition")
+        end
 
         # Extract value param should be changed to 
         valChangeTo::Float64 = 0.0
@@ -371,11 +423,18 @@ function changeExperimentalCond!(paramVec,
         end
 
         # Identify which index param corresponds to the in paramMap 
-        iParam = findfirst(x -> x == param, parameterNamesStr)
-        if !isnothing(iParam)
-            paramMapUse[iParam] = Pair(paramMapUse[iParam].first, valChangeTo) 
+        if changeParam == true        
+            iParam = findfirst(x -> x == variable, parameterNamesStr)
+            if !isnothing(iParam)
+                paramMapUse[iParam] = Pair(paramMapUse[iParam].first, valChangeTo) 
+            else
+                println("Error : Simulation parameter to change not found for experimental condition $expID")
+            end
+
+        # In case a state is changed 
         else
-            println("Error : Simulation parameter to change not found for experimental condition $expID")
+            valChangeU0[iS] = valChangeTo
+            iS += 1
         end
     end
 
@@ -385,6 +444,11 @@ function changeExperimentalCond!(paramVec,
     newVal = ModelingToolkit.varmap_to_vars(paramMapUse, peTabModel.paramNames)
     paramVec[iParamChange] .= newVal[iParamChange]
     peTabModel.evalU0!(stateVec, paramVec) 
+
+    # In case an experimental condition maps directly to the initial value of a state. 
+    if !isempty(iStateChange)
+        stateVec[iStateChange] .= valChangeU0
+    end
 
     return nothing
 end

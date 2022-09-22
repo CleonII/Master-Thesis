@@ -393,6 +393,7 @@ function calcLogLik(dynamicParamEst,
             logLik += log(sdVal[i]) + 0.5*log(2*pi) + 0.5*((yMod[i] - measurementData.yObsNotTransformed[i]) / sdVal[i])^2
         elseif measurementData.transformData[i] == :log10
             logLik += log(sdVal[i]) + 0.5*log(2*pi) + log(log(10)) + log(exp10(measurementData.yObsTransformed[i])) + 0.5*( ( log(exp10(yMod[i])) - log(exp10(measurementData.yObsTransformed[i])) ) / (log(10)*sdVal[i]))^2
+            #logLik += log(sdVal[i]) + 0.5*log(2*pi) + log(log(10)) + 0.5* ((yMod[i] - measurementData.yObsTransformed[i]) / sdVal[i])^2
         else
             println("Transformation ", measurementData.transformData[i], "not yet supported.")
         end
