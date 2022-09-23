@@ -148,14 +148,11 @@ end
 """
 function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
     
-    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostGradHess(peTabModel, solver, tol)
-    # "Exact" hessian via autodiff 
-    evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
 
     Random.seed!(123)
-    fileSaveCube = pwd() * "/tests/Test_model2/CubeTestModel2.csv"
-    createCube(5, lowerBounds, upperBounds, fileSaveCube, evalF)
-    cube = Matrix(CSV.read(fileSaveCube, DataFrame))
+    createCube(peTabOpt, 5)
+    cube = Matrix(CSV.read(peTabOpt.pathCube, DataFrame))
     nParam = size(cube)[2]
 
     for i in 1:5
@@ -163,7 +160,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
         paramVec = cube[i, :]
 
         # Evaluate cost 
-        costPeTab = evalF(paramVec)
+        costPeTab = peTabOpt.evalF(paramVec)
         costAnalytic = calcCostAnalytic(paramVec)
         sqDiffCost = (costPeTab - costAnalytic)^2
         if sqDiffCost > 1e-6
@@ -174,7 +171,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
 
         # Evaluate gradient 
         gradAnalytic = ForwardDiff.gradient(calcCostAnalytic, paramVec)
-        gradNumeric = zeros(nParam); evalGradF(paramVec, gradNumeric)
+        gradNumeric = zeros(nParam); peTabOpt.evalGradF(gradNumeric, paramVec)
         sqDiffGrad = sum((gradAnalytic - gradNumeric).^2)
         if sqDiffGrad > 1e-4
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
@@ -184,7 +181,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
 
         # Evaluate hessian 
         hessAnalytic = ForwardDiff.hessian(calcCostAnalytic, paramVec)
-        hessNumeric = zeros(nParam, nParam); evalH(hessNumeric, paramVec)
+        hessNumeric = zeros(nParam, nParam); peTabOpt.evalHess(hessNumeric, paramVec)
         sqDiffHess = sum((hessAnalytic - hessNumeric).^2)
         if sqDiffHess > 1e-3
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
@@ -212,30 +209,26 @@ end
 """
 function testOptimizer(peTabModel::PeTabModel, solver, tol)
 
-    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostGradHess(peTabModel, solver, tol)
-    # "Exact" hessian via autodiff 
-    evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
 
     Random.seed!(123)
-    fileSaveCube = pwd() * "/tests/Test_model2/CubeTestModel2.csv"
-    createCube(5, lowerBounds, upperBounds, fileSaveCube, evalF)
-    cube = Matrix(CSV.read(fileSaveCube, DataFrame))
-    nParam = size(cube)[2]
+    createCube(peTabOpt, 5)
+    cube = Matrix(CSV.read(peTabOpt.pathCube, DataFrame))
 
     # Ipopt optimizers 
-    ipoptProbHessApprox, iterArrHessApprox = createIpoptProbNew(evalF, evalGradF, evalHessianApproxF, lowerBounds, upperBounds, emptyH=false) 
-    ipoptProbBfgs, iterArrBfgs = createIpoptProbNew(evalF, evalGradF, evalHessianApproxF, lowerBounds, upperBounds, emptyH=true) 
-    ipoptProbAutoHess, iterArrAutoHess = createIpoptProbNew(evalF, evalGradF, evalH, lowerBounds, upperBounds, emptyH=false) 
+    ipoptProbHessApprox, iterArrHessApprox = createIpoptProb(peTabOpt, hessianUse=:blockAutoDiff)
+    ipoptProbBfgs, iterArrBfgs = createIpoptProb(peTabOpt, hessianUse=:LBFGS)
+    ipoptProbAutoHess, iterArrAutoHess = createIpoptProb(peTabOpt, hessianUse=:autoDiff)
 
     # Optim optimizers 
-    optimProbHessApprox = createOptimProb(evalF, evalGradF, evalHessianApproxF, lowerBounds, upperBounds, showTrace=false)
-    optimProbAutoHess = createOptimProb(evalF, evalGradF, evalH, lowerBounds, upperBounds, showTrace=false)
+    optimProbHessApprox = createOptimInteriorNewton(peTabOpt, hessianUse=:blockAutoDiff)
+    optimProbAutoHess = createOptimInteriorNewton(peTabOpt, hessianUse=:autoDiff)
 
     p0 = cube[1, :]
     # Ipopt Hessian approximation
     ipoptProbHessApprox.x = deepcopy(p0)
     sol_opt = Ipopt.IpoptSolve(ipoptProbHessApprox)
-    sqDiff = sum((ipoptProbHessApprox.x - paramVecEstTmp).^2)
+    sqDiff = sum((ipoptProbHessApprox.x - peTabOpt.paramVecNotTransformed).^2)
     if sqDiff > 1e-3
         @printf("sqDiffHessApprox = %.3e\n", sqDiff)
         @printf("Failed on optimization for Ipopt hessian approximation\n")
@@ -245,7 +238,7 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     # Ipopt AutoHessian 
     ipoptProbAutoHess.x = deepcopy(p0)
     sol_opt = Ipopt.IpoptSolve(ipoptProbAutoHess)
-    sqDiff = sum((ipoptProbAutoHess.x - paramVecEstTmp).^2)
+    sqDiff = sum((ipoptProbAutoHess.x - peTabOpt.paramVecNotTransformed).^2)
     if sqDiff > 1e-3
         @printf("sqDiffHessApprox = %.3e\n", sqDiff)
         @printf("Failed on optimization for Ipopt auto hessian\n")
@@ -255,7 +248,7 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     # Ipopt BFGS 
     ipoptProbBfgs.x = deepcopy(p0)
     sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
-    sqDiff = sum((ipoptProbBfgs.x - paramVecEstTmp).^2)
+    sqDiff = sum((ipoptProbBfgs.x - peTabOpt.paramVecNotTransformed).^2)
     if sqDiff > 1e-3
         @printf("sqDiffHessApprox = %.3e\n", sqDiff)
         @printf("Failed on optimization for Ipopt BFGS\n")
@@ -264,7 +257,7 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
 
     # Optim AutoHess 
     res = optimProbAutoHess(p0)
-    sqDiff = sum((res.minimizer - paramVecEstTmp).^2)
+    sqDiff = sum((res.minimizer - peTabOpt.paramVecNotTransformed).^2)
     if sqDiff > 1e-3
         @printf("sqDiffHessApprox = %.3e\n", sqDiff)
         @printf("Failed on optimization for Optim AutoHess\n")
@@ -273,7 +266,7 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
 
     # Optim HessApprox 
     res = optimProbHessApprox(p0)
-    sqDiff = sum((res.minimizer - paramVecEstTmp).^2)
+    sqDiff = sum((res.minimizer - peTabOpt.paramVecNotTransformed).^2)
     if sqDiff > 1e-3
         @printf("sqDiffHessApprox = %.3e\n", sqDiff)
         @printf("Failed on optimization for HessApprox\n")
@@ -306,3 +299,16 @@ if passTest == true
 else
     @printf("Did not pass test for checking optimizers\n")
 end
+
+
+peTabOpt = setUpCostGradHess(peTabModel, Vern9(), 1e-9)
+createCube(peTabOpt, 5)
+
+ipoptProb, iterArr = createIpoptProb(peTabOpt, hessianUse=:blockAutoDiff)
+a = 1
+ipoptProb.x = [3.0, 3.0, 3.0, 3.0]
+Ipopt.AddIpoptIntOption(ipoptProb, "print_level", 5)
+sol = Ipopt.IpoptSolve(ipoptProb)
+
+optOptim = createOptimInteriorNewton(peTabOpt, hessianUse=:autoDiff)
+res = optOptim([3.0, 3.0, 1.0, 1.0], showTrace=true)

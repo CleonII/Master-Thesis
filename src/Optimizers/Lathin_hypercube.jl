@@ -2,49 +2,71 @@ using LatinHypercubeSampling, CSV, DataFrames, Random
 using Distributions
 
 
-# For a PeTab model create a Lathin hypercube. Function will be altered after struct is fixed 
-# to hold PeTab-opt struct. 
-function createCube(nSamples, lowerBounds, upperBounds, fileSave, fCost::Function; seed=123)
+"""
+    createCube(pathSave::String, peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
+
+    For a PeTab-optimization struct create a Lathin-hypercube of nSamples parameter vectors which 
+    is stored at pathSave (default in peTabModel.dirModel). 
+"""
+function createCube(pathSave::String, peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
+    _createCube(pathSave, peTabOpt, nSamples, seed=seed, verbose=verbose)
+end
+"""
+    createCube(peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
+
+    For a PeTab-optimization struct create a Lathin-hypercube of nSamples parameter vectors which 
+    is stored at peTabOpt.pathCube (which by default is in peTabModel.dirModel). 
+"""
+function createCube(peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
+    _createCube(peTabOpt.pathCube, peTabOpt, nSamples, seed=seed, verbose=verbose)
+end
+
+
+function _createCube(pathSave::String, peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
 
     Random.seed!(seed)
-    println("Building cube")
 
-    if isfile(fileSave)
-        println("Cube already exists")
+    if isfile(pathSave)
+        println("Cube already exists will not build")
         return 
     end
+    println("Cube does not exist - will build cube")
 
+    lowerBounds, upperBounds = peTabOpt.lowerBounds, peTabOpt.upperBounds
     nDims = length(lowerBounds)
+    
     paramSave = zeros(Float64, (nSamples, nDims))
-    # The goal, as widely distributed distances as possible 
     useCube = true
     k, maxIter = 1, 1
+    # k = number of sucessfully found parameters 
     while k - 1 != nSamples && maxIter < nSamples*10
 
-        # If model could not be solved for some start-guesses generate a new Cube
-        # A new cube is best to maximise spread of start guesses 
+        # Generate a cube with iMax samples. This part regenerates cube 
+        # in case the cost could could not be evaluated for some previous 
+        # cuble value 
         iMax = nSamples - (k - 1)
-        println("iMax = ", iMax)
-        println("nDims = ", nDims)
+        # If less than 15 parameter-vectors are left to generate use random sampling 
+        # as new cube can be biased towards bad parameter regions.
         if iMax > 15
             plan = LHCoptim(iMax, nDims, 10)[1]
             bounds = [(lowerBounds[i], upperBounds[i]) for i in eachindex(lowerBounds)] 
             scaledPlan = Matrix(scaleLHC(plan, bounds))
+            useCube = true
         else
             iMax = 1
             useCube = false
-            paramI = [rand(Uniform(lowerBounds[i], upperBounds[i])) for i in eachindex(lowerBounds)]
         end
         
-
         for i in 1:iMax
-            if useCube
+            if useCube == true
                 paramI = scaledPlan[i, :]
+            else
+                paramI = [rand(Uniform(lowerBounds[i], upperBounds[i])) for i in eachindex(lowerBounds)]
             end
 
             local cost
             try 
-                cost = fCost(paramI)
+                cost = peTabOpt.evalF(paramI)
             catch
                 cost = Inf
             end
@@ -54,7 +76,7 @@ function createCube(nSamples, lowerBounds, upperBounds, fileSave, fCost::Functio
                 k += 1
             end
 
-            if k % 50 == 0
+            if k % 50 == 0 && verbose == true
                 println("Have found $k start guesses")
             end
 
@@ -62,13 +84,20 @@ function createCube(nSamples, lowerBounds, upperBounds, fileSave, fCost::Functio
                 break
             end
 
-        maxIter += 1
+            maxIter += 1
         end
     end
 
+    # In case maximum number of iterations were exceeded trying to find parameters 
     if k - 1 != nSamples
         println("Error : Did not find $nSamples start guesses for the estimation")
     end
 
-    CSV.write(fileSave, DataFrame(paramSave, :auto))
+    dataSave = DataFrame(paramSave, :auto)
+    rename!(dataSave, peTabOpt.namesParam)
+    CSV.write(pathSave, dataSave)
+
+    println("Cube saved at $pathSave")
 end
+
+

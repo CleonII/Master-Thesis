@@ -1,18 +1,96 @@
-# Evaluate hessian for Ipopt. Notice, the calc_hess function requires input on the 
-# format (hessian, inputVec). 
-function eval_h(x_arg::Vector{Float64}, 
+"""
+    createIpoptProb(peTabOpt::PeTabOpt,
+                    hessianUse::Symbol)
+    
+    For a PeTab model optimization struct (peTabOpt) create an Ipopt optimization
+    struct where the hessian is computed via eiter autoDiff (:autoDiff), approximated 
+    with blockAutoDiff (:blockAutoDiff) or a LBFGS approximation (:LBFGS). 
+"""
+function createIpoptProb(peTabOpt::PeTabOpt;
+                         hessianUse::Symbol=:LBFGS)
+
+    lowerBounds = peTabOpt.lowerBounds
+    upperBounds = peTabOpt.upperBounds
+
+    nParam = length(lowerBounds)
+    if hessianUse == :autoDiff
+        evalHessian = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, peTabOpt.evalHess)
+    elseif hessianUse == :blockAutoDiff
+        evalHessian = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, peTabOpt.evalHessApprox)
+    elseif hessianUse == :LBFGS
+        evalHessian = eval_h_empty
+    else
+        println("Error : For Ipopt hessianUse options are :autoDiff, :blockAutoDiff, :LBFGS, not $hessianUse")
+    end
+
+    # Of course Ipopt and Optim accept the gradient in different order 
+    evalGradFUse = (xArg, grad) -> peTabOpt.evalGradF(grad, xArg)
+
+    # Ipopt does not allow the iteration count to be stored directly. Thus the iteration is stored in an arrary which 
+    # is sent into the Ipopt callback function. 
+    iterArr = ones(Int64, 1) .* 20
+    intermediateUse = (alg_mod, iter_count, obj_value, inf_pr, inf_du, mu, d_norm, regularization_size, alpha_du, alpha_pr, ls_trials) -> intermediate(alg_mod, iter_count, obj_value, inf_pr, inf_du, mu, d_norm, regularization_size, alpha_du, alpha_pr, ls_trials, iterArr)
+
+    m = 0
+    nParamHess = Int(nParam*(nParam + 1) / 2)
+    # No inequality constraints assumed (to be added in the future)
+    g_L = Float64[]
+    g_U = Float64[] 
+    prob = Ipopt.CreateIpoptProblem(nParam, 
+                                    lowerBounds, 
+                                    upperBounds, 
+                                    m, # No constraints
+                                    g_L, # No constraints
+                                    g_U, # No constraints
+                                    0, # No constraints
+                                    nParamHess, 
+                                    peTabOpt.evalF, 
+                                    eval_g, # No constraints 
+                                    evalGradFUse,
+                                    eval_jac_g, 
+                                    evalHessian)
+    Ipopt.SetIntermediateCallback(prob, intermediateUse) # Allow iterations to be retrevied (see above) 
+
+    if hessianUse == :LBFGS
+        Ipopt.AddIpoptStrOption(prob, "hessian_approximation", "limited-memory")
+    end 
+    Ipopt.AddIpoptIntOption(prob, "print_level", 0)
+    Ipopt.AddIpoptIntOption(prob, "max_iter", 1000)
+
+    return prob, iterArr
+end
+
+
+"""
+    eval_h(x_arg::Vector{Float64}, 
+           rows::Vector{Int32}, 
+           cols::Vector{Int32}, 
+           obj_factor::Float64, 
+           lambda::Vector{Float64}, 
+           values::Union{Nothing,Vector{Float64}}, 
+           n_param, 
+           evalH::Function)
+
+    Helper function computing the hessian for Ipopt (all correct input arguments). 
+    The actual hessian is computed via the evalH function, and this function must 
+    be on the format evalH(hessian, paramVec).
+
+    Ipopt supports sparse hessians, but at the moment a dense hessian is assumed.
+"""
+function eval_h(xArg::Vector{Float64}, 
                 rows::Vector{Int32}, 
                 cols::Vector{Int32}, 
                 obj_factor::Float64, 
                 lambda::Vector{Float64}, 
                 values::Union{Nothing,Vector{Float64}}, 
-                n_param, 
-                calc_hess::Function)
+                nParam::Integer, 
+                evalH::Function)
 
+    idx::Int32 = 0
     if values === nothing
         # Symmetric matrix, fill the lower left triangle only
         idx = 1
-        for row in 1:n_param
+        @inbounds for row in 1:nParam
             for col in 1:row
                 rows[idx] = row
                 cols[idx] = col
@@ -20,21 +98,22 @@ function eval_h(x_arg::Vector{Float64},
             end
         end
     else
-        # Again, only lower left triangle
-        # Objective
-        hessian_mat = zeros(n_param, n_param)
-        calc_hess(hessian_mat, x_arg)
+        # Symmetric, fill only lower left matrix (values)
+        hessianMat = zeros(nParam, nParam)
+        evalH(hessianMat, xArg)
         idx = 1
-        for row in 1:n_param
+        @inbounds for row in 1:nParam
             for col in 1:row
-                values[idx] = hessian_mat[row, col] * obj_factor
+                values[idx] = hessianMat[row, col] * obj_factor
                 idx += 1
             end
         end
     end
     return
 end
-# In case user does not want to employ a hessian 
+
+
+# In case of of BFGS gradient provide Ipopt with empty hessian struct.
 function eval_h_empty(x_arg::Vector{Float64}, 
                       rows::Vector{Int32}, 
                       cols::Vector{Int32}, 
@@ -43,13 +122,18 @@ function eval_h_empty(x_arg::Vector{Float64},
                       values::Union{Nothing,Vector{Float64}})    
     return nothing
 end
+
+
+# These function wraps and handles constraints. TODO: Allow optimization under inequality constraints 
 function eval_jac_g(x::Vector{Float64}, rows::Vector{Int32}, cols::Vector{Int32}, values::Union{Nothing,Vector{Float64}})
     return 
 end
 function eval_g(x::Vector{Float64}, g::Vector{Float64})
     return 
 end
-# Callback for Ipopt allowing the number of iterations to be extracted from the solver
+
+
+# Callback for Ipopt allowing number of iterations to be stored.
 function intermediate(alg_mod::Cint,
                       iter_count::Cint,
                       obj_value::Float64,
@@ -68,38 +152,4 @@ function intermediate(alg_mod::Cint,
 end
 
 
-# Function will change when a PeTabOpt struct is created.
-function createIpoptProbNew(fPre::Function, 
-                            fGradPre::Function, 
-                            fHessPre::Function, 
-                            lowerBounds::Array{<:AbstractFloat, 1}, 
-                            upperBounds::Array{<:AbstractFloat, 1}; 
-                            emptyH::Bool=false)
-
-    nParam = length(lowerBounds)
-    if emptyH == false
-        evalHUse = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, fHessPre)
-    else
-        evalHUse = eval_h_empty
-    end
-
-    iterArr = ones(Int64, 1) .* 20
-    intermediateUse = (alg_mod, iter_count, obj_value, inf_pr, inf_du, mu, d_norm, regularization_size, alpha_du, alpha_pr, ls_trials) -> intermediate(alg_mod, iter_count, obj_value, inf_pr, inf_du, mu, d_norm, regularization_size, alpha_du, alpha_pr, ls_trials, iterArr)
-
-    m = 0
-    nParamHess = Int(nParam*(nParam + 1) / 2)
-    # No inequality constraints assumed 
-    g_L = Float64[]
-    g_U = Float64[] 
-    prob = Ipopt.CreateIpoptProblem(nParam, lowerBounds, upperBounds, m, g_L, g_U, 0, nParamHess, fPre, eval_g, fGradPre, eval_jac_g, evalHUse)
-    Ipopt.SetIntermediateCallback(prob, intermediateUse) # Allow iterations to be retrevied 
-
-    if emptyH == true
-        Ipopt.AddIpoptStrOption(prob, "hessian_approximation", "limited-memory")
-    end 
-    Ipopt.AddIpoptIntOption(prob, "print_level", 0)
-    Ipopt.AddIpoptIntOption(prob, "max_iter", 1000)
-
-    return prob, iterArr
-end
 

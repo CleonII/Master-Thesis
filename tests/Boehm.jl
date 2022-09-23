@@ -35,13 +35,10 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 """
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostGradHess(peTabModel, solver, tol)
-    # "Exact" hessian via autodiff 
-    evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
 
     paramVals = CSV.read(pwd() * "/tests/Boehm/Params.csv", DataFrame)
     paramMat = paramVals[!, Not([:Id, :ratio, :specC17])]
-    iUse = [findfirst(x -> x == idParam[i], names(paramMat)) for i in eachindex(idParam)]
     nParam = ncol(paramMat)
 
     costPython = (CSV.read(pwd() * "/tests/Boehm/Cost.csv", DataFrame))[!, :Cost]
@@ -51,7 +48,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
     for i in 1:nrow(paramMat)
         paramVec = collect(paramMat[i, :])
 
-        costJulia = evalF(paramVec)
+        costJulia = peTabOpt.evalF(paramVec)
         sqDiffCost = (costJulia - costPython[i])^2
         if sqDiffCost > 1e-5
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
@@ -59,7 +56,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
-        gradJulia = zeros(nParam); evalGradF(paramVec, gradJulia)
+        gradJulia = zeros(nParam); peTabOpt.evalGradF(gradJulia, paramVec)
         gradPython = collect(gradPythonMat[i, :])
         sqDiffGrad = sum((gradJulia - gradPython).^2)
         if sqDiffGrad > 1e-5

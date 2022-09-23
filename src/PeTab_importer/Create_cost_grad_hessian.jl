@@ -15,7 +15,7 @@ include(joinpath(pwd(), "src", "Common.jl"))
     and ReverseDiff is used for observable and sd parameters. The hessian approximation assumes the 
     interaction betweeen dynamic and (observable, sd) parameters is zero.
 """
-function setUpCostGradHess(peTabModel::PeTabModel, solver, tol::Float64)
+function setUpCostGradHess(peTabModel::PeTabModel, solver, tol::Float64)::PeTabOpt
 
     # Process PeTab files into type-stable Julia structs 
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
@@ -41,8 +41,9 @@ function setUpCostGradHess(peTabModel::PeTabModel, solver, tol::Float64)
     solveOdeModelAllCondUse! = (solArrayArg, odeProbArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol)
     
     evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
-    evalGradF = (paramVecEst, grad) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
-    evalHessianApproxF = (hessian, paramVecEst) -> calcHessianApprox!(hessian, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
+    evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
+    evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
+    evalHess = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
     
     # TODO: Move this to another function 
     # Lower and upper bounds for parameters to estimate 
@@ -55,9 +56,21 @@ function setUpCostGradHess(peTabModel::PeTabModel, solver, tol::Float64)
     # Transform upper and lower bounds if the case 
     transformParamVec!(lowerBounds, namesParamEst, parameterData, revTransform=true)
     transformParamVec!(upperBounds, namesParamEst, parameterData, revTransform=true)
-    transformParamVec!(paramVecNominal, namesParamEst, parameterData, revTransform=true)
+    paramVecNominalTransformed = transformParamVec(paramVecNominal, namesParamEst, parameterData, revTransform=true)
 
-    return evalF, evalGradF, evalHessianApproxF, paramVecNominal, lowerBounds, upperBounds, namesParamEst
+    peTabOpt = PeTabOpt(evalF, 
+                        evalGradF, 
+                        evalHess,
+                        evalHessApprox, 
+                        length(namesParamEst), 
+                        namesParamEst, 
+                        paramVecNominal, 
+                        paramVecNominalTransformed, 
+                        lowerBounds, 
+                        upperBounds, 
+                        peTabModel.dirModel * "Cube" * peTabModel.modelName * ".csv",
+                        peTabModel)
+    return peTabOpt
 end
 
 

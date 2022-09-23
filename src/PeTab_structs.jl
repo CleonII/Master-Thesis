@@ -42,6 +42,23 @@ struct PeTabModel{T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}},
 end
 
 
+struct PeTabOpt{T1 <: Integer, 
+                T2 <: Array{<:AbstractFloat, 1}}
+    evalF::Function
+    evalGradF::Function
+    evalHess::Function
+    evalHessApprox::Function
+    nParamEst::T1
+    namesParam::Array{String, 1}
+    paramVecNotTransformed::T2
+    paramVecTransformed::T2
+    lowerBounds::T2
+    upperBounds::T2
+    pathCube::String
+    peTabModel::PeTabModel
+end
+
+
 """
     ParamData
 

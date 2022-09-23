@@ -34,9 +34,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 """
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostGradHess(peTabModel, solver, tol)
-    # "Exact" hessian via autodiff 
-    evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
 
     # Parameter values to test gradient at 
     paramVals = CSV.read(pwd() * "/tests/Bachman/Params.csv", DataFrame)
@@ -48,14 +46,14 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
     gradPythonMat = gradPythonMat[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
 
     # For correct indexing when comparing gradient or when inputing PyPesto vector to Julia 
-    iUse = [findfirst(x -> x == idParam[i], names(paramMat)) for i in eachindex(idParam)]
+    iUse = [findfirst(x -> x == peTabOpt.namesParam[i], names(paramMat)) for i in eachindex(peTabOpt.namesParam)]
 
     for i in 1:nrow(paramMat)
         
         paramVec = collect(paramMat[i, :])[iUse]
 
         # Test cost 
-        costJulia = evalF(paramVec)
+        costJulia = peTabOpt.evalF(paramVec)
         sqDiffCost = (costJulia - costPython[i])^2
         if sqDiffCost > 1e-5
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
@@ -65,7 +63,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
 
         grad = zeros(length(paramVec))
         gradPython = collect(gradPythonMat[i, :])
-        evalGradF(paramVec, grad)
+        peTabOpt.evalGradF(grad, paramVec)
         sqDiffGrad = sum((grad - gradPython[iUse]).^2)
         if sqDiffGrad > 1e-5
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)

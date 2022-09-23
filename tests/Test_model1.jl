@@ -180,14 +180,11 @@ end
 """
 function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    evalF, evalGradF, evalHessianApproxF, paramVecEstTmp, lowerBounds, upperBounds, idParam = setUpCostGradHess(peTabModel, solver, tol)
-    # "Exact" hessian via autodiff 
-    evalH = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(evalF, paramVec)) end
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
 
     Random.seed!(123)
-    fileSaveCube = pwd() * "/tests/Test_model1/CubeTestModel1.csv"
-    createCube(5, lowerBounds, upperBounds, fileSaveCube, evalF)
-    cube = Matrix(CSV.read(fileSaveCube, DataFrame))
+    createCube(peTabOpt, 5)
+    cube = Matrix(CSV.read(peTabOpt.pathCube, DataFrame))
     nParam = size(cube)[2]
 
     for i in 1:5

@@ -1,18 +1,37 @@
-# Function will change when a PeTabOpt struct is created.
-function createOptimProb(fPre::Function, 
-                         fGradPre::Function, 
-                         fHessPre::Function, 
-                         lowerBounds::Array{<:AbstractFloat, 1}, 
-                         upperBounds::Array{<:AbstractFloat}; 
-                         showTrace::Bool=false)
+"""
+    createOptimInteriorNewton(peTabOpt::PeTabOpt;
+                              hessianUse::Symbol=:blockAutoDiff)
+
+    For a PeTab model optimization struct (peTabOpt) create an Optim interior point Newton 
+    function struct where the hessian is computed via eiter autoDiff (:autoDiff), or approximated 
+    with blockAutoDiff (:blockAutoDiff). 
+
+    To run the optimization just call evalOptim(paramVec, showTrace=true/false)
+"""
+function createOptimInteriorNewton(peTabOpt::PeTabOpt;
+                                   hessianUse::Symbol=:blockAutoDiff)
     
-    x0 = zeros(Float64, length(lowerBounds))
-    fGradUse = (grad, x) -> fGradPre(x, grad)
-    fHessUse = (hess, x) -> fHessPre(hess, x)
-    df = TwiceDifferentiable(fPre, fGradUse, fHessUse, x0)
+    lowerBounds = peTabOpt.lowerBounds
+    upperBounds = peTabOpt.upperBounds
+
+    nParam = length(lowerBounds)
+    if hessianUse == :autoDiff
+        evalHessian = peTabOpt.evalHess
+    elseif hessianUse == :blockAutoDiff
+        evalHessian = peTabOpt.evalHessApprox
+    else
+        println("Error : For optim interior point Newton availble hessianUse options are :autoDiff, :blockAutoDiff not $hessianUse")
+    end
+
+    x0 = zeros(Float64, nParam)
+    df = TwiceDifferentiable(peTabOpt.evalF, peTabOpt.evalGradF, evalHessian, x0)
     dfc = TwiceDifferentiableConstraints(lowerBounds .- 0.01, upperBounds .+ 0.01)
 
-    evalOptim = (p0) -> Optim.optimize(df, dfc, p0, IPNewton(), Optim.Options(iterations = 1000, show_trace = showTrace))
+    evalOptim = (p0; showTrace=false) -> Optim.optimize(df, 
+                                                        dfc, 
+                                                        p0, 
+                                                        IPNewton(), 
+                                                        Optim.Options(iterations = 1000, show_trace = showTrace))
 
     return evalOptim
 end
