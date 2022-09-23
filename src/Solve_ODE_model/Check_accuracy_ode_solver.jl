@@ -17,7 +17,7 @@
 function calcHighAccOdeSolution(prob::ODEProblem, 
                                 changeToExperimentalCondUse!::Function, 
                                 measurementData::DataFrame,
-                                simulationInfo::SimulationInfo,
+                                simulationInfo::SimulationInfo;
                                 tol::Float64=1e-15) 
                                 
     bigFloatOdeProb = createBigFloatODEProblem(prob)
@@ -64,13 +64,13 @@ end
     Recomended to compute high accuracy solution with small tolerances (1e-15) using a high accuracy solver
     and BigFloat. 
 """
-function calcSqErr(prob::ODEProblem, 
-                   solArrayHighAccuracy::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
-                   changeToExperimentalCondUse!::Function, 
-                   measurementData::DataFrame,
-                   simulationInfo::SimulationInfo,
-                   solver,
-                   tol::Float64)::Float64
+function calcAccuracyOdeSolver(prob::ODEProblem, 
+                               solArrayHighAccuracy::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
+                               changeToExperimentalCondUse!::Function, 
+                               measurementData::DataFrame,
+                               simulationInfo::SimulationInfo,
+                               solver,
+                               tol::Float64)::Float64
                    
     # Check if model can be solved (without using forced stops for integrator 
     # as this can make the solver converge).
@@ -84,7 +84,7 @@ function calcSqErr(prob::ODEProblem,
     # is done at the time-points in the high accuracy solver. 
     sqErr::Float64 = 0.0
     local couldSolve = true
-    if simulateSS == true
+    if simulationInfo.simulateSS == true
         k = 1
         for i in eachindex(simulationInfo.firstExpIds)
             for j in eachindex(simulationInfo.shiftExpIds[i])
@@ -106,7 +106,7 @@ function calcSqErr(prob::ODEProblem,
             end
         end
 
-    elseif simulateSS == false
+    elseif simulationInfo.simulateSS == false
 
         for i in eachindex(simulationInfo.firstExpIds)
             
