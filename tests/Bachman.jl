@@ -87,7 +87,7 @@ peTabModel = setUpPeTabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/")
 
 passTest = compareAgainstPyPesto(peTabModel, Rodas4P(), 1e-12, printRes=true)
 if passTest == true
-    @printf("Passed test Boehm against PyPesto\n")
+    @printf("Passed test Bachaman against PyPesto\n")
 else
-    @printf("Did not pass test Boehm against PyPesto\n")
+    @printf("Did not pass test Bachman against PyPesto\n")
 end
