@@ -4,6 +4,7 @@
 # This ODE is solved analytically, and using the analytical solution the accuracy of 
 # the ODE solver, cost function, gradient and hessian of the PeTab importer is checked.
 # The accuracy of the optimizers is further checked.
+# The measurment data is avaible in tests/Test_model2/
 
 
 using ModelingToolkit 
@@ -279,7 +280,7 @@ end
 
 peTabModel = setUpPeTabModel("Test_model2", pwd() * "/tests/Test_model2/")
 
-passTest = testOdeSol(peTabModel, Vern9(), 1e-9, printRes=false)
+passTest = testOdeSol(peTabModel, Vern9(), 1e-9, printRes=true)
 if passTest == true
     @printf("Passed test for ODE solution\n")
 else
@@ -300,15 +301,3 @@ else
     @printf("Did not pass test for checking optimizers\n")
 end
 
-
-peTabOpt = setUpCostGradHess(peTabModel, Vern9(), 1e-9)
-createCube(peTabOpt, 5)
-
-ipoptProb, iterArr = createIpoptProb(peTabOpt, hessianUse=:blockAutoDiff)
-a = 1
-ipoptProb.x = [3.0, 3.0, 3.0, 3.0]
-Ipopt.AddIpoptIntOption(ipoptProb, "print_level", 5)
-sol = Ipopt.IpoptSolve(ipoptProb)
-
-optOptim = createOptimInteriorNewton(peTabOpt, hessianUse=:autoDiff)
-res = optOptim([3.0, 3.0, 1.0, 1.0], showTrace=true)

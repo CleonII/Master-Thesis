@@ -2,7 +2,7 @@
 #   x' = Ax; x(0) = u0 and A = [alpha beta ; gamma delta].
 # This ODE is solved analytically, and using the analytical solution the accuracy of 
 # the ODE solver, cost function, gradient and hessian of the PeTab importer is checked.
-# The measurment data is avaible in TODO:Fix folders.
+# The measurment data is avaible in tests/Test_model1/
 
 
 using ModelingToolkit 
@@ -192,7 +192,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
         paramVec = cube[i, :]
 
         # Evaluate cost 
-        costPeTab = evalF(paramVec)
+        costPeTab = peTabOpt.evalF(paramVec)
         costAnalytic = calcCostAnalytic(paramVec)
         sqDiffCost = (costPeTab - costAnalytic)^2
         if sqDiffCost > 1e-6
@@ -203,7 +203,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
 
         # Evaluate gradient 
         gradAnalytic = ForwardDiff.gradient(calcCostAnalytic, paramVec)
-        gradNumeric = zeros(nParam); evalGradF(paramVec, gradNumeric)
+        gradNumeric = zeros(nParam); peTabOpt.evalGradF(gradNumeric, paramVec)
         sqDiffGrad = sum((gradAnalytic - gradNumeric).^2)
         if sqDiffGrad > 1e-6
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
@@ -213,7 +213,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
 
         # Evaluate hessian 
         hessAnalytic = ForwardDiff.hessian(calcCostAnalytic, paramVec)
-        hessNumeric = zeros(nParam, nParam); evalH(hessNumeric, paramVec)
+        hessNumeric = zeros(nParam, nParam); peTabOpt.evalHess(hessNumeric, paramVec)
         sqDiffHess = sum((hessAnalytic - hessNumeric).^2)
         if sqDiffHess > 1e-4
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
@@ -241,7 +241,7 @@ else
     @printf("Did not pass test for ODE solution\n")
 end
 
-passTest = testCostGradHess(peTabModel, Vern9(), 1e-12, printRes=false)
+passTest = testCostGradHess(peTabModel, Vern9(), 1e-12, printRes=true)
 if passTest == true
     @printf("Passed test for cost, gradient and hessian\n")
 else

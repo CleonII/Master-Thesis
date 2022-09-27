@@ -134,6 +134,28 @@ end
 
 
 """
+    ParamMap
+
+    Struct which makes out a map to correctly for an observation extract the correct observable 
+    or sd-param via the getObsOrSdParam function when computing the likelihood. Correctly built 
+    by `buildMapParameters`, and is part of the ParameterIndices-struct.
+
+    For noise or observable parameters belong to an observation, e.g (obsParam1, obsParam2), 
+    this struct stores which parameters should be estimtated, and for those parameters which 
+    index they correspond to in the parameter estimation vector. For constant parameters 
+    the struct stores the values. 
+
+    See also: [`getIndicesParam`, `buildMapParameters`]
+"""
+struct ParamMap{T1<:Array{<:AbstractFloat, 1}}
+    shouldEst::Array{Bool, 1}
+    indexUse::Array{UInt32, 1}
+    valuesConst::T1
+    nParam::UInt32
+end
+
+
+"""
     ParameterIndices
 
     Struct storing names and mapping indices for mapping the parameter provided 
@@ -145,12 +167,19 @@ end
     (only part of the standard deviation expression in the log-likelhood). This 
     struct stores mapping indices (starting with i) to map pVecEst 
     correctly when computing the likelihood (e.g map the SD-parameters in pVecEst
-    correctly to a vector of SD-vals). Further stores the name of each parameter.
+    correctly to a vector of SD-vals). Also stores the name of each parameter.
 
-    See also: [`getIndicesParam`]
+    Furthermore, when computing yMod or SD the correct observable and sd parameters 
+    has to be used for each observation. The mapArrays effectively contains precomputed  
+    maps allowing said parameter to be effectively be extracted by the getObsOrSdParam 
+    function. 
+
+    See also: [`getIndicesParam`, `ParamMap`]
 """
 struct ParameterIndices{T1<:Array{<:Integer, 1}, 
-                        T2<:Array{<:String, 1}}
+                        T2<:Array{<:String, 1}, 
+                        T3<:Array{<:UInt32, 1}, 
+                        T4<:Array{<:ParamMap, 1}}
 
     iDynParam::T1
     iObsParam::T1
@@ -159,4 +188,8 @@ struct ParameterIndices{T1<:Array{<:Integer, 1},
     namesObsParam::T2
     namesSdParam::T2
     namesParamEst::T2
+    indexObsParamMap::T3
+    indexSdParamMap::T3
+    mapArrayObsParam::T4
+    mapArraySdParam::T4
 end

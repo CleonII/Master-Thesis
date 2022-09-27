@@ -68,7 +68,7 @@ function createYmodFunction(modelName::String,
 
     io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "w")
     
-    write(io, "function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) \n")
+    write(io, "function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) \n")
 
     # Extract names of model states and write to file 
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
@@ -111,7 +111,7 @@ function createYmodFunction(modelName::String,
         # Extract observable parameters 
         obsParam = getObsParamStr(tmpFormula)
         if !isempty(obsParam)
-            strObserveble *= "\t\t" * obsParam * " = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)\n" 
+            strObserveble *= "\t\t" * obsParam * " = getObsOrSdParam(obsPar, mapObsParam)\n" 
         end 
 
         # Translate the formula for the observable to Julia syntax 
@@ -208,7 +208,7 @@ function createSdFunction(modelName::String,
 
     io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "a")
 
-    write(io, "\n\nfunction evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) \n")
+    write(io, "\n\nfunction evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) \n")
 
     # Extract names of model states and write to file 
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
@@ -251,7 +251,7 @@ function createSdFunction(modelName::String,
         # Extract noise parameters 
         noiseParam = getNoiseParamStr(tmpFormula)
         if !isempty(noiseParam)
-            strObserveble *= "\t\t" * noiseParam * " = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)\n" 
+            strObserveble *= "\t\t" * noiseParam * " = getObsOrSdParam(sdPar, mapSdParam)\n" 
         end 
 
         juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn)

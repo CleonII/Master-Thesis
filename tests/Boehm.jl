@@ -77,7 +77,7 @@ end
 
 peTabModel = setUpPeTabModel("Boehm_JProteomeRes2014", pwd() * "/tests/Boehm/")
 
-passTest = compareAgainstPyPesto(peTabModel, Rodas4P(), 1e-12, printRes=false)
+passTest = compareAgainstPyPesto(peTabModel, Rodas4P(), 1e-12, printRes=true)
 if passTest == true
     @printf("Passed test Boehm against PyPesto\n")
 else

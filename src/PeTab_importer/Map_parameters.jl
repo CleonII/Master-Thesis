@@ -7,12 +7,14 @@
     getIndicesParam(paramData::ParamData, measurementData::MeasurementData)::ParameterIndices
 
     For a PeTab-model creates index vectors for extracting the dynamic-, observable- and sd-parameters from 
-    the  optimizsing parameter vector, and extract names for all parameters and stores the information in 
-    the ParameterIndices-struct.
+    the  optimizsing parameter vector, and indices and maps to effectively for an observation, when computing 
+    the likelhood, to extract the correct SD- and obs-parameters. 
 
-    TODO: Add index for mapping observables
+    When correctly extracting sd- or obs-parameters the `ParamMap` struct is used. This struct has precomputed 
+    values for which parameters belong to a specific observation, for example, which of the to be estimated 
+    observable parameters should be used when computing a part of the likelihood.
 
-    See also: [`ParameterIndices`]
+    See also: [`ParameterIndices`, `ParamMap`]
 """
 function getIndicesParam(paramData::ParamData, measurementData::MeasurementData)::ParameterIndices
 
@@ -32,73 +34,131 @@ function getIndicesParam(paramData::ParamData, measurementData::MeasurementData)
     iSdPar::Array{UInt32, 1} = convert(Array{UInt32, 1}, collect((length(namesParamDyn)+1):(length(namesParamDyn) + length(namesSdParam))))
     iObsPar::Array{UInt32, 1} = convert(Array{UInt32, 1}, collect((length(namesParamDyn) + length(namesSdParam) + 1):(length(namesParamDyn) + length(namesSdParam) + length(namesObsParam))))
     
+    # When extracting observable or sd parameter for computing the likelhood a pre-calculcated map-array
+    # is used to efficently extract correct parameters. The arrays below define which map to extract to 
+    # use in the map array for each specific observation 
+    # Observable parameters 
+    keysObsMap = unique(measurementData.obsParam)
+    indexObsParamMap = [UInt32(findfirst(x -> x == measurementData.obsParam[i], keysObsMap)) for i in eachindex(measurementData.obsParam)]
+    # Noise parameters 
+    keysSdMap = unique(measurementData.sdParams)
+    indexSdParamMap = [UInt32(findfirst(x -> x == measurementData.sdParams[i], keysSdMap)) for i in eachindex(measurementData.sdParams)]
+
+    # Build maps to efficently map Obs- and SD-parameter when computing the likelhood
+    mapArrayObsParam = buildMapParameters(keysObsMap, measurementData, paramData, true)
+    mapArraySdParam = buildMapParameters(keysSdMap, measurementData, paramData, false)
+
+
     paramIndicies = ParameterIndices(iDynPar, 
                                      iObsPar, 
                                      iSdPar, 
                                      string.(namesParamDyn), 
                                      string.(namesObsParam), 
                                      string.(namesSdParam),
-                                     namesParamEst)
+                                     namesParamEst, 
+                                     indexObsParamMap, 
+                                     indexSdParamMap, 
+                                     mapArrayObsParam, 
+                                     mapArraySdParam)
 
     return paramIndicies
 end
 
 
-# Function for extracting Observable parameter when computing the cost. Will be heavily altered as slow.
-function getObsOrSdParam(vecParam,
-                         paramData::ParamData, 
-                         measurementData::MeasurementData, 
-                         observableId::String,
-                         simulationConditionId::String,
-                         t::Float64;
-                         getObsPar::Bool=true)
+function buildMapParameters(keysMap::Array{String, 1},
+                            measurementData::MeasurementData,
+                            parameterData::ParamData,
+                            buildObsParam::Bool)::Array{ParamMap, 1}
 
-    if getObsPar == true
-        idVec = getIdEst(measurementData.obsParam, paramData)
+    
+    mapEntries::Array{ParamMap, 1} = Array{ParamMap, 1}(undef, length(keysMap))
+
+    if buildObsParam == true
+        namesParamEst = getIdEst(measurementData.obsParam, parameterData)
     else
-        idVec = getIdEst(measurementData.sdParams, paramData)
+        namesParamEst = getIdEst(measurementData.sdParams, parameterData)
     end
 
-    nObs = length(measurementData.tObs)
-    # Acquire which observation is being handled (for really large parameter files smarter data structs might be needed)
-    iUse = findfirst(x -> measurementData.observebleID[x] == observableId && measurementData.conditionId[x] == simulationConditionId && measurementData.tObs[x] == t, 1:nObs)
-    if isnothing(iUse)
-        println("Warning : Cannot identify an observation in getObsParam ")
-    end
-    if getObsPar == true && isempty(measurementData.obsParam[iUse])
-        return nothing
-    elseif getObsPar == false && isempty(measurementData.sdParams[iUse])
-        return nothing
-    end
+    # For each Key build associated dict-entry which i) Holds the constant obsParam value or ii) holds the 
+    # index in obsParamVecEst-vector depending on the observable parameters should be estimated or not.
+    for i in eachindex(keysMap)
+        if isempty(keysMap[i])
+            mapEntries[i] = ParamMap(Array{Bool, 1}(undef, 0), Array{UInt32, 1}(undef, 0), Array{Float64, 1}(undef, 0), UInt32(0))
 
-    if getObsPar == true
-        paramsRet = split(measurementData.obsParam[iUse], ';')
-    else
-        paramsRet = split(measurementData.sdParams[iUse], ';')
-    end
+        elseif !isempty(keysMap[i])
 
-    output = Array{eltype(vecParam), 1}(undef, length(paramsRet))
-    for i in eachindex(paramsRet)
-        # Hard coded constant number 
-        if isNumber(paramsRet[i])
-            output[i] = parse(Float64, paramsRet[i])
+            paramsRet = split(keysMap[i], ';')
+            nParamsRet::Int = length(paramsRet)
+            shouldEst::Array{Bool, 1} = Array{Bool, 1}(undef, nParamsRet)
+            indexUse::Array{UInt32, 1} = Array{UInt32, 1}(undef, nParamsRet)
+            valuesConst::Array{Float64, 1} = Array{Float64, 1}(undef, nParamsRet)
 
-        # Parameter to be estimated 
-        elseif paramsRet[i] in idVec
-            output[i] = vecParam[findfirst(x -> x == paramsRet[i], idVec)]
-        
-        # Constant parameter 
-        elseif paramsRet[i] in paramData.parameterID
-            output[i] = paramData.paramVal[findfirst(x -> x == paramsRet[i], paramData.parameterID)]
-        else
-            println("Warning : cannot find matching for ", paramsRet[i])
+            for j in eachindex(paramsRet)
+                # In case observable parameter in paramsRet[j] should be estimated save which index 
+                # it has in the obsParam parameter vector.
+                if paramsRet[j] in namesParamEst
+                    shouldEst[j] = true
+                    indexUse[j] = UInt32(findfirst(x -> x == paramsRet[j], namesParamEst))
+
+                # In case observable parameter in paramsRet[j] is constant save its constant value. 
+                # The constant value can be found either directly in the measurementDataFile, or in 
+                # in the parametersFile.
+                else
+                    shouldEst[j] = false
+                    # Hard coded in Measurement data file 
+                    if isNumber(paramsRet[j])
+                        valuesConst[j] = parse(Float64, paramsRet[j])
+
+                    # Hard coded in Parameters file 
+                    elseif paramsRet[j] in paramData.parameterID
+                        valuesConst[j] = parameterData.paramVal[findfirst(x -> x == paramsRet[j], paramData.parameterID)]
+
+                    else
+                        println("Warning : cannot find matching for parameter ", paramsRet[j], " when building map.")
+                    end
+                end
+            end
+
+            mapEntries[i] = ParamMap(shouldEst, indexUse[shouldEst], valuesConst[.!shouldEst], UInt32(length(paramsRet)))
         end
     end
 
-    if length(output) == 1
-        return output[1]
+    return mapEntries
+end
+
+
+function getObsOrSdParam(paramVec, paramMap::ParamMap)
+
+    # In case of no SD/observable parameter exit function
+    if paramMap.nParam == 0
+        return
+    end
+
+    # In case of single-value return do not have to return an array and think about type
+    if paramMap.nParam == 1 
+        if paramMap.shouldEst[1] == true
+            return paramVec[paramMap.indexUse][1]
+        else
+            return paramMap.valuesConst[1]
+        end
+    end
+
+    # In case some of the parameters are estimated the return array can be either dual 
+    # or tracked array when computing derivatives. 
+    nParamEst = sum(paramMap.shouldEst)
+    if nParamEst == paramMap.nParam
+        return paramVec[paramMap.indexUse]
+
+    # Computaionally most demanding case. Keep in mind for future code optimizaiton.
+    elseif nParamEst > 0
+        valsRet = Array{eltype(paramVec), 1}(undef, paramMap.nParam) 
+        valsRet[paramMap.shouldEst] .= paramVec[paramMap.indexUse]
+        valsRet[.!paramMap.shouldEst] .= paramMap.valuesConst
+        return valsRet
+        
+    # In no parameter are estimated can return constant values as floats 
     else
-        return output
+        return paramMap.valuesConst
     end
 end
 
