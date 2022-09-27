@@ -54,7 +54,6 @@ function getSolverInfo(sparseList::Bool)
                   Rodas4P(), "Rodas4P", "stiff", "OrdinaryDiffEq", 
                   Rodas5(), "Rodas5", "stiff", "OrdinaryDiffEq", 
                   QNDF(), "QNDF", "stiff", "OrdinaryDiffEq", 
-                  QNDF2(), "QNDF2", "stiff", "OrdinaryDiffEq", 
                   FBDF(), "FDBF", "stiff", "OrdinaryDiffEq", 
                   Trapezoid(), "Trapezoid", "stiff", "OrdinaryDiffEq", 
                   KenCarp4(), "KenCarp4", "stiff", "OrdinaryDiffEq", 
@@ -222,6 +221,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                         benchRunTime[i] = bMin.time # microsecond
                         benchMemory[i] = bMin.memory # bytes
                         benchAllocs[i] = bMin.allocs # number of allocations
+                        GC.gc(); GC.gc();GC.gc()
                     end
                 else
                     benchRunTime .= NaN
@@ -247,6 +247,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                 else
                     CSV.write(pathFileSave, dataSave)
                 end
+                GC.gc(); GC.gc();GC.gc()
             end
         else
             for tol in Tols
@@ -304,7 +305,8 @@ for i in eachindex(modelListTry)
     dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
     peTabModel = setUpPeTabModel(modelName, dirModel)
     runBenchmarkOdeSolvers(peTabModel, pathFileSaveNotSparse, false, nTimesRepat=UInt(1))
+    GC.gc(); GC.gc();GC.gc()
     runBenchmarkOdeSolvers(peTabModel, pathFileSaveSparse, true, nTimesRepat=UInt(1))
-
+    GC.gc(); GC.gc();GC.gc()
 end
 

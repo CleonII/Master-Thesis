@@ -18,7 +18,8 @@ function calcHighAccOdeSolution(prob::ODEProblem,
                                 changeToExperimentalCondUse!::Function, 
                                 measurementData::DataFrame,
                                 simulationInfo::SimulationInfo;
-                                tol::Float64=1e-15) 
+                                tol::Float64=1e-15, 
+                                nTSave=100) 
                                 
     bigFloatOdeProb = createBigFloatODEProblem(prob)
 
@@ -28,16 +29,16 @@ function calcHighAccOdeSolution(prob::ODEProblem,
     local solArrayHighAcc
     local sucessSolver
     try 
-        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverNonStiff, tol; nTSave=100)                                      
+        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverNonStiff, tol; nTSave=nTSave)                                      
     catch 
-        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverStiff, tol; nTSave=100)                                      
+        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverStiff, tol; nTSave=nTSave)                                      
     end
     GC.gc()
 
     # In cases the non-stiff solver just fails 
     if sucessSolver != true
         try 
-            solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverStiff, tol; nTSave=100)                                      
+            solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverStiff, tol; nTSave=nTSave)                                      
         catch
             sucessSolver = false
             solArrayHighAcc = nothing
