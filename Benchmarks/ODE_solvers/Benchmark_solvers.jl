@@ -70,10 +70,12 @@ function getSolverInfo(sparseList::Bool)
                   CVODE_BDF(linear_solver=:GMRES), "CVODE_BDF_GMRES", "stiff", "Sundials", 
                   CVODE_Adams(linear_solver=:Dense), "CVODE_Adams_Dense", "nonStiff", "Sundials", 
                   CVODE_Adams(linear_solver=:LapackDense), "CVODE_Adams_LapackDense", "nonStiff", "Sundials", 
-                  ARKODE(Sundials.Explicit(), order=4), "ARKODE_Exp4", "nonStiff", "Sundials", 
-                  ARKODE(Sundials.Explicit(), order=8), "ARKODE_Exp8", "nonStiff", "Sundials", 
-                  ARKODE(Sundials.Implicit(), order=3), "ARKODE_Imp3", "stiff", "Sundials", 
-                  ARKODE(Sundials.Implicit(), order=5), "ARKODE_Imp5", "stiff", "Sundials",
+                  # In Julia v1.8.1 these crash for several solvers as there is problem with ccall
+                  # Try out again for v.1.8.2
+                  #ARKODE(Sundials.Explicit(), order=4), "ARKODE_Exp4", "nonStiff", "Sundials", 
+                  #ARKODE(Sundials.Explicit(), order=8), "ARKODE_Exp8", "nonStiff", "Sundials", 
+                  #ARKODE(Sundials.Implicit(), order=3), "ARKODE_Imp3", "stiff", "Sundials", 
+                  #ARKODE(Sundials.Implicit(), order=5), "ARKODE_Imp5", "stiff", "Sundials",
                   dopri5(), "dopri5", "nonStiff", "ODEInterface", 
                   dop853(), "dop853", "nonStiff", "ODEInterface", 
                   radau(), "radau", "stiff", "ODEInterface", 
