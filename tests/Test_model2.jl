@@ -228,50 +228,63 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     p0 = cube[1, :]
     # Ipopt Hessian approximation
     ipoptProbHessApprox.x = deepcopy(p0)
+    ipoptProbHessApprox.eval_f(p0) # Needed to avoid segfault, must write a wrapper for this 
     sol_opt = Ipopt.IpoptSolve(ipoptProbHessApprox)
     sqDiff = sum((ipoptProbHessApprox.x - peTabOpt.paramVecNotTransformed).^2)
     if sqDiff > 1e-3
         @printf("sqDiffHessApprox = %.3e\n", sqDiff)
         @printf("Failed on optimization for Ipopt hessian approximation\n")
         return false
+    else
+        @printf("Passed test for Ipopt hess approx\n")
     end
     
     # Ipopt AutoHessian 
     ipoptProbAutoHess.x = deepcopy(p0)
+    ipoptProbAutoHess.eval_f(p0)
     sol_opt = Ipopt.IpoptSolve(ipoptProbAutoHess)
     sqDiff = sum((ipoptProbAutoHess.x - peTabOpt.paramVecNotTransformed).^2)
     if sqDiff > 1e-3
         @printf("sqDiffHessApprox = %.3e\n", sqDiff)
         @printf("Failed on optimization for Ipopt auto hessian\n")
         return false
+    else
+        @printf("Passed test for Ipopt hess autodiff\n")
     end
 
     # Ipopt BFGS 
     ipoptProbBfgs.x = deepcopy(p0)
+    ipoptProbBfgs.eval_f(p0)
     sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
     sqDiff = sum((ipoptProbBfgs.x - peTabOpt.paramVecNotTransformed).^2)
     if sqDiff > 1e-3
         @printf("sqDiffHessApprox = %.3e\n", sqDiff)
         @printf("Failed on optimization for Ipopt BFGS\n")
         return false
-    end
-
-    # Optim AutoHess 
-    res = optimProbAutoHess(p0)
-    sqDiff = sum((res.minimizer - peTabOpt.paramVecNotTransformed).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
-        @printf("Failed on optimization for Optim AutoHess\n")
-        return false
+    else
+        @printf("Passed test for Ipopt LBFGS\n")
     end
 
     # Optim HessApprox 
-    res = optimProbHessApprox(p0)
+    res = optimProbHessApprox(p0, showTrace=false)
     sqDiff = sum((res.minimizer - peTabOpt.paramVecNotTransformed).^2)
     if sqDiff > 1e-3
         @printf("sqDiffHessApprox = %.3e\n", sqDiff)
         @printf("Failed on optimization for HessApprox\n")
         return false
+    else
+        @printf("Passed test for Optim interior point newton hessian approximation\n")
+    end
+
+    # Optim AutoHess 
+    res = optimProbAutoHess(p0, showTrace=false)
+    sqDiff = sum((res.minimizer - peTabOpt.paramVecNotTransformed).^2)
+    if sqDiff > 1e-3
+        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
+        @printf("Failed on optimization for Optim AutoHess\n")
+        return false
+    else
+        @printf("Passed test for Optim interior point newton hessian autoDiff\n")
     end
 
     return true
@@ -300,4 +313,3 @@ if passTest == true
 else
     @printf("Did not pass test for checking optimizers\n")
 end
-

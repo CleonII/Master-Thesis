@@ -130,6 +130,7 @@ struct SimulationInfo{T1<:Array{<:String, 1},
     conditionIdSol::T1
     simulateSS::T3
     solArray::T4
+    solArrayGrad::T4
 end
 
 

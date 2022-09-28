@@ -279,7 +279,12 @@ function getSimulationInfo(measurementData::DataFrame)::SimulationInfo
     else
         nForwardSol = Int64(length(firstExpIds))
     end
+    # When computing the gradient and hessian the ODE-system needs to be resolved to compute the gradient 
+    # of the dynamic parameters, while for the observable/sd parameters the system should not be resolved. 
+    # Rather, an ODE solution without dual numbers is required and this solution can be the same which is 
+    # used when computing the cost.
     solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
+    solArrayGrad = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
 
     # Array with conition-ID for each foward simulations 
     conditionIdSol = Array{String, 1}(undef, nForwardSol)
@@ -288,7 +293,8 @@ function getSimulationInfo(measurementData::DataFrame)::SimulationInfo
                                     shiftExpIds, 
                                     conditionIdSol, 
                                     simulateSS,
-                                    solArray)
+                                    solArray, 
+                                    solArrayGrad)
     return simulationInfo
 end
 

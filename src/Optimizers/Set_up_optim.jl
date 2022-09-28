@@ -27,11 +27,16 @@ function createOptimInteriorNewton(peTabOpt::PeTabOpt;
     df = TwiceDifferentiable(peTabOpt.evalF, peTabOpt.evalGradF, evalHessian, x0)
     dfc = TwiceDifferentiableConstraints(lowerBounds .- 0.01, upperBounds .+ 0.01)
 
-    evalOptim = (p0; showTrace=false) -> Optim.optimize(df, 
-                                                        dfc, 
-                                                        p0, 
-                                                        IPNewton(), 
-                                                        Optim.Options(iterations = 1000, show_trace = showTrace))
+    evalOptim = (p0; showTrace=false) -> begin 
+                                               df.f(p0)
+                                               return Optim.optimize(df, 
+                                                                     dfc, 
+                                                                     p0, 
+                                                                     IPNewton(), 
+                                                                     Optim.Options(iterations = 1000, 
+                                                                                   show_trace = showTrace, 
+                                                                                   allow_f_increases=true))
+                                         end
 
     return evalOptim
 end
