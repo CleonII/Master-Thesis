@@ -11,7 +11,7 @@
     solution for each experimenta condition along with a vector with the condition 
     name for each solution 
 """
-function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64)
+function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64; nTSave::Int64=0, denseSol::Bool=true)
 
     # Process PeTab files into type-stable Julia structs 
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
@@ -29,7 +29,7 @@ function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64)
     changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, parameterData, experimentalConditionsFile, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
-    solArray, status = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol)
+    solArray, status = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, nTSave=nTSave, denseSol=denseSol)
 
     return solArray, simulationInfo
 end

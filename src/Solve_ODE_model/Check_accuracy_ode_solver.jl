@@ -75,7 +75,7 @@ function calcAccuracyOdeSolver(prob::ODEProblem,
                    
     # Check if model can be solved (without using forced stops for integrator 
     # as this can make the solver converge).
-    solArrayTmp, sucess = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, measurementData, simulationInfo, solver, tol)
+    solArrayTmp, sucess = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, measurementData, simulationInfo, solver, tol, nTSave=100)
     solArrayTmp = 0
     if sucess == false
         return Inf 

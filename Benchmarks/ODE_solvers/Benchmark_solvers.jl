@@ -215,7 +215,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                     
                 if solverSuccess
                     for i in 1:nTimesRepat
-                        b = @benchmark solveOdeModelAllExperimentalCond($odeProb, $changeToExperimentalCondUse!, $measurementDataFile, $simulationInfo, $solver, $tol) samples=1 evals=1
+                        b = @benchmark solveOdeModelAllExperimentalCond($odeProb, $changeToExperimentalCondUse!, $measurementDataFile, $simulationInfo, $solver, $tol, nTSave=100) samples=1 evals=1
                         bMin = minimum(b)
                         benchRunTime[i] = bMin.time # microsecond
                         benchMemory[i] = bMin.memory # bytes
@@ -303,9 +303,9 @@ for i in eachindex(modelListTry)
     modelName = modelListTry[i]
     dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
     peTabModel = setUpPeTabModel(modelName, dirModel)
-    runBenchmarkOdeSolvers(peTabModel, pathFileSaveNotSparse, false, nTimesRepat=UInt(1))
+    runBenchmarkOdeSolvers(peTabModel, pathFileSaveNotSparse, false, nTimesRepat=UInt(3))
     GC.gc(); GC.gc();GC.gc()
-    runBenchmarkOdeSolvers(peTabModel, pathFileSaveSparse, true, nTimesRepat=UInt(1))
+    runBenchmarkOdeSolvers(peTabModel, pathFileSaveSparse, true, nTimesRepat=UInt(3))
     GC.gc(); GC.gc();GC.gc()
 end
 
