@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable= u 
 	Epo_degradation_BaF3, k_exp_hetero, k_exp_homo, k_imp_hetero, k_imp_homo, k_phos = dynPar 
@@ -36,7 +36,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable= u 
 	Epo_degradation_BaF3, k_exp_hetero, k_exp_homo, k_imp_hetero, k_imp_homo, k_phos = dynPar 
@@ -44,17 +44,17 @@ function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulati
 	specC17_C = paramData.paramVal[11] 
 
 	if observableId == "pSTAT5A_rel" 
-		noiseParameter1_pSTAT5A_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_pSTAT5A_rel = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pSTAT5A_rel 
 	end
 
 	if observableId == "pSTAT5B_rel" 
-		noiseParameter1_pSTAT5B_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_pSTAT5B_rel = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pSTAT5B_rel 
 	end
 
 	if observableId == "rSTAT5A_rel" 
-		noiseParameter1_rSTAT5A_rel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_rSTAT5A_rel = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_rSTAT5A_rel 
 	end
 
