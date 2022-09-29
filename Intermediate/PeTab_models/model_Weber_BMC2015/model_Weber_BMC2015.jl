@@ -35,7 +35,7 @@ function getODEModel_model_Weber_BMC2015()
     D(u4) ~ 0,
     D(u3) ~ 0,
     D(u5) ~ 0,
-    D(dummyVariable) ~ +PdBu_time+Ect_Expr_CERT_flag+Ect_Expr_PI4K3beta_flag+PdBu_dose
+    D(dummyVariable) ~ 1e-60*( +PdBu_time+Ect_Expr_CERT_flag+Ect_Expr_PI4K3beta_flag+PdBu_dose)
     ]
 
     @named sys = ODESystem(eqs, t, continuous_events = continuous_events)

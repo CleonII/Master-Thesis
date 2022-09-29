@@ -26,7 +26,7 @@ function getODEModel_model_Crauste_CellSystems2017()
     D(LateEffector) ~ +1.0 * ( 1 /default ) * (EarlyEffector * delta_EL)-1.0 * ( 1 /default ) * ((LateEffector)^(2) * mu_LL)-1.0 * ( 1 /default ) * (EarlyEffector * LateEffector * mu_LE)-1.0 * ( 1 /default ) * (LateEffector * delta_LM),
     D(EarlyEffector) ~ +1.0 * ( 1 /default ) * (Naive * Pathogen * delta_NE)+1.0 * ( 1 /default ) * (EarlyEffector * Pathogen * rho_E)-1.0 * ( 1 /default ) * ((EarlyEffector)^(2) * mu_EE)-1.0 * ( 1 /default ) * (EarlyEffector * delta_EL),
     D(Memory) ~ +1.0 * ( 1 /default ) * (LateEffector * delta_LM),
-    D(dummyVariable) ~ +default
+    D(dummyVariable) ~ 1e-60*( +default)
     ]
 
     @named sys = ODESystem(eqs)

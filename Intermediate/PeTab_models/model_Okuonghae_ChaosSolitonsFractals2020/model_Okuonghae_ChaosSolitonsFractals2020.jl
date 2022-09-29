@@ -29,7 +29,7 @@ function getODEModel_model_Okuonghae_ChaosSolitonsFractals2020()
     D(deceased) ~ +1.0 * ( 1 /Lagos ) * (Lagos * d_0 * symptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * d_D * detected),
     D(recovered) ~ +1.0 * ( 1 /Lagos ) * (Lagos * gamma_0 * symptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * gamma_a * asymptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * gamma_i * detected),
     D(susceptible) ~ -1.0 * ( 1 /Lagos ) * (Lagos * (transmission_rate_effective * (1 - eps) * (1 - delta) * (alpha * asymptomatic + symptomatic) / ((asymptomatic + detected + exposed + recovered + susceptible + symptomatic) - detected)) * susceptible),
-    D(dummyVariable) ~ +exposed_start+asymptomatic_start+symptomatic_start
+    D(dummyVariable) ~ 1e-60*( +exposed_start+asymptomatic_start+symptomatic_start)
     ]
 
     @named sys = ODESystem(eqs)

@@ -46,7 +46,7 @@ function getODEModel_model_Bachmann_MSB2011()
     D(EpoRpJAK2) ~ +1.0 * ( 1 /cyt ) * (cyt * (Epo * EpoRJAK2 * JAK2ActEpo / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * ( 1 /cyt ) * (cyt * (EpoRpJAK2 * JAK2EpoRDeaSHP1 * SHP1Act / init_SHP1))-1.0 * ( 1 /cyt ) * (cyt * (EpoRpJAK2 * EpoRActJAK2 / (SOCS3 * SOCS3Inh / SOCS3Eqc + 1)))-1.0 * ( 1 /cyt ) * (cyt * (3 * EpoRpJAK2 * EpoRActJAK2 / ((SOCS3 * SOCS3Inh / SOCS3Eqc + 1) * (EpoRCISInh * EpoRJAK2_CIS + 1)))),
     D(CISnRNA2) ~ +1.0 * ( 1 /nuc ) * (nuc * CISnRNA1 * CISRNADelay)-1.0 * ( 1 /nuc ) * (nuc * CISnRNA2 * CISRNADelay),
     D(CISRNA) ~ +1.0 * ( 1 /cyt ) * (nuc * CISnRNA5 * CISRNADelay)-1.0 * ( 1 /cyt ) * (cyt * CISRNA * CISRNATurn),
-    D(dummyVariable) ~ +init_SOCS3_multiplier+init_EpoRJAK2_CIS+init_CIS_multiplier+SOCS3EqcOE+init_SHP1+CISEqcOE+CISEqc+SHP1ProOE+init_STAT5+init_SHP1_multiplier+init_EpoRJAK2+SOCS3Eqc
+    D(dummyVariable) ~ 1e-60*( +init_SOCS3_multiplier+init_EpoRJAK2_CIS+init_CIS_multiplier+SOCS3EqcOE+init_SHP1+CISEqcOE+CISEqc+SHP1ProOE+init_STAT5+init_SHP1_multiplier+init_EpoRJAK2+SOCS3Eqc)
     ]
 
     @named sys = ODESystem(eqs)

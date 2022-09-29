@@ -30,7 +30,7 @@ function getODEModel_model_Oliveira_NatCommun2021()
     D(Recovered) ~ +1.0 * ( 1 /Interior ) * (Interior * gamma_a * Asymptomatic)+1.0 * ( 1 /Interior ) * (Interior * ((1 - h_hosp_rate) * gamma_s) * Symptomatic)+1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * (1 - mu_h) * gamma_h) * Hospital),
     D(Deaths) ~ +1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * mu_h * gamma_h) * Hospital)+1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_u) * mu_u * gamma_u) * ICU),
     D(Susceptible) ~ -1.0 * ( 1 /Interior ) * (Interior * ((((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))) + (t < t_1) * ((beta_0) - ((beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier) + (t < t_2) * ((beta_1) - (beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))))))) * Susceptible * (Symptomatic + delta_ * Asymptomatic) / population)),
-    D(dummyVariable) ~ +asymptomatic_init_concentration+symptomatic_init_concentration+exposed_init_concentration+population
+    D(dummyVariable) ~ 1e-60*( +asymptomatic_init_concentration+symptomatic_init_concentration+exposed_init_concentration+population)
     ]
 
     @named sys = ODESystem(eqs)

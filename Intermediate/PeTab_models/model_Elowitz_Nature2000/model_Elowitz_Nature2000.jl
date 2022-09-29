@@ -29,7 +29,7 @@ function getODEModel_model_Elowitz_Nature2000()
     D(Z_protein) ~ +1.0 * ( 1 /cell ) * (cell * (Z_mRNA * eff / tau_mRNA))-1.0 * ( 1 /cell ) * (cell * (Z_protein * log(2) / tau_prot)),
     D(Y_protein) ~ +1.0 * ( 1 /cell ) * (cell * (Y_mRNA * eff / tau_mRNA))-1.0 * ( 1 /cell ) * (cell * (Y_protein * log(2) / tau_prot)),
     D(GFP) ~ +1.0 * ( 1 /cell ) * (cell * (GFP_mRNA * eff_GFP / tau_mRNA_GFP))-1.0 * ( 1 /cell ) * (cell * (GFP * log(2) / tau_prot_GFP))+1.0 * ( 1 /cell ) * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (X_protein)^(n_Hill)))),
-    D(dummyVariable) ~ +init_X_protein+init_GFP+init_GFP_mRNA+init_Y_mRNA+init_Y_protein+init_Z_protein+init_X_mRNA+init_Z_mRNA
+    D(dummyVariable) ~ 1e-60*( +init_X_protein+init_GFP+init_GFP_mRNA+init_Y_mRNA+init_Y_protein+init_Z_protein+init_X_mRNA+init_Z_mRNA)
     ]
 
     @named sys = ODESystem(eqs)

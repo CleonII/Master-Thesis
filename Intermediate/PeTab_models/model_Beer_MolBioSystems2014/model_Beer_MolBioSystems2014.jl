@@ -30,7 +30,7 @@ function getODEModel_model_Beer_MolBioSystems2014()
     D(Ind) ~ +1.0 * ( 1 /medium ) * (medium * ((cGlu)^(2) * kdim - Ind * kdegi)),
     D(Bac) ~ +1.0 * ( 1 /medium ) * (medium * (Bac * beta * lag * (Bacmax + -Bac) / Bacmax)),
     D(lag) ~ 0,
-    D(dummyVariable) ~ +tau+init_Bac
+    D(dummyVariable) ~ 1e-60*( +tau+init_Bac)
     ]
 
     @named sys = ODESystem(eqs, t, continuous_events = continuous_events)

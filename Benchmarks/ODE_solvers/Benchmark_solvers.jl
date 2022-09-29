@@ -195,7 +195,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
 
         println("Trying solver = ", solver)
         # Crashes as problem is to stiff 
-        if !((peTabModel.modelName == "model_Crauste_CellSystems2017") && alg_solver == AutoTsit5(Rosenbrock23())) 
+        if !((peTabModel.modelName == "model_Crauste_CellSystems2017") && solver == AutoTsit5(Rosenbrock23())) 
             for tol in tolsCheck
             
                 benchRunTime = Vector{Float64}(undef, nTimesRepat)

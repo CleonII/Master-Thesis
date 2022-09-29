@@ -46,7 +46,7 @@ function getODEModel_model_Isensee_JCB2018()
     D(RIIp_Rp_cAMPS_C_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Rp_cAMPS * kf_cAMP * xi_b_Rp_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Rp_cAMPS_C_2 * kf_cAMP * xi_b_Rp_cAMPS * xi_KD_Rp_cAMPS),
     D(RIIp_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * kf_RII_C_2__RII_2 * xi_kf_RII_C_2__RII_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * RIIp_2 * kf_RII_2__RII_C_2 * xi_kf_RII_2__RII_C_2)-1.0 * ( 1 /cyt ) * (cyt * RIIp_2 * kf_RIIp_2__RII_2)+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_cAMP_2 * kf_cAMP)+1.0 * ( 1 /cyt ) * (cyt * (KD_IBMX * RIIp_cAMP_2 * kdeg_cAMP * (PDE + pPDE * xi_pPDE) / (IBMX + KD_IBMX)))+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Sp8_Br_cAMPS_2 * kf_cAMP * xi_b_Sp8_Br_cAMPS * xi_KD_Sp8_Br_cAMPS),
     D(RIIp_cAMP_C_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * cAMP * kf_cAMP)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_cAMP_C_2 * kf_cAMP)-1.0 * ( 1 /cyt ) * (cyt * (KD_IBMX * RIIp_cAMP_C_2 * kdeg_cAMP * (PDE + pPDE * xi_pPDE) / (IBMX + KD_IBMX)))-1.0 * ( 1 /cyt ) * (cyt * RIIp_cAMP_C_2 * kf_RIIp_cAMP_C_2__RIIp_2),
-    D(dummyVariable) ~ +fourABnOH_level+default+AC_total+nuc+RII2_total+fourABnOH_incubation_time+PDE_total
+    D(dummyVariable) ~ 1e-60*( +fourABnOH_level+default+AC_total+nuc+RII2_total+fourABnOH_incubation_time+PDE_total)
     ]
 
     @named sys = ODESystem(eqs)

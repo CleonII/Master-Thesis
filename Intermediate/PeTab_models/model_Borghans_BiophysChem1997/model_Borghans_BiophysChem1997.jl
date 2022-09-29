@@ -24,7 +24,7 @@ function getODEModel_model_Borghans_BiophysChem1997()
     D(A_state) ~ +1.0 * ( 1 /cytosol ) * (cytosol * Vp * beta_par)-1.0 * ( 1 /cytosol ) * (cytosol * ((A_state)^(2) * Vd * (Z_state)^(n_par) / (((Kd)^(n_par) + (Z_state)^(n_par)) * ((A_state)^(2) + (Kp)^(2)))))-1.0 * ( 1 /cytosol ) * (cytosol * A_state * epsilon_par),
     D(Y_state) ~ +1.0 * ( 1 /intravesicular ) * (cytosol * (Vm2 * (Z_state)^(2) / ((K2)^(2) + (Z_state)^(2))))-1.0 * ( 1 /intravesicular ) * (intravesicular * ((A_state)^(4) * Vm3 * (Y_state)^(2) * (Z_state)^(4) / (((A_state)^(4) + (Ka)^(4)) * ((Ky)^(2) + (Y_state)^(2)) * ((Kz)^(4) + (Z_state)^(4)))))-1.0 * ( 1 /intravesicular ) * (intravesicular * Kf * Y_state),
     D(Z_state) ~ +1.0 * ( 1 /cytosol ) * (cytosol * (v0 + beta_par * v1))-1.0 * ( 1 /cytosol ) * (cytosol * (Vm2 * (Z_state)^(2) / ((K2)^(2) + (Z_state)^(2))))+1.0 * ( 1 /cytosol ) * (intravesicular * ((A_state)^(4) * Vm3 * (Y_state)^(2) * (Z_state)^(4) / (((A_state)^(4) + (Ka)^(4)) * ((Ky)^(2) + (Y_state)^(2)) * ((Kz)^(4) + (Z_state)^(4)))))+1.0 * ( 1 /cytosol ) * (intravesicular * Kf * Y_state)-1.0 * ( 1 /cytosol ) * (cytosol * K_par * Z_state),
-    D(dummyVariable) ~ +init_Y_state+extracellular+init_A_state+init_Z_state
+    D(dummyVariable) ~ 1e-60*( +init_Y_state+extracellular+init_A_state+init_Z_state)
     ]
 
     @named sys = ODESystem(eqs)

@@ -29,7 +29,7 @@ function getODEModel_model_Boehm_JProteomeRes2014()
     D(pApB) ~ +1.0 * ( 1 /cyt ) * (cyt * (1.25e-7 * exp(-1 * Epo_degradation_BaF3 * t)) * STAT5A * STAT5B * k_phos)-1.0 * ( 1 /cyt ) * (cyt * k_imp_hetero * pApB),
     D(nucpApA) ~ +1.0 * ( 1 /nuc ) * (cyt * k_imp_homo * pApA)-1.0 * ( 1 /nuc ) * (nuc * k_exp_homo * nucpApA),
     D(pBpB) ~ +1.0 * ( 1 /cyt ) * (cyt * (1.25e-7 * exp(-1 * Epo_degradation_BaF3 * t)) * (STAT5B)^(2) * k_phos)-1.0 * ( 1 /cyt ) * (cyt * k_imp_homo * pBpB),
-    D(dummyVariable) ~ +specC17+ratio
+    D(dummyVariable) ~ 1e-60*( +specC17+ratio)
     ]
 
     @named sys = ODESystem(eqs)

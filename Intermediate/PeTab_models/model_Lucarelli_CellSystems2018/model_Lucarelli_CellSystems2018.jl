@@ -54,7 +54,7 @@ function getODEModel_model_Lucarelli_CellSystems2018()
     D(ppS2_ppS2_S4) ~ +1.0 * ( 1 /cell ) * (cell * S4 * k_224 * (ppS2)^(2))-1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS2_S4),
     D(ppS2_ppS3_ppS3) ~ +1.0 * ( 1 /cell ) * (cell * k_233 * ppS2 * (ppS3)^(2))-1.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2_ppS3_ppS3)-1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS3_ppS3),
     D(ppS2) ~ -3.0 * ( 1 /cell ) * (cell * khomo2 * (ppS2)^(3))+2.0 * ( 1 /cell ) * (cell * 3 * S_dephosphos * ppS2_ppS2_ppS2)+1.0 * ( 1 /cell ) * (cell * S2 * S_phos * TGFb_pRec)-1.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2)-2.0 * ( 1 /cell ) * (cell * k_223 * (ppS2)^(2) * ppS3)+1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS2_ppS3)+2.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2_ppS2_ppS3)-2.0 * ( 1 /cell ) * (cell * S4 * k_224 * (ppS2)^(2))+1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS2_S4)-1.0 * ( 1 /cell ) * (cell * k_233 * ppS2 * (ppS3)^(2))+1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS3_ppS3)-1.0 * ( 1 /cell ) * (cell * (S4)^(2) * k_244 * ppS2)-1.0 * ( 1 /cell ) * (cell * S4 * k_234 * ppS2 * ppS3)+1.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2_ppS3_S4),
-    D(dummyVariable) ~ +init_S4+init_Rec+init_TGFb+init_S2+init_S3
+    D(dummyVariable) ~ 1e-60*( +init_S4+init_Rec+init_TGFb+init_S2+init_S3)
     ]
 
     @named sys = ODESystem(eqs)

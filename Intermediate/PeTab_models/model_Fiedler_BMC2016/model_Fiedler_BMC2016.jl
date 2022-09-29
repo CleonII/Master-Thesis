@@ -27,7 +27,7 @@ function getODEModel_model_Fiedler_BMC2016()
     D(pERK) ~ +1.0 * ( 1 /cyt ) * (cyt * (ERK * K_3 * k5 * pMEK / (K_3 + UO126)))-1.0 * ( 1 /cyt ) * (cyt * k6 * pERK),
     D(pRAF) ~ +1.0 * ( 1 /cyt ) * (cyt * (K_1 * RAF * (k10 - k11 * exp(-t / tau2) * (exp(-t / tau1) - 1)) / (K_1 + pERK)))-1.0 * ( 1 /cyt ) * (cyt * k2 * pRAF),
     D(ERK) ~ -1.0 * ( 1 /cyt ) * (cyt * (ERK * K_3 * k5 * pMEK / (K_3 + UO126)))+1.0 * ( 1 /cyt ) * (cyt * k6 * pERK),
-    D(dummyVariable) ~ +MEK_total+ERK_total+K_1+k4+k10+k3+k6+k5+k2+RAF_total
+    D(dummyVariable) ~ 1e-60*( +MEK_total+ERK_total+K_1+k4+k10+k3+k6+k5+k2+RAF_total)
     ]
 
     @named sys = ODESystem(eqs)

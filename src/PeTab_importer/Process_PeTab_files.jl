@@ -14,7 +14,7 @@
 
     TODO : Example  
 """
-function setUpPeTabModel(modelName::String, dirModel::String)::PeTabModel
+function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::Bool=false)::PeTabModel
 
     # Sanity check user input 
     modelFileXml = dirModel * modelName * ".xml"
@@ -26,11 +26,17 @@ function setUpPeTabModel(modelName::String, dirModel::String)::PeTabModel
         @printf("Model directory does not contain xml-file with name %s\n", modelName * "xml")
     end
     # If Julia model file does exists build it 
-    if !isfile(modelFileJl)
+    if !isfile(modelFileJl) && forceBuildJlFile == false
         @printf("Julia model file does not exist - will build it\n")
         XmlToModellingToolkit(modelFileXml, modelName, dirModel)
-    else
+    elseif isfile(modelFileJl) && forceBuildJlFile == false
         @printf("Julia model file exists at %s - will not rebuild it\n", modelFileJl)
+    elseif forceBuildJlFile == true
+        @printf("By user option rebuilds Julia model file\n")
+        if isfile(modelFileJl)
+            rm(modelFileJl)
+        end
+        XmlToModellingToolkit(modelFileXml, modelName, dirModel)
     end
 
     # Extract ODE-system and mapping of maps of how to map parameters to states and model parmaeters 
@@ -243,7 +249,9 @@ end
     stores a solArray with the ODE solution where conditionIdSol of the ID for 
     each forward solution
 """
-function getSimulationInfo(measurementData::DataFrame)::SimulationInfo
+function getSimulationInfo(measurementData::DataFrame;
+                           absTolSS::Float64=1e-8,
+                           relTolSS::Float64=1e-6)::SimulationInfo
 
     # If preequilibrationConditionId column is not empty the model should 
     # first be simulated to a stady state 
@@ -294,7 +302,9 @@ function getSimulationInfo(measurementData::DataFrame)::SimulationInfo
                                     conditionIdSol, 
                                     simulateSS,
                                     solArray, 
-                                    solArrayGrad)
+                                    solArrayGrad, 
+                                    absTolSS, 
+                                    relTolSS)
     return simulationInfo
 end
 

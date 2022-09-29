@@ -25,7 +25,7 @@ function getODEModel_model_Perelson_Science1996()
     D(V) ~ -1.0 * ( 1 /default ) * (c * Vin)-1.0 * ( 1 /default ) * (c * Vni)+1.0 * ( 1 /default ) * (delta * NN * Tstar),
     D(Vin) ~ -1.0 * ( 1 /default ) * (c * Vin),
     D(Tstar) ~ +1.0 * ( 1 /default ) * (K0 * T0 * Vin)-1.0 * ( 1 /default ) * (delta * Tstar),
-    D(dummyVariable) ~ +default
+    D(dummyVariable) ~ 1e-60*( +default)
     ]
 
     @named sys = ODESystem(eqs)

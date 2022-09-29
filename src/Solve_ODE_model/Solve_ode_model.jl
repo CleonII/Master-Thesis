@@ -88,7 +88,17 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                 firstExpId = simulationInfo.firstExpIds[i]
                 shiftExpId = simulationInfo.shiftExpIds[i][j]
                 t_max_ss = getTimeMax(measurementData, shiftExpId)
-                solArray[k] = solveOdeSS(prob, changeToExperimentalCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, nTSave=nTSave, denseSol=denseSol)
+                solArray[k] = solveOdeSS(prob, 
+                                         changeToExperimentalCondUse!, 
+                                         firstExpId, 
+                                         shiftExpId, 
+                                         tol, 
+                                         t_max_ss, 
+                                         solver, 
+                                         nTSave=nTSave, 
+                                         denseSol=denseSol, 
+                                         absTolSS=simulationInfo.absTolSS, 
+                                         relTolSS=simulationInfo.relTolSS)
                 
                 # Keep index of which forward solution index k corresponds for calculating cost 
                 simulationInfo.conditionIdSol[k] = firstExpId * shiftExpId
@@ -108,7 +118,16 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
             
             firstExpId = simulationInfo.firstExpIds[i]
             t_max = getTimeMax(measurementData, firstExpId)
-            solArray[i] = solveOdeNoSS(prob, changeToExperimentalCondUse!, firstExpId, tol, solver, t_max, nTSave=nTSave, denseSol=denseSol)
+            solArray[i] = solveOdeNoSS(prob, 
+                                       changeToExperimentalCondUse!, 
+                                       firstExpId, 
+                                       tol, 
+                                       solver, 
+                                       t_max, 
+                                       nTSave=nTSave, 
+                                       denseSol=denseSol, 
+                                       absTolSS=simulationInfo.absTolSS, 
+                                       relTolSS=simulationInfo.relTolSS)
 
             # Keep index of which forward solution index i corresponds for calculating cost 
             simulationInfo.conditionIdSol[i] = firstExpId
@@ -205,7 +224,9 @@ function solveOdeSS(prob::ODEProblem,
                     solver;
                     tSave=Float64[], 
                     nTSave=0, 
-                    denseSol::Bool=true)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                    denseSol::Bool=true,
+                    absTolSS::Float64=1e-8, 
+                    relTolSS::Float64=1e-6)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
     # Sanity check input. Can only provide either nTsave (points to save solution at) or tSave (number of points to save)
     if length(tSave) != 0 && nTSave != 0
@@ -226,11 +247,11 @@ function solveOdeSS(prob::ODEProblem,
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # The preequilibration simulations are terminated upon a steady state using the TerminateSteadyState callback.
     if typeof(solver) <: Vector{Symbol} # Alg-hint case
-        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), dense=false)
+        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(absTolSS, relTolSS), dense=false)
         solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
 
     else # Julia solver case
-        solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), dense=false)
+        solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(absTolSS, relTolSS), dense=false)
         solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
     end
 
@@ -289,7 +310,9 @@ function solveOdeNoSS(prob::ODEProblem,
                       t_max::Float64; 
                       tSave=Float64[], 
                       nTSave::Int64=0, 
-                      denseSol::Bool=true)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                      denseSol::Bool=true, 
+                      absTolSS::Float64=1e-8, 
+                      relTolSS::Float64=1e-6)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
     # Sanity check input. Can only provide either nTsave (points to save solution at) or tSave (number of points to save)
     if length(tSave) != 0 && nTSave != 0
@@ -315,11 +338,11 @@ function solveOdeNoSS(prob::ODEProblem,
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
     if typeof(solver) <: Vector{Symbol} && isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
+        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(absTolSS, relTolSS), save_on=false, save_end=true, dense=dense)
     elseif typeof(solver) <: Vector{Symbol} && !isinf(t_max)
         solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
     elseif !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(), save_on=false, save_end=true, dense=dense)
+        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(absTolSS, relTolSS), save_on=false, save_end=true, dense=dense)
     elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
         solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
     else

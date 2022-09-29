@@ -1031,9 +1031,11 @@ function writeODEModelToFile(libsbml, model, modelName, path, useData, wrapped; 
     end
     if length(dummyVariableDict) > 0
         dummyVariableDerivative = ",\n    D(dummyVariable) ~ "
+        dummyVariableDerivative *= "1e-60*( "
         for key in keys(dummyVariableDict)
             dummyVariableDerivative = dummyVariableDerivative * "+" * key
         end
+        dummyVariableDerivative *= ")"
         println(modelFile, dummyVariableDerivative)
     end
     

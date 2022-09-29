@@ -15,13 +15,18 @@ include(joinpath(pwd(), "src", "Common.jl"))
     and ReverseDiff is used for observable and sd parameters. The hessian approximation assumes the 
     interaction betweeen dynamic and (observable, sd) parameters is zero.
 """
-function setUpCostGradHess(peTabModel::PeTabModel, solver, tol::Float64; sparseJac::Bool=false)::PeTabOpt
+function setUpCostGradHess(peTabModel::PeTabModel, 
+                           solver, 
+                           tol::Float64; 
+                           sparseJac::Bool=false, 
+                           absTolSS::Float64=1e-8, 
+                           relTolSS::Float64=1e-6)::PeTabOpt
 
     # Process PeTab files into type-stable Julia structs 
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
     parameterData = processParameterData(parameterDataFile)
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    simulationInfo = getSimulationInfo(measurementDataFile)
+    simulationInfo = getSimulationInfo(measurementDataFile, absTolSS=absTolSS, relTolSS=relTolSS)
 
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
     paramEstIndices = getIndicesParam(parameterData, measurementData)

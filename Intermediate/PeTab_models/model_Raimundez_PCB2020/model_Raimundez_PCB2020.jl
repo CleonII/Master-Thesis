@@ -43,7 +43,7 @@ function getODEModel_model_Raimundez_PCB2020()
     D(EGFR_CET) ~ +1.0 * ( 1 /cyt ) * (cyt * (6.86 * CET_level * (1 + (t < 0) * ((0) - (1)))) * EGFR * kbin_EGFR_CET)-1.0 * ( 1 /cyt ) * (cyt * EGFR_CET * KD_EGFR_CET * kbin_EGFR_CET)-1.0 * ( 1 /cyt ) * (cyt * EGFR_CET * (kdeg_membran__MKN1 * exp(HS746T * d_kdeg_membran__MKN1_2_HS746T))),
     D(pMMET_pEGFR) ~ +1.0 * ( 1 /cyt ) * (cyt * MMET_EGFR * kpho_MMET_EGFR * xi_kpho_MMET_EGFR)-1.0 * ( 1 /cyt ) * (cyt * (kimp_pEGFR_EGF_2__MKN1 * exp(HS746T * d_kimp_pEGFR_EGF_2__MKN1_2_HS746T)) * pMMET_pEGFR * xi_kimp_pMMET_pEGFR),
     D(EGFR_MMET_METinh) ~ +1.0 * ( 1 /cyt ) * (cyt * EGFR * MMET_METinh * kdim_MMET_EGFR * xi_kdim_MMET_EGFR),
-    D(dummyVariable) ~ +full_medium
+    D(dummyVariable) ~ 1e-60*( +full_medium)
     ]
 
     @named sys = ODESystem(eqs)

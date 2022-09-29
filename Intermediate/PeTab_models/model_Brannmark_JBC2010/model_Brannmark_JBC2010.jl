@@ -30,7 +30,7 @@ function getODEModel_model_Brannmark_JBC2010()
     D(IRi) ~ +1.0 * ( 1 /cyt ) * (cyt * IRiP * (k1e + Xp * k1f / (Xp + 1)))-1.0 * ( 1 /cyt ) * (cyt * IRi * k1r),
     D(IRSiP) ~ +1.0 * ( 1 /cyt ) * (cyt * IRS * k21 * (IRp + IRiP * k22))-1.0 * ( 1 /cyt ) * (cyt * IRSiP * km2),
     D(Xp) ~ +1.0 * ( 1 /cyt ) * (cyt * IRSiP * X * k3)-1.0 * ( 1 /cyt ) * (cyt * Xp * km3),
-    D(dummyVariable) ~ +default+k_IRSiP_DosR
+    D(dummyVariable) ~ 1e-60*( +default+k_IRSiP_DosR)
     ]
 
     @named sys = ODESystem(eqs)

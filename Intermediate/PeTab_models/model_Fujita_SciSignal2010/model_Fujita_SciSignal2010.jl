@@ -34,8 +34,8 @@ function getODEModel_model_Fujita_SciSignal2010()
     D(Akt) ~ -1.0 * ( 1 /Cell ) * (Cell * (Akt * pEGFR * reaction_2_k1 - pEGFR_Akt * reaction_2_k2))+1.0 * ( 1 /Cell ) * (Cell * pAkt * reaction_7_k1),
     D(S6) ~ -1.0 * ( 1 /Cell ) * (Cell * (S6 * pAkt * reaction_5_k1 - pAkt_S6 * reaction_5_k2))+1.0 * ( 1 /Cell ) * (Cell * pS6 * reaction_8_k1),
     D(EGF_EGFR) ~ +1.0 * ( 1 /Cell ) * (Cell * (EGF * EGFR * reaction_1_k1 - EGF_EGFR * reaction_1_k2))-1.0 * ( 1 /Cell ) * (Cell * EGF_EGFR * reaction_9_k1),
-    D(EGF) ~ EGF_rate,
-    D(dummyVariable) ~ +init_S6+EGF_end+init_EGFR+init_AKT+EGF_rate+EGF_0
+    D(EGF) ~ 0,
+    D(dummyVariable) ~ 1e-60*( +init_S6+EGF_end+init_EGFR+init_AKT+EGF_rate+EGF_0)
     ]
 
     @named sys = ODESystem(eqs, t, continuous_events = continuous_events)
@@ -51,7 +51,7 @@ function getODEModel_model_Fujita_SciSignal2010()
     Akt => init_AKT,
     S6 => init_S6,
     EGF_EGFR => 0.0,
-    EGF => EGF_0,
+    EGF => 0.0,
     dummyVariable => 0.0]
 
     ### True parameter values ###

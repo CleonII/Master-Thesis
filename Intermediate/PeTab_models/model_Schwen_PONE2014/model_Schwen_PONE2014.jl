@@ -32,7 +32,7 @@ function getODEModel_model_Schwen_PONE2014()
     D(Rec1) ~ -1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec1 * ka1)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kd1)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1in * kout_frag),
     D(Ins) ~ -1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec1 * ka1)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec2 * ka1 * ka2fold)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * kon_unspec)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * BoundUnspec * koff_unspec)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kd1)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2 * kd1 * kd2fold),
     D(BoundUnspec) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * kon_unspec)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * BoundUnspec * koff_unspec),
-    D(dummyVariable) ~ +init_Ins+ini_R2fold+ini_R1
+    D(dummyVariable) ~ 1e-60*( +init_Ins+ini_R2fold+ini_R1)
     ]
 
     @named sys = ODESystem(eqs)

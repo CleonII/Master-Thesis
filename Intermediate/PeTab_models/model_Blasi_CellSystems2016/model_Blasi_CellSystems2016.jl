@@ -37,7 +37,7 @@ function getODEModel_model_Blasi_CellSystems2016()
     D(x_4ac) ~ +1.0 * ( 1 /default ) * ((a_basal) * x_k5k8k12 - d * x_4ac)+1.0 * ( 1 /default ) * ((a_basal) * x_k5k8k16 - d * x_4ac)+1.0 * ( 1 /default ) * ((a_basal) * x_k5k12k16 - d * x_4ac)+1.0 * ( 1 /default ) * (a_k8k12k16_4ac * x_k8k12k16 - d * x_4ac),
     D(x_k8k16) ~ +1.0 * ( 1 /default ) * ((a_basal) * x_k8 - d * x_k8k16)+1.0 * ( 1 /default ) * ((a_basal) * x_k16 - d * x_k8k16)-1.0 * ( 1 /default ) * ((a_basal) * x_k8k16 - d * x_k5k8k16)-1.0 * ( 1 /default ) * ((a_basal) * x_k8k16 - d * x_k8k12k16),
     D(x_k5k8k16) ~ +1.0 * ( 1 /default ) * ((a_basal) * x_k5k8 - d * x_k5k8k16)+1.0 * ( 1 /default ) * ((a_basal) * x_k5k16 - d * x_k5k8k16)+1.0 * ( 1 /default ) * ((a_basal) * x_k8k16 - d * x_k5k8k16)-1.0 * ( 1 /default ) * ((a_basal) * x_k5k8k16 - d * x_4ac),
-    D(dummyVariable) ~ +default
+    D(dummyVariable) ~ 1e-60*( +default)
     ]
 
     @named sys = ODESystem(eqs)

@@ -29,7 +29,7 @@ function getODEModel_model_Bertozzi_PNAS2020()
     D(Recovered) ~ +1.0 * ( 1 /USA___CA__NY ) * (USA___CA__NY * (Trigger_NY * gamma_NY + (1 - Trigger_NY) * gamma_CA) * Infected),
     D(Susceptible) ~ -1.0 * ( 1 /USA___CA__NY ) * (USA___CA__NY * ((Trigger_NY * gamma_NY + (1 - Trigger_NY) * gamma_CA) * Ro * Infected * Susceptible)),
     D(Ro) ~ 0,
-    D(dummyVariable) ~ +Lockdown_NY_end+Pop_CA+Io_CA+Pop_NY+Io_NY+Trigger_NY+Lockdown_CA_start+Trigger_Lockdown+Ro_NY+Lockdown_CA_end+Ro_CA+Lockdown_NY_start
+    D(dummyVariable) ~ 1e-60*( +Lockdown_NY_end+Pop_CA+Io_CA+Pop_NY+Io_NY+Trigger_NY+Lockdown_CA_start+Trigger_Lockdown+Ro_NY+Lockdown_CA_end+Ro_CA+Lockdown_NY_start)
     ]
 
     @named sys = ODESystem(eqs, t, continuous_events = continuous_events)

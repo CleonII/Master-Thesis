@@ -28,7 +28,7 @@ function getODEModel_model_Bruno_JExpBot2016()
     D(bcry) ~ -1.0 * ( 1 /cyt ) * (cyt * bcry * kc1 * kc1_multiplier)-1.0 * ( 1 /cyt ) * (cyt * bcry * kc2 * kc2_multiplier),
     D(ohb10) ~ +1.0 * ( 1 /cyt ) * (cyt * bcry * kc2 * kc2_multiplier)-1.0 * ( 1 /cyt ) * (cyt * kc4 * kc4_multiplier * ohb10)+1.0 * ( 1 /cyt ) * (cyt * k5 * k5_multiplier * zea),
     D(bcar) ~ -1.0 * ( 1 /cyt ) * (cyt * bcar * kb1 * kb1_multiplier),
-    D(dummyVariable) ~ +init_zea+init_ohb10+init_bcar+init_b10+init_bcry
+    D(dummyVariable) ~ 1e-60*( +init_zea+init_ohb10+init_bcar+init_b10+init_bcry)
     ]
 
     @named sys = ODESystem(eqs)

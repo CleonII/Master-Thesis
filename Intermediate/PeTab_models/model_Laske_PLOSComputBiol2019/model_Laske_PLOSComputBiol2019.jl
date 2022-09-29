@@ -55,7 +55,7 @@ function getODEModel_model_Laske_PLOSComputBiol2019()
     D(P_RdRp) ~ -1.0 * ( 1 /compartment ) * (compartment * k_bind_RdRp * R_C * P_RdRp)-1.0 * ( 1 /compartment ) * (compartment * k_bind_RdRp * R_V * P_RdRp)+1.0 * ( 1 /compartment ) * (compartment * k_RdRp * P_B1 * P_B2 * P_PA)-37.0 * ( 1 /compartment ) * (compartment * (k_rel * Vp_cyt_M1 * P_RdRp * P_HA * P_NP * P_NA * P_M1 * P_M2 * P_NEP / ((P_RdRp + (ModelValue_107 * ModelValue_101)) * (P_HA + (ModelValue_107 * ModelValue_102)) * (P_NP + (ModelValue_107 * ModelValue_106)) * (P_NA + (ModelValue_107 * ModelValue_104)) * (P_M1 + (ModelValue_107 * ModelValue_103)) * (P_M2 + (ModelValue_107 * ModelValue_113)) * (P_NEP + (ModelValue_107 * ModelValue_105))))),
     D(R_M3) ~ +1.0 * ( 1 /compartment ) * (compartment * (ModelValue_79 / ModelValue_86 / 8) * Vp_nuc)-1.0 * ( 1 /compartment ) * (compartment * (ModelValue_80 / ModelValue_82) * R_M3)+1.0 * ( 1 /compartment ) * (compartment * (ModelValue_80 / ModelValue_82) * R_M3)-1.0 * ( 1 /compartment ) * (compartment * k_deg_R_M * R_M3),
     D(P_B1) ~ +1.0 * ( 1 /compartment ) * (compartment * (ModelValue_80 / ModelValue_82) * R_M2)-1.0 * ( 1 /compartment ) * (compartment * k_RdRp * P_B1 * P_B2 * P_PA),
-    D(dummyVariable) ~ +L1+N_P_M2+N_P_M1+K_eq_Hi+L4+L8+k_syn_R_M+N_P_NP+L2+L6+L3+N_P_RdRp+D_rib+F_Spl8+F_Spl7+k_syn_P+k_att_Lo+k_fus+N_P_HA+K_eq_Lo+K_V_rel+L7+N_P_NA+N_P_NEP+F_fus+k_att_Hi+L5
+    D(dummyVariable) ~ 1e-60*( +L1+N_P_M2+N_P_M1+K_eq_Hi+L4+L8+k_syn_R_M+N_P_NP+L2+L6+L3+N_P_RdRp+D_rib+F_Spl8+F_Spl7+k_syn_P+k_att_Lo+k_fus+N_P_HA+K_eq_Lo+K_V_rel+L7+N_P_NA+N_P_NEP+F_fus+k_att_Hi+L5)
     ]
 
     @named sys = ODESystem(eqs)

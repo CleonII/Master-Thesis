@@ -28,7 +28,7 @@ function getODEModel_model_Rahman_MBS2016()
     D(infected_weak) ~ +1.0 * ( 1 /c1 ) * (infected_moderate_worsen_rate * infected_moderate)-1.0 * ( 1 /c1 ) * (infected_weak_treatment_rate * infected_weak)-1.0 * ( 1 /c1 ) * (infected_weak_death_rate * infected_weak),
     D(treated_moderate) ~ +1.0 * ( 1 /c1 ) * (treated_weak_improve_rate * treated_weak)-1.0 * ( 1 /c1 ) * (treated_moderate_improve_rate * treated_moderate)+1.0 * ( 1 /c1 ) * (infected_moderate_treatment_rate * infected_moderate)-1.0 * ( 1 /c1 ) * (treated_moderate_death_rate * treated_moderate),
     D(susceptible) ~ +1.0 * ( 1 /c1 ) * (recruitment_rate)-1.0 * ( 1 /c1 ) * ((((infected_normal_transmission_rate_relative * infected_moderate_transmission_rate) * infected_normal + infected_moderate_transmission_rate * infected_moderate + (infected_weak_transmission_rate_relative * infected_moderate_transmission_rate) * infected_weak + (0.04 * infected_moderate_transmission_rate) * (treated_normal + treated_moderate + treated_weak)) / (susceptible + infected_normal + infected_moderate + infected_weak + treated_normal + treated_moderate + treated_weak) * exp(-1 * behavioural_change_rate * (infected_normal + infected_moderate + infected_weak + treated_normal + treated_moderate + treated_weak))) * susceptible)-1.0 * ( 1 /c1 ) * (susceptible_death_rate * susceptible),
-    D(dummyVariable) ~ +c1
+    D(dummyVariable) ~ 1e-60*( +c1)
     ]
 
     @named sys = ODESystem(eqs)

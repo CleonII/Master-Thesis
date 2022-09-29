@@ -131,6 +131,8 @@ struct SimulationInfo{T1<:Array{<:String, 1},
     simulateSS::T3
     solArray::T4
     solArrayGrad::T4
+    absTolSS::Float64
+    relTolSS::Float64
 end
 
 
