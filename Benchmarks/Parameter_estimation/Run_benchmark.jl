@@ -130,4 +130,4 @@ end
 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Boehm_JProteomeRes2014/"
 peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel)
-benchmarkParameterEstimation(peTabModel, Rodas4P(), "Rodas4", 1e-9, 500) 
+benchmarkParameterEstimation(peTabModel, Rodas4P(), "Rodas4", 1e-9, 1000) 
