@@ -27,12 +27,16 @@ function getIndicesParam(paramData::ParamData, measurementData::MeasurementData)
     isDynamicParam = (paramData.shouldEst .&& .!isSdParam .&& .!isObsParam)
     namesParamDyn = paramData.parameterID[isDynamicParam]
 
-    namesParamEst::Array{String, 1} = string.(vcat(string.(namesParamDyn), string.(namesSdParam), string.(namesObsParam)))
+    # A paramter can be both a SD and observable parameter
+    namesSdObsParam::Array{String, 1} = string.(unique(vcat(namesSdParam, namesObsParam)))
+
+    namesParamEst::Array{String, 1} = string.(vcat(string.(namesParamDyn), string.(namesSdObsParam)))
     
     # Index vector for the dynamic and sd parameters as UInt32 vectors 
-    iDynPar::Array{UInt32, 1} = convert(Array{UInt32, 1}, collect(1:length(namesParamDyn)))
-    iSdPar::Array{UInt32, 1} = convert(Array{UInt32, 1}, collect((length(namesParamDyn)+1):(length(namesParamDyn) + length(namesSdParam))))
-    iObsPar::Array{UInt32, 1} = convert(Array{UInt32, 1}, collect((length(namesParamDyn) + length(namesSdParam) + 1):(length(namesParamDyn) + length(namesSdParam) + length(namesObsParam))))
+    iDynPar::Array{UInt32, 1} = [findfirst(x -> x == namesParamDyn[i],  namesParamEst) for i in eachindex(namesParamDyn)]
+    iSdPar::Array{UInt32, 1} = [findfirst(x -> x == namesSdParam[i],  namesParamEst) for i in eachindex(namesSdParam)]
+    iObsPar::Array{UInt32, 1} = [findfirst(x -> x == namesObsParam[i],  namesParamEst) for i in eachindex(namesObsParam)]
+    iSdObsPar::Array{UInt32, 1} = [findfirst(x -> x == namesSdObsParam[i],  namesParamEst) for i in eachindex(namesSdObsParam)]
     
     # When extracting observable or sd parameter for computing the likelhood a pre-calculcated map-array
     # is used to efficently extract correct parameters. The arrays below define which map to extract to 
@@ -48,13 +52,14 @@ function getIndicesParam(paramData::ParamData, measurementData::MeasurementData)
     mapArrayObsParam = buildMapParameters(keysObsMap, measurementData, paramData, true)
     mapArraySdParam = buildMapParameters(keysSdMap, measurementData, paramData, false)
 
-
     paramIndicies = ParameterIndices(iDynPar, 
                                      iObsPar, 
                                      iSdPar, 
+                                     iSdObsPar,
                                      string.(namesParamDyn), 
                                      string.(namesObsParam), 
                                      string.(namesSdParam),
+                                     namesSdObsParam,
                                      namesParamEst, 
                                      indexObsParamMap, 
                                      indexSdParamMap, 

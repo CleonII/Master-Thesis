@@ -169,6 +169,9 @@ function calcGradCost!(grad::T1,
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
     obsParEst = paramVecEst[paramIndices.iObsParam]
     sdParamEst = paramVecEst[paramIndices.iSdParam]
+    namesSdParam = paramIndices.namesSdParam
+    namesObsParam = paramIndices.namesObsParam
+    namesSdObsParam = paramIndices.namesSdObsParam
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
 
@@ -178,12 +181,15 @@ function calcGradCost!(grad::T1,
     calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcGradDynParam=true)
     grad[paramIndices.iDynParam] .= ForwardDiff.gradient(calcCostDyn, dynamicParamEst)::Vector{Float64}
 
-    # Gradient of OBS and SD parameters 
-    noneDynPar = vcat(sdParamEst, obsParEst)
-    iSdUse, iObsUse = 1:length(sdParamEst), (length(sdParamEst)+1):(length(sdParamEst) + length(obsParEst))
-    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=true)
+    # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
+    # of both Sd and Obs param is used to account for this 
+    noneDynPar = paramVecEst[paramIndices.iSdObsPar]
+    iSdUse = [findfirst(x -> x == namesSdParam[i], namesSdObsParam) for i in eachindex(namesSdParam)]
+    iObsUse = [findfirst(x -> x == namesObsParam[i],  namesSdObsParam) for i in eachindex(namesObsParam)]
+
     # TODO : Make choice of gradient availble 
-    @views ReverseDiff.gradient!(grad[vcat(paramIndices.iSdParam, paramIndices.iObsParam)], calcCostNonDyn, noneDynPar)
+    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=true)
+    @views ReverseDiff.gradient!(grad[paramIndices.iSdObsPar], calcCostNonDyn, noneDynPar)
 end
 
 
@@ -225,16 +231,33 @@ function calcHessianApprox!(hessian::T1,
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
     obsParEst = paramVecEst[paramIndices.iObsParam]
     sdParamEst = paramVecEst[paramIndices.iSdParam]
+    namesSdParam = paramIndices.namesSdParam
+    namesObsParam = paramIndices.namesObsParam
+    namesSdObsParam = paramIndices.namesSdObsParam
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
     calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcHessDynParam=true)
-    @views hessian[paramIndices.iDynParam, paramIndices.iDynParam] .= ForwardDiff.hessian(calcCostDyn, dynamicParamEst)
+    hessian[paramIndices.iDynParam, paramIndices.iDynParam] .= ForwardDiff.hessian(calcCostDyn, dynamicParamEst)::Matrix{Float64}
 
-    # Compute gradient for none dynamic parameters 
-    noneDynPar = vcat(sdParamEst, obsParEst)
-    iSdUse, iObsUse = 1:length(sdParamEst), (length(sdParamEst)+1):(length(sdParamEst) + length(obsParEst))
+    # An ODE sol without dual numbers is needed here so ODE-system is resolved TODO: Make this the cost solution
+    #=
+    dynParamSolve = deepcopy(dynamicParamEst)
+    transformParamVec!(dynParamSolve, paramIndices.namesDynParam, parameterData)
+    odeProbUse = remake(odeProb, p = convert.(eltype(dynParamSolve), odeProb.p), u0 = convert.(eltype(dynParamSolve), odeProb.u0))
+    changeModelParamUse!(odeProbUse.p, odeProbUse.u0, dynParamSolve, paramIndices.namesDynParam)
+    solveOdeModelAllCondUse!(simulationInfo.solArray, odeProbUse)
+    =#
+
+    # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
+    # of both Sd and Obs param is used to account for this 
+    noneDynPar::Array{Float64, 1} = paramVecEst[paramIndices.iSdObsPar]
+    iSdUse = [findfirst(x -> x == namesSdParam[i], namesSdObsParam) for i in eachindex(namesSdParam)]
+    iObsUse = [findfirst(x -> x == namesObsParam[i],  namesSdObsParam) for i in eachindex(namesObsParam)]
+    
+    # Compute hessian for none dynamic parameters 
     calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData)
-    @views hessian[vcat(paramIndices.iSdParam, paramIndices.iObsParam), vcat(paramIndices.iSdParam, paramIndices.iObsParam)] .= ForwardDiff.hessian(calcCostNonDyn, noneDynPar)
+    @views ReverseDiff.hessian!(hessian[paramIndices.iSdObsPar, paramIndices.iSdObsPar], calcCostNonDyn, noneDynPar)
+
 end
 
 

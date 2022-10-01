@@ -187,9 +187,11 @@ struct ParameterIndices{T1<:Array{<:Integer, 1},
     iDynParam::T1
     iObsParam::T1
     iSdParam::T1
+    iSdObsPar::T1
     namesDynParam::T2
     namesObsParam::T2
     namesSdParam::T2
+    namesSdObsParam::T2
     namesParamEst::T2
     indexObsParamMap::T3
     indexSdParamMap::T3
