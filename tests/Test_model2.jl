@@ -40,6 +40,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 # Optimizers 
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_Ipopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_optim.jl"))
+include(joinpath(pwd(), "src", "Optimizers", "Set_up_forward_gradient.jl"))
 
 
 """
@@ -285,6 +286,21 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
         return false
     else
         @printf("Passed test for Optim interior point newton hessian autoDiff\n")
+    end
+    
+    p0 = peTabOpt.paramVecNotTransformed .+ 0.1
+    stepLengths = log10.(LinRange(exp10(1e-2),exp10(1e-4), 10000))
+    forwardGradOpt = createFowardGradientProb(peTabOpt, stepLengths, 10000)
+    minCost, minParams, costVal, paramVal = runAdam(p0, forwardGradOpt, verbose=false, seed=14)
+    # The dynamic parameters are easily estimated, but sd-parameter often fail so do not 
+    # include them into the tests.
+    sqDiff = sum((minParams[1:2] - peTabOpt.paramVecNotTransformed[1:2]).^2)
+    if sqDiff > 1e-3
+        @printf("sqDiffForwardGradient = %.3e\n", sqDiff)
+        @printf("Failed optimization for forward gradient\n")
+        return false
+    else
+        @printf("Passed test for optimization forward gradient\n")
     end
 
     return true
