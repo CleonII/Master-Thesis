@@ -11,6 +11,7 @@ using Distributions
 using Printf
 using Ipopt
 using Optim
+using BenchmarkTools
 
 
 # Relevant PeTab structs for computations 
@@ -117,17 +118,23 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
         end
 
         if :OptimAutoHess in algList
-            res = optimProbAutoHess(p0, showTrace=true)
+            res = optimProbAutoHess(p0, showTrace=false)
             writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimAutoHess", solverStr, string(tol))
         end
 
         if :OptimBlockAutoDiff in algList
-            res = optimProbHessApprox(p0, showTrace=true)
+            res = optimProbHessApprox(p0, showTrace=false)
             writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimBlockAutoHess", solverStr, string(tol))
         end
     end
 end
 
+#=
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Boehm_JProteomeRes2014/"
 peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel)
 benchmarkParameterEstimation(peTabModel, Rodas4P(), "Rodas4", 1e-9, 1000) 
+=#
+
+dirModel = pwd() * "/Intermediate/PeTab_models/model_Fiedler_BMC2016/"
+peTabModel = setUpPeTabModel("model_Fiedler_BMC2016", dirModel)
+benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000) 

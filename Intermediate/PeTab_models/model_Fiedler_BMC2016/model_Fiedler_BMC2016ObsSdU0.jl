@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	RAF, MEK, pMEK, pERK, pRAF, ERK, dummyVariable= u 
 	K_1, K_2, K_3, k10, k11, k2, k3, k4, k5, k6, tau1, tau2 = dynPar 
@@ -7,12 +7,12 @@ function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simula
 	RAF_total_C = paramData.paramVal[6] 
 
 	if observableId == "pErk" 
-		observableParameter1_pErk = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_pErk = getObsOrSdParam(obsPar, mapObsParam)
 		return pERK * observableParameter1_pErk 
 	end
 
 	if observableId == "pMek" 
-		observableParameter1_pMek = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_pMek = getObsOrSdParam(obsPar, mapObsParam)
 		return pMEK * observableParameter1_pMek 
 	end
 
@@ -33,7 +33,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= RAF, MEK, pMEK, pERK, pRAF, ERK, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	RAF, MEK, pMEK, pERK, pRAF, ERK, dummyVariable= u 
 	K_1, K_2, K_3, k10, k11, k2, k3, k4, k5, k6, tau1, tau2 = dynPar 
@@ -42,12 +42,12 @@ function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulati
 	RAF_total_C = paramData.paramVal[6] 
 
 	if observableId == "pErk" 
-		noiseParameter1_pErk, noiseParameter2_pErk = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_pErk, noiseParameter2_pErk = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pErk * noiseParameter2_pErk 
 	end
 
 	if observableId == "pMek" 
-		noiseParameter1_pMek, noiseParameter2_pMek = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_pMek, noiseParameter2_pMek = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pMek * noiseParameter2_pMek 
 	end
 
