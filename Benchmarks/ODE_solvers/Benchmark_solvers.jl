@@ -169,17 +169,23 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
     # Functions to map experimental conditions and parameters correctly to the ODE model 
     changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, parameterData, experimentalConditionsFile, peTabModel)
 
-    # High accruacy ODE solution 
+    # High accruacy ODE solution. The Isensee model crashes any BigFloat solution, henc KenCarp58 is used with very low 
+    # tolerance.
     println("Computing high accuracy model")
-    solArrayHighAcc, statusHighAcc = calcHighAccOdeSolution(odeProbHighAcc, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, tol=1e-14)
+    if peTabModel.modelName != "model_Isensee_JCB2018"
+        solArrayHighAcc, statusHighAcc = calcHighAccOdeSolution(odeProbHighAcc, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, tol=1e-14)
+    else
+        solArrayHighAcc, tmp = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, KenCarp58(), 1e-14, nTSave=100)
+        statusHighAcc = true
+    end
     println("Done")
 
     solverInfoMat = getSolverInfo(sparseLinSolvers)
 
     if statusHighAcc != true
         # Log failure to disk 
-        println("High accuracy solver failed for $modelFile")
-        open(joinpath(pwd(), "Benchmakrs", "ODE_solvers", "Log.txt"), "a") do io
+        println("High accuracy solver failed for ", peTabModel.modelName)
+        open(joinpath(pwd(), "Benchmark", "ODE_solvers", "Log.txt"), "a") do io
             println(io, "Failed with high accuracy solution for $modelFile")
         end
         return 
@@ -298,6 +304,8 @@ modelListTry = ["model_Beer_MolBioSystems2014", "model_Weber_BMC2015", "model_Sc
                 "model_Isensee_JCB2018", "model_Laske_PLOSComputBiol2019", "model_Lucarelli_CellSystems2018", "model_Okuonghae_ChaosSolitonsFractals2020", 
                 "model_Oliveira_NatCommun2021", "model_Perelson_Science1996", "model_Rahman_MBS2016", 
                 "model_SalazarCavazos_MBoC2020", "model_Sneyd_PNAS2002", "model_Zhao_QuantBiol2020", "model_Zheng_PNAS2012"]
+
+modelListTry = ["model_Isensee_JCB2018"]
 
 for i in eachindex(modelListTry)
     modelName = modelListTry[i]
