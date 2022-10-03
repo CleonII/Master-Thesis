@@ -20,6 +20,7 @@ using Distributions
 using Printf
 using Ipopt
 using Optim
+using NLopt
 using LineSearches
 
 
@@ -41,6 +42,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 # Optimizers 
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_Ipopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_optim.jl"))
+include(joinpath(pwd(), "src", "Optimizers", "Set_up_NLopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_forward_gradient.jl"))
 
 
@@ -229,6 +231,10 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     optimProbBFGS = createOptimProb(peTabOpt, BFGS())
     optimProbLBFGS = createOptimProb(peTabOpt, LBFGS())
 
+    # NLopt optimizers 
+    NLoptLBFGS = createNLoptProb(peTabOpt, :LD_LBFGS, verbose=false)
+    NLoptTNewton = createNLoptProb(peTabOpt, :LD_TNEWTON_PRECOND_RESTART, verbose=false)
+
     p0 = cube[1, :]
     # Ipopt Hessian approximation
     ipoptProbHessApprox.x = deepcopy(p0)
@@ -312,7 +318,29 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     else
         @printf("Passed test for Optim LBFGS\n")
     end
-    
+
+    # NLopt LBFGS
+    minf, minx, ret = NLopt.optimize(NLoptLBFGS, p0)
+    sqDiff = sum((minx - peTabOpt.paramVecNotTransformed).^2)
+    if sqDiff > 1e-3
+        @printf("sqDiffLBFGS = %.3e\n", sqDiff)
+        @printf("Failed on optimization for NLopt LBFGS\n")
+        return false
+    else
+        @printf("Passed test for NLopt LBFGS\n")
+    end
+
+    # NLopt truncated Newton with preconditioner 
+    minf, minx, ret = NLopt.optimize(NLoptTNewton, p0)
+    sqDiff = sum((minx - peTabOpt.paramVecNotTransformed).^2)
+    if sqDiff > 1e-3
+        @printf("sqDiffLBFGS = %.3e\n", sqDiff)
+        @printf("Failed on optimization for NLopt Newton with preconditioner \n")
+        return false
+    else
+        @printf("Passed test for NLopt Newton with preconditioner \n")
+    end
+
     p0 = peTabOpt.paramVecNotTransformed .+ 0.1
     stepLengths = log10.(LinRange(exp10(1e-2),exp10(1e-4), 10000))
     forwardGradOpt = createFowardGradientProb(peTabOpt, stepLengths, 10000)
