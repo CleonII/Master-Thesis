@@ -37,6 +37,7 @@ function calcHighAccOdeSolution(prob::ODEProblem,
 
     # In cases the non-stiff solver just fails 
     if sucessSolver != true
+        println("Failed with composite solver - moving on to stiff solver")
         try 
             solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverStiff, tol; nTSave=nTSave)                                      
         catch

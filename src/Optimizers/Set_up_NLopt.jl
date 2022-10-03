@@ -7,7 +7,7 @@
     struct where the optmization is performed using NLoptAlg. In principle any 
     NLopt-alg is supported.
 """
-function createNLoptProb(peTabOpt::PeTabOpt, NLoptAlg::Symbol; maxeval::Integer=5000, verbose::Bool=false)
+function createNLoptProb(peTabOpt::PeTabOpt, NLoptAlg::Symbol; maxeval::Integer=2000, verbose::Bool=false)
 
     algSupport = [:LD_TNEWTON_PRECOND_RESTART, :LD_LBFGS]
     if !(NLoptAlg in algSupport)
@@ -17,8 +17,8 @@ function createNLoptProb(peTabOpt::PeTabOpt, NLoptAlg::Symbol; maxeval::Integer=
     end
 
     NLoptObj = NLopt.Opt(NLoptAlg, peTabOpt.nParamEst)
-    NLoptObj.lower_bounds = peTabOpt.lowerBounds 
-    NLoptObj.upper_bounds = peTabOpt.upperBounds
+    NLoptObj.lower_bounds = peTabOpt.lowerBounds .- 1e-9
+    NLoptObj.upper_bounds = peTabOpt.upperBounds .+ 1e-9
     NLoptObj.maxeval = maxeval # Prevent never ending optmization
     NLoptObj.min_objective = (x, grad) -> NLoptF(x, grad, peTabOpt.evalF, peTabOpt.evalGradF, verbose=verbose)
 

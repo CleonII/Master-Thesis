@@ -11,7 +11,9 @@ using Distributions
 using Printf
 using Ipopt
 using Optim
+using NLopt
 using BenchmarkTools
+using ProgressMeter
 
 
 # Relevant PeTab structs for computations 
@@ -32,6 +34,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 # Optimizers 
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_Ipopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_optim.jl"))
+include(joinpath(pwd(), "src", "Optimizers", "Set_up_NLopt.jl"))
 
 function writeFile(pathFile::String, 
                    finalCost, 
@@ -57,7 +60,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
                                       solverStr::String, 
                                       tol::Float64, 
                                       nStartGuess::Integer;
-                                      algList=[:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimAutoHess, :OptimBlockAutoDiff])
+                                      algList=[:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS])
 
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
 
@@ -76,24 +79,27 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
     ipoptProbBfgs, iterArrBfgs = createIpoptProb(peTabOpt, hessianUse=:LBFGS)
     ipoptProbAutoHess, iterArrAutoHess = createIpoptProb(peTabOpt, hessianUse=:autoDiff)
     # Optim optimizers 
-    optimProbHessApprox = createOptimInteriorNewton(peTabOpt, hessianUse=:blockAutoDiff)
-    optimProbAutoHess = createOptimInteriorNewton(peTabOpt, hessianUse=:autoDiff)
+    optimProbHessApprox = createOptimProb(peTabOpt, IPNewton(), hessianUse=:blockAutoDiff)
+    optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff)
+    optimProbLBFGS = createOptimProb(peTabOpt, LBFGS())
+    # NLopt optimizers 
+    NLoptLBFGS = createNLoptProb(peTabOpt, :LD_LBFGS, verbose=false)
+    NLoptTNewton = createNLoptProb(peTabOpt, :LD_TNEWTON_PRECOND_RESTART, verbose=false)
 
     # Make sure to activate allocation of required arrays for Ipopt solvers, and to compile 
     # gradient and required hessian functions to avoid bias in run-times for benchmark. 
     pTmp, gradTmp, hessTmp = cube[1, :], zeros(peTabOpt.nParamEst), zeros(peTabOpt.nParamEst, peTabOpt.nParamEst)
     costTmp = peTabOpt.evalF(pTmp)
     peTabOpt.evalGradF(gradTmp, pTmp)
-    if :IpoptAutoHess in algList || :OptimAutoHess in algList
+    if :IpoptAutoHess in algList || :OptimIPNewtonAutoHess in algList
         peTabOpt.evalHess(hessTmp, pTmp)
     end
-    if :IpoptBlockAutoDiff in algList || :OptimBlockAutoDiff in algList
+    if :IpoptBlockAutoDiff in algList || :OptimIPNewtonBlockAutoDiff in algList
         peTabOpt.evalHessApprox(hessTmp, pTmp)
     end
 
-    for i in 1:nStartGuess
+    @showprogress "Running benchmark... " for i in 1:nStartGuess
 
-        println("Start guess = $i")
         p0 = cube[i, :]
 
         if :IpoptAutoHess in algList
@@ -112,29 +118,49 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
 
         if :IpoptLBFGS in algList
             ipoptProbBfgs.x = deepcopy(p0)
-            Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 0)
+            Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 5)
             runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
             writeFile(pathSave, ipoptProbBfgs.obj_val, runTime, ipoptProbBfgs.status, iterArrBfgs[1], i, "IpoptLBFGS", solverStr, string(tol))
         end
 
-        if :OptimAutoHess in algList
+        if :OptimIPNewtonAutoHess in algList
             res = optimProbAutoHess(p0, showTrace=false)
-            writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimAutoHess", solverStr, string(tol))
+            writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimIPNewtonAutoHess", solverStr, string(tol))
         end
 
-        if :OptimBlockAutoDiff in algList
+        if :OptimIPNewtonBlockAutoDiff in algList
             res = optimProbHessApprox(p0, showTrace=false)
-            writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimBlockAutoHess", solverStr, string(tol))
+            writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimIPNewtonBlockAutoHess", solverStr, string(tol))
+        end
+
+        if :OptimLBFGS in algList
+            res = optimProbLBFGS(p0, showTrace=true)
+            writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimLBFGS", solverStr, string(tol))
+        end
+
+        if :NLoptLBFGS in algList
+            runTime = @elapsed minF, min, ret = NLopt.optimize(NLoptLBFGS, p0)
+            writeFile(pathSave, minF, runTime, string(ret), NLoptLBFGS.numevals, i, "NLoptLBFGS", solverStr, string(tol))
         end
     end
 end
 
-#=
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Boehm_JProteomeRes2014/"
-peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel)
-benchmarkParameterEstimation(peTabModel, Rodas4P(), "Rodas4", 1e-9, 1000) 
-=#
 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Fiedler_BMC2016/"
-peTabModel = setUpPeTabModel("model_Fiedler_BMC2016", dirModel)
-benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000) 
+if ARGS[1] == "Fiedler"
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Fiedler_BMC2016/"
+    peTabModel = setUpPeTabModel("model_Fiedler_BMC2016", dirModel)
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000) 
+end
+
+if ARGS[1] == "Boehm"
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Boehm_JProteomeRes2014/"
+    peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel)
+    benchmarkParameterEstimation(peTabModel, Rodas4P(), "Rodas4", 1e-9, 1000) 
+end
+
+if ARGS[1] == "Bachmann"
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
+    peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel)
+    algsTest = [:IpoptLBFGS, :NLoptLBFGS]
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000, algList=algsTest)
+end
