@@ -20,6 +20,7 @@ using Distributions
 using Printf
 using Ipopt
 using Optim
+using LineSearches
 
 
 # Relevant PeTab structs for compuations 
@@ -223,8 +224,10 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     ipoptProbAutoHess, iterArrAutoHess = createIpoptProb(peTabOpt, hessianUse=:autoDiff)
 
     # Optim optimizers 
-    optimProbHessApprox = createOptimInteriorNewton(peTabOpt, hessianUse=:blockAutoDiff)
-    optimProbAutoHess = createOptimInteriorNewton(peTabOpt, hessianUse=:autoDiff)
+    optimProbHessApprox = createOptimProb(peTabOpt, IPNewton(), hessianUse=:blockAutoDiff)
+    optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff)
+    optimProbBFGS = createOptimProb(peTabOpt, BFGS())
+    optimProbLBFGS = createOptimProb(peTabOpt, LBFGS())
 
     p0 = cube[1, :]
     # Ipopt Hessian approximation
@@ -286,6 +289,28 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
         return false
     else
         @printf("Passed test for Optim interior point newton hessian autoDiff\n")
+    end
+
+    # Optim BFGS
+    res = optimProbBFGS(p0, showTrace=false)
+    sqDiff = sum((res.minimizer - peTabOpt.paramVecNotTransformed).^2)
+    if sqDiff > 1e-3
+        @printf("sqDiffBFGS = %.3e\n", sqDiff)
+        @printf("Failed on optimization for Optim BFGS\n")
+        return false
+    else
+        @printf("Passed test for Optim BFGS\n")
+    end
+
+    # Optim BFGS
+    res = optimProbLBFGS(p0, showTrace=false)
+    sqDiff = sum((res.minimizer - peTabOpt.paramVecNotTransformed).^2)
+    if sqDiff > 1e-3
+        @printf("sqDiffLBFGS = %.3e\n", sqDiff)
+        @printf("Failed on optimization for Optim LBFGS\n")
+        return false
+    else
+        @printf("Passed test for Optim LBFGS\n")
     end
     
     p0 = peTabOpt.paramVecNotTransformed .+ 0.1
