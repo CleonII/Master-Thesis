@@ -247,12 +247,14 @@ function solveOdeSS(prob::ODEProblem,
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # The preequilibration simulations are terminated upon a steady state using the TerminateSteadyState callback.
     if typeof(solver) <: Vector{Symbol} # Alg-hint case
-        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(absTolSS, relTolSS), dense=false)
-        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
+        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, dense=false, 
+                                       callback=TerminateSteadyState(absTolSS, relTolSS), isoutofdomain = (u,p,t)->any(x->x<0,u))
+        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense, isoutofdomain = (u,p,t)->any(x->x<0,u))
 
     else # Julia solver case
-        solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(absTolSS, relTolSS), dense=false)
-        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
+        solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, dense=false, 
+            callback=TerminateSteadyState(absTolSS, relTolSS), isoutofdomain = (u,p,t)->any(x->x<0,u))
+        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense, isoutofdomain = (u,p,t)->any(x->x<0,u))
     end
 
     # Change to parameters for the preequilibration simulations 
@@ -338,13 +340,15 @@ function solveOdeNoSS(prob::ODEProblem,
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
     if typeof(solver) <: Vector{Symbol} && isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(absTolSS, relTolSS), save_on=false, save_end=true, dense=dense)
+        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, save_on=false, save_end=true, dense=dense, 
+            callback=TerminateSteadyState(absTolSS, relTolSS), isoutofdomain = (u,p,t)->any(x->x<0,u))
     elseif typeof(solver) <: Vector{Symbol} && !isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
+        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense, isoutofdomain = (u,p,t)->any(x->x<0,u))
     elseif !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, callback=TerminateSteadyState(absTolSS, relTolSS), save_on=false, save_end=true, dense=dense)
+        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, save_on=false, save_end=true, dense=dense, 
+            callback=TerminateSteadyState(absTolSS, relTolSS))
     elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
+        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense, isoutofdomain = (u,p,t)->any(x->x<0,u))
     else
         println("Error : Solver option does not exist")        
     end
