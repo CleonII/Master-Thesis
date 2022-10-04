@@ -39,9 +39,9 @@ function transformObsOrData(val, transform::Symbol)
     if transform == :lin
         return val
     elseif transform == :log10
-        return log10(val)
+        return val > 0 ? log10(val) : Inf
     elseif transform == :log
-        return log(val)
+        return val > 0 ? log(val) : Inf
     else
         println("Error : $transform is not an allowed transformation")
         println("Only :lin, :log10 and :log are supported.")

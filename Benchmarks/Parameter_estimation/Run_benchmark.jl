@@ -118,7 +118,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
 
         if :IpoptLBFGS in algList
             ipoptProbBfgs.x = deepcopy(p0)
-            Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 5)
+            Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 0)
             runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
             writeFile(pathSave, ipoptProbBfgs.obj_val, runTime, ipoptProbBfgs.status, iterArrBfgs[1], i, "IpoptLBFGS", solverStr, string(tol))
         end
@@ -134,7 +134,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
         end
 
         if :OptimLBFGS in algList
-            res = optimProbLBFGS(p0, showTrace=true)
+            res = optimProbLBFGS(p0, showTrace=false)
             writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimLBFGS", solverStr, string(tol))
         end
 
@@ -162,5 +162,5 @@ if ARGS[1] == "Bachmann"
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
     peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel)
     algsTest = [:IpoptLBFGS, :NLoptLBFGS]
-    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000, algList=algsTest)
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-6, 1000, algList=algsTest)
 end

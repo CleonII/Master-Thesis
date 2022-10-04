@@ -422,8 +422,13 @@ function calcLogLik(dynamicParamEst::T1,
         yMod[i] = peTabModel.evalYmod(odeSol, t, dynamicParamEst, obsPar, parameterData, measurementData.observebleID[i], mapObsParam) 
     end
 
-    # Transform model output if required
+    # By default a positive ODE solution is not enforced (even though the user can provide it as option).
+    # In case with transformations on the data the code can crash, hence Inf is returned in case the 
+    # model data transformation can not be perfomred. 
     transformYobsOrYmodArr!(yMod, measurementData.transformData)
+    if any(isinf.(yMod))
+        return Inf
+    end
 
     # Calculate (or extract) standard deviation for each observation 
     sdVal = Array{eltype(sdParamEst), 1}(undef, length(measurementData.yObsNotTransformed))
