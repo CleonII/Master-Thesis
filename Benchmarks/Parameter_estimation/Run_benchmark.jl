@@ -13,7 +13,6 @@ using Ipopt
 using Optim
 using NLopt
 using BenchmarkTools
-using ProgressMeter
 
 
 # Relevant PeTab structs for computations 
@@ -98,9 +97,10 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
         peTabOpt.evalHessApprox(hessTmp, pTmp)
     end
 
-    @showprogress "Running benchmark... " for i in 1:nStartGuess
+    for i in 1:nStartGuess
 
         p0 = cube[i, :]
+        println("Iteration = $i")
 
         if :IpoptAutoHess in algList
             ipoptProbAutoHess.x = deepcopy(p0)
@@ -163,4 +163,20 @@ if ARGS[1] == "Bachmann"
     peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel)
     algsTest = [:IpoptLBFGS, :NLoptLBFGS]
     benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-6, 1000, algList=algsTest)
+end
+
+
+if ARGS[1] == "Brannmark"
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Brannmark_JBC2010/"
+    peTabModel = setUpPeTabModel("model_Brannmark_JBC2010", dirModel)
+    algsTest = [:IpoptLBFGS, :IpoptBlockAutoDiff, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS]
+    benchmarkParameterEstimation(peTabModel, Rodas5(), "Rodas5", 1e-6, 1000, algList=algsTest)
+end
+
+
+if ARGS[1] == "Fujita"
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Fujita_SciSignal2010/"
+    peTabModel = setUpPeTabModel("model_Fujita_SciSignal2010", dirModel)
+    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :NLoptLBFGS]
+    benchmarkParameterEstimation(peTabModel, Rodas5(), "Rodas5", 1e-6, 1000, algList=algsTest)
 end

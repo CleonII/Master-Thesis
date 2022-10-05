@@ -91,8 +91,9 @@ function createOptimFminbox(peTabOpt::PeTabOpt,
                                                         upperBounds, 
                                                         p0, 
                                                         Fminbox(optimAlg), 
-                                                        Optim.Options(iterations = 1000, 
-                                                                    show_trace = showTrace, 
-                                                                    allow_f_increases=true))
+                                                        Optim.Options(iterations = 250, 
+                                                                      show_trace = showTrace, 
+                                                                      allow_f_increases=true, 
+                                                                      outer_iterations = 2))
     return evalOptim
 end

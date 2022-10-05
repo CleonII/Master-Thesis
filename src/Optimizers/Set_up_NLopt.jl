@@ -19,6 +19,8 @@ function createNLoptProb(peTabOpt::PeTabOpt, NLoptAlg::Symbol; maxeval::Integer=
     NLoptObj = NLopt.Opt(NLoptAlg, peTabOpt.nParamEst)
     NLoptObj.lower_bounds = peTabOpt.lowerBounds .- 1e-9
     NLoptObj.upper_bounds = peTabOpt.upperBounds .+ 1e-9
+    NLoptObj.ftol_rel = 1e-3
+    NLoptObj.xtol_rel = 1e-3
     NLoptObj.maxeval = maxeval # Prevent never ending optmization
     NLoptObj.min_objective = (x, grad) -> NLoptF(x, grad, peTabOpt.evalF, peTabOpt.evalGradF, verbose=verbose)
 
@@ -35,7 +37,7 @@ function NLoptF(x::T1, grad::T1, evalF::Function, evalGradF::Function; verbose::
     cost = evalF(x)
 
     if verbose == true
-        @printf("Cost = %.3e\n", cost)
+        @printf("Cost = %.5e\n", cost)
     end
 
     return cost 

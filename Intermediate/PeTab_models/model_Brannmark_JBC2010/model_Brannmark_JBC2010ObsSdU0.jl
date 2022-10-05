@@ -1,20 +1,20 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp, dummyVariable= u 
 	k1a, k1aBasic, k1b, k1c, k1d, k1e, k1f, k1g, k1r, k21, k22, k3, km2, km3 = dynPar 
 
 	if observableId == "IR1_P" 
-		observableParameter1_IR1_P = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_IR1_P = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_IR1_P * ( IRp + IRiP ) 
 	end
 
 	if observableId == "IRS1_P" 
-		observableParameter1_IRS1_P = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_IRS1_P = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_IRS1_P * IRSiP 
 	end
 
 	if observableId == "IRS1_P_DosR" 
-		observableParameter1_IRS1_P_DosR = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_IRS1_P_DosR = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_IRS1_P_DosR * IRSiP 
 	end
 
@@ -38,23 +38,23 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp, dummyVariable= u 
 	k1a, k1aBasic, k1b, k1c, k1d, k1e, k1f, k1g, k1r, k21, k22, k3, km2, km3 = dynPar 
 
 	if observableId == "IR1_P" 
-		noiseParameter1_IR1_P = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_IR1_P = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_IR1_P 
 	end
 
 	if observableId == "IRS1_P" 
-		noiseParameter1_IRS1_P = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_IRS1_P = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_IRS1_P 
 	end
 
 	if observableId == "IRS1_P_DosR" 
-		noiseParameter1_IRS1_P_DosR = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_IRS1_P_DosR = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_IRS1_P_DosR 
 	end
 
