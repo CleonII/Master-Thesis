@@ -11,12 +11,13 @@
     solution for each experimenta condition along with a vector with the condition 
     name for each solution 
 """
-function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64; nTSave::Int64=0, denseSol::Bool=true)
+function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64; 
+                                   nTSave::Int64=0, denseSol::Bool=true, absTolSS=1e-8, relTolSS=1e-6)
 
     # Process PeTab files into type-stable Julia structs 
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
     parameterData = processParameterData(parameterDataFile)
-    simulationInfo = getSimulationInfo(measurementDataFile)
+    simulationInfo = getSimulationInfo(measurementDataFile, absTolSS=absTolSS, relTolSS=relTolSS)
     
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
@@ -333,9 +334,9 @@ function solveOdeNoSS(prob::ODEProblem,
     end
 
     # Change to parameters to the relevant experimental condition 
+    t_max_use = isinf(t_max) ? 1e6 : t_max
     changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
-    probUse = remake(prob, tspan=(0.0, t_max), u0 = prob.u0[:], p = prob.p[:])
-    t_max = probUse.tspan[2]
+    probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
