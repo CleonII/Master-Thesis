@@ -54,10 +54,16 @@ function createOptimInteriorNewton(peTabOpt::PeTabOpt;
 
     x0 = zeros(Float64, nParam)
     df = TwiceDifferentiable(peTabOpt.evalF, peTabOpt.evalGradF, evalHessian, x0)
-    dfc = TwiceDifferentiableConstraints(lowerBounds .- 0.01, upperBounds .+ 0.01)
+    dfc = TwiceDifferentiableConstraints(lowerBounds, upperBounds)
 
     evalOptim = (p0; showTrace=false) -> begin 
+                                               # Move points within bounds 
+                                               iBelow = p0 .<= peTabOpt.lowerBounds
+                                               iAbove = p0 .>= peTabOpt.upperBounds 
+                                               p0[iBelow] .= peTabOpt.lowerBounds[iBelow] .+ 0.001
+                                               p0[iAbove] .= peTabOpt.upperBounds[iAbove] .- 0.001
                                                df.f(p0)
+                                               println("p0 = $p0")
                                                return Optim.optimize(df, 
                                                                      dfc, 
                                                                      p0, 
