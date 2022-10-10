@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	Naive, Pathogen, LateEffector, EarlyEffector, Memory, dummyVariable= u 
 	delta_EL, delta_LM, delta_NE, mu_EE, mu_LE, mu_LL, mu_N, mu_P, mu_PE, mu_PL, rho_E, rho_P = dynPar 
@@ -35,28 +35,28 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Naive, Pathogen, LateEffector, EarlyEffector, Memory, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	Naive, Pathogen, LateEffector, EarlyEffector, Memory, dummyVariable= u 
 	delta_EL, delta_LM, delta_NE, mu_EE, mu_LE, mu_LL, mu_N, mu_P, mu_PE, mu_PL, rho_E, rho_P = dynPar 
 
 	if observableId == "observable_EarlyEffector" 
-		noiseParameter1_observable_EarlyEffector = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_EarlyEffector = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_EarlyEffector 
 	end
 
 	if observableId == "observable_LateEffector" 
-		noiseParameter1_observable_LateEffector = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_LateEffector = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_LateEffector 
 	end
 
 	if observableId == "observable_Memory" 
-		noiseParameter1_observable_Memory = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_Memory = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_Memory 
 	end
 
 	if observableId == "observable_Naive" 
-		noiseParameter1_observable_Naive = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_Naive = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_Naive 
 	end
 

@@ -180,3 +180,11 @@ if ARGS[1] == "Fujita"
     algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :NLoptLBFGS]
     benchmarkParameterEstimation(peTabModel, Rodas5(), "Rodas5", 1e-6, 1000, algList=algsTest)
 end
+
+
+if ARGS[1] == "Crauste"
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Crauste_CellSystems2017/"
+    peTabModel = setUpPeTabModel("model_Crauste_CellSystems2017", dirModel)
+    algsTest = [:IpoptAutoHess, :IpoptLBFGS, :OptimIPNewtonAutoHess, :NLoptLBFGS, :OptimLBFGS]
+    benchmarkParameterEstimation(peTabModel, Rodas4P(), "Rodas4P", 1e-8, 1000, algList=algsTest)
+end
