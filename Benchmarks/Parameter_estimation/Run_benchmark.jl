@@ -188,3 +188,11 @@ if ARGS[1] == "Crauste"
     algsTest = [:IpoptAutoHess, :IpoptLBFGS, :OptimIPNewtonAutoHess, :NLoptLBFGS, :OptimLBFGS]
     benchmarkParameterEstimation(peTabModel, Rodas4P(), "Rodas4P", 1e-8, 1000, algList=algsTest)
 end
+
+
+if ARGS[1] == "Zheng"
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Zheng_PNAS2012/"
+    peTabModel = setUpPeTabModel("model_Zheng_PNAS2012", dirModel)
+    algsTest = [:IpoptLBFGS, :IpoptBlockAutoDiff, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS]
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-6, 1000, algList=algsTest)
+end
