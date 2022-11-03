@@ -8,6 +8,8 @@ function getODEModel_model_Rahman_MBS2016()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Rahman_MBS2016()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -44,7 +48,7 @@ function getODEModel_model_Rahman_MBS2016()
     susceptible => 1.794e7,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     c1 => 1.0,
     treated_normal_death_rate => 0.0408,

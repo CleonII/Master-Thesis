@@ -43,7 +43,8 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
     include(modelFileJl)
     expr = Expr(:call, Symbol("getODEModel_" * modelName))
     odeSys, stateMap, paramMap = eval(expr)
-    odeSysUse = ode_order_lowering(odeSys)
+    #odeSysUse = ode_order_lowering(odeSys)
+    odeSysUse = structural_simplify(odeSys)
     # Parameter and state names for ODE-system 
     parameterNames = parameters(odeSysUse)
     stateNames = states(odeSysUse)

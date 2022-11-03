@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	Vni, V, Vin, Tstar, dummyVariable= u 
 	c, delta = dynPar 
@@ -25,7 +25,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Vni, V, Vin, Tstar, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	Vni, V, Vin, Tstar, dummyVariable= u 
 	c, delta = dynPar 
@@ -34,7 +34,7 @@ function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulati
 	K0_C = paramData.paramVal[5] 
 
 	if observableId == "task0_model0_perelson1_V" 
-		noiseParameter1_task0_model0_perelson1_V = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_task0_model0_perelson1_V = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_task0_model0_perelson1_V 
 	end
 

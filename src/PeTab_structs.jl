@@ -23,8 +23,9 @@
 """
 struct PeTabModel{T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}}, 
                   T2<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}},
-                  T3<:Vector{Sym{Real, Base.ImmutableDict{DataType, Any}}}, 
-                  T4<:Vector{Any}}
+                  #T3<:Vector{Sym{Real, Base.ImmutableDict{DataType, Any}}}, 
+                  T3<:Vector{<:Any}, 
+                  T4<:Vector{<:Any}}
     modelName::String
     evalYmod::Function 
     evalU0!::Function

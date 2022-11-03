@@ -115,8 +115,8 @@ function buildMapParameters(keysMap::Array{String, 1},
                         valuesConst[j] = parse(Float64, paramsRet[j])
 
                     # Hard coded in Parameters file 
-                    elseif paramsRet[j] in paramData.parameterID
-                        valuesConst[j] = parameterData.paramVal[findfirst(x -> x == paramsRet[j], paramData.parameterID)]
+                    elseif paramsRet[j] in parameterData.parameterID
+                        valuesConst[j] = parameterData.paramVal[findfirst(x -> x == paramsRet[j], parameterData.parameterID)]
 
                     else
                         println("Warning : cannot find matching for parameter ", paramsRet[j], " when building map.")

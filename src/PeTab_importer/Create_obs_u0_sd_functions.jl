@@ -19,7 +19,7 @@ function createFileYmodSdU0(modelName::String,
                             dirModel::String, 
                             odeSys::ODESystem, 
                             stateMap)
-    
+                            
     parameterNames = parameters(odeSys)
     stateNames = states(odeSys)
 

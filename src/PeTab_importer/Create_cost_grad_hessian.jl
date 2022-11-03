@@ -107,7 +107,7 @@ end
 
     See also: [`setUpCostGradHess`]
 """
-function calcCost(paramVecEst::T1,
+function calcCost(paramVecEst,
                   odeProb::ODEProblem,  
                   peTabModel::PeTabModel,
                   simulationInfo::SimulationInfo,
@@ -116,7 +116,7 @@ function calcCost(paramVecEst::T1,
                   parameterData::ParamData,
                   changeModelParamUse!::Function,
                   solveOdeModelAllCondUse!::Function;
-                  calcHessian::Bool=false) where T1<:Vector{<:Real}
+                  calcHessian::Bool=false)
                                                             
 
     # Correctly map paramVecEst to dynmaic, observable and sd param. The vectors, 
@@ -285,7 +285,7 @@ end
 
     See also: [`calcCost`, `setUpCostGradHess`]
 """
-function calcLogLikSolveODE(dynamicParamEst::T1, 
+function calcLogLikSolveODE(dynamicParamEst,
                             sdParamEst,
                             obsParEst,
                             odeProb::ODEProblem,
@@ -297,7 +297,7 @@ function calcLogLikSolveODE(dynamicParamEst::T1,
                             changeModelParamUse!::Function,
                             solveOdeModelAllCondUse!::Function;
                             calcHessDynParam::Bool=false, 
-                            calcGradDynParam::Bool=false)::Real where T1<:Vector{<:Real}
+                            calcGradDynParam::Bool=false)::Real
 
     dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
     sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
@@ -384,7 +384,7 @@ end
 
     See also: [`calcCost`, `setUpCostGradHess`]
 """
-function calcLogLik(dynamicParamEst::T1,
+function calcLogLik(dynamicParamEst,
                     sdParamEst, 
                     obsPar, 
                     peTabModel::PeTabModel,
@@ -394,7 +394,7 @@ function calcLogLik(dynamicParamEst::T1,
                     parameterData::ParamData;
                     calcHessDynParam::Bool=false, 
                     calcGradDynParam::Bool=false, 
-                    calcGradObsSdParam::Bool=false)::Real where T1<:Vector{<:Real}
+                    calcGradObsSdParam::Bool=false)::Real 
 
     if calcHessDynParam == true || calcGradDynParam == true || calcGradObsSdParam == true
         odeSolArray = simulationInfo.solArrayGrad

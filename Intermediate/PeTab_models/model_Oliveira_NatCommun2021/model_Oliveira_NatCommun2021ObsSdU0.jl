@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible, dummyVariable= u 
 	beta_0, beta_1, beta_2, t_1, t_2, delta_, h_hosp_rate, gamma_h, gamma_u, exposed_init_concentration, asymptomatic_init_concentration, symptomatic_init_concentration = dynPar 
@@ -27,7 +27,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	gamma_u, xi, gamma_s, omega_u, mu_h, gamma_h, omega_h, h_hosp_rate, mu_u, kappa, p_symp_rate, Interior, gamma_a, population, beta_2, delta_, beta_0, beta_1, beta_2_multiplier, t_1, t_2, exposed_init_concentration, asymptomatic_init_concentration, symptomatic_init_concentration = paramVec 
+	gamma_u, xi, gamma_s, omega_u, mu_h, gamma_h, omega_h, h_hosp_rate, mu_u, kappa, p_symp_rate, Interior, gamma_a, delta_, population, beta_2, t_1, beta_2_multiplier, t_2, beta_0, beta_1, symptomatic_init_concentration, exposed_init_concentration, asymptomatic_init_concentration = paramVec 
 
 	Hospital = 0.0 
 	Symptomatic = population * symptomatic_init_concentration 
@@ -43,7 +43,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible, dummyVariable= u 
 	beta_0, beta_1, beta_2, t_1, t_2, delta_, h_hosp_rate, gamma_h, gamma_u, exposed_init_concentration, asymptomatic_init_concentration, symptomatic_init_concentration = dynPar 
@@ -61,12 +61,12 @@ function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulati
 	population_C = paramData.paramVal[21] 
 
 	if observableId == "cumulative_deaths" 
-		noiseParameter1_cumulative_deaths = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_cumulative_deaths = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_cumulative_deaths 
 	end
 
 	if observableId == "cumulative_cases" 
-		noiseParameter1_cumulative_cases = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_cumulative_cases = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_cumulative_cases 
 	end
 

@@ -1,10 +1,10 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP, dummyVariable= u 
 	KM, eff, eff_GFP, init_GFP, init_GFP_mRNA, init_X_mRNA, init_X_protein, init_Y_mRNA, init_Y_protein, init_Z_mRNA, init_Z_protein, n_Hill, tau_mRNA, tau_mRNA_GFP, tau_prot, tau_prot_GFP, tps_active, tps_repr = dynPar 
 
 	if observableId == "fluorescence" 
-		observableParameter1_fluorescence, observableParameter2_fluorescence = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_fluorescence, observableParameter2_fluorescence = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_fluorescence + GFP * observableParameter2_fluorescence 
 	end
 
@@ -27,13 +27,13 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP, dummyVariable= u 
 	KM, eff, eff_GFP, init_GFP, init_GFP_mRNA, init_X_mRNA, init_X_protein, init_Y_mRNA, init_Y_protein, init_Z_mRNA, init_Z_protein, n_Hill, tau_mRNA, tau_mRNA_GFP, tau_prot, tau_prot_GFP, tps_active, tps_repr = dynPar 
 
 	if observableId == "fluorescence" 
-		noiseParameter1_fluorescence = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_fluorescence = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_fluorescence 
 	end
 

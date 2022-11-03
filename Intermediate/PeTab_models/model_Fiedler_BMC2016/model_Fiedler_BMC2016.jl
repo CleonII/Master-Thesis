@@ -8,6 +8,8 @@ function getODEModel_model_Fiedler_BMC2016()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Fiedler_BMC2016()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -42,7 +46,7 @@ function getODEModel_model_Fiedler_BMC2016()
     ERK => ERK_total - (ERK_total * MEK_total * k5 * ((K_1)^(2) * (k2)^(2) * (k4)^(2) * (k6)^(2) + (K_1)^(2) * (k4)^(2) * (k6)^(2) * (k10)^(2) + (K_1)^(2) * (RAF_total)^(2) * (k3)^(2) * (k6)^(2) * (k10)^(2) + 2 * (K_1)^(2) * k2 * (k4)^(2) * (k6)^(2) * k10 + 2 * (K_1)^(2) * RAF_total * k3 * k4 * (k6)^(2) * (k10)^(2) + (K_1)^(2) * (MEK_total)^(2) * (RAF_total)^(2) * (k3)^(2) * (k5)^(2) * (k10)^(2) + 2 * (K_1)^(2) * MEK_total * (RAF_total)^(2) * (k3)^(2) * k5 * k6 * (k10)^(2) + 2 * (K_1)^(2) * RAF_total * k2 * k3 * k4 * (k6)^(2) * k10 + 2 * (K_1)^(2) * MEK_total * RAF_total * k3 * k4 * k5 * k6 * (k10)^(2) + 2 * (K_1)^(2) * MEK_total * RAF_total * k2 * k3 * k4 * k5 * k6 * k10 + 4 * ERK_total * K_1 * MEK_total * RAF_total * k2 * k3 * k4 * k5 * k6 * k10)^((1/2)) + ERK_total * K_1 * (MEK_total)^(2) * RAF_total * k3 * (k5)^(2) * k10 - ERK_total * K_1 * MEK_total * k2 * k4 * k5 * k6 - ERK_total * K_1 * MEK_total * k4 * k5 * k6 * k10 + ERK_total * K_1 * MEK_total * RAF_total * k3 * k5 * k6 * k10) / ((k6 + MEK_total * k5) * ((K_1)^(2) * (k2)^(2) * (k4)^(2) * (k6)^(2) + (K_1)^(2) * (k4)^(2) * (k6)^(2) * (k10)^(2) + (K_1)^(2) * (RAF_total)^(2) * (k3)^(2) * (k6)^(2) * (k10)^(2) + 2 * (K_1)^(2) * k2 * (k4)^(2) * (k6)^(2) * k10 + 2 * (K_1)^(2) * RAF_total * k3 * k4 * (k6)^(2) * (k10)^(2) + (K_1)^(2) * (MEK_total)^(2) * (RAF_total)^(2) * (k3)^(2) * (k5)^(2) * (k10)^(2) + 2 * (K_1)^(2) * MEK_total * (RAF_total)^(2) * (k3)^(2) * k5 * k6 * (k10)^(2) + 2 * (K_1)^(2) * RAF_total * k2 * k3 * k4 * (k6)^(2) * k10 + 2 * (K_1)^(2) * MEK_total * RAF_total * k3 * k4 * k5 * k6 * (k10)^(2) + 2 * (K_1)^(2) * MEK_total * RAF_total * k2 * k3 * k4 * k5 * k6 * k10 + 4 * ERK_total * K_1 * MEK_total * RAF_total * k2 * k3 * k4 * k5 * k6 * k10)^((1/2)) + k2 * k4 * (K_1 * ((k6)^(2) + MEK_total * k5 * k6) + 2 * ERK_total * MEK_total * k5 * k6) + K_1 * k4 * k10 * ((k6)^(2) + MEK_total * k5 * k6) + K_1 * RAF_total * k3 * k10 * ((k6)^(2) + (MEK_total)^(2) * (k5)^(2) + 2 * MEK_total * k5 * k6)),
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     ERK_total => 1.0,
     UO126 => 0.0,

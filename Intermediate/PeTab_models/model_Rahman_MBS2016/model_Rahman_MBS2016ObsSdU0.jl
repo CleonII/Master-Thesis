@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	treated_weak, infected_moderate, treated_normal, infected_normal, infected_weak, treated_moderate, susceptible, dummyVariable= u 
 	infected_normal_transmission_rate_relative, infected_moderate_transmission_rate, infected_weak_transmission_rate_relative, infected_weak_treatment_rate, infected_normal_worsen_rate, infected_moderate_worsen_rate, treated_moderate_improve_rate, treated_weak_improve_rate, behavioural_change_rate = dynPar 
@@ -27,13 +27,13 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= treated_weak, infected_moderate, treated_normal, infected_normal, infected_weak, treated_moderate, susceptible, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	treated_weak, infected_moderate, treated_normal, infected_normal, infected_weak, treated_moderate, susceptible, dummyVariable= u 
 	infected_normal_transmission_rate_relative, infected_moderate_transmission_rate, infected_weak_transmission_rate_relative, infected_weak_treatment_rate, infected_normal_worsen_rate, infected_moderate_worsen_rate, treated_moderate_improve_rate, treated_weak_improve_rate, behavioural_change_rate = dynPar 
 
 	if observableId == "observable_prevalence" 
-		noiseParameter1_observable_prevalence = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_prevalence = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_prevalence 
 	end
 

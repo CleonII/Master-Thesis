@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	b10, bio, ohbio, zea, bcry, ohb10, bcar, dummyVariable= u 
 	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, k5, kb1, kb2, kc1, kc2, kc4, szea = dynPar 
@@ -45,38 +45,38 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= b10, bio, ohbio, zea, bcry, ohb10, bcar, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	b10, bio, ohbio, zea, bcry, ohb10, bcar, dummyVariable= u 
 	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, k5, kb1, kb2, kc1, kc2, kc4, szea = dynPar 
 
 	if observableId == "ob10" 
-		noiseParameter1_ob10 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_ob10 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_ob10 
 	end
 
 	if observableId == "obcar" 
-		noiseParameter1_obcar = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_obcar = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_obcar 
 	end
 
 	if observableId == "obcry" 
-		noiseParameter1_obcry = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_obcry = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_obcry 
 	end
 
 	if observableId == "obio" 
-		noiseParameter1_obio = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_obio = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_obio 
 	end
 
 	if observableId == "oohb10" 
-		noiseParameter1_oohb10 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_oohb10 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_oohb10 
 	end
 
 	if observableId == "ozea" 
-		noiseParameter1_ozea = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_ozea = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_ozea 
 	end
 

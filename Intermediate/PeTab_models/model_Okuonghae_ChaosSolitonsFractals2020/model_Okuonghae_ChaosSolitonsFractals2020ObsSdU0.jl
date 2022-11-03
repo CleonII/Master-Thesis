@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	detected_cumulative, symptomatic, asymptomatic, detected, exposed, deceased, recovered, susceptible, dummyVariable= u 
 	alpha, d_0, d_D, gamma_0, gamma_a, gamma_i, nu, psi, sigma, theta, asymptomatic_start, symptomatic_start, exposed_start, transmission_rate_effective = dynPar 
@@ -30,18 +30,18 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= detected_cumulative, symptomatic, asymptomatic, detected, exposed, deceased, recovered, susceptible, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	detected_cumulative, symptomatic, asymptomatic, detected, exposed, deceased, recovered, susceptible, dummyVariable= u 
 	alpha, d_0, d_D, gamma_0, gamma_a, gamma_i, nu, psi, sigma, theta, asymptomatic_start, symptomatic_start, exposed_start, transmission_rate_effective = dynPar 
 
 	if observableId == "observable_Cumulative" 
-		noiseParameter1_observable_Cumulative = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_Cumulative = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_Cumulative 
 	end
 
 	if observableId == "observable_ActiveCases" 
-		noiseParameter1_observable_ActiveCases = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_ActiveCases = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_ActiveCases 
 	end
 

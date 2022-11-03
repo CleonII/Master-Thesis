@@ -8,6 +8,8 @@ function getODEModel_model_Schwen_PONE2014()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Schwen_PONE2014()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -52,7 +56,7 @@ function getODEModel_model_Schwen_PONE2014()
     BoundUnspec => 0.0,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     ka1 => 0.00937980436663883,
     ini_R2fold => 16.457631927604,

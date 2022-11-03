@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1, dummyVariable= u 
 	k_imp, k_syn_R_M, k_syn_R_C, k_syn_R_V, k_bind_M1, k_rel = dynPar 
@@ -114,73 +114,73 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1, dummyVariable= u 
 	k_imp, k_syn_R_M, k_syn_R_C, k_syn_R_V, k_bind_M1, k_rel = dynPar 
 
 	if observableId == "RM5" 
-		noiseParameter1_RM5 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_RM5 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_RM5 
 	end
 
 	if observableId == "RVSegTot" 
-		noiseParameter1_RVSegTot = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_RVSegTot = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_RVSegTot 
 	end
 
 	if observableId == "RCSegTot" 
-		noiseParameter1_RCSegTot = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_RCSegTot = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_RCSegTot 
 	end
 
 	if observableId == "Vrel" 
-		noiseParameter1_Vrel = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_Vrel = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_Vrel 
 	end
 
 	if observableId == "IntNucOffset" 
-		noiseParameter1_IntNucOffset = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_IntNucOffset = getObsOrSdParam(sdPar, mapSdParam)
 		return 13.0334748500416 * noiseParameter1_IntNucOffset 
 	end
 
 	if observableId == "FracNucInt_1" 
-		noiseParameter1_FracNucInt_1 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_FracNucInt_1 = getObsOrSdParam(sdPar, mapSdParam)
 		return 3.10956052629092 * noiseParameter1_FracNucInt_1 
 	end
 
 	if observableId == "FracNucInt_2" 
-		noiseParameter1_FracNucInt_2 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_FracNucInt_2 = getObsOrSdParam(sdPar, mapSdParam)
 		return 3.44650910342625 * noiseParameter1_FracNucInt_2 
 	end
 
 	if observableId == "FracNucInt_3" 
-		noiseParameter1_FracNucInt_3 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_FracNucInt_3 = getObsOrSdParam(sdPar, mapSdParam)
 		return 1.96540708251497 * noiseParameter1_FracNucInt_3 
 	end
 
 	if observableId == "FracNucInt_4" 
-		noiseParameter1_FracNucInt_4 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_FracNucInt_4 = getObsOrSdParam(sdPar, mapSdParam)
 		return 3.03676774438437 * noiseParameter1_FracNucInt_4 
 	end
 
 	if observableId == "FracNucInt_5" 
-		noiseParameter1_FracNucInt_5 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_FracNucInt_5 = getObsOrSdParam(sdPar, mapSdParam)
 		return 4.00311961683219 * noiseParameter1_FracNucInt_5 
 	end
 
 	if observableId == "FracNucInt_6" 
-		noiseParameter1_FracNucInt_6 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_FracNucInt_6 = getObsOrSdParam(sdPar, mapSdParam)
 		return 4.8783911282307 * noiseParameter1_FracNucInt_6 
 	end
 
 	if observableId == "FracNucInt_7" 
-		noiseParameter1_FracNucInt_7 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_FracNucInt_7 = getObsOrSdParam(sdPar, mapSdParam)
 		return 3.96353798182046 * noiseParameter1_FracNucInt_7 
 	end
 
 	if observableId == "FracNucInt_8" 
-		noiseParameter1_FracNucInt_8 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_FracNucInt_8 = getObsOrSdParam(sdPar, mapSdParam)
 		return 4.8820897165046 * noiseParameter1_FracNucInt_8 
 	end
 

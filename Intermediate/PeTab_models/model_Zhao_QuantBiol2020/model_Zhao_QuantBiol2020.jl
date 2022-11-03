@@ -8,6 +8,8 @@ function getODEModel_model_Zhao_QuantBiol2020()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Zhao_QuantBiol2020()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -38,7 +42,7 @@ function getODEModel_model_Zhao_QuantBiol2020()
     Unquarantined_Infected => Trigger_Wuhan * (Trigger_Stage_I * 258 + Trigger_Stage_II * 15270 + Trigger_Stage_III * 4000) + Trigger_Hubei * (Trigger_Stage_I * 270 + Trigger_Stage_II * 5700) + Trigger_China * (Trigger_Stage_I * 291 + Trigger_Stage_II * 2800),
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     Total_Pop_Hubei => 4.8e7,
     R_Stage_I_Wuhan => 4.7092,

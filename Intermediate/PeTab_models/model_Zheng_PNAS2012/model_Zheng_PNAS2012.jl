@@ -8,6 +8,8 @@ function getODEModel_model_Zheng_PNAS2012()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
 
     ### Define parameters
@@ -16,7 +18,9 @@ function getODEModel_model_Zheng_PNAS2012()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -56,7 +60,7 @@ function getODEModel_model_Zheng_PNAS2012()
     K27me3K36me0 => 0.00330168411604165,
     K27me1K36me0 => 0.00165412810279407]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     k20_10 => 1.00000000000008e-5,
     k11_12 => 7.20477305381394,

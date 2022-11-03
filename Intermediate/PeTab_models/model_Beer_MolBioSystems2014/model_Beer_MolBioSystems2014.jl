@@ -7,6 +7,8 @@ function getODEModel_model_Beer_MolBioSystems2014()
     ModelingToolkit.@variables t Glu(t) cGlu(t) Ind(t) Bac(t)
 
     ### Define variable parameters
+
+    ### Define potential algebraic variables
     ModelingToolkit.@variables lag(t)
 
     ### Define dummy variable
@@ -18,10 +20,9 @@ function getODEModel_model_Beer_MolBioSystems2014()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
-    continuous_events = [
-    [t - tau ~ 0] => [lag ~ 1]
-    ]
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -29,11 +30,11 @@ function getODEModel_model_Beer_MolBioSystems2014()
     D(cGlu) ~ +1.0 * ( 1 /medium ) * (medium * (Bac * Glu * ksyn - (cGlu)^(2) * kdim)),
     D(Ind) ~ +1.0 * ( 1 /medium ) * (medium * ((cGlu)^(2) * kdim - Ind * kdegi)),
     D(Bac) ~ +1.0 * ( 1 /medium ) * (medium * (Bac * beta * lag * (Bacmax + -Bac) / Bacmax)),
-    D(lag) ~ 0,
+    lag ~ ifelse(t - tau < 0, 0, 1),
     D(dummyVariable) ~ 1e-60*( +tau+init_Bac)
     ]
 
-    @named sys = ODESystem(eqs, t, continuous_events = continuous_events)
+    @named sys = ODESystem(eqs)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -41,10 +42,9 @@ function getODEModel_model_Beer_MolBioSystems2014()
     cGlu => 0.0,
     Ind => 0.0,
     Bac => init_Bac,
-    lag => 0.0,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     kdegi => 1.0,
     medium => 1.0,

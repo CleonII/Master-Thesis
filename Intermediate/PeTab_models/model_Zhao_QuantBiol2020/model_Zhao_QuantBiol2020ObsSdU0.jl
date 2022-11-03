@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	Quarantined_Infected, Confirmed_Infected, Susceptible, Unquarantined_Infected, dummyVariable= u 
 	R_Stage_I_Wuhan, gamma_1_Stage_I_Wuhan, gamma_2_Stage_I_Wuhan, R_Stage_II_Wuhan, gamma_1_Stage_II_Wuhan, gamma_2_Stage_II_Wuhan, R_Stage_III_Wuhan, gamma_1_Stage_III_Wuhan, gamma_2_Stage_III_Wuhan, R_Stage_I_Hubei, gamma_1_Stage_I_Hubei, gamma_2_Stage_I_Hubei, R_Stage_II_Hubei, gamma_1_Stage_II_Hubei, gamma_2_Stage_II_Hubei, R_Stage_I_China, gamma_1_Stage_I_China, gamma_2_Stage_I_China, R_Stage_II_China, gamma_1_Stage_II_China, gamma_2_Stage_II_China = dynPar 
@@ -41,34 +41,34 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Quarantined_Infected, Confirmed_Infected, Susceptible, Unquarantined_Infected, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	Quarantined_Infected, Confirmed_Infected, Susceptible, Unquarantined_Infected, dummyVariable= u 
 	R_Stage_I_Wuhan, gamma_1_Stage_I_Wuhan, gamma_2_Stage_I_Wuhan, R_Stage_II_Wuhan, gamma_1_Stage_II_Wuhan, gamma_2_Stage_II_Wuhan, R_Stage_III_Wuhan, gamma_1_Stage_III_Wuhan, gamma_2_Stage_III_Wuhan, R_Stage_I_Hubei, gamma_1_Stage_I_Hubei, gamma_2_Stage_I_Hubei, R_Stage_II_Hubei, gamma_1_Stage_II_Hubei, gamma_2_Stage_II_Hubei, R_Stage_I_China, gamma_1_Stage_I_China, gamma_2_Stage_I_China, R_Stage_II_China, gamma_1_Stage_II_China, gamma_2_Stage_II_China = dynPar 
 	sigma_C = paramData.paramVal[1] 
 
 	if observableId == "observable_confirmed_infected" 
-		noiseParameter1_observable_confirmed_infected = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_confirmed_infected = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_confirmed_infected 
 	end
 
 	if observableId == "observable_susceptible" 
-		noiseParameter1_observable_susceptible = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_susceptible = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_susceptible 
 	end
 
 	if observableId == "observable_unquarantined_infected" 
-		noiseParameter1_observable_confirmed_infected = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_confirmed_infected = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_confirmed_infected 
 	end
 
 	if observableId == "observable_quarantined_infected" 
-		noiseParameter1_observable_quarantined_infected = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_quarantined_infected = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_quarantined_infected 
 	end
 
 	if observableId == "observable_cumulative_infected" 
-		noiseParameter1_observable_cumulative_infected = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_cumulative_infected = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_cumulative_infected 
 	end
 

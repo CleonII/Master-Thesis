@@ -7,6 +7,8 @@ function getODEModel_model_Fujita_SciSignal2010()
     ModelingToolkit.@variables t pAkt_S6(t) pAkt(t) pS6(t) EGFR(t) pEGFR_Akt(t) pEGFR(t) Akt(t) S6(t) EGF_EGFR(t)
 
     ### Define variable parameters
+
+    ### Define potential algebraic variables
     ModelingToolkit.@variables EGF(t)
 
     ### Define dummy variable
@@ -18,10 +20,9 @@ function getODEModel_model_Fujita_SciSignal2010()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
-    continuous_events = [
-    [t ~ EGF_end] => [EGF ~ 0]
-    ]
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -34,11 +35,11 @@ function getODEModel_model_Fujita_SciSignal2010()
     D(Akt) ~ -1.0 * ( 1 /Cell ) * (Cell * (Akt * pEGFR * reaction_2_k1 - pEGFR_Akt * reaction_2_k2))+1.0 * ( 1 /Cell ) * (Cell * pAkt * reaction_7_k1),
     D(S6) ~ -1.0 * ( 1 /Cell ) * (Cell * (S6 * pAkt * reaction_5_k1 - pAkt_S6 * reaction_5_k2))+1.0 * ( 1 /Cell ) * (Cell * pS6 * reaction_8_k1),
     D(EGF_EGFR) ~ +1.0 * ( 1 /Cell ) * (Cell * (EGF * EGFR * reaction_1_k1 - EGF_EGFR * reaction_1_k2))-1.0 * ( 1 /Cell ) * (Cell * EGF_EGFR * reaction_9_k1),
-    D(EGF) ~ EGF_rate,
+    EGF ~ ifelse(t <= EGF_end, EGF_rate * t + EGF_0, 0),
     D(dummyVariable) ~ 1e-60*( +init_S6+EGF_end+init_EGFR+init_AKT+EGF_rate+EGF_0)
     ]
 
-    @named sys = ODESystem(eqs, t, continuous_events = continuous_events)
+    @named sys = ODESystem(eqs)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -51,10 +52,9 @@ function getODEModel_model_Fujita_SciSignal2010()
     Akt => init_AKT,
     S6 => init_S6,
     EGF_EGFR => 0.0,
-    EGF => EGF_0,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     EGF_end => 0.0,
     reaction_5_k1 => 2.9643709900602e-6,

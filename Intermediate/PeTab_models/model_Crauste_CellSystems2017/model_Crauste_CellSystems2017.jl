@@ -8,6 +8,8 @@ function getODEModel_model_Crauste_CellSystems2017()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Crauste_CellSystems2017()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -40,7 +44,7 @@ function getODEModel_model_Crauste_CellSystems2017()
     Memory => 0.0,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     mu_LL => 8.11520135326853e-6,
     delta_NE => 0.0119307857579241,

@@ -8,6 +8,8 @@ function getODEModel_model_Borghans_BiophysChem1997()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Borghans_BiophysChem1997()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -36,7 +40,7 @@ function getODEModel_model_Borghans_BiophysChem1997()
     Z_state => init_Z_state,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     v0 => 2.31778715779187,
     Ky => 0.200364133028272,

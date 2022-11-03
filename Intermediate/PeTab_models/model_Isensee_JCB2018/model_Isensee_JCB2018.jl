@@ -8,6 +8,9 @@ function getODEModel_model_Isensee_JCB2018()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+    ModelingToolkit.@variables Rp_cAMPS_pAB(t) H89(t) Fsk(t) IBMXex(t) Rp8_Br_cAMPS_pAB(t) Rp8_pCPT_cAMPS_pAB(t) fourABnOH(t) Sp8_Br_cAMPS_AM(t)
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,36 +20,46 @@ function getODEModel_model_Isensee_JCB2018()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
-    D(pAC) ~ -1.0 * ( 1 /cyt ) * (cyt * (Fsk_level * (1 + (t - Fsk_time < 0) * ((0) - (1)))) * kf_Fsk * pAC)+1.0 * ( 1 /cyt ) * (cyt * KD_Fsk * kf_Fsk * pAC_Fsk)+1.0 * ( 1 /cyt ) * (cyt * AC * Csub * kp_AC)-1.0 * ( 1 /cyt ) * (cyt * kdp_AC * pAC),
-    D(Rp8_Br_cAMPS) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_Rp8_Br_cAMPS_pAB * (Rp8_Br_cAMPS - (Rp8_Br_cAMPS_pAB_level * (1 + (t - Rp8_Br_cAMPS_pAB_incubation_time < 0) * ((0) - (1)))) * xi_i_Rp8_Br_cAMPS_pAB)),
-    D(Rp8_pCPT_cAMPS) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_Rp8_pCPT_cAMPS_pAB * (Rp8_pCPT_cAMPS - (Rp8_pCPT_cAMPS_pAB_level * (1 + (t - Rp8_pCPT_cAMPS_pAB_incubation_time < 0) * ((0) - (1)))) * xi_i_Rp8_pCPT_cAMPS_pAB)),
+    D(pAC) ~ -1.0 * ( 1 /cyt ) * (cyt * Fsk * kf_Fsk * pAC)+1.0 * ( 1 /cyt ) * (cyt * KD_Fsk * kf_Fsk * pAC_Fsk)+1.0 * ( 1 /cyt ) * (cyt * AC * Csub * kp_AC)-1.0 * ( 1 /cyt ) * (cyt * kdp_AC * pAC),
+    D(Rp8_Br_cAMPS) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_Rp8_Br_cAMPS_pAB * (Rp8_Br_cAMPS - Rp8_Br_cAMPS_pAB * xi_i_Rp8_Br_cAMPS_pAB)),
+    D(Rp8_pCPT_cAMPS) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_Rp8_pCPT_cAMPS_pAB * (Rp8_pCPT_cAMPS - Rp8_pCPT_cAMPS_pAB * xi_i_Rp8_pCPT_cAMPS_pAB)),
     D(PDE) ~ -1.0 * ( 1 /cyt ) * (cyt * Csub * PDE * kf_PDE_Csub)+1.0 * ( 1 /cyt ) * (cyt * KD_PDE_Csub * kf_PDE_Csub * pPDE),
-    D(Rp_cAMPS) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_Rp_cAMPS_pAB * (Rp_cAMPS - (Rp_cAMPS_pAB_level * (1 + (t - Rp_cAMPS_pAB_incubation_time < 0) * ((0) - (1)))) * xi_i_Rp_cAMPS_pAB)),
+    D(Rp_cAMPS) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_Rp_cAMPS_pAB * (Rp_cAMPS - Rp_cAMPS_pAB * xi_i_Rp_cAMPS_pAB)),
     D(RII_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RII_C_2 * kf_RII_C_2__RII_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * RII_2 * kf_RII_2__RII_C_2)+1.0 * ( 1 /cyt ) * (cyt * RIIp_2 * kf_RIIp_2__RII_2),
     D(RIIp_Rp8_Br_cAMPS_C_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Rp8_Br_cAMPS * kf_cAMP * xi_b_Rp8_Br_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Rp8_Br_cAMPS_C_2 * kf_cAMP * xi_b_Rp8_Br_cAMPS * xi_KD_Rp8_Br_cAMPS),
     D(cAMP) ~ +1.0 * ( 1 /cyt ) * (cyt * ks_AC_cAMP * (AC + pAC * xi_pAC))+1.0 * ( 1 /cyt ) * (cyt * ks_AC_cAMP * xi_AC_cAMP_Fsk * (AC_Fsk + pAC_Fsk * xi_pAC))-1.0 * ( 1 /cyt ) * (cyt * (KD_IBMX * cAMP * kdeg_cAMP_free * (PDE + pPDE * xi_pPDE) / (IBMX + KD_IBMX))),
     D(RIIp_Sp8_Br_cAMPS_C_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Sp8_Br_cAMPS * kf_cAMP * xi_b_Sp8_Br_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Sp8_Br_cAMPS_C_2 * kf_cAMP * xi_b_Sp8_Br_cAMPS * xi_KD_Sp8_Br_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * RIIp_Sp8_Br_cAMPS_C_2 * kf_RIIp_cAMP_C_2__RIIp_2),
-    D(IBMX) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_IBMX * (IBMX - (IBMX_level * (1 + (t - IBMX_time < 0) * ((0) - (1)))))),
-    D(AC_Fsk) ~ +1.0 * ( 1 /cyt ) * (cyt * AC * (Fsk_level * (1 + (t - Fsk_time < 0) * ((0) - (1)))) * kf_Fsk)-1.0 * ( 1 /cyt ) * (cyt * AC_Fsk * KD_Fsk * kf_Fsk)-1.0 * ( 1 /cyt ) * (cyt * AC_Fsk * Csub * kp_AC)+1.0 * ( 1 /cyt ) * (cyt * kdp_AC * pAC_Fsk),
+    D(IBMX) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_IBMX * (IBMX - IBMXex)),
+    D(AC_Fsk) ~ +1.0 * ( 1 /cyt ) * (cyt * AC * Fsk * kf_Fsk)-1.0 * ( 1 /cyt ) * (cyt * AC_Fsk * KD_Fsk * kf_Fsk)-1.0 * ( 1 /cyt ) * (cyt * AC_Fsk * Csub * kp_AC)+1.0 * ( 1 /cyt ) * (cyt * kdp_AC * pAC_Fsk),
     D(RIIp_C_2) ~ -1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * kf_RII_C_2__RII_2 * xi_kf_RII_C_2__RII_2)+1.0 * ( 1 /cyt ) * (cyt * Csub * RIIp_2 * kf_RII_2__RII_C_2 * xi_kf_RII_2__RII_C_2)+1.0 * ( 1 /cyt ) * (cyt * RII_C_2 * kf_RII_C_2__RIIp_C_2)-1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * kf_RIIp_C_2__RII_C_2)-1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * cAMP * kf_cAMP)+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_cAMP_C_2 * kf_cAMP)+1.0 * ( 1 /cyt ) * (cyt * (KD_IBMX * RIIp_cAMP_C_2 * kdeg_cAMP * (PDE + pPDE * xi_pPDE) / (IBMX + KD_IBMX)))-1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Rp8_Br_cAMPS * kf_cAMP * xi_b_Rp8_Br_cAMPS)+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Rp8_Br_cAMPS_C_2 * kf_cAMP * xi_b_Rp8_Br_cAMPS * xi_KD_Rp8_Br_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Rp8_pCPT_cAMPS * kf_cAMP * xi_b_Rp8_pCPT_cAMPS)+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Rp8_pCPT_cAMPS_C_2 * kf_cAMP * xi_b_Rp8_pCPT_cAMPS * xi_KD_Rp8_pCPT_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Rp_cAMPS * kf_cAMP * xi_b_Rp_cAMPS)+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Rp_cAMPS_C_2 * kf_cAMP * xi_b_Rp_cAMPS * xi_KD_Rp_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Sp8_Br_cAMPS * kf_cAMP * xi_b_Sp8_Br_cAMPS)+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Sp8_Br_cAMPS_C_2 * kf_cAMP * xi_b_Sp8_Br_cAMPS * xi_KD_Sp8_Br_cAMPS),
-    D(Sp8_Br_cAMPS) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_Sp8_Br_cAMPS_AM * (Sp8_Br_cAMPS - (Sp8_Br_cAMPS_AM_level * (1 + (t - Sp8_Br_cAMPS_AM_time < 0) * ((0) - (1)))) * xi_i_Sp8_Br_cAMPS_AM)),
+    D(Sp8_Br_cAMPS) ~ +1.0 * ( 1 /cyt ) * (cyt * -ki_Sp8_Br_cAMPS_AM * (Sp8_Br_cAMPS - Sp8_Br_cAMPS_AM * xi_i_Sp8_Br_cAMPS_AM)),
     D(RII_C_2) ~ -1.0 * ( 1 /cyt ) * (cyt * RII_C_2 * kf_RII_C_2__RII_2)+1.0 * ( 1 /cyt ) * (cyt * Csub * RII_2 * kf_RII_2__RII_C_2)-1.0 * ( 1 /cyt ) * (cyt * RII_C_2 * kf_RII_C_2__RIIp_C_2)+1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * kf_RIIp_C_2__RII_C_2),
     D(RIIp_Sp8_Br_cAMPS_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_Sp8_Br_cAMPS_C_2 * kf_RIIp_cAMP_C_2__RIIp_2)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Sp8_Br_cAMPS_2 * kf_cAMP * xi_b_Sp8_Br_cAMPS * xi_KD_Sp8_Br_cAMPS),
-    D(Csub) ~ +1.0 * ( 1 /cyt ) * (cyt * RII_C_2 * kf_RII_C_2__RII_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * RII_2 * kf_RII_2__RII_C_2)+1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * kf_RII_C_2__RII_2 * xi_kf_RII_C_2__RII_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * RIIp_2 * kf_RII_2__RII_C_2 * xi_kf_RII_2__RII_C_2)+1.0 * ( 1 /cyt ) * (cyt * RIIp_cAMP_C_2 * kf_RIIp_cAMP_C_2__RIIp_2)+1.0 * ( 1 /cyt ) * (cyt * RIIp_Sp8_Br_cAMPS_C_2 * kf_RIIp_cAMP_C_2__RIIp_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * (H89_level * (1 + (t - H89_time < 0) * ((0) - (1)))) * kf_H89)+1.0 * ( 1 /cyt ) * (cyt * Csub_H89 * KD_H89 * kf_H89),
-    D(Csub_H89) ~ +1.0 * ( 1 /cyt ) * (cyt * Csub * (H89_level * (1 + (t - H89_time < 0) * ((0) - (1)))) * kf_H89)-1.0 * ( 1 /cyt ) * (cyt * Csub_H89 * KD_H89 * kf_H89),
-    D(AC) ~ -1.0 * ( 1 /cyt ) * (cyt * AC * (Fsk_level * (1 + (t - Fsk_time < 0) * ((0) - (1)))) * kf_Fsk)+1.0 * ( 1 /cyt ) * (cyt * AC_Fsk * KD_Fsk * kf_Fsk)-1.0 * ( 1 /cyt ) * (cyt * AC * Csub * kp_AC)+1.0 * ( 1 /cyt ) * (cyt * kdp_AC * pAC),
+    D(Csub) ~ +1.0 * ( 1 /cyt ) * (cyt * RII_C_2 * kf_RII_C_2__RII_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * RII_2 * kf_RII_2__RII_C_2)+1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * kf_RII_C_2__RII_2 * xi_kf_RII_C_2__RII_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * RIIp_2 * kf_RII_2__RII_C_2 * xi_kf_RII_2__RII_C_2)+1.0 * ( 1 /cyt ) * (cyt * RIIp_cAMP_C_2 * kf_RIIp_cAMP_C_2__RIIp_2)+1.0 * ( 1 /cyt ) * (cyt * RIIp_Sp8_Br_cAMPS_C_2 * kf_RIIp_cAMP_C_2__RIIp_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * H89 * kf_H89)+1.0 * ( 1 /cyt ) * (cyt * Csub_H89 * KD_H89 * kf_H89),
+    D(Csub_H89) ~ +1.0 * ( 1 /cyt ) * (cyt * Csub * H89 * kf_H89)-1.0 * ( 1 /cyt ) * (cyt * Csub_H89 * KD_H89 * kf_H89),
+    D(AC) ~ -1.0 * ( 1 /cyt ) * (cyt * AC * Fsk * kf_Fsk)+1.0 * ( 1 /cyt ) * (cyt * AC_Fsk * KD_Fsk * kf_Fsk)-1.0 * ( 1 /cyt ) * (cyt * AC * Csub * kp_AC)+1.0 * ( 1 /cyt ) * (cyt * kdp_AC * pAC),
     D(RIIp_cAMP_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_cAMP_C_2 * kf_RIIp_cAMP_C_2__RIIp_2)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_cAMP_2 * kf_cAMP)-1.0 * ( 1 /cyt ) * (cyt * (KD_IBMX * RIIp_cAMP_2 * kdeg_cAMP * (PDE + pPDE * xi_pPDE) / (IBMX + KD_IBMX))),
-    D(pAC_Fsk) ~ +1.0 * ( 1 /cyt ) * (cyt * (Fsk_level * (1 + (t - Fsk_time < 0) * ((0) - (1)))) * kf_Fsk * pAC)-1.0 * ( 1 /cyt ) * (cyt * KD_Fsk * kf_Fsk * pAC_Fsk)+1.0 * ( 1 /cyt ) * (cyt * AC_Fsk * Csub * kp_AC)-1.0 * ( 1 /cyt ) * (cyt * kdp_AC * pAC_Fsk),
+    D(pAC_Fsk) ~ +1.0 * ( 1 /cyt ) * (cyt * Fsk * kf_Fsk * pAC)-1.0 * ( 1 /cyt ) * (cyt * KD_Fsk * kf_Fsk * pAC_Fsk)+1.0 * ( 1 /cyt ) * (cyt * AC_Fsk * Csub * kp_AC)-1.0 * ( 1 /cyt ) * (cyt * kdp_AC * pAC_Fsk),
     D(RIIp_Rp8_pCPT_cAMPS_C_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Rp8_pCPT_cAMPS * kf_cAMP * xi_b_Rp8_pCPT_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Rp8_pCPT_cAMPS_C_2 * kf_cAMP * xi_b_Rp8_pCPT_cAMPS * xi_KD_Rp8_pCPT_cAMPS),
     D(pPDE) ~ +1.0 * ( 1 /cyt ) * (cyt * Csub * PDE * kf_PDE_Csub)-1.0 * ( 1 /cyt ) * (cyt * KD_PDE_Csub * kf_PDE_Csub * pPDE),
     D(RIIp_Rp_cAMPS_C_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * Rp_cAMPS * kf_cAMP * xi_b_Rp_cAMPS)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Rp_cAMPS_C_2 * kf_cAMP * xi_b_Rp_cAMPS * xi_KD_Rp_cAMPS),
     D(RIIp_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * kf_RII_C_2__RII_2 * xi_kf_RII_C_2__RII_2)-1.0 * ( 1 /cyt ) * (cyt * Csub * RIIp_2 * kf_RII_2__RII_C_2 * xi_kf_RII_2__RII_C_2)-1.0 * ( 1 /cyt ) * (cyt * RIIp_2 * kf_RIIp_2__RII_2)+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_cAMP_2 * kf_cAMP)+1.0 * ( 1 /cyt ) * (cyt * (KD_IBMX * RIIp_cAMP_2 * kdeg_cAMP * (PDE + pPDE * xi_pPDE) / (IBMX + KD_IBMX)))+1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_Sp8_Br_cAMPS_2 * kf_cAMP * xi_b_Sp8_Br_cAMPS * xi_KD_Sp8_Br_cAMPS),
     D(RIIp_cAMP_C_2) ~ +1.0 * ( 1 /cyt ) * (cyt * RIIp_C_2 * cAMP * kf_cAMP)-1.0 * ( 1 /cyt ) * (cyt * KD_cAMP * RIIp_cAMP_C_2 * kf_cAMP)-1.0 * ( 1 /cyt ) * (cyt * (KD_IBMX * RIIp_cAMP_C_2 * kdeg_cAMP * (PDE + pPDE * xi_pPDE) / (IBMX + KD_IBMX)))-1.0 * ( 1 /cyt ) * (cyt * RIIp_cAMP_C_2 * kf_RIIp_cAMP_C_2__RIIp_2),
-    D(dummyVariable) ~ 1e-60*( +fourABnOH_level+default+AC_total+nuc+RII2_total+fourABnOH_incubation_time+PDE_total)
+    Rp_cAMPS_pAB ~ Rp_cAMPS_pAB_level * ifelse(t - Rp_cAMPS_pAB_incubation_time < 0, 0, 1),
+    H89 ~ H89_level * ifelse(t - H89_time < 0, 0, 1),
+    Fsk ~ Fsk_level * ifelse(t - Fsk_time < 0, 0, 1),
+    IBMXex ~ IBMX_level * ifelse(t - IBMX_time < 0, 0, 1),
+    Rp8_Br_cAMPS_pAB ~ Rp8_Br_cAMPS_pAB_level * ifelse(t - Rp8_Br_cAMPS_pAB_incubation_time < 0, 0, 1),
+    Rp8_pCPT_cAMPS_pAB ~ Rp8_pCPT_cAMPS_pAB_level * ifelse(t - Rp8_pCPT_cAMPS_pAB_incubation_time < 0, 0, 1),
+    fourABnOH ~ fourABnOH_level * ifelse(t - fourABnOH_incubation_time < 0, 0, 1),
+    Sp8_Br_cAMPS_AM ~ Sp8_Br_cAMPS_AM_level * ifelse(t - Sp8_Br_cAMPS_AM_time < 0, 0, 1),
+    D(dummyVariable) ~ 1e-60*( +H89_time+RII2_total+fourABnOH_incubation_time+IBMX_time+Rp_cAMPS_pAB_incubation_time+Fsk_time+Rp8_pCPT_cAMPS_pAB_incubation_time+PDE_total+default+Sp8_Br_cAMPS_AM_time+Rp8_Br_cAMPS_pAB_incubation_time+AC_total+nuc)
     ]
 
     @named sys = ODESystem(eqs)
@@ -80,7 +93,7 @@ function getODEModel_model_Isensee_JCB2018()
     RIIp_cAMP_C_2 => 0.00541202870022029,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     ki_Rp8_pCPT_cAMPS_pAB => 9.24294887100985,
     xi_b_Rp_cAMPS => 0.607960299288444,

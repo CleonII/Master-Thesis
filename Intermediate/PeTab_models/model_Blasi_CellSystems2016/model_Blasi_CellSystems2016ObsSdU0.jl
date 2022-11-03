@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16, dummyVariable= u 
 	a_basal, a_k8, a_k5_k5k12, a_k12_k5k12, a_k16_k12k16, a_k5k12_k5k8k12, a_k12k16_k8k12k16, a_k8k12k16_4ac = dynPar 
@@ -95,89 +95,89 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16, dummyVariable= u 
 	a_basal, a_k8, a_k5_k5k12, a_k12_k5k12, a_k16_k12k16, a_k5k12_k5k8k12, a_k12k16_k8k12k16, a_k8k12k16_4ac = dynPar 
 	d_C = paramData.paramVal[9] 
 
 	if observableId == "observable_0ac" 
-		noiseParameter1_observable_0ac = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_0ac = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_0ac 
 	end
 
 	if observableId == "observable_4ac" 
-		noiseParameter1_observable_4ac = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_4ac = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_4ac 
 	end
 
 	if observableId == "observable_k12" 
-		noiseParameter1_observable_k12 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k12 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k12 
 	end
 
 	if observableId == "observable_k12k16" 
-		noiseParameter1_observable_k12k16 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k12k16 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k12k16 
 	end
 
 	if observableId == "observable_k16" 
-		noiseParameter1_observable_k16 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k16 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k16 
 	end
 
 	if observableId == "observable_k5" 
-		noiseParameter1_observable_k5 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k5 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k5 
 	end
 
 	if observableId == "observable_k5k12" 
-		noiseParameter1_observable_k5k12 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k5k12 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k5k12 
 	end
 
 	if observableId == "observable_k5k12k16" 
-		noiseParameter1_observable_k5k12k16 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k5k12k16 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k5k12k16 
 	end
 
 	if observableId == "observable_k5k16" 
-		noiseParameter1_observable_k5k16 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k5k16 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k5k16 
 	end
 
 	if observableId == "observable_k5k8" 
-		noiseParameter1_observable_k5k8 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k5k8 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k5k8 
 	end
 
 	if observableId == "observable_k5k8k12" 
-		noiseParameter1_observable_k5k8k12 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k5k8k12 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k5k8k12 
 	end
 
 	if observableId == "observable_k5k8k16" 
-		noiseParameter1_observable_k5k8k16 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k5k8k16 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k5k8k16 
 	end
 
 	if observableId == "observable_k8" 
-		noiseParameter1_observable_k8 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k8 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k8 
 	end
 
 	if observableId == "observable_k8k12" 
-		noiseParameter1_observable_k8k12 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k8k12 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k8k12 
 	end
 
 	if observableId == "observable_k8k12k16" 
-		noiseParameter1_observable_k8k12k16 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k8k12k16 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k8k12k16 
 	end
 
 	if observableId == "observable_k8k16" 
-		noiseParameter1_observable_k8k16 = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_observable_k8k16 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_observable_k8k16 
 	end
 

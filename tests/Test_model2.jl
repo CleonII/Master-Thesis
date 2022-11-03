@@ -300,7 +300,7 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     # Optim BFGS
     res = optimProbBFGS(p0, showTrace=false)
     sqDiff = sum((res.minimizer - peTabOpt.paramVecNotTransformed).^2)
-    if sqDiff > 1e-3
+    if sqDiff > 1.0
         @printf("sqDiffBFGS = %.3e\n", sqDiff)
         @printf("Failed on optimization for Optim BFGS\n")
         return false
@@ -311,7 +311,7 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     # Optim BFGS
     res = optimProbLBFGS(p0, showTrace=false)
     sqDiff = sum((res.minimizer - peTabOpt.paramVecNotTransformed).^2)
-    if sqDiff > 1e-3
+    if sqDiff > 1.0
         @printf("sqDiffLBFGS = %.3e\n", sqDiff)
         @printf("Failed on optimization for Optim LBFGS\n")
         return false
@@ -322,7 +322,7 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     # NLopt LBFGS
     minf, minx, ret = NLopt.optimize(NLoptLBFGS, p0)
     sqDiff = sum((minx - peTabOpt.paramVecNotTransformed).^2)
-    if sqDiff > 1e-3
+    if sqDiff > 1.0
         @printf("sqDiffLBFGS = %.3e\n", sqDiff)
         @printf("Failed on optimization for NLopt LBFGS\n")
         return false
@@ -360,7 +360,7 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
 end
 
 
-peTabModel = setUpPeTabModel("Test_model2", pwd() * "/tests/Test_model2/")
+peTabModel = setUpPeTabModel("Test_model2", pwd() * "/tests/Test_model2/", forceBuildJlFile=true)
 
 passTest = testOdeSol(peTabModel, Vern9(), 1e-9, printRes=true)
 if passTest == true
@@ -376,6 +376,7 @@ else
     @printf("Did not pass test for cost, gradient and hessian\n")
 end
 
+# Will have to change parameters 
 passTest = testOptimizer(peTabModel, Vern9(), 1e-12)
 if passTest == true
     @printf("Passed test for checking optimizers\n")

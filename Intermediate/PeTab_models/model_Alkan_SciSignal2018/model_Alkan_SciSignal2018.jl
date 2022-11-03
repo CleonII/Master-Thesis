@@ -8,6 +8,8 @@ function getODEModel_model_Alkan_SciSignal2018()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Alkan_SciSignal2018()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -28,7 +32,7 @@ function getODEModel_model_Alkan_SciSignal2018()
     D(Wip1_mRNA_S) ~ +1.0 * ( 1 /default ) * (p_wip1_mrna_turn * pp53_S / (p_mrna_exp_inh_dox * ((Dox_level)^(6) / ((Dox_level)^(6) + (p_mrna_exp_inh_dox_kd)^(6))) + 1))-1.0 * ( 1 /default ) * (Wip1_mRNA_S * p_wip1_mrna_turn),
     D(pATM_S) ~ +1.0 * ( 1 /default ) * (-(Cells_DSBDamage_S * p_atm_act_dsb * (pATM_S - 1)) / (Cells + Cells_Apo + Cells_Apo1 + Cells_Apo2 + Cells_Apo3 + Cells_Apo4 + Cells_Cycle_G2 + Cells_Cycle_S + Cells_Apo_ReOx + Cells_DSBDamage_G2 + Cells_DSBDamage_S + Cells_SSBDamage_S))-1.0 * ( 1 /default ) * (pATM_S / 24),
     D(p21_G2) ~ +1.0 * ( 1 /default ) * (p21_mRNA_G2 * p_p21_turn)-1.0 * ( 1 /default ) * (p21_G2 * p_p21_turn),
-    D(Cells_SSBDamage_S) ~ -1.0 * ( 1 /default ) * (Cells_SSBDamage_S * k_dox_apo * ((Dox_level)^(6) / ((Dox_level)^(6) + (k_dox_kd)^(6))))+1.0 * ( 1 /default ) * (Gem_level * Cells_Cycle_S * k_damage_gem_ssb)+1.0 * ( 1 /default ) * (SN38_level * Cells_Cycle_S * k_damage_sn38_ssb)-1.0 * ( 1 /default ) * (Cells_SSBDamage_S * (k_ssb_to_dsb + k_ssb_to_dsb_sn38 * ((SN38_level > 0) * 1 + (SN38_level <= 0) * 0)))-1.0 * ( 1 /default ) * (Cells_SSBDamage_S * k_rep_s * pATR_S)-1.0 * ( 1 /default ) * (Cells_SSBDamage_S * k_apo_ssb * pp53_S)-1.0 * ( 1 /default ) * (Cells_SSBDamage_S * kt_apo / (k_cyc_arr_chk1 * pChk1_S + 1)),
+    D(Cells_SSBDamage_S) ~ -1.0 * ( 1 /default ) * (Cells_SSBDamage_S * k_dox_apo * ((Dox_level)^(6) / ((Dox_level)^(6) + (k_dox_kd)^(6))))+1.0 * ( 1 /default ) * (Gem_level * Cells_Cycle_S * k_damage_gem_ssb)+1.0 * ( 1 /default ) * (SN38_level * Cells_Cycle_S * k_damage_sn38_ssb)-1.0 * ( 1 /default ) * (Cells_SSBDamage_S * (k_ssb_to_dsb + k_ssb_to_dsb_sn38 * ifelse(SN38_level > 0, 1, 0)))-1.0 * ( 1 /default ) * (Cells_SSBDamage_S * k_rep_s * pATR_S)-1.0 * ( 1 /default ) * (Cells_SSBDamage_S * k_apo_ssb * pp53_S)-1.0 * ( 1 /default ) * (Cells_SSBDamage_S * kt_apo / (k_cyc_arr_chk1 * pChk1_S + 1)),
     D(pp53_S) ~ +1.0 * ( 1 /default ) * (-pATR_S * p_p53_act_atr * (pp53_S - 1))+1.0 * ( 1 /default ) * (-pChk1_S * p_p53_act_chk1 * (pp53_S - 1))+1.0 * ( 1 /default ) * (-pATM_S * p_p53_act_atm * (pp53_S - 1))+1.0 * ( 1 /default ) * (-pChk2_S * p_p53_act_chk2 * (pp53_S - 1))-1.0 * ( 1 /default ) * (pp53_S / 24),
     D(pATM_G2) ~ +1.0 * ( 1 /default ) * (-(Cells_DSBDamage_G2 * p_atm_act_dsb * (pATM_G2 - 1)) / (Cells + Cells_Apo + Cells_Apo1 + Cells_Apo2 + Cells_Apo3 + Cells_Apo4 + 2 * Cells_Cycle_G2 + Cells_Apo_ReOx + Cells_DSBDamage_G2 + Cells_DSBDamage_S + Cells_SSBDamage_S))-1.0 * ( 1 /default ) * (pATM_G2 / 24),
     D(Cells_Apo2) ~ +1.0 * ( 1 /default ) * (Cells_Apo1 * k_death_delay)-1.0 * ( 1 /default ) * (Cells_Apo2 * k_death_delay)-1.0 * ( 1 /default ) * (Cells_Apo2 * k_dox_apo * ((Dox_level)^(6) / ((Dox_level)^(6) + (k_dox_kd)^(6)))),
@@ -45,7 +49,7 @@ function getODEModel_model_Alkan_SciSignal2018()
     D(Wip1_G2) ~ +1.0 * ( 1 /default ) * (Wip1_mRNA_G2 * p_wip1_turn)-1.0 * ( 1 /default ) * (Wip1_G2 * p_wip1_turn),
     D(pATR_S) ~ +1.0 * ( 1 /default ) * (-(Cells_SSBDamage_S * p_atr_act_ssb * (pATR_S - 1)) / (Cells + Cells_Apo + Cells_Apo1 + Cells_Apo2 + Cells_Apo3 + Cells_Apo4 + Cells_Cycle_G2 + Cells_Cycle_S + Cells_Apo_ReOx + Cells_DSBDamage_G2 + Cells_DSBDamage_S + Cells_SSBDamage_S))+1.0 * ( 1 /default ) * (-pATM_S * p_atr_act_atm * (pATR_S - 1))-1.0 * ( 1 /default ) * (pATR_S / 24),
     D(p21_S) ~ +1.0 * ( 1 /default ) * (p21_mRNA_S * p_p21_turn)-1.0 * ( 1 /default ) * (p21_S * p_p21_turn),
-    D(Cells_DSBDamage_S) ~ -1.0 * ( 1 /default ) * (Cells_DSBDamage_S * k_dox_apo * ((Dox_level)^(6) / ((Dox_level)^(6) + (k_dox_kd)^(6))))+1.0 * ( 1 /default ) * (Cells_SSBDamage_S * (k_ssb_to_dsb + k_ssb_to_dsb_sn38 * ((SN38_level > 0) * 1 + (SN38_level <= 0) * 0)))-1.0 * ( 1 /default ) * (Cells_DSBDamage_S * k_rep_nhej * pDNAPK_S / (Cells_DSBDamage_S + k_rep_nhej_sat))-1.0 * ( 1 /default ) * (Cells_DSBDamage_S * k_apo_dsb_s * pp53_S)-1.0 * ( 1 /default ) * (Cells_DSBDamage_S * kt_apo / (k_cyc_arr_chk1 * pChk1_S + 1)),
+    D(Cells_DSBDamage_S) ~ -1.0 * ( 1 /default ) * (Cells_DSBDamage_S * k_dox_apo * ((Dox_level)^(6) / ((Dox_level)^(6) + (k_dox_kd)^(6))))+1.0 * ( 1 /default ) * (Cells_SSBDamage_S * (k_ssb_to_dsb + k_ssb_to_dsb_sn38 * ifelse(SN38_level > 0, 1, 0)))-1.0 * ( 1 /default ) * (Cells_DSBDamage_S * k_rep_nhej * pDNAPK_S / (Cells_DSBDamage_S + k_rep_nhej_sat))-1.0 * ( 1 /default ) * (Cells_DSBDamage_S * k_apo_dsb_s * pp53_S)-1.0 * ( 1 /default ) * (Cells_DSBDamage_S * kt_apo / (k_cyc_arr_chk1 * pChk1_S + 1)),
     D(p21_mRNA_G2) ~ +1.0 * ( 1 /default ) * (p_p21_mrna_turn * pp53_G2 / (p_mrna_exp_inh_dox * ((Dox_level)^(6) / ((Dox_level)^(6) + (p_mrna_exp_inh_dox_kd)^(6))) + 1))-1.0 * ( 1 /default ) * (p21_mRNA_G2 * p_p21_mrna_turn),
     D(Space) ~ -1.0 * ( 1 /default ) * (Cells * Space * kt / init_Space)+1.0 * ( 1 /default ) * (Cells_Dead * k_lyse),
     D(pChk2_S) ~ +1.0 * ( 1 /default ) * (-pATM_S * p_chk2_act * (pChk2_S - 1))-1.0 * ( 1 /default ) * (pChk2_S / 24)-1.0 * ( 1 /default ) * (Wip1_S * pChk2_S * p_chk2_dea_wip1),
@@ -57,7 +61,7 @@ function getODEModel_model_Alkan_SciSignal2018()
     D(pDNAPK_G2) ~ +1.0 * ( 1 /default ) * (-(Cells_DSBDamage_G2 * p_dnapk_act * (pDNAPK_G2 - 1)) / (Cells + Cells_Apo + Cells_Apo1 + Cells_Apo2 + Cells_Apo3 + Cells_Apo4 + 2 * Cells_Cycle_G2 + Cells_Apo_ReOx + Cells_DSBDamage_G2 + Cells_DSBDamage_S + Cells_SSBDamage_S))-1.0 * ( 1 /default ) * (pDNAPK_G2 / 24)-1.0 * ( 1 /default ) * (Wip1_G2 * pDNAPK_G2 * p_dnapk_dea_wip1),
     D(pp53_G2) ~ +1.0 * ( 1 /default ) * (-pATR_G2 * p_p53_act_atr * (pp53_G2 - 1))+1.0 * ( 1 /default ) * (-pChk1_G2 * p_p53_act_chk1 * (pp53_G2 - 1))+1.0 * ( 1 /default ) * (-pATM_G2 * p_p53_act_atm * (pp53_G2 - 1))+1.0 * ( 1 /default ) * (-pChk2_G2 * p_p53_act_chk2 * (pp53_G2 - 1))-1.0 * ( 1 /default ) * (pp53_G2 / 24),
     D(Cells) ~ -1.0 * ( 1 /default ) * (Cells * Space * kt / init_Space)+2.0 * ( 1 /default ) * (-(Cells_Cycle_G2 * init_Cells * kt * (init_Cells_Cycle_G2_rel - 1) * (init_Cells_Cycle_S_rel - 1) * (init_Cells * init_Cells_Cycle_S_rel + init_Cells * (init_Cells_Cycle_G2_rel - 1) * (init_Cells_Cycle_S_rel - 1) - init_Cells * init_Cells_Cycle_G2_rel * (init_Cells_Cycle_S_rel - 1))) / ((init_Cells)^(2) * init_Cells_Cycle_G2_rel * (init_Cells_Cycle_G2_rel - 1) * (init_Cells_Cycle_S_rel - 1)^(2) - 2 * (init_Cells)^(2) * (init_Cells_Cycle_G2_rel)^(2) * (init_Cells_Cycle_S_rel - 1)^(2) + 2 * (init_Cells)^(2) * init_Cells_Cycle_G2_rel * init_Cells_Cycle_S_rel * (init_Cells_Cycle_S_rel - 1)))-1.0 * ( 1 /default ) * (Cells * k_dox_apo * ((Dox_level)^(6) / ((Dox_level)^(6) + (k_dox_kd)^(6)))),
-    D(dummyVariable) ~ 1e-60*( +init_Cells_Cycle_G2_rel+default+init_Cells_Cycle_S_rel+init_Space+init_Cells)
+    D(dummyVariable) ~ 1e-60*( +SN38_level+init_Cells_Cycle_G2_rel+default+init_Cells_Cycle_S_rel+init_Space+init_Cells)
     ]
 
     @named sys = ODESystem(eqs)
@@ -102,7 +106,7 @@ function getODEModel_model_Alkan_SciSignal2018()
     Cells => init_Cells * (init_Cells_Cycle_G2_rel - 1) * (init_Cells_Cycle_S_rel - 1),
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     k_dox_apo => 0.0488009964455022,
     p_p53_act_atm => 0.172667542315577,

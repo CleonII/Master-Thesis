@@ -1,10 +1,10 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
 
 	A_state, Y_state, Z_state, dummyVariable= u 
 	K2, K_par, Ka, Kd, Kf, Kp, Ky, Kz, Vd, Vm2, Vm3, Vp, beta_par, epsilon_par, init_A_state, init_Y_state, init_Z_state, n_par, v0, v1 = dynPar 
 
 	if observableId == "Ca" 
-		observableParameter1_Ca, observableParameter2_Ca = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_Ca, observableParameter2_Ca = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_Ca + Z_state * observableParameter2_Ca 
 	end
 
@@ -22,13 +22,13 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= A_state, Y_state, Z_state, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
 
 	A_state, Y_state, Z_state, dummyVariable= u 
 	K2, K_par, Ka, Kd, Kf, Kp, Ky, Kz, Vd, Vm2, Vm3, Vp, beta_par, epsilon_par, init_A_state, init_Y_state, init_Z_state, n_par, v0, v1 = dynPar 
 
 	if observableId == "Ca" 
-		noiseParameter1_Ca = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_Ca = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_Ca 
 	end
 

@@ -8,6 +8,8 @@ function getODEModel_model_Lucarelli_CellSystems2018()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Lucarelli_CellSystems2018()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -96,7 +100,7 @@ function getODEModel_model_Lucarelli_CellSystems2018()
     ppS2 => 0.0,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     geneC_inh3 => 0.035379693264711,
     geneJ_act1 => 0.0,

@@ -7,7 +7,9 @@ function getODEModel_model_Weber_BMC2015()
     ModelingToolkit.@variables t CERTERa(t) PI4K3B(t) CERT(t) CERTTGNa(t) PKDDAGa(t) PKD(t) PI4K3Ba(t)
 
     ### Define variable parameters
-    ModelingToolkit.@variables u4(t) u3(t) u5(t)
+
+    ### Define potential algebraic variables
+    ModelingToolkit.@variables u6(t) u4(t) u3(t) u5(t)
 
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
@@ -18,10 +20,9 @@ function getODEModel_model_Weber_BMC2015()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
-    continuous_events = [
-    [t ~ 0] => [u3 ~ Ect_Expr_PI4K3beta_flag], [t ~ 0] => [u4 ~ Ect_Expr_CERT_flag], [t - PdBu_time ~ 0] => [u5 ~ PdBu_dose]
-    ]
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -29,16 +30,17 @@ function getODEModel_model_Weber_BMC2015()
     D(PI4K3B) ~ +1.0 * ( 1 /cyt ) * (cyt * PI4K3Ba * p21)-1.0 * ( 1 /cyt ) * (cyt * (PI4K3B * PKDDAGa * p22 / (PKDDAGa + m22)))+1.0 * ( 1 /cyt ) * (cyt * s21)+1.0 * ( 1 /cyt ) * (cyt * pu3 * u3)-1.0 * ( 1 /cyt ) * (cyt * PI4K3B * a21),
     D(CERT) ~ -1.0 * ( 1 /cyt ) * (cyt * CERT * p32)+1.0 * ( 1 /cyt ) * (cyt * (CERTTGNa * PKDDAGa * p33 / (PKDDAGa + m33)))-1.0 * ( 1 /cyt ) * (cyt * CERT * a32),
     D(CERTTGNa) ~ +1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))-1.0 * ( 1 /cyt ) * (cyt * (CERTTGNa * PKDDAGa * p33 / (PKDDAGa + m33)))-1.0 * ( 1 /cyt ) * (cyt * CERTTGNa * a33),
-    D(PKDDAGa) ~ +1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))+1.0 * ( 1 /cyt ) * (cyt * PKD * p12 * (pu5 * u5 + 1))-1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * p13 * (pu6 * (kb_NB142_70_dose * (1 + (t - kb_NB142_70_time < 0) * ((0) - (1)))) + 1))-1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * a12),
-    D(PKD) ~ -1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))-1.0 * ( 1 /cyt ) * (cyt * PKD * p12 * (pu5 * u5 + 1))+1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * p13 * (pu6 * (kb_NB142_70_dose * (1 + (t - kb_NB142_70_time < 0) * ((0) - (1)))) + 1))+1.0 * ( 1 /cyt ) * (cyt * s12)+1.0 * ( 1 /cyt ) * (cyt * pu2 * u2)-1.0 * ( 1 /cyt ) * (cyt * PKD * a11),
+    D(PKDDAGa) ~ +1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))+1.0 * ( 1 /cyt ) * (cyt * PKD * p12 * (pu5 * u5 + 1))-1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * p13 * (pu6 * u6 + 1))-1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * a12),
+    D(PKD) ~ -1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))-1.0 * ( 1 /cyt ) * (cyt * PKD * p12 * (pu5 * u5 + 1))+1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * p13 * (pu6 * u6 + 1))+1.0 * ( 1 /cyt ) * (cyt * s12)+1.0 * ( 1 /cyt ) * (cyt * pu2 * u2)-1.0 * ( 1 /cyt ) * (cyt * PKD * a11),
     D(PI4K3Ba) ~ -1.0 * ( 1 /cyt ) * (cyt * PI4K3Ba * p21)+1.0 * ( 1 /cyt ) * (cyt * (PI4K3B * PKDDAGa * p22 / (PKDDAGa + m22)))-1.0 * ( 1 /cyt ) * (cyt * PI4K3Ba * a22),
-    D(u4) ~ 0,
-    D(u3) ~ 0,
-    D(u5) ~ 0,
-    D(dummyVariable) ~ 1e-60*( +PdBu_time+Ect_Expr_CERT_flag+Ect_Expr_PI4K3beta_flag+PdBu_dose)
+    u6 ~ kb_NB142_70_dose * ifelse(t - kb_NB142_70_time < 0, 0, 1),
+    u4 ~ ifelse(t < 0, 0, Ect_Expr_CERT_flag),
+    u3 ~ ifelse(t < 0, 0, Ect_Expr_PI4K3beta_flag),
+    u5 ~ ifelse(t - PdBu_time < 0, 0, PdBu_dose),
+    D(dummyVariable) ~ 1e-60*( +PdBu_time+Ect_Expr_CERT_flag+Ect_Expr_PI4K3beta_flag+kb_NB142_70_time+PdBu_dose)
     ]
 
-    @named sys = ODESystem(eqs, t, continuous_events = continuous_events)
+    @named sys = ODESystem(eqs)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -49,12 +51,9 @@ function getODEModel_model_Weber_BMC2015()
     PKDDAGa => 123.8608,
     PKD => 466534.7994,
     PI4K3Ba => 332054.5041,
-    u4 => 0.0,
-    u3 => 0.0,
-    u5 => 0.0,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     a21 => 1.86921330588484,
     m33 => 7.56019670948633e7,

@@ -210,7 +210,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
 end
 
 
-peTabModel = setUpPeTabModel("Test_model3", pwd() * "/tests/Test_model3/")
+peTabModel = setUpPeTabModel("Test_model3", pwd() * "/tests/Test_model3/", forceBuildJlFile=true)
 
 
 passTest = testOdeSol(peTabModel, Rodas4P(), 1e-12, printRes=true)

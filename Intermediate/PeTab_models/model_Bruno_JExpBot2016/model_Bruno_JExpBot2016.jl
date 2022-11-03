@@ -8,6 +8,8 @@ function getODEModel_model_Bruno_JExpBot2016()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Bruno_JExpBot2016()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -44,7 +48,7 @@ function getODEModel_model_Bruno_JExpBot2016()
     bcar => init_bcar,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     kc2_multiplier => 0.521817105884857,
     init_zea => 3.25673310603827,
