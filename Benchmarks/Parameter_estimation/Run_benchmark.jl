@@ -34,6 +34,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_Ipopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_optim.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_NLopt.jl"))
+include(joinpath(pwd(), "src", "Optimizers", "Set_up_fides.jl"))
 
 function writeFile(pathFile::String, 
                    finalCost, 
@@ -59,7 +60,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
                                       solverStr::String, 
                                       tol::Float64, 
                                       nStartGuess::Integer;
-                                      algList=[:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS])
+                                      algList=[:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS, :FidesAutoHess, :FidesBlockAutoHess])
 
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
 
@@ -71,7 +72,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
     if !isdir(dirRes)
         mkpath(dirRes)
     end
-    pathSave = dirRes * "Benchmark_result.csv"
+    pathSave = dirRes * "Benchmark_result_fides.csv"
 
     # Ipopt optimizers 
     ipoptProbHessApprox, iterArrHessApprox = createIpoptProb(peTabOpt, hessianUse=:blockAutoDiff)
@@ -84,16 +85,19 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
     # NLopt optimizers 
     NLoptLBFGS = createNLoptProb(peTabOpt, :LD_LBFGS, verbose=false)
     NLoptTNewton = createNLoptProb(peTabOpt, :LD_TNEWTON_PRECOND_RESTART, verbose=false)
+    # Fides Optmizers 
+    FidesAutoHess = setUpFides(peTabOpt, :autoDiff; verbose=0)
+    FidesAutoHessBlock = setUpFides(peTabOpt, :blockAutoDiff; verbose=0)
 
     # Make sure to activate allocation of required arrays for Ipopt solvers, and to compile 
     # gradient and required hessian functions to avoid bias in run-times for benchmark. 
     pTmp, gradTmp, hessTmp = cube[1, :], zeros(peTabOpt.nParamEst), zeros(peTabOpt.nParamEst, peTabOpt.nParamEst)
     costTmp = peTabOpt.evalF(pTmp)
     peTabOpt.evalGradF(gradTmp, pTmp)
-    if :IpoptAutoHess in algList || :OptimIPNewtonAutoHess in algList
+    if :IpoptAutoHess in algList || :OptimIPNewtonAutoHess in algList || :FidesAutoHess in algList
         peTabOpt.evalHess(hessTmp, pTmp)
     end
-    if :IpoptBlockAutoDiff in algList || :OptimIPNewtonBlockAutoDiff in algList
+    if :IpoptBlockAutoDiff in algList || :OptimIPNewtonBlockAutoDiff in algList || :FidesBlockAutoDiff in algList
         peTabOpt.evalHessApprox(hessTmp, pTmp)
     end
 
@@ -142,20 +146,34 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
             runTime = @elapsed minF, min, ret = NLopt.optimize(NLoptLBFGS, p0)
             writeFile(pathSave, minF, runTime, string(ret), NLoptLBFGS.numevals, i, "NLoptLBFGS", solverStr, string(tol))
         end
+
+        if :FidesAutoHess in algList
+            runTime = @elapsed res, nIter, converged = FidesAutoHess(p0)
+            writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHess", solverStr, string(tol))
+        end
+
+        if :FidesBlockAutoHess in algList
+            runTime = @elapsed res, nIter, converged = FidesAutoHessBlock(p0)
+            writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHess", solverStr, string(tol))
+        end
     end
 end
 
 
 if ARGS[1] == "Fiedler"
+    loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
+    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :FidesAutoHess, :FidesBlockAutoHess]
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Fiedler_BMC2016/"
     peTabModel = setUpPeTabModel("model_Fiedler_BMC2016", dirModel)
-    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000) 
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000, algList=algsTest) 
 end
 
 if ARGS[1] == "Boehm"
+    loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
+    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :FidesAutoHess, :FidesBlockAutoHess]
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Boehm_JProteomeRes2014/"
     peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel)
-    benchmarkParameterEstimation(peTabModel, Rodas4P(), "Rodas4", 1e-9, 1000) 
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000, algList=algsTest) 
 end
 
 if ARGS[1] == "Bachmann"
