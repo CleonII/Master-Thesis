@@ -43,6 +43,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_Ipopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_optim.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_NLopt.jl"))
+include(joinpath(pwd(), "src", "Optimizers", "Set_up_fides.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_forward_gradient.jl"))
 
 
@@ -225,6 +226,10 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     ipoptProbBfgs, iterArrBfgs = createIpoptProb(peTabOpt, hessianUse=:LBFGS)
     ipoptProbAutoHess, iterArrAutoHess = createIpoptProb(peTabOpt, hessianUse=:autoDiff)
 
+    # Fides optimizers 
+    runFidesHess = setUpFides(peTabOpt, :autoDiff; verbose=0)
+    runFidesHessBlock = setUpFides(peTabOpt, :blockAutoDiff; verbose=0)
+
     # Optim optimizers 
     optimProbHessApprox = createOptimProb(peTabOpt, IPNewton(), hessianUse=:blockAutoDiff)
     optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff)
@@ -273,6 +278,28 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
         return false
     else
         @printf("Passed test for Ipopt LBFGS\n")
+    end
+
+    # Fides autoDiff hessian 
+    res, niter, converged = runFidesHess(p0)
+    sqDiff = sum((res[2] - peTabOpt.paramVecNotTransformed).^2)
+    if sqDiff > 1e-3
+        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
+        @printf("Failed on optimization for Fides hessian autodiff\n")
+        return false
+    else
+        @printf("Passed test for Fides hessian autodiff\n")
+    end
+
+    # Fides block auto diff hessian 
+    res, niter, converged = runFidesHessBlock(p0)
+    sqDiff = sum((res[2] - peTabOpt.paramVecNotTransformed).^2)
+    if sqDiff > 1e-3
+        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
+        @printf("Failed on optimization for Fides hessian block autodiff\n")
+        return false
+    else
+        @printf("Passed test for Fides hessian block autodiff\n")
     end
 
     # Optim HessApprox 
@@ -377,6 +404,7 @@ else
 end
 
 # Will have to change parameters 
+loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
 passTest = testOptimizer(peTabModel, Vern9(), 1e-12)
 if passTest == true
     @printf("Passed test for checking optimizers\n")
