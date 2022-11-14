@@ -165,7 +165,7 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     tObs::Array{Float64, 1} = convert(Array{Float64, 1}, measurementData[!, "time"])
     nObs = length(yObs)
 
-    # Get the experimental condition ID describing the experimental conditiosn for each observed time-point. 
+    # Get the experimental condition ID describing the experimental conditions for each observed time-point. 
     # In case of preequilibration simulation the condition ID is stored in a single-string as the 
     # concatenation of the pre and post equlibration ID:s.
     conditionId::Array{String, 1} = Array{String, 1}(undef, nObs)
@@ -234,7 +234,23 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     yObsTransformed::Array{Float64, 1} = deepcopy(yObs)
     transformYobsOrYmodArr!(yObsTransformed, transformArr)
 
-    return MeasurementData(yObs, yObsTransformed, tObs, obsID, conditionId, sdParams, transformArr, obsParam)
+    # For each experimental condition we want to know the vector of time-points to save the ODE solution at 
+    # for each experimental condition. For each t-obs we also want to know which index in t-save vector 
+    # it corresponds to.
+    iTimePoint = Array{Int64, 1}(undef, nObs)
+    uniqueConditionID = unique(conditionId)
+    tVecSave = Dict()
+    for i in eachindex(uniqueConditionID)
+        iConditionId = findall(x -> x == uniqueConditionID[i], conditionId)
+        # Sorting is needed so that when extracting time-points when computing the cost 
+        # we extract the correct index.
+        tVecSave[uniqueConditionID[i]] = sort(unique(tObs[iConditionId]))
+        for j in iConditionId
+            iTimePoint[j] = findfirst(x -> x == tObs[j], tVecSave[uniqueConditionID[i]])
+        end
+    end
+
+    return MeasurementData(yObs, yObsTransformed, tObs, obsID, conditionId, sdParams, transformArr, obsParam, tVecSave, iTimePoint)
 end
 
 
@@ -249,18 +265,21 @@ end
     simulateSS (whether or not to simulate ODE-model to steady state). Further 
     stores a solArray with the ODE solution where conditionIdSol of the ID for 
     each forward solution
+
+    TODO: Compute t-vec save at from measurementDataFile (instead of providing another struct)
 """
-function getSimulationInfo(measurementData::DataFrame;
+function getSimulationInfo(measurementDataFile::DataFrame,
+                           measurementData::MeasurementData;
                            absTolSS::Float64=1e-8,
                            relTolSS::Float64=1e-6)::SimulationInfo
 
     # If preequilibrationConditionId column is not empty the model should 
     # first be simulated to a stady state 
-    colNames = names(measurementData)
+    colNames = names(measurementDataFile)
     if !("preequilibrationConditionId" in colNames)
         preEqIDs = Array{String, 1}(undef, 0)
     else
-        preEqIDs = convert(Array{String, 1}, unique(filter(x -> !ismissing(x), measurementData[!, "preequilibrationConditionId"])))
+        preEqIDs = convert(Array{String, 1}, unique(filter(x -> !ismissing(x), measurementDataFile[!, "preequilibrationConditionId"])))
     end
     simulateSS = length(preEqIDs) > 0
 
@@ -269,8 +288,8 @@ function getSimulationInfo(measurementData::DataFrame;
         firstExpIds = preEqIDs
         shiftExpIds = Any[]
         for firstExpId in firstExpIds
-            iRows = findall(x -> x == firstExpId, measurementData[!, "preequilibrationConditionId"])
-            shiftExpId = unique(measurementData[iRows, "simulationConditionId"])
+            iRows = findall(x -> x == firstExpId, measurementDataFile[!, "preequilibrationConditionId"])
+            shiftExpId = unique(measurementDataFile[iRows, "simulationConditionId"])
             push!(shiftExpIds, shiftExpId)
         end
         shiftExpIds = convert(Vector{Vector{String}}, shiftExpIds)
@@ -278,7 +297,7 @@ function getSimulationInfo(measurementData::DataFrame;
 
     # In case the the model is mpt simulated to steday state store experimental condition in firstExpIds
     if simulateSS == false
-        firstExpIds = convert(Array{String, 1}, unique(measurementData[!, "simulationConditionId"]))
+        firstExpIds = convert(Array{String, 1}, unique(measurementDataFile[!, "simulationConditionId"]))
         shiftExpIds = Array{Array{String, 1}, 1}(undef, 0)
     end
 
@@ -305,7 +324,8 @@ function getSimulationInfo(measurementData::DataFrame;
                                     solArray, 
                                     solArrayGrad, 
                                     absTolSS, 
-                                    relTolSS)
+                                    relTolSS, 
+                                    deepcopy(measurementData.tVecSave))
     return simulationInfo
 end
 

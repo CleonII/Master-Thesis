@@ -17,7 +17,8 @@ function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64;
     # Process PeTab files into type-stable Julia structs 
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
     parameterData = processParameterData(parameterDataFile)
-    simulationInfo = getSimulationInfo(measurementDataFile, absTolSS=absTolSS, relTolSS=relTolSS)
+    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
+    simulationInfo = getSimulationInfo(measurementDataFile, measurementData, absTolSS=absTolSS, relTolSS=relTolSS)
     
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
@@ -77,6 +78,7 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                            solver,
                                            tol::Float64;
                                            nTSave::Int64=0, 
+                                           onlySaveAtTobs::Bool=false,
                                            denseSol::Bool=true)::Bool
 
     local sucess = true
@@ -86,8 +88,20 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         @inbounds for i in eachindex(simulationInfo.firstExpIds)
             for j in eachindex(simulationInfo.shiftExpIds[i])
 
+                # Keep index of which forward solution index k corresponds for calculating cost 
                 firstExpId = simulationInfo.firstExpIds[i]
                 shiftExpId = simulationInfo.shiftExpIds[i][j]
+                simulationInfo.conditionIdSol[k] = firstExpId * shiftExpId
+
+                # Whether or not we only want to save solution at observed time-points 
+                if onlySaveAtTobs == true
+                    nTSave = 0
+                    # Extract t-save point for specific condition ID 
+                    tSave = simulationInfo.tVecSave[firstExpId * shiftExpId]
+                else
+                    tSave=Float64[]
+                end
+
                 t_max_ss = getTimeMax(measurementData, shiftExpId)
                 solArray[k] = solveOdeSS(prob, 
                                          changeToExperimentalCondUse!, 
@@ -96,13 +110,11 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                          tol, 
                                          t_max_ss, 
                                          solver, 
+                                         tSave=tSave,
                                          nTSave=nTSave, 
                                          denseSol=denseSol, 
                                          absTolSS=simulationInfo.absTolSS, 
                                          relTolSS=simulationInfo.relTolSS)
-                
-                # Keep index of which forward solution index k corresponds for calculating cost 
-                simulationInfo.conditionIdSol[k] = firstExpId * shiftExpId
 
                 if solArray[k].retcode != :Success
                     sucess = false
@@ -118,6 +130,16 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         @inbounds for i in eachindex(simulationInfo.firstExpIds)
             
             firstExpId = simulationInfo.firstExpIds[i]
+
+            # Whether or not we only want to save solution at observed time-points 
+            if onlySaveAtTobs == true
+                nTSave = 0
+                # Extract t-save point for specific condition ID 
+                tSave = simulationInfo.tVecSave[firstExpId]
+            else
+                tSave=Float64[]
+            end
+
             t_max = getTimeMax(measurementData, firstExpId)
             solArray[i] = solveOdeNoSS(prob, 
                                        changeToExperimentalCondUse!, 
@@ -126,6 +148,7 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                        solver, 
                                        t_max, 
                                        nTSave=nTSave, 
+                                       tSave=tSave,
                                        denseSol=denseSol, 
                                        absTolSS=simulationInfo.absTolSS, 
                                        relTolSS=simulationInfo.relTolSS)
@@ -166,6 +189,7 @@ function solveOdeModelAllExperimentalCond(prob::ODEProblem,
                                           solver, 
                                           tol::Float64;
                                           nTSave::Int64=0, 
+                                          onlySaveAtTobs::Bool=false,
                                           denseSol::Bool=true)
 
     local solArray
@@ -186,7 +210,8 @@ function solveOdeModelAllExperimentalCond(prob::ODEProblem,
                                                 solver, 
                                                 tol, 
                                                 nTSave=nTSave, 
-                                                denseSol=denseSol)
+                                                denseSol=denseSol, 
+                                                onlySaveAtTobs=onlySaveAtTobs)
 
     return solArray, success
 end
@@ -229,7 +254,7 @@ function solveOdeSS(prob::ODEProblem,
                     absTolSS::Float64=1e-8, 
                     relTolSS::Float64=1e-6)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
-    # Sanity check input. Can only provide either nTsave (points to save solution at) or tSave (number of points to save)
+    # Sanity check input. Can provide either nTsave (points to save solution at) or tSave (time points to saveat)
     if length(tSave) != 0 && nTSave != 0
         println("Error : Can only provide tSave (vector to save at) or nTSave as saveat argument to solvers")
     elseif nTSave != 0

@@ -100,12 +100,13 @@ end
 function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
    
     # Set values to PeTab file values 
-    experimentalConditionsFile, measurementDataFile, parameterBoundsFile = readDataFiles(peTabModel.dirModel)
-    paramData = processParameterData(parameterBoundsFile) 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
+    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
+    paramData = processParameterData(parameterDataFile) 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
     
     # Extract experimental conditions for simulations 
-    simulationInfo = getSimulationInfo(measurementDataFile, absTolSS=1e-12, relTolSS=1e-10)
+    simulationInfo = getSimulationInfo(measurementDataFile, measurementData, absTolSS=1e-12, relTolSS=1e-10)
 
     # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
     # a, b, c, d

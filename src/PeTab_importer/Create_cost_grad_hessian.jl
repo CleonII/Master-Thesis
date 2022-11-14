@@ -26,7 +26,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
     parameterData = processParameterData(parameterDataFile)
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    simulationInfo = getSimulationInfo(measurementDataFile, absTolSS=absTolSS, relTolSS=relTolSS)
+    simulationInfo = getSimulationInfo(measurementDataFile, measurementData, absTolSS=absTolSS, relTolSS=relTolSS)
 
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
     paramEstIndices = getIndicesParam(parameterData, measurementData)
@@ -43,7 +43,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     changeModelParamUse! = (pVec, u0Vec, paramEst, paramEstNames) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstNames, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
-    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol)
+    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, onlySaveAtTobs=true)
     
     evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
     evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
@@ -314,7 +314,7 @@ function calcLogLikSolveODE(dynamicParamEst,
         success = solveOdeModelAllCondUse!(simulationInfo.solArray, odeProbUse)
     end
     if success != true
-        return Inf
+        println("Failed to solve ODE model")
     end
 
     logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcHessDynParam=calcHessDynParam, calcGradDynParam=calcGradDynParam)
@@ -414,9 +414,9 @@ function calcLogLik(dynamicParamEst,
         whichForwardSol = findfirst(x -> x == measurementData.conditionId[i], simulationInfo.conditionIdSol)
         t = measurementData.tObs[i]
         if calcGradObsSdParam == true
-            odeSol = dualVecToFloatVec(odeSolArray[whichForwardSol](t))
+            odeSol = dualVecToFloatVec((odeSolArray[whichForwardSol])[:, measurementData.iTObs[i]])
         else
-            odeSol = odeSolArray[whichForwardSol](t)
+            odeSol = (odeSolArray[whichForwardSol])[:, measurementData.iTObs[i]]
         end
         mapObsParam = paramIndices.mapArrayObsParam[paramIndices.indexObsParamMap[i]]
         yMod[i] = peTabModel.evalYmod(odeSol, t, dynamicParamEst, obsPar, parameterData, measurementData.observebleID[i], mapObsParam) 
@@ -442,9 +442,9 @@ function calcLogLik(dynamicParamEst,
         whichForwardSol = findfirst(x -> x == measurementData.conditionId[i], simulationInfo.conditionIdSol)
         t = measurementData.tObs[i]
         if calcGradObsSdParam == true
-            odeSol = dualVecToFloatVec(odeSolArray[whichForwardSol](t))
+            odeSol = dualVecToFloatVec((odeSolArray[whichForwardSol])[:, measurementData.iTObs[i]])
         else
-            odeSol = odeSolArray[whichForwardSol](t)
+            odeSol = (odeSolArray[whichForwardSol])[:, measurementData.iTObs[i]]
         end
         mapSdParam = paramIndices.mapArraySdParam[paramIndices.indexSdParamMap[i]]
         sdVal[i] = peTabModel.evalSd!(odeSol, t, sdParamEst, dynamicParamEst, parameterData, measurementData.observebleID[i], mapSdParam)

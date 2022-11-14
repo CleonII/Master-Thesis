@@ -97,7 +97,9 @@ end
 """
 struct MeasurementData{T1<:Array{<:AbstractFloat, 1}, 
                        T2<:Array{<:String, 1}, 
-                       T3<:Array{<:Symbol, 1}}
+                       T3<:Array{<:Symbol, 1}, 
+                       T4<:Dict, 
+                       T5<:Array{<:Integer, 1}}
                     
     yObsNotTransformed::T1
     yObsTransformed::T1
@@ -107,6 +109,8 @@ struct MeasurementData{T1<:Array{<:AbstractFloat, 1},
     sdParams::T2
     transformData::T3 # Only done once 
     obsParam::T2
+    tVecSave::T4
+    iTObs::T5
 end
 
 
@@ -118,14 +122,16 @@ end
     firstExpIds (preequilibration ID:s), the shiftExpIds (postequilibration), and
     simulateSS (whether or not to simulate ODE-model to steady state). Further 
     stores a solArray with the ODE solution where conditionIdSol of the ID for 
-    each forward solution
+    each forward solution. It also stores for each experimental condition which 
+    time-points we have observed data at
 
     See also: [`getSimulationInfo`]
 """
 struct SimulationInfo{T1<:Array{<:String, 1}, 
                       T2<:Vector{<:Vector{String}},
                       T3<:Bool,
-                      T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}}
+                      T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}, 
+                      T5<:Dict}
     firstExpIds::T1
     shiftExpIds::T2
     conditionIdSol::T1
@@ -134,6 +140,7 @@ struct SimulationInfo{T1<:Array{<:String, 1},
     solArrayGrad::T4
     absTolSS::Float64
     relTolSS::Float64
+    tVecSave::T5
 end
 
 
