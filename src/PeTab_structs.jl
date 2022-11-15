@@ -111,6 +111,7 @@ struct MeasurementData{T1<:Array{<:AbstractFloat, 1},
     obsParam::T2
     tVecSave::T4
     iTObs::T5
+    iPerConditionId::T4
 end
 
 

@@ -238,6 +238,7 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     # for each experimental condition. For each t-obs we also want to know which index in t-save vector 
     # it corresponds to.
     iTimePoint = Array{Int64, 1}(undef, nObs)
+    iPerConditionId = Dict() # Index in measurment data corresponding to specific condition id 
     uniqueConditionID = unique(conditionId)
     tVecSave = Dict()
     for i in eachindex(uniqueConditionID)
@@ -245,12 +246,13 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
         # Sorting is needed so that when extracting time-points when computing the cost 
         # we extract the correct index.
         tVecSave[uniqueConditionID[i]] = sort(unique(tObs[iConditionId]))
+        iPerConditionId[uniqueConditionID[i]] = iConditionId
         for j in iConditionId
             iTimePoint[j] = findfirst(x -> x == tObs[j], tVecSave[uniqueConditionID[i]])
         end
     end
 
-    return MeasurementData(yObs, yObsTransformed, tObs, obsID, conditionId, sdParams, transformArr, obsParam, tVecSave, iTimePoint)
+    return MeasurementData(yObs, yObsTransformed, tObs, obsID, conditionId, sdParams, transformArr, obsParam, tVecSave, iTimePoint, iPerConditionId)
 end
 
 

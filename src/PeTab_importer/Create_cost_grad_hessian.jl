@@ -401,64 +401,78 @@ function calcLogLik(dynamicParamEst,
     else
         odeSolArray = simulationInfo.solArray
     end
-                                               
-    # Ensure correct type of yMod-array (dual only if obs-par or ODE solution are dual)
-    if calcHessDynParam == false && calcGradDynParam == false
-        yMod = Array{eltype(obsPar), 1}(undef, length(measurementData.yObsNotTransformed))
-    else
-        yMod = Array{eltype(dynamicParamEst), 1}(undef, length(measurementData.yObsNotTransformed))
+
+    # Compute yMod and sd-val by looping through all experimental conditons. At the end 
+    # update the likelihood 
+    logLik = 0.0
+    for conditionID in keys(measurementData.iPerConditionId)
+        # Extract the ODE-solution for specific condition ID
+        whichForwardSol = findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)
+        odeSol = odeSolArray[whichForwardSol]   
+        logLik += calcLogLikExpCond(odeSol, dynamicParamEst, sdParamEst, obsPar, 
+                                    peTabModel, conditionID, paramIndices,
+                                    measurementData, parameterData, calcGradObsSdParam)
+
+        if isinf(logLik)
+            return Inf
+        end
     end
 
-    # Compute yMod value by looping through all observables 
-    @inbounds for i in eachindex(yMod)
-        whichForwardSol = findfirst(x -> x == measurementData.conditionId[i], simulationInfo.conditionIdSol)
+    return logLik
+end
+
+
+function calcLogLikExpCond(odeSol::ODESolution,
+                           dynamicParamEst,
+                           sdParamEst, 
+                           obsPar, 
+                           peTabModel::PeTabModel,
+                           conditionID::String,
+                           paramIndices::ParameterIndices,
+                           measurementData::MeasurementData,
+                           parameterData::ParamData, 
+                           calcGradObsSdParam::Bool)::Real
+
+    # Compute yMod and sd for all observations having id conditionID 
+    logLik = 0.0
+    for i in measurementData.iPerConditionId[conditionID]
+        # Compute Y-mod value 
         t = measurementData.tObs[i]
         if calcGradObsSdParam == true
-            odeSol = dualVecToFloatVec((odeSolArray[whichForwardSol])[:, measurementData.iTObs[i]])
+            odeSolAtT = dualVecToFloatVec(odeSol[:, measurementData.iTObs[i]])
         else
-            odeSol = (odeSolArray[whichForwardSol])[:, measurementData.iTObs[i]]
+            odeSolAtT = odeSol[:, measurementData.iTObs[i]]
         end
         mapObsParam = paramIndices.mapArrayObsParam[paramIndices.indexObsParamMap[i]]
-        yMod[i] = peTabModel.evalYmod(odeSol, t, dynamicParamEst, obsPar, parameterData, measurementData.observebleID[i], mapObsParam) 
-    end
+        yMod = peTabModel.evalYmod(odeSolAtT, t, dynamicParamEst, obsPar, parameterData, measurementData.observebleID[i], mapObsParam) 
 
-    # By default a positive ODE solution is not enforced (even though the user can provide it as option).
-    # In case with transformations on the data the code can crash, hence Inf is returned in case the 
-    # model data transformation can not be perfomred. 
-    transformYobsOrYmodArr!(yMod, measurementData.transformData)
-    if any(isinf.(yMod))
-        return Inf
-    end
-
-    # Calculate (or extract) standard deviation for each observation 
-    sdVal = Array{eltype(sdParamEst), 1}(undef, length(measurementData.yObsNotTransformed))
-    @inbounds for i in eachindex(sdVal)
-        # Known SD-value 
+        # Compute associated SD-value or extract said number if it is known 
         if isNumber(measurementData.sdParams[i])
-            sdVal[i] = parse(Float64, measurementData.sdParams[i])
-            continue
-        end
-        # Compute SD in case not known 
-        whichForwardSol = findfirst(x -> x == measurementData.conditionId[i], simulationInfo.conditionIdSol)
-        t = measurementData.tObs[i]
-        if calcGradObsSdParam == true
-            odeSol = dualVecToFloatVec((odeSolArray[whichForwardSol])[:, measurementData.iTObs[i]])
+            sdVal = parse(Float64, measurementData.sdParams[i])
         else
-            odeSol = (odeSolArray[whichForwardSol])[:, measurementData.iTObs[i]]
+            mapSdParam = paramIndices.mapArraySdParam[paramIndices.indexSdParamMap[i]]
+            sdVal = peTabModel.evalSd!(odeSolAtT, t, sdParamEst, dynamicParamEst, parameterData, measurementData.observebleID[i], mapSdParam)
         end
-        mapSdParam = paramIndices.mapArraySdParam[paramIndices.indexSdParamMap[i]]
-        sdVal[i] = peTabModel.evalSd!(odeSol, t, sdParamEst, dynamicParamEst, parameterData, measurementData.observebleID[i], mapSdParam)
-    end
 
-    logLik = 0.0
-    @inbounds for i in eachindex(sdVal)
+        # Transform yMod is necessary
+        yModTrans = transformObsOrData(yMod, measurementData.transformData[i])
+            
+        # By default a positive ODE solution is not enforced (even though the user can provide it as option).
+        # In case with transformations on the data the code can crash, hence Inf is returned in case the 
+        # model data transformation can not be perfomred. 
+        if isinf(yModTrans)
+            return Inf
+        end
+
+        # Update log-likelihood 
         if measurementData.transformData[i] == :lin
-            logLik += log(sdVal[i]) + 0.5*log(2*pi) + 0.5*((yMod[i] - measurementData.yObsNotTransformed[i]) / sdVal[i])^2
+            logLik += log(sdVal) + 0.5*log(2*pi) + 0.5*((yModTrans - measurementData.yObsNotTransformed[i]) / sdVal)^2
         elseif measurementData.transformData[i] == :log10
-            logLik += log(sdVal[i]) + 0.5*log(2*pi) + log(log(10)) + log(exp10(measurementData.yObsTransformed[i])) + 0.5*( ( log(exp10(yMod[i])) - log(exp10(measurementData.yObsTransformed[i])) ) / (log(10)*sdVal[i]))^2
+            logLik += log(sdVal) + 0.5*log(2*pi) + log(log(10)) + log(exp10(measurementData.yObsTransformed[i])) + 0.5*( ( log(exp10(yModTrans)) - log(exp10(measurementData.yObsTransformed[i])) ) / (log(10)*sdVal))^2
         else
             println("Transformation ", measurementData.transformData[i], "not yet supported.")
-        end
+            return Inf
+        end   
     end
 
     return logLik
