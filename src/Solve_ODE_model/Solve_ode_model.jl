@@ -88,11 +88,6 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         @inbounds for i in eachindex(simulationInfo.firstExpIds)
             for j in eachindex(simulationInfo.shiftExpIds[i])
 
-                # Keep index of which forward solution index k corresponds for calculating cost 
-                firstExpId = simulationInfo.firstExpIds[i]
-                shiftExpId = simulationInfo.shiftExpIds[i][j]
-                simulationInfo.conditionIdSol[k] = firstExpId * shiftExpId
-
                 # Whether or not we only want to save solution at observed time-points 
                 if onlySaveAtTobs == true
                     nTSave = 0
@@ -130,6 +125,8 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         @inbounds for i in eachindex(simulationInfo.firstExpIds)
             
             firstExpId = simulationInfo.firstExpIds[i]
+            # Keep index of which forward solution index i corresponds for calculating cost 
+            simulationInfo.conditionIdSol[i] = firstExpId
 
             # Whether or not we only want to save solution at observed time-points 
             if onlySaveAtTobs == true
@@ -152,9 +149,6 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                        denseSol=denseSol, 
                                        absTolSS=simulationInfo.absTolSS, 
                                        relTolSS=simulationInfo.relTolSS)
-
-            # Keep index of which forward solution index i corresponds for calculating cost 
-            simulationInfo.conditionIdSol[i] = firstExpId
 
             if !(solArray[i].retcode == :Success || solArray[i].retcode == :Terminated)
                 sucess = false
@@ -472,7 +466,7 @@ function changeExperimentalCond!(paramVec,
 
         else
             println("Error : Simulation parameter not found for experimental condition $expID")
-            println("valsChangeTo[i] = ", valsChangeTo[i])
+            println("valsChangeTo[$i] = ", valsChangeTo[i])
         end
 
         # Identify which index param corresponds to the in paramMap 

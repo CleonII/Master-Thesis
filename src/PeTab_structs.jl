@@ -191,7 +191,8 @@ end
 struct ParameterIndices{T1<:Array{<:Integer, 1}, 
                         T2<:Array{<:String, 1}, 
                         T3<:Array{<:UInt32, 1}, 
-                        T4<:Array{<:ParamMap, 1}}
+                        T4<:Array{<:ParamMap, 1}, 
+                        T5<:Array{<:Integer, 1}}
 
     iDynParam::T1
     iObsParam::T1
@@ -206,4 +207,5 @@ struct ParameterIndices{T1<:Array{<:Integer, 1},
     indexSdParamMap::T3
     mapArrayObsParam::T4
     mapArraySdParam::T4
+    iMapDynParam::T5
 end

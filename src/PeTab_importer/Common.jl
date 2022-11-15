@@ -4,13 +4,17 @@
     Check if a string x is a number (Float).
 """
 function isNumber(x::String)::Bool
-    return tryparse(Float64, x) !== nothing
+    re1 = r"^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)$" # Picks up scientific notation
+    re2 = r"^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$"
+    return (occursin(re1, x) || occursin(re2, x))
 end
 """
     isNumber(x::SubString{String})::Bool
 """
 function isNumber(x::SubString{String})::Bool
-    return tryparse(Float64, x) !== nothing
+    re1 = r"^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)$" # Picks up scientific notation
+    re2 = r"^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$"
+    return (occursin(re1, x) || occursin(re2, x))
 end
 
 

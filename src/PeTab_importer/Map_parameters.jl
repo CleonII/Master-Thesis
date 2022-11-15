@@ -52,6 +52,10 @@ function getIndicesParam(paramData::ParamData, measurementData::MeasurementData)
     mapArrayObsParam = buildMapParameters(keysObsMap, measurementData, paramData, true)
     mapArraySdParam = buildMapParameters(keysSdMap, measurementData, paramData, false)
 
+    # Set up a map for changing ODEProblem model parameters when doing parameter estimation 
+    namesAllString = string.(parameters(peTabModel.odeSystem)) 
+    iMapDynParam = [findfirst(x -> x == namesParamDyn[i], namesAllString) for i in eachindex(namesParamDyn)]
+
     paramIndicies = ParameterIndices(iDynPar, 
                                      iObsPar, 
                                      iSdPar, 
@@ -64,7 +68,8 @@ function getIndicesParam(paramData::ParamData, measurementData::MeasurementData)
                                      indexObsParamMap, 
                                      indexSdParamMap, 
                                      mapArrayObsParam, 
-                                     mapArraySdParam)
+                                     mapArraySdParam, 
+                                     iMapDynParam)
 
     return paramIndicies
 end

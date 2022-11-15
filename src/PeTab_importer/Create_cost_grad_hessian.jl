@@ -40,7 +40,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
 
     # Functions to map experimental conditions and parameters correctly to the ODE model 
     changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, parameterData, experimentalConditionsFile, peTabModel)
-    changeModelParamUse! = (pVec, u0Vec, paramEst, paramEstNames) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstNames, peTabModel)
+    changeModelParamUse! = (pVec, u0Vec, paramEst, paramEstNames) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstNames, paramEstIndices, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
     solveOdeModelAllCondUse! = (solArrayArg, odeProbArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, onlySaveAtTobs=true)
@@ -484,6 +484,7 @@ end
                       stateVecOdeModel,
                       paramVecEst,
                       paramEstNames::Array{String, 1},
+                      paramIndices::ParameterIndices,
                       peTabModel::PeTabModel)
 
     Change the ODE parameter vector (paramVecOdeModel) and initial value vector (stateVecOdeModel)
@@ -500,6 +501,7 @@ function changeModelParam!(paramVecOdeModel,
                            stateVecOdeModel,
                            paramVecEst,
                            paramEstNames::Array{String, 1},
+                           paramIndices::ParameterIndices,
                            peTabModel::PeTabModel)
 
     # Allow the code to propegate dual numbers for gradients 
@@ -507,7 +509,8 @@ function changeModelParam!(paramVecOdeModel,
     # TODO: Precompute this step 
     parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
 
-    # Change parameters (and states) to current iterations in parameter estimation vector 
+    # Keep correct indices in ParamMap (for downstream computations when changing experimental conditions)
+    # TODO : Check if this can be removed
     for i in eachindex(paramEstNames)
         
         paramChangeName = paramEstNames[i]
@@ -528,8 +531,7 @@ function changeModelParam!(paramVecOdeModel,
     end
 
     # Use ModellingToolkit and u0 function to correctly map parameters to ODE-system 
-    newVal = ModelingToolkit.varmap_to_vars(paramMapUse, peTabModel.paramNames)
-    paramVecOdeModel .= newVal
+    paramVecOdeModel[paramIndices.iMapDynParam] .= paramVecEst
     peTabModel.evalU0!(stateVecOdeModel, paramVecOdeModel) 
     
     return nothing

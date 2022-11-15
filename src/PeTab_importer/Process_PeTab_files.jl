@@ -316,8 +316,26 @@ function getSimulationInfo(measurementDataFile::DataFrame,
     solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
     solArrayGrad = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
 
-    # Array with conition-ID for each foward simulations 
+    # Array with conition-ID for each foward simulations. As we always solve the ODE in the same order this can 
+    # be pre-computed.
     conditionIdSol = Array{String, 1}(undef, nForwardSol)
+    if simulateSS == true
+        k = 1
+        for i in eachindex(firstExpIds)
+            for j in eachindex(shiftExpIds[i])
+                firstExpId = firstExpIds[i]
+                shiftExpId = shiftExpIds[i][j]
+                conditionIdSol[k] = firstExpId * shiftExpId
+                k +=1
+            end
+        end
+    else
+        for i in eachindex(firstExpIds)    
+            firstExpId = firstExpIds[i]
+            conditionIdSol[i] = firstExpId
+        end
+
+    end
 
     simulationInfo = SimulationInfo(firstExpIds, 
                                     shiftExpIds, 
