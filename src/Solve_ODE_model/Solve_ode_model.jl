@@ -12,7 +12,8 @@
     name for each solution 
 """
 function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64; 
-                                   nTSave::Int64=0, denseSol::Bool=true, absTolSS=1e-8, relTolSS=1e-6)
+                                   nTSave::Int64=0, denseSol::Bool=true, absTolSS=1e-8, relTolSS=1e-6, 
+                                   absTol=1e-6, relTol=1e-6)
 
     # Process PeTab files into type-stable Julia structs 
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
@@ -31,7 +32,7 @@ function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64;
     changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, parameterData, experimentalConditionsFile, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
-    solArray, status = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, nTSave=nTSave, denseSol=denseSol)
+    solArray, status = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, absTol, relTol, nTSave=nTSave, denseSol=denseSol)
 
     return solArray, simulationInfo
 end
@@ -76,7 +77,8 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                            measurementData::DataFrame,
                                            simulationInfo::SimulationInfo,
                                            solver,
-                                           tol::Float64;
+                                           absTol::Float64,
+                                           relTol::Float64;
                                            nTSave::Int64=0, 
                                            onlySaveAtTobs::Bool=false,
                                            denseSol::Bool=true)::Bool
@@ -87,6 +89,9 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         k = 1
         @inbounds for i in eachindex(simulationInfo.firstExpIds)
             for j in eachindex(simulationInfo.shiftExpIds[i])
+
+                firstExpId = simulationInfo.firstExpIds[i]
+                shiftExpId = simulationInfo.shiftExpIds[i][j]
 
                 # Whether or not we only want to save solution at observed time-points 
                 if onlySaveAtTobs == true
@@ -102,7 +107,8 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                          changeToExperimentalCondUse!, 
                                          firstExpId, 
                                          shiftExpId, 
-                                         tol, 
+                                         absTol,
+                                         relTol, 
                                          t_max_ss, 
                                          solver, 
                                          tSave=tSave,
@@ -141,7 +147,8 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
             solArray[i] = solveOdeNoSS(prob, 
                                        changeToExperimentalCondUse!, 
                                        firstExpId, 
-                                       tol, 
+                                       absTol,
+                                       relTol, 
                                        solver, 
                                        t_max, 
                                        nTSave=nTSave, 
@@ -176,12 +183,98 @@ end
      
     See also: [`solveOdeModelAllExperimentalCond!`]
 """
+function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem, 
+                                               conditionId::String,
+                                               changeToExperimentalCondUse!::Function, 
+                                               measurementDataFile::DataFrame,
+                                               measurementData::MeasurementData,
+                                               simulationInfo::SimulationInfo,
+                                               solver, 
+                                               absTol::Float64, 
+                                               relTol::Float64;
+                                               nTSave::Int64=0, 
+                                               onlySaveAtTobs::Bool=false,
+                                               denseSol::Bool=true)
+
+    # In case the model is first simulated to a steady state 
+    local success = true
+    if simulationInfo.simulateSS == true
+
+        firstExpId = measurementData.preEqCond[measurementData.iPerConditionId[conditionId][1]]
+        shiftExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
+            
+        # Whether or not we only want to save solution at observed time-points 
+        if onlySaveAtTobs == true
+            nTSave = 0
+            # Extract t-save point for specific condition ID 
+            tSave = simulationInfo.tVecSave[conditionId]
+        else
+            tSave=Float64[]
+        end
+
+        t_max_ss = getTimeMax(measurementDataFile, shiftExpId)
+        sol = solveOdeSS(prob, 
+                         changeToExperimentalCondUse!, 
+                         firstExpId, 
+                         shiftExpId, 
+                         absTol, 
+                         relTol,
+                         t_max_ss, 
+                         solver, 
+                         tSave=tSave,
+                         nTSave=nTSave, 
+                         denseSol=denseSol, 
+                         absTolSS=simulationInfo.absTolSS, 
+                         relTolSS=simulationInfo.relTolSS)
+
+        if sol.retcode != :Success
+            sucess = false
+        end
+
+    # In case the model is not first simulated to a steady state 
+    elseif simulationInfo.simulateSS == false
+
+        firstExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
+        tSave = simulationInfo.tVecSave[conditionId]
+        t_max = getTimeMax(measurementDataFile, firstExpId)
+
+        changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
+        probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
+
+        # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
+        # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
+        if !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
+            solveCall = (probArg) -> solve(probArg, solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=dense, 
+                callback=TerminateSteadyState(absTolSS, relTolSS))
+        elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
+            solveCall = (probArg) -> solve(probArg, 
+                                           solver, 
+                                           abstol=absTol, 
+                                           reltol=relTol, 
+                                           saveat=tSave, 
+                                           sensealg=ForwardDiffSensitivity())
+        else
+            println("Error : Solver option does not exist")        
+        end
+
+        sol = solveCall(probUse)
+
+        if !(sol.retcode == :Success || sol.retcode == :Terminated)
+            sucess = false
+        end
+    end
+    
+    return sol, success
+end
+
+
 function solveOdeModelAllExperimentalCond(prob::ODEProblem, 
                                           changeToExperimentalCondUse!::Function, 
                                           measurementData::DataFrame,
                                           simulationInfo::SimulationInfo,
                                           solver, 
-                                          tol::Float64;
+                                          absTol::Float64,
+                                          relTol::Float64;
                                           nTSave::Int64=0, 
                                           onlySaveAtTobs::Bool=false,
                                           denseSol::Bool=true)
@@ -202,13 +295,15 @@ function solveOdeModelAllExperimentalCond(prob::ODEProblem,
                                                 measurementData, 
                                                 simulationInfo, 
                                                 solver, 
-                                                tol, 
+                                                absTol, 
+                                                relTol,
                                                 nTSave=nTSave, 
                                                 denseSol=denseSol, 
                                                 onlySaveAtTobs=onlySaveAtTobs)
 
     return solArray, success
 end
+
 
 
 """
@@ -239,7 +334,8 @@ function solveOdeSS(prob::ODEProblem,
                     changeToExperimentalCondUse!::Function, 
                     firstExpId::String, 
                     shiftExpId::String,
-                    tol::Float64, 
+                    absTol::Float64, 
+                    relTol::Float64,
                     t_max_ss::Float64,
                     solver;
                     tSave=Float64[], 
@@ -267,14 +363,14 @@ function solveOdeSS(prob::ODEProblem,
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # The preequilibration simulations are terminated upon a steady state using the TerminateSteadyState callback.
     if typeof(solver) <: Vector{Symbol} # Alg-hint case
-        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, dense=false, 
+        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=absTol, reltol=relTol, dense=false, 
                                        callback=TerminateSteadyState(absTolSS, relTolSS))
-        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense, isoutofdomain = (u,p,t)->any(x->x<0,u))
+        solveCallPost = (prob) -> solve(prob, alg_hints=solver, abstol=absTol, reltol=relTol, saveat=saveAtVec, dense=dense, isoutofdomain = (u,p,t)->any(x->x<0,u))
 
     else # Julia solver case
-        solveCallPre = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, dense=false, 
+        solveCallPre = (prob) -> solve(prob, solver, abstol=absTol, reltol=relTol, dense=false, 
             callback=TerminateSteadyState(absTolSS, relTolSS))
-        solveCallPost = (prob) -> solve(prob, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
+        solveCallPost = (prob) -> solve(prob, solver, abstol=absTol, reltol=relTol, saveat=saveAtVec, dense=dense)
     end
 
     # Change to parameters for the preequilibration simulations 
@@ -327,7 +423,8 @@ end
 function solveOdeNoSS(prob::ODEProblem, 
                       changeToExperimentalCondUse!::Function, 
                       firstExpId::String, 
-                      tol::Float64, 
+                      absTol::Float64, 
+                      relTol::Float64,
                       solver, 
                       t_max::Float64; 
                       tSave=Float64[], 
@@ -360,15 +457,15 @@ function solveOdeNoSS(prob::ODEProblem,
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
     if typeof(solver) <: Vector{Symbol} && isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, save_on=false, save_end=true, dense=dense, 
+        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=dense, 
             callback=TerminateSteadyState(absTolSS, relTolSS))
     elseif typeof(solver) <: Vector{Symbol} && !isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
+        solveCall = (probArg) -> solve(probArg, alg_hints=solver, abstol=absTol, reltol=relTol, saveat=saveAtVec, dense=dense)
     elseif !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, save_on=false, save_end=true, dense=dense, 
+        solveCall = (probArg) -> solve(probArg, solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=dense, 
             callback=TerminateSteadyState(absTolSS, relTolSS))
     elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
-        solveCall = (probArg) -> solve(probArg, solver, abstol=tol, reltol=tol, saveat=saveAtVec, dense=dense)
+        solveCall = (probArg) -> solve(probArg, solver, abstol=absTol, reltol=relTol, saveat=saveAtVec, dense=dense)
     else
         println("Error : Solver option does not exist")        
     end

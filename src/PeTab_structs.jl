@@ -46,6 +46,7 @@ end
 struct PeTabOpt{T1 <: Integer, 
                 T2 <: Array{<:AbstractFloat, 1}}
     evalF::Function
+    evalFZygote::Function
     evalGradF::Function
     evalHess::Function
     evalHessApprox::Function
@@ -112,6 +113,8 @@ struct MeasurementData{T1<:Array{<:AbstractFloat, 1},
     tVecSave::T4
     iTObs::T5
     iPerConditionId::T4
+    preEqCond::T2
+    simCond::T2
 end
 
 

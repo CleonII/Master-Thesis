@@ -174,13 +174,18 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     else
         preEq = measurementData[!, "preequilibrationConditionId"]
     end
-    simCond = measurementData[!, "simulationConditionId"]
+    simCond = String.(measurementData[!, "simulationConditionId"])
     for i in eachindex(conditionId)
         if ismissing(preEq[i])
             conditionId[i] = String(simCond[i])
         else
             conditionId[i] = String(preEq[i]) * String(simCond[i])
         end
+    end
+    if any(x -> ismissing(x), preEq)
+        preEq = Array{String, 1}(undef, 0)
+    else
+        preEq = String.(preEq)
     end
 
     # PeTab observable ID for each measurment 
@@ -230,6 +235,9 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
         end
     end
 
+    # Save for each observation its pre-equlibrium and simulation condition id. 
+
+
     # To avoid repeating calculations yObs is stored in a transformed and untransformed format 
     yObsTransformed::Array{Float64, 1} = deepcopy(yObs)
     transformYobsOrYmodArr!(yObsTransformed, transformArr)
@@ -252,7 +260,7 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
         end
     end
 
-    return MeasurementData(yObs, yObsTransformed, tObs, obsID, conditionId, sdParams, transformArr, obsParam, tVecSave, iTimePoint, iPerConditionId)
+    return MeasurementData(yObs, yObsTransformed, tObs, obsID, conditionId, sdParams, transformArr, obsParam, tVecSave, iTimePoint, iPerConditionId, preEq, simCond)
 end
 
 

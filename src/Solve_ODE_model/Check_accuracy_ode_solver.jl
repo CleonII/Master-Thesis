@@ -18,7 +18,8 @@ function calcHighAccOdeSolution(prob::ODEProblem,
                                 changeToExperimentalCondUse!::Function, 
                                 measurementData::DataFrame,
                                 simulationInfo::SimulationInfo;
-                                tol::Float64=1e-15, 
+                                absTol::Float64=1e-15, 
+                                relTol::Float64=1e-15,
                                 nTSave=100) 
                                 
     bigFloatOdeProb = createBigFloatODEProblem(prob)
@@ -29,9 +30,9 @@ function calcHighAccOdeSolution(prob::ODEProblem,
     local solArrayHighAcc
     local sucessSolver
     try 
-        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverNonStiff, tol; nTSave=nTSave)                                      
+        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverNonStiff, absTol, relTol; nTSave=nTSave)                                      
     catch 
-        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverStiff, tol; nTSave=nTSave)                                      
+        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverStiff, absTol, relTol; nTSave=nTSave)                                      
     end
     GC.gc()
 
@@ -39,7 +40,7 @@ function calcHighAccOdeSolution(prob::ODEProblem,
     if sucessSolver != true
         println("Failed with composite solver - moving on to stiff solver")
         try 
-            solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverStiff, tol; nTSave=nTSave)                                      
+            solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, measurementData, simulationInfo, solverStiff, absTol, relTol; nTSave=nTSave)                                      
         catch
             sucessSolver = false
             solArrayHighAcc = nothing
@@ -72,11 +73,12 @@ function calcAccuracyOdeSolver(prob::ODEProblem,
                                measurementData::DataFrame,
                                simulationInfo::SimulationInfo,
                                solver,
-                               tol::Float64)::Float64
+                               absTol::Float64, 
+                               relTol::Float64)::Float64
                    
     # Check if model can be solved (without using forced stops for integrator 
     # as this can make the solver converge).
-    solArrayTmp, sucess = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, measurementData, simulationInfo, solver, tol, nTSave=100)
+    solArrayTmp, sucess = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, measurementData, simulationInfo, solver, absTol, relTol, nTSave=100)
     solArrayTmp = 0
     if sucess == false
         return Inf 
@@ -95,7 +97,7 @@ function calcAccuracyOdeSolver(prob::ODEProblem,
                 shiftExpId = simulationInfo.shiftExpIds[i][j]
                 t_max_ss = getTimeMax(measurementData, shiftExpId)
                 
-                solCompare = solveOdeSS(prob, changeToExperimentalCondUse!, firstExpId, shiftExpId, tol, t_max_ss, solver, tSave=solArrayHighAccuracy[k].t)
+                solCompare = solveOdeSS(prob, changeToExperimentalCondUse!, firstExpId, shiftExpId, absTol, relTol, t_max_ss, solver, tSave=solArrayHighAccuracy[k].t)
                 
                 # Only compute comparison upon Success retcode, and if solCompare made it to the end-point.
                 if solCompare.retcode != :Success && solCompare.t[end] != solArrayHighAccuracy[k].t[end]
@@ -115,7 +117,7 @@ function calcAccuracyOdeSolver(prob::ODEProblem,
             firstExpId = simulationInfo.firstExpIds[i]
             t_max = getTimeMax(measurementData, firstExpId)
 
-            solCompare = solveOdeNoSS(prob, changeToExperimentalCondUse!, firstExpId, tol, solver, t_max, tSave=solArrayHighAccuracy[i].t)
+            solCompare = solveOdeNoSS(prob, changeToExperimentalCondUse!, firstExpId, absTol, relTol, solver, t_max, tSave=solArrayHighAccuracy[i].t)
 
             # In case t_max = Inf only calculate sqErr if the model could reach a steady state 
             if isinf(t_max) && solCompare.retcode != :Terminated

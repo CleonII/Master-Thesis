@@ -129,7 +129,7 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, paramData, experimentalConditionsFile, peTabModel)
         
         # Solve ODE system with steady state simulation 
-        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol)
+        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, tol)
 
         # Solve ODE system with algebraic intial values 
         solArrayAlg = getSolAlgebraicSS(peTabModel, solver, tol, a, b, c, d)
