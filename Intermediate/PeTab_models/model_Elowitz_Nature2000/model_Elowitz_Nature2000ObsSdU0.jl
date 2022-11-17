@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP, dummyVariable= u 
 	KM, eff, eff_GFP, init_GFP, init_GFP_mRNA, init_X_mRNA, init_X_protein, init_Y_mRNA, init_Y_protein, init_Z_mRNA, init_Z_protein, n_Hill, tau_mRNA, tau_mRNA_GFP, tau_prot, tau_prot_GFP, tps_active, tps_repr = dynPar 
@@ -27,7 +27,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynPar, paramData, observableId, mapSdParam) 
 
 	X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP, dummyVariable= u 
 	KM, eff, eff_GFP, init_GFP, init_GFP_mRNA, init_X_mRNA, init_X_protein, init_Y_mRNA, init_Y_protein, init_Z_mRNA, init_Z_protein, n_Hill, tau_mRNA, tau_mRNA_GFP, tau_prot, tau_prot_GFP, tps_active, tps_repr = dynPar 

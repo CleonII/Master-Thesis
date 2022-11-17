@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	pAkt_S6, pAkt, pS6, EGFR, pEGFR_Akt, pEGFR, Akt, S6, EGF_EGFR, dummyVariable= u 
 	EGFR_turnover, init_AKT, init_EGFR, init_S6, reaction_1_k1, reaction_1_k2, reaction_2_k1, reaction_2_k2, reaction_3_k1, reaction_4_k1, reaction_5_k1, reaction_5_k2, reaction_6_k1, reaction_7_k1, reaction_8_k1, reaction_9_k1 = dynPar 
@@ -38,7 +38,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= pAkt_S6, pAkt, pS6, EGFR, pEGFR_Akt, pEGFR, Akt, S6, EGF_EGFR, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynPar, paramData, observableId, mapSdParam) 
 
 	pAkt_S6, pAkt, pS6, EGFR, pEGFR_Akt, pEGFR, Akt, S6, EGF_EGFR, dummyVariable= u 
 	EGFR_turnover, init_AKT, init_EGFR, init_S6, reaction_1_k1, reaction_1_k2, reaction_2_k1, reaction_2_k2, reaction_3_k1, reaction_4_k1, reaction_5_k1, reaction_5_k2, reaction_6_k1, reaction_7_k1, reaction_8_k1, reaction_9_k1 = dynPar 

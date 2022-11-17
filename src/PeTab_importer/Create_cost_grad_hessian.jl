@@ -33,7 +33,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     simulationInfo = getSimulationInfo(measurementDataFile, measurementData, absTolSS=absTolSS, relTolSS=relTolSS)
 
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
-    paramEstIndices = getIndicesParam(parameterData, measurementData)
+    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem)
     
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
@@ -126,14 +126,14 @@ function calcCost(paramVecEst,
                   calcHessian::Bool=false)
                                                             
 
-    # Correctly map paramVecEst to dynmaic, observable and sd param. The vectors, 
-    # e.g dynamicParamEst, are distinct copies so transforming them will not change 
-    # paramVecEst.
+    # Correctly map paramVecEst to dynmaic, observable and sd param. The new vectors 
+    # are all distinct copies.
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
     obsParEst = paramVecEst[paramIndices.iObsParam]
     sdParamEst = paramVecEst[paramIndices.iSdParam]
+    nonDynamicParamEst = paramVecEst[paramIndices.iNonDynParam]
 
-    logLik = calcLogLikSolveODE(dynamicParamEst, sdParamEst, obsParEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcHessDynParam=calcHessian)
+    logLik = calcLogLikSolveODE(dynamicParamEst, sdParamEst, obsParEst, nonDynamicParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcHessDynParam=calcHessian)
 
     return logLik
 end
@@ -176,27 +176,30 @@ function calcGradCost!(grad::T1,
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
     obsParEst = paramVecEst[paramIndices.iObsParam]
     sdParamEst = paramVecEst[paramIndices.iSdParam]
+    noneDynParamEst = paramVecEst[paramIndices.iNonDynParam]
     namesSdParam = paramIndices.namesSdParam
     namesObsParam = paramIndices.namesObsParam
-    namesSdObsParam = paramIndices.namesSdObsParam
+    namesNonDynParam = paramVecEst[paramIndices.namesNonDynParam]
+    namesSdObsNonDynPar = paramIndices.namesSdObsNonDynPar
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
 
     # I have tried to decrease run time here with chunking without success (deafult value performs best). Might be 
     # worth to look into a parellisation over the chunks (as for larger models each call takes relatively long time). 
     # Also parellisation of the chunks should be faster than paralellisation over experimental condtions.
-    calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcGradDynParam=true)
+    calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcGradDynParam=true)
     grad[paramIndices.iDynParam] .= ForwardDiff.gradient(calcCostDyn, dynamicParamEst)::Vector{Float64}
 
     # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
-    # of both Sd and Obs param is used to account for this 
-    noneDynPar = paramVecEst[paramIndices.iSdObsPar]
-    iSdUse = [findfirst(x -> x == namesSdParam[i], namesSdObsParam) for i in eachindex(namesSdParam)]
-    iObsUse = [findfirst(x -> x == namesObsParam[i],  namesSdObsParam) for i in eachindex(namesObsParam)]
+    # of both Sd and Obs param is used to account for this. This is not a worry for non-dynamic parameters.
+    paramNotOdeSys = paramVecEst[paramIndices.iSdObsNonDynPar]
+    iSdUse = [findfirst(x -> x == namesSdParam[i], namesSdObsNonDynPar) for i in eachindex(namesSdParam)]
+    iObsUse = [findfirst(x -> x == namesObsParam[i],  namesSdObsNonDynPar) for i in eachindex(namesObsParam)]
+    iNonDynUse = [findfirst(x -> x == namesNonDynParam[i],  namesSdObsNonDynPar) for i in eachindex(namesNonDynParam)]
 
     # TODO : Make choice of gradient availble 
-    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=true)
-    @views ReverseDiff.gradient!(grad[paramIndices.iSdObsPar], calcCostNonDyn, noneDynPar)
+    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=true)
+    @views ReverseDiff.gradient!(grad[paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
 end
 
 
@@ -235,26 +238,30 @@ function calcHessianApprox!(hessian::T1,
     # Avoid incorrect non-zero values 
     hessian .= 0.0
 
+    # Split input into observeble and dynamic parameters 
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
     obsParEst = paramVecEst[paramIndices.iObsParam]
     sdParamEst = paramVecEst[paramIndices.iSdParam]
+    noneDynParamEst = paramVecEst[paramIndices.iNonDynParam]
     namesSdParam = paramIndices.namesSdParam
     namesObsParam = paramIndices.namesObsParam
-    namesSdObsParam = paramIndices.namesSdObsParam
+    namesNonDynParam = paramVecEst[paramIndices.namesNonDynParam]
+    namesSdObsNonDynPar = paramIndices.namesSdObsNonDynPar
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
-    calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcHessDynParam=true)
+    calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcHessDynParam=true)
     hessian[paramIndices.iDynParam, paramIndices.iDynParam] .= ForwardDiff.hessian(calcCostDyn, dynamicParamEst)::Matrix{Float64}
 
     # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
     # of both Sd and Obs param is used to account for this 
-    noneDynPar::Array{Float64, 1} = paramVecEst[paramIndices.iSdObsPar]
-    iSdUse = [findfirst(x -> x == namesSdParam[i], namesSdObsParam) for i in eachindex(namesSdParam)]
-    iObsUse = [findfirst(x -> x == namesObsParam[i],  namesSdObsParam) for i in eachindex(namesObsParam)]
+    paramNotOdeSys = paramVecEst[paramIndices.iSdObsNonDynPar]
+    iSdUse = [findfirst(x -> x == namesSdParam[i], namesSdObsNonDynPar) for i in eachindex(namesSdParam)]
+    iObsUse = [findfirst(x -> x == namesObsParam[i],  namesSdObsNonDynPar) for i in eachindex(namesObsParam)]
+    iNonDynUse = [findfirst(x -> x == namesNonDynParam[i],  namesSdObsNonDynPar) for i in eachindex(namesNonDynParam)]
     
     # Compute hessian for none dynamic parameters 
-    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData)
-    @views ReverseDiff.hessian!(hessian[paramIndices.iSdObsPar, paramIndices.iSdObsPar], calcCostNonDyn, noneDynPar)
+    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData)
+    @views ReverseDiff.hessian!(hessian[paramIndices.iSdObsNonDynPar, paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
 
 end
 
@@ -263,6 +270,7 @@ end
     calcLogLikSolveODE(dynamicParamEst, 
                        sdParamEst, 
                        obsParEst, 
+                       nonDynParamEst,
                        odeProb::ODEProblem,
                        peTabModel::PeTabModel,
                        simulationInfo::SimulationInfo,
@@ -286,6 +294,7 @@ end
 function calcLogLikSolveODE(dynamicParamEst,
                             sdParamEst,
                             obsParEst,
+                            nonDynParamEst,
                             odeProb::ODEProblem,
                             peTabModel::PeTabModel,
                             simulationInfo::SimulationInfo,
@@ -300,6 +309,7 @@ function calcLogLikSolveODE(dynamicParamEst,
     dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
     sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
     obsParEstUse = transformParamVec(obsParEst, paramIndices.namesObsParam, parameterData)
+    nonDynParamEstUse = transformParamVec(nonDynParamEst, paramIndices.namesNonDynParam, parameterData)
 
     odeProbUse = remake(odeProb, p = convert.(eltype(dynamicParamEstUse), odeProb.p), u0 = convert.(eltype(dynamicParamEstUse), odeProb.u0))
     changeModelParamUse!(odeProbUse.p, odeProbUse.u0, dynamicParamEstUse, paramIndices.namesDynParam)
@@ -315,7 +325,7 @@ function calcLogLikSolveODE(dynamicParamEst,
         println("Failed to solve ODE model")
     end
 
-    logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcHessDynParam=calcHessDynParam, calcGradDynParam=calcGradDynParam)
+    logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParEstUse, nonDynParamEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcHessDynParam=calcHessDynParam, calcGradDynParam=calcGradDynParam)
 
     return logLik
 end
@@ -345,6 +355,7 @@ end
 function calcLogLikNotSolveODE(dynamicParamEst::T1, 
                                sdParamEst,
                                obsParamEst,
+                               nonDynParamEst,
                                peTabModel::PeTabModel,
                                simulationInfo::SimulationInfo,
                                paramIndices::ParameterIndices,
@@ -357,8 +368,9 @@ function calcLogLikNotSolveODE(dynamicParamEst::T1,
     dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
     sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
     obsParamEstUse = transformParamVec(obsParamEst, paramIndices.namesObsParam, parameterData)
+    nonDynParamEstUse = transformParamVec(nonDynParamEst, paramIndices.namesNonDynParam, parameterData)
 
-    logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParamEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=calcGradObsSdParam)
+    logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParamEstUse, nonDynParamEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=calcGradObsSdParam)
     
     return logLik
 end
@@ -385,6 +397,7 @@ end
 function calcLogLik(dynamicParamEst,
                     sdParamEst, 
                     obsPar, 
+                    nonDynParamEst,
                     peTabModel::PeTabModel,
                     simulationInfo::SimulationInfo,
                     paramIndices::ParameterIndices,
@@ -408,7 +421,7 @@ function calcLogLik(dynamicParamEst,
         whichForwardSol = findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)
         odeSol = odeSolArray[whichForwardSol]   
         logLik += calcLogLikExpCond(odeSol, dynamicParamEst, sdParamEst, obsPar, 
-                                    peTabModel, conditionID, paramIndices,
+                                    nonDynParamEst, peTabModel, conditionID, paramIndices,
                                     measurementData, parameterData, calcGradObsSdParam)
 
         if isinf(logLik)
@@ -424,6 +437,7 @@ function calcLogLikExpCond(odeSol::ODESolution,
                            dynamicParamEst,
                            sdParamEst, 
                            obsPar, 
+                           nonDynParamEst,
                            peTabModel::PeTabModel,
                            conditionID::String,
                            paramIndices::ParameterIndices,
@@ -442,14 +456,14 @@ function calcLogLikExpCond(odeSol::ODESolution,
             odeSolAtT = odeSol[:, measurementData.iTObs[i]]
         end
         mapObsParam = paramIndices.mapArrayObsParam[paramIndices.indexObsParamMap[i]]
-        yMod = peTabModel.evalYmod(odeSolAtT, t, dynamicParamEst, obsPar, parameterData, measurementData.observebleID[i], mapObsParam) 
+        yMod = peTabModel.evalYmod(odeSolAtT, t, dynamicParamEst, obsPar, nonDynParamEst, parameterData, measurementData.observebleID[i], mapObsParam) 
 
         # Compute associated SD-value or extract said number if it is known 
         if isNumber(measurementData.sdParams[i])
             sdVal = parse(Float64, measurementData.sdParams[i])
         else
             mapSdParam = paramIndices.mapArraySdParam[paramIndices.indexSdParamMap[i]]
-            sdVal = peTabModel.evalSd!(odeSolAtT, t, sdParamEst, dynamicParamEst, parameterData, measurementData.observebleID[i], mapSdParam)
+            sdVal = peTabModel.evalSd!(odeSolAtT, t, sdParamEst, dynamicParamEst, nonDynParamEst, parameterData, measurementData.observebleID[i], mapSdParam)
         end
 
         # Transform yMod is necessary

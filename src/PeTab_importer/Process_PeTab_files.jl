@@ -197,14 +197,14 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     if !("noiseParameters" in names(measurementData))
         sdObs = [missing for i in 1:nObs]
     else
-        sdObs = string.(measurementData[!, "noiseParameters"])
+        sdObs = measurementData[!, "noiseParameters"]
     end
     sdParams::Array{String, 1} = Array{String, 1}(undef, nObs)
     for i in eachindex(sdObs)
-        if ismissing(sdObs[i])
+        if ismissing(sdObs[i]) 
             sdParams[i] = ""
         else
-            sdParams[i] = sdObs[i]
+            sdParams[i] = string(sdObs[i])
         end
     end
 
@@ -217,10 +217,10 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     end
     obsParam = Array{String, 1}(undef, nObs)
     for i in 1:nObs
-        if ismissing(obsParamFile[i])
+        if ismissing(obsParamFile[i]) 
             obsParam[i] = ""
         else
-            obsParam[i] = obsParamFile[i]
+            obsParam[i] = string(obsParamFile[i])
         end
     end
 

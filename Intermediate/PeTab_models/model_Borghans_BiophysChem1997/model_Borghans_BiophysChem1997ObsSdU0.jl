@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	A_state, Y_state, Z_state, dummyVariable= u 
 	K2, K_par, Ka, Kd, Kf, Kp, Ky, Kz, Vd, Vm2, Vm3, Vp, beta_par, epsilon_par, init_A_state, init_Y_state, init_Z_state, n_par, v0, v1 = dynPar 
@@ -22,7 +22,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= A_state, Y_state, Z_state, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	A_state, Y_state, Z_state, dummyVariable= u 
 	K2, K_par, Ka, Kd, Kf, Kp, Ky, Kz, Vd, Vm2, Vm3, Vp, beta_par, epsilon_par, init_A_state, init_Y_state, init_Z_state, n_par, v0, v1 = dynPar 

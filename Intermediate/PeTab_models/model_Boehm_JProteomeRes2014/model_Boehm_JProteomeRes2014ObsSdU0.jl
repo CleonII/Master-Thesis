@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable= u 
 	Epo_degradation_BaF3, k_exp_hetero, k_exp_homo, k_imp_hetero, k_imp_homo, k_phos = dynPar 
@@ -36,7 +36,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynPar, paramData, observableId, mapSdParam) 
 
 	STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB, dummyVariable= u 
 	Epo_degradation_BaF3, k_exp_hetero, k_exp_homo, k_imp_hetero, k_imp_homo, k_phos = dynPar 

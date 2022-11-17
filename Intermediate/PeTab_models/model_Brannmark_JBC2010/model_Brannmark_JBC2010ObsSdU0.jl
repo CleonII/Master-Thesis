@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp, dummyVariable= u 
 	k1a, k1aBasic, k1b, k1c, k1d, k1e, k1f, k1g, k1r, k21, k22, k3, km2, km3 = dynPar 
@@ -38,7 +38,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynPar, paramData, observableId, mapSdParam) 
 
 	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp, dummyVariable= u 
 	k1a, k1aBasic, k1b, k1c, k1d, k1e, k1f, k1g, k1r, k21, k22, k3, km2, km3 = dynPar 

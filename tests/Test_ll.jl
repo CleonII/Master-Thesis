@@ -48,13 +48,11 @@ if diff > 1e-3
 end
 
 
-# Beer model - currently we lack support for these kind of models 
-#=
+# Beer model - Currently we do not support parameter estimation for models with condition specific parameters to estimate
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Beer_MolBioSystems2014/"
 peTabModel = setUpPeTabModel("model_Beer_MolBioSystems2014", dirModel)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
-=#
+#peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
+#cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 
 
 # Boehm model 
@@ -66,7 +64,6 @@ diff = cost + (-138.22199693517703)
 if diff > 1e-3
     println("Does not pass ll-test for Boehm model")
     passTest = false
-    
 end
 
 
@@ -82,8 +79,7 @@ if diff > 1e-3
 end
 
 
-# Bruno model 
-# Broken must check why (problem building index map)
+# Beer model - Currently we do not support parameter estimation for models with condition specific parameters to estimate
 #= 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Bruno_JExpBot2016/"
 peTabModel = setUpPeTabModel("model_Bruno_JExpBot2016", dirModel)
@@ -141,20 +137,19 @@ end
 
 
 # Isensee model - Break code check why 
-#=
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Isensee_JCB2018/"
 peTabModel = setUpPeTabModel("model_Isensee_JCB2018", dirModel)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
+peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-9)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
-diff = abs(cost + (53.08377736998929))
-if diff > 1e-3
+diff = abs(cost + (-3949.375966548649))
+if diff > 1e-2
     println("Does not pass ll-test for Isensee model")
     passTest = false
 end
-=#
 
 
-# Lucarelli - Break code where all other solvers break
+
+# Lucarelli - Breaks code by the same reason as above 
 #=
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Lucarelli_CellSystems2018/"
 peTabModel = setUpPeTabModel("model_Lucarelli_CellSystems2018", dirModel)

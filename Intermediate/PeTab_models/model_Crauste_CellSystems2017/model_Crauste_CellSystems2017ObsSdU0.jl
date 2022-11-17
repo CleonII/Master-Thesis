@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	Naive, Pathogen, LateEffector, EarlyEffector, Memory, dummyVariable= u 
 	delta_EL, delta_LM, delta_NE, mu_EE, mu_LE, mu_LL, mu_N, mu_P, mu_PE, mu_PL, rho_E, rho_P = dynPar 
@@ -35,7 +35,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Naive, Pathogen, LateEffector, EarlyEffector, Memory, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynPar, paramData, observableId, mapSdParam) 
 
 	Naive, Pathogen, LateEffector, EarlyEffector, Memory, dummyVariable= u 
 	delta_EL, delta_LM, delta_NE, mu_EE, mu_LE, mu_LL, mu_N, mu_P, mu_PE, mu_PL, rho_E, rho_P = dynPar 

@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible, dummyVariable= u 
 	beta_0, beta_1, beta_2, t_1, t_2, delta_, h_hosp_rate, gamma_h, gamma_u, exposed_init_concentration, asymptomatic_init_concentration, symptomatic_init_concentration = dynPar 
@@ -43,7 +43,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible, dummyVariable= u 
 	beta_0, beta_1, beta_2, t_1, t_2, delta_, h_hosp_rate, gamma_h, gamma_u, exposed_init_concentration, asymptomatic_init_concentration, symptomatic_init_concentration = dynPar 

@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	Vni, V, Vin, Tstar, dummyVariable= u 
 	c, delta = dynPar 
@@ -25,7 +25,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Vni, V, Vin, Tstar, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	Vni, V, Vin, Tstar, dummyVariable= u 
 	c, delta = dynPar 

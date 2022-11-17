@@ -8,6 +8,8 @@ function getODEModel_model_Boehm_JProteomeRes2014()
 
     ### Define variable parameters
 
+    ### Define potential algebraic variables
+
     ### Define dummy variable
     ModelingToolkit.@variables dummyVariable(t)
 
@@ -17,7 +19,9 @@ function getODEModel_model_Boehm_JProteomeRes2014()
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
 
-    ### Events ###
+    ### Continious events ###
+
+    ### Discrete events ###
 
     ### Derivatives ###
     eqs = [
@@ -46,7 +50,7 @@ function getODEModel_model_Boehm_JProteomeRes2014()
     pBpB => 0.0,
     dummyVariable => 0.0]
 
-    ### True parameter values ###
+    ### SBML file parameter values ###
     trueParameterValues = [
     ratio => 0.693,
     k_imp_homo => 96945.5391768823,

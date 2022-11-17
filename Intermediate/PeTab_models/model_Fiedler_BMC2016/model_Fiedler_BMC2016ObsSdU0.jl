@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	RAF, MEK, pMEK, pERK, pRAF, ERK, dummyVariable= u 
 	K_1, K_2, K_3, k10, k11, k2, k3, k4, k5, k6, tau1, tau2 = dynPar 
@@ -33,7 +33,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= RAF, MEK, pMEK, pERK, pRAF, ERK, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynPar, paramData, observableId, mapSdParam) 
 
 	RAF, MEK, pMEK, pERK, pRAF, ERK, dummyVariable= u 
 	K_1, K_2, K_3, k10, k11, k2, k3, k4, k5, k6, tau1, tau2 = dynPar 

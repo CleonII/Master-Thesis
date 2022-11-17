@@ -16,7 +16,9 @@
 
     See also: [`ParameterIndices`, `ParamMap`]
 """
-function getIndicesParam(paramData::ParamData, measurementData::MeasurementData)::ParameterIndices
+function getIndicesParam(paramData::ParamData, 
+                         measurementData::MeasurementData, 
+                         odeSystem::ODESystem)::ParameterIndices
 
     namesObsParam = getIdEst(measurementData.obsParam, paramData)
     isObsParam = [paramData.parameterID[i] in namesObsParam for i in eachindex(paramData.parameterID)]
@@ -24,19 +26,27 @@ function getIndicesParam(paramData::ParamData, measurementData::MeasurementData)
     namesSdParam = getIdEst(measurementData.sdParams, paramData)
     isSdParam = [paramData.parameterID[i] in namesSdParam for i in eachindex(paramData.parameterID)]
 
-    isDynamicParam = (paramData.shouldEst .&& .!isSdParam .&& .!isObsParam)
+    # Parameters not entering the ODE system (or initial values), are not noise-parameter or observable 
+    # parameters, but appear in SD and/or OBS functions. Must be tagged specifically as we do 
+    # want to compute gradients for these given a fixed ODE solution.
+    isNonDynamicParam = (paramData.shouldEst .&& .!isSdParam .&& .!isObsParam)
+    namesNonDynamicParam = paramData.parameterID[isNonDynamicParam]
+    namesNonDynamicParam = namesNonDynamicParam[findall(x -> x ∉ (string.(parameters(odeSystem))), namesNonDynamicParam)]
+    isNonDynamicParam = [paramData.parameterID[i] in namesNonDynamicParam for i in eachindex(paramData.parameterID)]
+
+    isDynamicParam = (paramData.shouldEst .&& .!isNonDynamicParam .&& .!isSdParam .&& .!isObsParam)
     namesParamDyn = paramData.parameterID[isDynamicParam]
 
     # A paramter can be both a SD and observable parameter
-    namesSdObsParam::Array{String, 1} = string.(unique(vcat(namesSdParam, namesObsParam)))
+    namesSdObsNonDynParam::Array{String, 1} = string.(unique(vcat(namesSdParam, namesObsParam, namesNonDynamicParam)))
+    namesParamEst::Array{String, 1} = string.(vcat(string.(namesParamDyn), string.(namesSdObsNonDynParam)))
 
-    namesParamEst::Array{String, 1} = string.(vcat(string.(namesParamDyn), string.(namesSdObsParam)))
-    
     # Index vector for the dynamic and sd parameters as UInt32 vectors 
     iDynPar::Array{UInt32, 1} = [findfirst(x -> x == namesParamDyn[i],  namesParamEst) for i in eachindex(namesParamDyn)]
     iSdPar::Array{UInt32, 1} = [findfirst(x -> x == namesSdParam[i],  namesParamEst) for i in eachindex(namesSdParam)]
     iObsPar::Array{UInt32, 1} = [findfirst(x -> x == namesObsParam[i],  namesParamEst) for i in eachindex(namesObsParam)]
-    iSdObsPar::Array{UInt32, 1} = [findfirst(x -> x == namesSdObsParam[i],  namesParamEst) for i in eachindex(namesSdObsParam)]
+    iNonDynPar::Array{UInt32, 1} = [findfirst(x -> x == namesNonDynamicParam[i],  namesParamEst) for i in eachindex(namesNonDynamicParam)]
+    iSdObsNonDynPar::Array{UInt32, 1} = [findfirst(x -> x == namesSdObsNonDynParam[i],  namesParamEst) for i in eachindex(namesSdObsNonDynParam)]
     
     # When extracting observable or sd parameter for computing the likelhood a pre-calculcated map-array
     # is used to efficently extract correct parameters. The arrays below define which map to extract to 
@@ -53,17 +63,19 @@ function getIndicesParam(paramData::ParamData, measurementData::MeasurementData)
     mapArraySdParam = buildMapParameters(keysSdMap, measurementData, paramData, false)
 
     # Set up a map for changing ODEProblem model parameters when doing parameter estimation 
-    namesAllString = string.(parameters(peTabModel.odeSystem)) 
+    namesAllString = string.(parameters(odeSystem)) 
     iMapDynParam = [findfirst(x -> x == namesParamDyn[i], namesAllString) for i in eachindex(namesParamDyn)]
 
     paramIndicies = ParameterIndices(iDynPar, 
                                      iObsPar, 
                                      iSdPar, 
-                                     iSdObsPar,
+                                     iSdObsNonDynPar,
+                                     iNonDynPar,
                                      string.(namesParamDyn), 
                                      string.(namesObsParam), 
                                      string.(namesSdParam),
-                                     namesSdObsParam,
+                                     namesSdObsNonDynParam,
+                                     string.(namesNonDynamicParam),
                                      namesParamEst, 
                                      indexObsParamMap, 
                                      indexSdParamMap, 

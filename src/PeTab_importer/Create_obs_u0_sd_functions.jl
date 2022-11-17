@@ -29,9 +29,9 @@ function createFileYmodSdU0(modelName::String,
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
     
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
-    paramIndices = getIndicesParam(paramData, measurementData)
+    paramIndices = getIndicesParam(paramData, measurementData, odeSys)
     
-    createYmodFunction(modelName, dirModel, stateNames, paramData, paramIndices.namesDynParam, observablesDataFile)
+    createYmodFunction(modelName, dirModel, stateNames, paramData, paramIndices.namesDynParam, paramIndices.namesNonDynParam, observablesDataFile)
     println("Done with Ymod function")
     println("")
     
@@ -39,7 +39,7 @@ function createFileYmodSdU0(modelName::String,
     println("Done with u0 function")
     println("")
 
-    createSdFunction(modelName, dirModel, paramData, stateNames, paramIndices.namesDynParam, observablesDataFile)
+    createSdFunction(modelName, dirModel, paramData, stateNames, paramIndices.namesDynParam, paramIndices.namesNonDynParam, observablesDataFile)
     println("Done with sd function")
     println("")
 end
@@ -64,11 +64,12 @@ function createYmodFunction(modelName::String,
                             stateNames, 
                             paramData::ParamData, 
                             namesParamDyn::Array{String, 1}, 
+                            namesNonDynParam::Array{String, 1},
                             observablesData::DataFrame)
 
     io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "w")
     
-    write(io, "function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) \n")
+    write(io, "function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) \n")
 
     # Extract names of model states and write to file 
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
@@ -88,6 +89,17 @@ function createYmodFunction(modelName::String,
     paramDynStr = paramDynStr[1:end-2]
     paramDynStr *= " = dynPar \n"
     write(io, paramDynStr)
+
+    # Extract name of non-dynamic parameter and write to file
+    if !isempty(namesNonDynParam)
+        paramNonDynStr = "\t"
+        for i in eachindex(namesNonDynParam)
+            paramNonDynStr *= namesNonDynParam[i] * ", "
+        end
+        paramNonDynStr = paramNonDynStr[1:end-2]
+        paramNonDynStr *= " = nonDynParam \n"
+        write(io, paramNonDynStr)
+    end
 
     # Extract constant parameters. To avoid cluttering the function only constant parameters that are used to 
     # to compute yMod are written to file.
@@ -115,7 +127,7 @@ function createYmodFunction(modelName::String,
         end 
 
         # Translate the formula for the observable to Julia syntax 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn)
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
         strObserveble *= "\t\t" * "return " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
     end
@@ -165,7 +177,7 @@ function createU0Function(modelName::String,
     for i in eachindex(stateMap)
         stateName = stateNames[i]
         stateExp = replace(string(stateMap[i].second), " " => "")
-        stateFormula = peTabFormulaToJulia(stateExp, stateNames, paramData, namesParameter)
+        stateFormula = peTabFormulaToJulia(stateExp, stateNames, paramData, namesParameter, String[])
         stateExpWrite *= "\t" * stateName * " = " * stateFormula * "\n"
     end
     write(io, stateExpWrite * "\n")
@@ -203,12 +215,13 @@ function createSdFunction(modelName::String,
                           paramData::ParamData, 
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
+                          namesNonDynParam::Array{String, 1},
                           observablesData::DataFrame)
 
 
     io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "a")
 
-    write(io, "\n\nfunction evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) \n")
+    write(io, "\n\nfunction evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) \n")
 
     # Extract names of model states and write to file 
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
@@ -228,6 +241,17 @@ function createSdFunction(modelName::String,
     paramDynStr = paramDynStr[1:end-2]
     paramDynStr *= " = dynPar \n"
     write(io, paramDynStr)
+
+    # Extract name of non-dynamic parameter and write to file
+    if !isempty(namesNonDynParam)
+        paramNonDynStr = "\t"
+        for i in eachindex(namesNonDynParam)
+            paramNonDynStr *= namesNonDynParam[i] * ", "
+        end
+        paramNonDynStr = paramNonDynStr[1:end-2]
+        paramNonDynStr *= " = nonDynParam \n"
+        write(io, paramNonDynStr)
+    end
 
     # Extract constant parameters. To avoid cluttering the function only constant parameters that are used to 
     # to compute yMod are written to file.
@@ -254,7 +278,7 @@ function createSdFunction(modelName::String,
             strObserveble *= "\t\t" * noiseParam * " = getObsOrSdParam(sdPar, mapSdParam)\n" 
         end 
 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn)
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
         strObserveble *= "\t\t" * "return " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
     end
@@ -274,7 +298,7 @@ end
 
     State-names, namesParamDyn and paramData are all required to correctly identify states and parameters in the formula.
 """
-function peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1})::String
+function peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1})::String
 
     # Characters directly translate to Julia and characters that also are assumed to terminate a word (e.g state and parameter)
     charDirectTranslate = ['(', ')', '+', '-', '/', '*', '^'] 
@@ -292,7 +316,7 @@ function peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, 
             # Get word (e.g param, state, math-operation or number)
             word, iNew = getWord(formula, i, charDirectTranslate)
             # Translate word to Julia syntax 
-            formulaJulia *= wordToJuliaSyntax(word, stateNames, paramData, namesParamDyn)
+            formulaJulia *= wordToJuliaSyntax(word, stateNames, paramData, namesParamDyn, namesNonDynParam)
             i = iNew
 
             # Special case where we have multiplication
@@ -370,7 +394,8 @@ end
 function wordToJuliaSyntax(wordTranslate::String, 
                            stateNames,
                            paramData::ParamData, 
-                           namesParamDyn::Array{String, 1})::String
+                           namesParamDyn::Array{String, 1}, 
+                           namesNonDynParam::Array{String, 1})::String
 
     # List of mathemathical operations that are accpeted and will be translated 
     # into Julia syntax (t is assumed to be time)
@@ -380,13 +405,17 @@ function wordToJuliaSyntax(wordTranslate::String,
     wordJuliaSyntax = ""
     
     # If wordTranslate is a constant parameter (is not paramDyn - list of parameter to estimate)
-    if wordTranslate in paramData.parameterID && !(wordTranslate in namesParamDyn)
+    if wordTranslate in paramData.parameterID && !(wordTranslate in namesParamDyn) && !(wordTranslate in namesNonDynParam)
         # Constant parameters get a _C appended to tell them apart 
         wordJuliaSyntax *= wordTranslate * "_C"
     end
 
     # If wordTranslate is a dynamic parameters 
     if wordTranslate in namesParamDyn
+        wordJuliaSyntax *= wordTranslate
+    end
+
+    if wordTranslate in namesNonDynParam
         wordJuliaSyntax *= wordTranslate
     end
 

@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	Infected, Recovered, Susceptible, dummyVariable= u 
 	gamma_NY, Ro_NY, Io_NY = dynPar 
@@ -34,7 +34,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Infected, Recovered, Susceptible, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	Infected, Recovered, Susceptible, dummyVariable= u 
 	gamma_NY, Ro_NY, Io_NY = dynPar 

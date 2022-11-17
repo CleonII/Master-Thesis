@@ -1,7 +1,8 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	pAC, Rp8_Br_cAMPS, Rp8_pCPT_cAMPS, PDE, Rp_cAMPS, RII_2, RIIp_Rp8_Br_cAMPS_C_2, cAMP, RIIp_Sp8_Br_cAMPS_C_2, IBMX, AC_Fsk, RIIp_C_2, Sp8_Br_cAMPS, RII_C_2, RIIp_Sp8_Br_cAMPS_2, Csub, Csub_H89, AC, RIIp_cAMP_2, pAC_Fsk, RIIp_Rp8_pCPT_cAMPS_C_2, pPDE, RIIp_Rp_cAMPS_C_2, RIIp_2, RIIp_cAMP_C_2, dummyVariable= u 
-	KD_Fsk, KD_H89, KD_IBMX, KD_cAMP, b_Calpha_global, b_pRII_global, kdeg_cAMP, kdeg_cAMP_free, kf_Fsk, kf_H89, kf_RII_2__RII_C_2, kf_RII_C_2__RII_2, kf_RII_C_2__RIIp_C_2, kf_RIIp_2__RII_2, kf_RIIp_C_2__RII_C_2, kf_RIIp_cAMP_C_2__RIIp_2, kf_cAMP, ki_IBMX, ki_Rp8_Br_cAMPS_pAB, ki_Rp8_pCPT_cAMPS_pAB, ki_Rp_cAMPS_pAB, ki_Sp8_Br_cAMPS_AM, ks_AC_cAMP, rel_open, s_Calpha_global, s_pRII_Western, s_pRII_global, rho_Calpha_Microscopy, rho_pRII_Microscopy, rho_pRII_Western, xi_AC_cAMP_Fsk, xi_KD_Rp8_Br_cAMPS, xi_KD_Rp8_pCPT_cAMPS, xi_KD_Rp_cAMPS, xi_KD_Sp8_Br_cAMPS, xi_b_Rp8_Br_cAMPS, xi_b_Rp8_pCPT_cAMPS, xi_b_Rp_cAMPS, xi_b_Sp8_Br_cAMPS, xi_kf_RII_2__RII_C_2, xi_kf_RII_C_2__RII_2, xi_rel_open = dynPar 
+	KD_Fsk, KD_H89, KD_IBMX, KD_cAMP, kdeg_cAMP, kdeg_cAMP_free, kf_Fsk, kf_H89, kf_RII_2__RII_C_2, kf_RII_C_2__RII_2, kf_RII_C_2__RIIp_C_2, kf_RIIp_2__RII_2, kf_RIIp_C_2__RII_C_2, kf_RIIp_cAMP_C_2__RIIp_2, kf_cAMP, ki_IBMX, ki_Rp8_Br_cAMPS_pAB, ki_Rp8_pCPT_cAMPS_pAB, ki_Rp_cAMPS_pAB, ki_Sp8_Br_cAMPS_AM, ks_AC_cAMP, xi_AC_cAMP_Fsk, xi_KD_Rp8_Br_cAMPS, xi_KD_Rp8_pCPT_cAMPS, xi_KD_Rp_cAMPS, xi_KD_Sp8_Br_cAMPS, xi_b_Rp8_Br_cAMPS, xi_b_Rp8_pCPT_cAMPS, xi_b_Rp_cAMPS, xi_b_Sp8_Br_cAMPS, xi_kf_RII_2__RII_C_2, xi_kf_RII_C_2__RII_2 = dynPar 
+	b_Calpha_global, b_pRII_global, rel_open, s_Calpha_global, s_pRII_Western, s_pRII_global, rho_Calpha_Microscopy, rho_pRII_Microscopy, rho_pRII_Western, xi_rel_open = nonDynParam 
 	AC_total_C = paramData.paramVal[1] 
 	KD_PDE_Csub_C = paramData.paramVal[5] 
 	PDE_total_C = paramData.paramVal[7] 
@@ -67,10 +68,11 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= pAC, Rp8_Br_cAMPS, Rp8_pCPT_cAMPS, PDE, Rp_cAMPS, RII_2, RIIp_Rp8_Br_cAMPS_C_2, cAMP, RIIp_Sp8_Br_cAMPS_C_2, IBMX, AC_Fsk, RIIp_C_2, Sp8_Br_cAMPS, RII_C_2, RIIp_Sp8_Br_cAMPS_2, Csub, Csub_H89, AC, RIIp_cAMP_2, pAC_Fsk, RIIp_Rp8_pCPT_cAMPS_C_2, pPDE, RIIp_Rp_cAMPS_C_2, RIIp_2, RIIp_cAMP_C_2, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	pAC, Rp8_Br_cAMPS, Rp8_pCPT_cAMPS, PDE, Rp_cAMPS, RII_2, RIIp_Rp8_Br_cAMPS_C_2, cAMP, RIIp_Sp8_Br_cAMPS_C_2, IBMX, AC_Fsk, RIIp_C_2, Sp8_Br_cAMPS, RII_C_2, RIIp_Sp8_Br_cAMPS_2, Csub, Csub_H89, AC, RIIp_cAMP_2, pAC_Fsk, RIIp_Rp8_pCPT_cAMPS_C_2, pPDE, RIIp_Rp_cAMPS_C_2, RIIp_2, RIIp_cAMP_C_2, dummyVariable= u 
-	KD_Fsk, KD_H89, KD_IBMX, KD_cAMP, b_Calpha_global, b_pRII_global, kdeg_cAMP, kdeg_cAMP_free, kf_Fsk, kf_H89, kf_RII_2__RII_C_2, kf_RII_C_2__RII_2, kf_RII_C_2__RIIp_C_2, kf_RIIp_2__RII_2, kf_RIIp_C_2__RII_C_2, kf_RIIp_cAMP_C_2__RIIp_2, kf_cAMP, ki_IBMX, ki_Rp8_Br_cAMPS_pAB, ki_Rp8_pCPT_cAMPS_pAB, ki_Rp_cAMPS_pAB, ki_Sp8_Br_cAMPS_AM, ks_AC_cAMP, rel_open, s_Calpha_global, s_pRII_Western, s_pRII_global, rho_Calpha_Microscopy, rho_pRII_Microscopy, rho_pRII_Western, xi_AC_cAMP_Fsk, xi_KD_Rp8_Br_cAMPS, xi_KD_Rp8_pCPT_cAMPS, xi_KD_Rp_cAMPS, xi_KD_Sp8_Br_cAMPS, xi_b_Rp8_Br_cAMPS, xi_b_Rp8_pCPT_cAMPS, xi_b_Rp_cAMPS, xi_b_Sp8_Br_cAMPS, xi_kf_RII_2__RII_C_2, xi_kf_RII_C_2__RII_2, xi_rel_open = dynPar 
+	KD_Fsk, KD_H89, KD_IBMX, KD_cAMP, kdeg_cAMP, kdeg_cAMP_free, kf_Fsk, kf_H89, kf_RII_2__RII_C_2, kf_RII_C_2__RII_2, kf_RII_C_2__RIIp_C_2, kf_RIIp_2__RII_2, kf_RIIp_C_2__RII_C_2, kf_RIIp_cAMP_C_2__RIIp_2, kf_cAMP, ki_IBMX, ki_Rp8_Br_cAMPS_pAB, ki_Rp8_pCPT_cAMPS_pAB, ki_Rp_cAMPS_pAB, ki_Sp8_Br_cAMPS_AM, ks_AC_cAMP, xi_AC_cAMP_Fsk, xi_KD_Rp8_Br_cAMPS, xi_KD_Rp8_pCPT_cAMPS, xi_KD_Rp_cAMPS, xi_KD_Sp8_Br_cAMPS, xi_b_Rp8_Br_cAMPS, xi_b_Rp8_pCPT_cAMPS, xi_b_Rp_cAMPS, xi_b_Sp8_Br_cAMPS, xi_kf_RII_2__RII_C_2, xi_kf_RII_C_2__RII_2 = dynPar 
+	b_Calpha_global, b_pRII_global, rel_open, s_Calpha_global, s_pRII_Western, s_pRII_global, rho_Calpha_Microscopy, rho_pRII_Microscopy, rho_pRII_Western, xi_rel_open = nonDynParam 
 	AC_total_C = paramData.paramVal[1] 
 	KD_PDE_Csub_C = paramData.paramVal[5] 
 	PDE_total_C = paramData.paramVal[7] 

@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	IR2, IR2in, Rec2, IR1in, Uptake1, Uptake2, InsulinFragments, IR1, Rec1, Ins, BoundUnspec, dummyVariable= u 
 	ini_R1, ini_R2fold, ka1, ka2fold, kd1, kd2fold, kin, kin2, koff_unspec, kon_unspec, kout, kout2, kout_frag = dynPar 
@@ -45,7 +45,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= IR2, IR2in, Rec2, IR1in, Uptake1, Uptake2, InsulinFragments, IR1, Rec1, Ins, BoundUnspec, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	IR2, IR2in, Rec2, IR1in, Uptake1, Uptake2, InsulinFragments, IR1, Rec1, Ins, BoundUnspec, dummyVariable= u 
 	ini_R1, ini_R2fold, ka1, ka2fold, kd1, kd2fold, kin, kin2, koff_unspec, kon_unspec, kout, kout2, kout_frag = dynPar 

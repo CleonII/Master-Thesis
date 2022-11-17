@@ -1,4 +1,4 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simulationId) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	Cells_Dead, Cells_Apo1, pATR_G2, yH2AX_G2, Wip1_mRNA_S, pATM_S, p21_G2, Cells_SSBDamage_S, pp53_S, pATM_G2, Cells_Apo2, Cells_Cycle_G2, Cells_Apo_ReOx, yH2AX_S, p21_mRNA_S, Wip1_S, Wip1_mRNA_G2, Cells_Apo4, Cells_DSBDamage_G2, Cells_Apo, pChk2_G2, Wip1_G2, pATR_S, p21_S, Cells_DSBDamage_S, p21_mRNA_G2, Space, pChk2_S, Cells_Cycle_S, Cells_Apo3, pChk1_G2, pDNAPK_S, pChk1_S, pDNAPK_G2, pp53_G2, Cells, dummyVariable= u 
 	k_damage_dox_dsb, k_damage_gem_ssb, k_damage_sn38_ssb, k_death_reox, k_dox_apo, k_rep_hr, k_rep_nhej, k_rep_nhej_sat, k_rep_s, k_ssb_to_dsb, k_ssb_to_dsb_sn38, kt, p_atm_act_dsb, p_atr_act_atm, p_atr_act_ssb, p_chk1_act, p_chk1_dea_wip1, p_chk2_act, p_chk2_dea_wip1, p_dnapk_act, p_dnapk_dea_wip1, p_h2ax_act_atm, p_h2ax_act_atr, p_h2ax_act_dnapk, p_h2ax_dea, p_mrna_exp_inh_dox, p_p21_mrna_turn, p_p21_turn, p_p53_act_atm, p_p53_act_atr, p_p53_act_chk1, p_p53_act_chk2, p_wip1_mrna_turn, p_wip1_turn = dynPar 
@@ -27,52 +27,52 @@ function evalYmod(u, t, dynPar, obsPar, paramData, obsData, observableId, simula
 	end
 
 	if observableId == "Wip1_mRNA_fold" 
-		observableParameter1_Wip1_mRNA_fold = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_Wip1_mRNA_fold = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_Wip1_mRNA_fold * ( Wip1_mRNA_G2 + Wip1_mRNA_S ) + 1 
 	end
 
 	if observableId == "p21_mRNA_fold" 
-		observableParameter1_p21_mRNA_fold = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_p21_mRNA_fold = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_p21_mRNA_fold * ( p21_mRNA_S + p21_mRNA_G2 ) + 1 
 	end
 
 	if observableId == "pATM_au" 
-		observableParameter1_pATM_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_pATM_au = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_pATM_au * ( pATM_G2 + pATM_S ) 
 	end
 
 	if observableId == "pChk1_au" 
-		observableParameter1_pChk1_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_pChk1_au = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_pChk1_au * ( pChk1_G2 + pChk1_S ) 
 	end
 
 	if observableId == "pChk2_au" 
-		observableParameter1_pChk2_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_pChk2_au = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_pChk2_au * ( pChk2_S + pChk2_G2 ) 
 	end
 
 	if observableId == "pDNAPK_au" 
-		observableParameter1_pDNAPK_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_pDNAPK_au = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_pDNAPK_au * ( pDNAPK_G2 + pDNAPK_S ) 
 	end
 
 	if observableId == "pp53_au" 
-		observableParameter1_pp53_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_pp53_au = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_pp53_au * ( pp53_S + pp53_G2 ) 
 	end
 
 	if observableId == "tp21_au" 
-		observableParameter1_tp21_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_tp21_au = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_tp21_au * ( p21_S + p21_G2 ) 
 	end
 
 	if observableId == "tp53_au" 
-		observableParameter1_tp53_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_tp53_au = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_tp53_au * ( pp53_S + pp53_G2 ) 
 	end
 
 	if observableId == "yH2AX_au" 
-		observableParameter1_yH2AX_au = getObsOrSdParam(obsPar, paramData, obsData, observableId, simulationId, t)
+		observableParameter1_yH2AX_au = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_yH2AX_au * ( yH2AX_S + yH2AX_G2 ) 
 	end
 
@@ -123,7 +123,7 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Cells_Dead, Cells_Apo1, pATR_G2, yH2AX_G2, Wip1_mRNA_S, pATM_S, p21_G2, Cells_SSBDamage_S, pp53_S, pATM_G2, Cells_Apo2, Cells_Cycle_G2, Cells_Apo_ReOx, yH2AX_S, p21_mRNA_S, Wip1_S, Wip1_mRNA_G2, Cells_Apo4, Cells_DSBDamage_G2, Cells_Apo, pChk2_G2, Wip1_G2, pATR_S, p21_S, Cells_DSBDamage_S, p21_mRNA_G2, Space, pChk2_S, Cells_Cycle_S, Cells_Apo3, pChk1_G2, pDNAPK_S, pChk1_S, pDNAPK_G2, pp53_G2, Cells, dummyVariable
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulationId) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	Cells_Dead, Cells_Apo1, pATR_G2, yH2AX_G2, Wip1_mRNA_S, pATM_S, p21_G2, Cells_SSBDamage_S, pp53_S, pATM_G2, Cells_Apo2, Cells_Cycle_G2, Cells_Apo_ReOx, yH2AX_S, p21_mRNA_S, Wip1_S, Wip1_mRNA_G2, Cells_Apo4, Cells_DSBDamage_G2, Cells_Apo, pChk2_G2, Wip1_G2, pATR_S, p21_S, Cells_DSBDamage_S, p21_mRNA_G2, Space, pChk2_S, Cells_Cycle_S, Cells_Apo3, pChk1_G2, pDNAPK_S, pChk1_S, pDNAPK_G2, pp53_G2, Cells, dummyVariable= u 
 	k_damage_dox_dsb, k_damage_gem_ssb, k_damage_sn38_ssb, k_death_reox, k_dox_apo, k_rep_hr, k_rep_nhej, k_rep_nhej_sat, k_rep_s, k_ssb_to_dsb, k_ssb_to_dsb_sn38, kt, p_atm_act_dsb, p_atr_act_atm, p_atr_act_ssb, p_chk1_act, p_chk1_dea_wip1, p_chk2_act, p_chk2_dea_wip1, p_dnapk_act, p_dnapk_dea_wip1, p_h2ax_act_atm, p_h2ax_act_atr, p_h2ax_act_dnapk, p_h2ax_dea, p_mrna_exp_inh_dox, p_p21_mrna_turn, p_p21_turn, p_p53_act_atm, p_p53_act_atr, p_p53_act_chk1, p_p53_act_chk2, p_wip1_mrna_turn, p_wip1_turn = dynPar 
@@ -144,62 +144,62 @@ function evalSd!(u, t, sdPar, dynPar, paramData, obsData, observableId, simulati
 	p_mrna_exp_inh_dox_kd_C = paramData.paramVal[41] 
 
 	if observableId == "CellsCasp_count" 
-		noiseParameter1_CellsCasp_count = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_CellsCasp_count = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_CellsCasp_count 
 	end
 
 	if observableId == "Cells_count" 
-		noiseParameter1_Cells_count = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_Cells_count = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_Cells_count 
 	end
 
 	if observableId == "Wip1_mRNA_fold" 
-		noiseParameter1_Wip1_mRNA_fold = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_Wip1_mRNA_fold = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_Wip1_mRNA_fold 
 	end
 
 	if observableId == "p21_mRNA_fold" 
-		noiseParameter1_p21_mRNA_fold = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_p21_mRNA_fold = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_p21_mRNA_fold 
 	end
 
 	if observableId == "pATM_au" 
-		noiseParameter1_pATM_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_pATM_au = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pATM_au 
 	end
 
 	if observableId == "pChk1_au" 
-		noiseParameter1_pChk1_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_pChk1_au = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pChk1_au 
 	end
 
 	if observableId == "pChk2_au" 
-		noiseParameter1_pChk2_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_pChk2_au = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pChk2_au 
 	end
 
 	if observableId == "pDNAPK_au" 
-		noiseParameter1_pDNAPK_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_pDNAPK_au = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pDNAPK_au 
 	end
 
 	if observableId == "pp53_au" 
-		noiseParameter1_pp53_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_pp53_au = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pp53_au 
 	end
 
 	if observableId == "tp21_au" 
-		noiseParameter1_tp21_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_tp21_au = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_tp21_au 
 	end
 
 	if observableId == "tp53_au" 
-		noiseParameter1_tp53_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_tp53_au = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_tp53_au 
 	end
 
 	if observableId == "yH2AX_au" 
-		noiseParameter1_yH2AX_au = getObsOrSdParam(sdPar, paramData, obsData, observableId, simulationId, t, getObsPar=false)
+		noiseParameter1_yH2AX_au = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_yH2AX_au 
 	end
 
