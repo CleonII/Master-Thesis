@@ -20,20 +20,6 @@ function rewritePiecewiseToIfElse(ruleFormula, variable, modelDict, baseFunction
         vals = args[1:2:end]
         conds = args[2:2:end]
 
-        # If any values are a set of parameter(s) and/or constant(s), add it/them to the dummyVariable to keep 
-        # ModellingToolkit from removing them. Insert function definitions in Julia syntax if needed
-        for (vIndex, val) in enumerate(vals)
-            valArgs = getArguments(val, modelDict["modelFunctions"], baseFunctions)
-            if valArgs[2]
-                vals[vIndex] = rewriteFunctionOfFunction(val, modelDict["modelFunctions"])
-            end
-            for valArg in split(valArgs[1], ", ")
-                if valArg in keys(modelDict["parameters"])
-                    modelDict["dummyVariable"][valArg] = modelDict["parameters"][valArg]
-                end
-            end
-        end   
-
         # In case our variable is the sum of several piecewise bookeep each piecewise
         if length(piecewiseStrings) > 1
             varChange = variable * "Event" * string(i)
@@ -154,14 +140,6 @@ function simplePiecewiseToIfElse(condition, variable, valActive, valInactive, di
         inEqUse = " > "
     else
         println("Cannot recognize form of inequality")
-    end
-
-    # If the trigger or event contains parameters or constant, add them to the dummyVariable to keep defined
-    args = split(getArguments(strippedCondition, baseFunctions), ", ")
-    for arg in args
-        if arg in keys(dicts["parameters"])
-            dicts["dummyVariable"][arg] = dicts["parameters"][arg]
-        end
     end
         
     parts = splitBetween(strippedCondition, ',')

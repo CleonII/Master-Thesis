@@ -96,12 +96,6 @@ function processInitialAssignment(libsbml, model, modelDict::Dict, baseFunctions
             println("Error: could not find assigned variable/parameter")
         end
 
-        # Add assigned variable to dummy variable to prevent it from being simplified away 
-        for part in split(getArguments(assignFormula, baseFunctions), ", ")
-            if part in keys(modelDict["parameters"])
-                modelDict["dummyVariable"][part] = modelDict["parameters"][part]
-            end
-        end
     end
 
     # If the initial assignment for a state is the value of another state apply recursion until continue looping 
@@ -151,15 +145,13 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     # i) Model parameters (constant during for a simulation)
     # ii) Model parameters that are nonConstant (e.g due to events) during a simulation
     # iii) Model states 
-    # iv) Dummy variable (TODO: Remove if possible)
-    # v) Model function (functions in the SBML file we rewrite to Julia syntax)
-    # vi) Model rules (rules defined in the SBML model we rewrite to Julia syntax)
-    # vii) Model derivatives (derivatives defined by the SBML model)
+    # iv) Model function (functions in the SBML file we rewrite to Julia syntax)
+    # v) Model rules (rules defined in the SBML model we rewrite to Julia syntax)
+    # vi) Model derivatives (derivatives defined by the SBML model)
     modelDict = Dict()    
     modelDict["states"] = Dict()
     modelDict["parameters"] = Dict()
     modelDict["nonConstantParameters"] = Dict()
-    modelDict["dummyVariable"] = Dict()
     modelDict["modelFunctions"] = Dict()
     modelDict["modelRuleFunctions"] = Dict()
     modelDict["modelRules"] = Dict()
@@ -222,13 +214,6 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         trigger = event[:getTrigger]()
         triggerMath = trigger[:getMath]()
         triggerFormula = asTrigger(libsbml[:formulaToString](triggerMath))
-        # if the trigger contains parameters, add them to the dummy variables
-        triggerArgs = split(getArguments(triggerFormula[2:end-1], baseFunctions), ", ")
-        for triggerArg in triggerArgs
-            if triggerArg in keys(dicts["parameters"])
-                dicts["dummyVariable"][triggerArg] = dicts["parameters"][triggerArg]
-            end
-        end
         eventAsString = ""
         for (eaIndex, eventAssignment) in enumerate(event[:getListOfEventAssignments]())
             variableName = eventAssignment[:getVariable]()
@@ -240,13 +225,6 @@ function writeODEModelToFile(libsbml, model, modelName, path)
 
             eventMath = eventAssignment[:getMath]()
             eventMathAsString = libsbml[:formulaToString](eventMath)
-            # if the event math contains parameters, add them to the dummy variable so that they stay defined 
-            eventMathArgs = split(getArguments(eventMathAsString, baseFunctions), ", ")
-            for eventMathArg in eventMathArgs
-                if eventMathArg in keys(parameterDict)
-                    dummyVariableDict[eventMathArg] = parameterDict[eventMathArg]
-                end
-            end
 
             # Add the event 
             if eaIndex == 1
@@ -321,11 +299,6 @@ function writeODEModelToFile(libsbml, model, modelName, path)
             end
         end
     end
-    for (i, pars) in enumerate(keys(modelDict["parameters"]))
-        if !isInODESys[i]
-            modelDict["dummyVariable"][pars] = modelDict["parameters"][pars]
-        end
-    end
 
     ### Writing to file 
     modelFile = open(path * "/" * modelName * ".jl", "w")
@@ -342,6 +315,16 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     for key in keys(modelDict["states"])
         defineVariables = defineVariables * " " * key * "(t)"
     end
+    println(modelFile, defineVariables)
+
+    println(modelFile, "")
+    println(modelFile, "    ### Store dependent variables in array for ODESystem command")
+    defineVariables = "    stateArray = ["
+    for key in keys(modelDict["states"])
+        defineVariables = defineVariables * key * ", "
+    end
+    # Replace the last ", " with a "]"
+    defineVariables = defineVariables[1:end-2] * "]"
     println(modelFile, defineVariables)
 
     println(modelFile, "")
@@ -365,18 +348,21 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     end
     
     println(modelFile, "")
-    println(modelFile, "    ### Define dummy variable")
-    if length(modelDict["dummyVariable"]) > 0
-        defineDummyVariables = "    ModelingToolkit.@variables dummyVariable(t)"
-        println(modelFile, defineDummyVariables)
-    end
-    
-    println(modelFile, "")
     println(modelFile, "    ### Define parameters")
     defineParameters = "    ModelingToolkit.@parameters"
     for key in keys(modelDict["parameters"])
         defineParameters = defineParameters * " " * key
     end
+    println(modelFile, defineParameters)
+
+    println(modelFile, "")
+    println(modelFile, "    ### Store parameters in array for ODESystem command")
+    defineParameters = "    parameterArray = ["
+    for key in keys(modelDict["parameters"])
+        defineParameters = defineParameters * key * ", "
+    end
+    # Replace the last ", " with a "]"
+    defineParameters = defineParameters[1:end-2] * "]"
     println(modelFile, defineParameters)
 
     println(modelFile, "")
@@ -415,33 +401,27 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     for key in keys(modelDict["inputFunctions"])
         print(modelFile, ",\n    " * modelDict["inputFunctions"][key])
     end
-    if length(modelDict["dummyVariable"]) > 0
-        dummyVariableDerivative = ",\n    D(dummyVariable) ~ "
-        dummyVariableDerivative *= "1e-60*( "
-        for key in keys(modelDict["dummyVariable"])
-            dummyVariableDerivative = dummyVariableDerivative * "+" * key
-        end
-        dummyVariableDerivative *= ")"
-        println(modelFile, dummyVariableDerivative)
-    end
-    
+    println(modelFile, "")
     println(modelFile, "    ]")
 
     println(modelFile, "")
     if length(stringOfEvents) > 0 && length(discreteEventString) > 0
-        println(modelFile, "    @named sys = ODESystem(eqs, t, continuous_events = continuous_events, discrete_events = discrete_events)")
+        println(modelFile, "    @named sys = ODESystem(eqs, t, stateArray, parameterArray, continuous_events = continuous_events, discrete_events = discrete_events)")
     elseif length(stringOfEvents) > 0 && length(discreteEventString) == 0
-        println(modelFile, "    @named sys = ODESystem(eqs, t, continuous_events = continuous_events)")
+        println(modelFile, "    @named sys = ODESystem(eqs, t, stateArray, parameterArray, continuous_events = continuous_events)")
     elseif length(stringOfEvents) == 0 && length(discreteEventString) > 0
-        println(modelFile, "    @named sys = ODESystem(eqs, t, discrete_events = discrete_events)")
+        println(modelFile, "    @named sys = ODESystem(eqs, t, stateArray, parameterArray, discrete_events = discrete_events)")
     else
-        println(modelFile, "    @named sys = ODESystem(eqs)")
+        println(modelFile, "    @named sys = ODESystem(eqs, t, stateArray, parameterArray)")
     end
 
     println(modelFile, "")
     println(modelFile, "    ### Initial species concentrations ###")
     println(modelFile, "    initialSpeciesValues = [")
     for (index, (key, value)) in enumerate(modelDict["states"])
+        if tryparse(Float64,value) !== nothing
+            value = string(parse(Float64,value))
+        end
         if index == 1
             assignString = "    " * key * " => " * value
         else
@@ -453,16 +433,16 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         assignString = ",\n    " * key * " => " * value
         print(modelFile, assignString)
     end
-    if length(modelDict["dummyVariable"]) > 0
-        assignString = ",\n    dummyVariable => 0.0"
-        print(modelFile, assignString)
-    end
-    println(modelFile, "]")
+    println(modelFile, "")
+    println(modelFile, "    ]")
 
     println(modelFile, "")
     println(modelFile, "    ### SBML file parameter values ###")
     println(modelFile, "    trueParameterValues = [")
     for (index, (key, value)) in enumerate(modelDict["parameters"])
+        if tryparse(Float64,value) !== nothing
+            value = string(parse(Float64,value))
+        end
         if index == 1
             assignString = "    " * key * " => " * value
         else
@@ -470,7 +450,8 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         end
         print(modelFile, assignString)
     end
-    println(modelFile, "]")
+    println(modelFile, "")
+    println(modelFile, "    ]")
     println(modelFile, "")
 
     println(modelFile, "    return sys, initialSpeciesValues, trueParameterValues")
