@@ -1,6 +1,6 @@
 function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
-	Cells_Dead, Cells_Apo1, pATR_G2, yH2AX_G2, Wip1_mRNA_S, pATM_S, p21_G2, Cells_SSBDamage_S, pp53_S, pATM_G2, Cells_Apo2, Cells_Cycle_G2, Cells_Apo_ReOx, yH2AX_S, p21_mRNA_S, Wip1_S, Wip1_mRNA_G2, Cells_Apo4, Cells_DSBDamage_G2, Cells_Apo, pChk2_G2, Wip1_G2, pATR_S, p21_S, Cells_DSBDamage_S, p21_mRNA_G2, Space, pChk2_S, Cells_Cycle_S, Cells_Apo3, pChk1_G2, pDNAPK_S, pChk1_S, pDNAPK_G2, pp53_G2, Cells, dummyVariable= u 
+	Cells_Dead, Cells_Apo1, pATR_G2, yH2AX_G2, Wip1_mRNA_S, pATM_S, p21_G2, Cells_SSBDamage_S, pp53_S, pATM_G2, Cells_Apo2, Cells_Cycle_G2, Cells_Apo_ReOx, yH2AX_S, p21_mRNA_S, Wip1_S, Wip1_mRNA_G2, Cells_Apo4, Cells_DSBDamage_G2, Cells_Apo, pChk2_G2, Wip1_G2, pATR_S, p21_S, Cells_DSBDamage_S, p21_mRNA_G2, Space, pChk2_S, Cells_Cycle_S, Cells_Apo3, pChk1_G2, pDNAPK_S, pChk1_S, pDNAPK_G2, pp53_G2, Cells= u 
 	k_damage_dox_dsb, k_damage_gem_ssb, k_damage_sn38_ssb, k_death_reox, k_dox_apo, k_rep_hr, k_rep_nhej, k_rep_nhej_sat, k_rep_s, k_ssb_to_dsb, k_ssb_to_dsb_sn38, kt, p_atm_act_dsb, p_atr_act_atm, p_atr_act_ssb, p_chk1_act, p_chk1_dea_wip1, p_chk2_act, p_chk2_dea_wip1, p_dnapk_act, p_dnapk_dea_wip1, p_h2ax_act_atm, p_h2ax_act_atr, p_h2ax_act_dnapk, p_h2ax_dea, p_mrna_exp_inh_dox, p_p21_mrna_turn, p_p21_turn, p_p53_act_atm, p_p53_act_atr, p_p53_act_chk1, p_p53_act_chk2, p_wip1_mrna_turn, p_wip1_turn = dynPar 
 	init_Cells_C = paramData.paramVal[1] 
 	init_Cells_Cycle_G2_rel_C = paramData.paramVal[2] 
@@ -80,7 +80,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	k_death, default, k_lyse, k_death_reox, k_death_delay, k_dox_apo, k_dox_kd, Dox_level, p_atr_act_atm, p_h2ax_act_atr, p_h2ax_act_dnapk, p_h2ax_dea, p_h2ax_act_atm, p_wip1_mrna_turn, p_mrna_exp_inh_dox, p_mrna_exp_inh_dox_kd, p_atm_act_dsb, p_p21_turn, k_apo_ssb, Gem_level, kt_apo, SN38_level, k_damage_gem_ssb, k_damage_sn38_ssb, k_ssb_to_dsb_sn38, k_cyc_arr_chk1, k_ssb_to_dsb, k_rep_s, p_p53_act_chk2, p_p53_act_atm, p_p53_act_atr, p_p53_act_chk1, init_Cells, k_rep_nhej_sat, init_Cells_Cycle_S_rel, init_Cells_Cycle_G2_rel, k_rep_nhej, k_damage_dox_dsb, k_rep_hr, kt, p_p21_mrna_turn, p_wip1_turn, k_apo_dsb_g2, k_cyc_arr_chk2, k_apo_dsb_s, p_chk2_act, p_chk2_dea_wip1, p_atr_act_ssb, init_Space, p_chk1_dea_wip1, p_chk1_act, p_dnapk_dea_wip1, p_dnapk_act = paramVec 
+	k_dox_apo, p_p53_act_atm, p_chk1_dea_wip1, k_rep_hr, p_p53_act_chk1, k_rep_nhej, k_death, k_dox_kd, init_Cells_Cycle_G2_rel, k_apo_dsb_g2, k_rep_s, p_p21_turn, p_h2ax_act_atm, p_p53_act_chk2, p_atr_act_ssb, p_mrna_exp_inh_dox_kd, p_chk2_dea_wip1, k_cyc_arr_chk2, p_wip1_mrna_turn, p_mrna_exp_inh_dox, Gem_level, k_ssb_to_dsb, k_rep_nhej_sat, Dox_level, k_lyse, k_damage_sn38_ssb, p_chk1_act, p_atr_act_atm, default, k_apo_ssb, k_apo_dsb_s, k_cyc_arr_chk1, p_h2ax_act_atr, k_death_delay, p_h2ax_act_dnapk, k_damage_dox_dsb, p_chk2_act, p_atm_act_dsb, kt, p_dnapk_act, k_damage_gem_ssb, p_p53_act_atr, init_Cells_Cycle_S_rel, k_death_reox, kt_apo, k_ssb_to_dsb_sn38, init_Space, init_Cells, p_dnapk_dea_wip1, SN38_level, p_h2ax_dea, p_p21_mrna_turn, p_wip1_turn = paramVec 
 
 	Cells_Dead = 0.0 
 	Cells_Apo1 = 0.0 
@@ -118,14 +118,13 @@ function evalU0!(u0Vec, paramVec)
 	pDNAPK_G2 = 0.0 
 	pp53_G2 = 0.0 
 	Cells = init_Cells * ( init_Cells_Cycle_G2_rel - 1 ) * ( init_Cells_Cycle_S_rel - 1 ) 
-	dummyVariable = 0.0 
 
-	u0Vec .= Cells_Dead, Cells_Apo1, pATR_G2, yH2AX_G2, Wip1_mRNA_S, pATM_S, p21_G2, Cells_SSBDamage_S, pp53_S, pATM_G2, Cells_Apo2, Cells_Cycle_G2, Cells_Apo_ReOx, yH2AX_S, p21_mRNA_S, Wip1_S, Wip1_mRNA_G2, Cells_Apo4, Cells_DSBDamage_G2, Cells_Apo, pChk2_G2, Wip1_G2, pATR_S, p21_S, Cells_DSBDamage_S, p21_mRNA_G2, Space, pChk2_S, Cells_Cycle_S, Cells_Apo3, pChk1_G2, pDNAPK_S, pChk1_S, pDNAPK_G2, pp53_G2, Cells, dummyVariable
+	u0Vec .= Cells_Dead, Cells_Apo1, pATR_G2, yH2AX_G2, Wip1_mRNA_S, pATM_S, p21_G2, Cells_SSBDamage_S, pp53_S, pATM_G2, Cells_Apo2, Cells_Cycle_G2, Cells_Apo_ReOx, yH2AX_S, p21_mRNA_S, Wip1_S, Wip1_mRNA_G2, Cells_Apo4, Cells_DSBDamage_G2, Cells_Apo, pChk2_G2, Wip1_G2, pATR_S, p21_S, Cells_DSBDamage_S, p21_mRNA_G2, Space, pChk2_S, Cells_Cycle_S, Cells_Apo3, pChk1_G2, pDNAPK_S, pChk1_S, pDNAPK_G2, pp53_G2, Cells
 end
 
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
-	Cells_Dead, Cells_Apo1, pATR_G2, yH2AX_G2, Wip1_mRNA_S, pATM_S, p21_G2, Cells_SSBDamage_S, pp53_S, pATM_G2, Cells_Apo2, Cells_Cycle_G2, Cells_Apo_ReOx, yH2AX_S, p21_mRNA_S, Wip1_S, Wip1_mRNA_G2, Cells_Apo4, Cells_DSBDamage_G2, Cells_Apo, pChk2_G2, Wip1_G2, pATR_S, p21_S, Cells_DSBDamage_S, p21_mRNA_G2, Space, pChk2_S, Cells_Cycle_S, Cells_Apo3, pChk1_G2, pDNAPK_S, pChk1_S, pDNAPK_G2, pp53_G2, Cells, dummyVariable= u 
+	Cells_Dead, Cells_Apo1, pATR_G2, yH2AX_G2, Wip1_mRNA_S, pATM_S, p21_G2, Cells_SSBDamage_S, pp53_S, pATM_G2, Cells_Apo2, Cells_Cycle_G2, Cells_Apo_ReOx, yH2AX_S, p21_mRNA_S, Wip1_S, Wip1_mRNA_G2, Cells_Apo4, Cells_DSBDamage_G2, Cells_Apo, pChk2_G2, Wip1_G2, pATR_S, p21_S, Cells_DSBDamage_S, p21_mRNA_G2, Space, pChk2_S, Cells_Cycle_S, Cells_Apo3, pChk1_G2, pDNAPK_S, pChk1_S, pDNAPK_G2, pp53_G2, Cells= u 
 	k_damage_dox_dsb, k_damage_gem_ssb, k_damage_sn38_ssb, k_death_reox, k_dox_apo, k_rep_hr, k_rep_nhej, k_rep_nhej_sat, k_rep_s, k_ssb_to_dsb, k_ssb_to_dsb_sn38, kt, p_atm_act_dsb, p_atr_act_atm, p_atr_act_ssb, p_chk1_act, p_chk1_dea_wip1, p_chk2_act, p_chk2_dea_wip1, p_dnapk_act, p_dnapk_dea_wip1, p_h2ax_act_atm, p_h2ax_act_atr, p_h2ax_act_dnapk, p_h2ax_dea, p_mrna_exp_inh_dox, p_p21_mrna_turn, p_p21_turn, p_p53_act_atm, p_p53_act_atr, p_p53_act_chk1, p_p53_act_chk2, p_wip1_mrna_turn, p_wip1_turn = dynPar 
 	init_Cells_C = paramData.paramVal[1] 
 	init_Cells_Cycle_G2_rel_C = paramData.paramVal[2] 

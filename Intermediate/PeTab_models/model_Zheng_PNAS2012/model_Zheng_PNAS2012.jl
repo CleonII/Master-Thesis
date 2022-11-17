@@ -6,14 +6,18 @@ function getODEModel_model_Zheng_PNAS2012()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t K27me0K36me0(t) K27me2K36me3(t) K27me2K36me0(t) K27me0K36me1(t) K27me2K36me1(t) K27me0K36me2(t) K27me1K36me2(t) K27me3K36me2(t) K27me1K36me1(t) K27me1K36me3(t) K27me2K36me2(t) K27me0K36me3(t) K27me3K36me1(t) K27me3K36me0(t) K27me1K36me0(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [K27me0K36me0, K27me2K36me3, K27me2K36me0, K27me0K36me1, K27me2K36me1, K27me0K36me2, K27me1K36me2, K27me3K36me2, K27me1K36me1, K27me1K36me3, K27me2K36me2, K27me0K36me3, K27me3K36me1, K27me3K36me0, K27me1K36me0]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-
     ### Define parameters
     ModelingToolkit.@parameters k20_10 k11_12 k22_32 k21_11 k13_12 k01_00 k11_01 k22_21 k22_12 k11_10 k12_11 k21_31 k02_12 k30_20 dilution k31_21 k23_22 k02_01 k03_13 k10_11 k21_20 k10_00 k30_31 k20_30 k20_21 k00_10 k12_13 k01_11 k02_03 k00_01 k03_02 k23_13 k32_31 default k13_03 k31_30 k12_02 k31_32 k01_02 k13_23 k21_22 k12_22 k11_21 k22_23 k10_20 inflowp k32_22
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [k20_10, k11_12, k22_32, k21_11, k13_12, k01_00, k11_01, k22_21, k22_12, k11_10, k12_11, k21_31, k02_12, k30_20, dilution, k31_21, k23_22, k02_01, k03_13, k10_11, k21_20, k10_00, k30_31, k20_30, k20_21, k00_10, k12_13, k01_11, k02_03, k00_01, k03_02, k23_13, k32_31, default, k13_03, k31_30, k12_02, k31_32, k01_02, k13_23, k21_22, k12_22, k11_21, k22_23, k10_20, inflowp, k32_22]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -38,9 +42,10 @@ function getODEModel_model_Zheng_PNAS2012()
     D(K27me0K36me3) ~ +1.0 * ( 1 /default ) * (default * (K27me0K36me2 * k02_03 / default))-1.0 * ( 1 /default ) * (default * (K27me0K36me3 * k03_02 / default))-1.0 * ( 1 /default ) * (default * (K27me0K36me3 * k03_13 / default))+1.0 * ( 1 /default ) * (default * (K27me1K36me3 * k13_03 / default))-1.0 * ( 1 /default ) * (default * (K27me0K36me3 * (inflowp * dilution) / default)),
     D(K27me3K36me1) ~ +1.0 * ( 1 /default ) * (default * (K27me3K36me0 * k30_31 / default))-1.0 * ( 1 /default ) * (default * (K27me3K36me1 * k31_30 / default))+1.0 * ( 1 /default ) * (default * (K27me2K36me1 * k21_31 / default))-1.0 * ( 1 /default ) * (default * (K27me3K36me1 * k31_21 / default))-1.0 * ( 1 /default ) * (default * (K27me3K36me1 * k31_32 / default))+1.0 * ( 1 /default ) * (default * (K27me3K36me2 * k32_31 / default))-1.0 * ( 1 /default ) * (default * (K27me3K36me1 * (inflowp * dilution) / default)),
     D(K27me3K36me0) ~ +1.0 * ( 1 /default ) * (default * (K27me2K36me0 * k20_30 / default))-1.0 * ( 1 /default ) * (default * (K27me3K36me0 * k30_20 / default))-1.0 * ( 1 /default ) * (default * (K27me3K36me0 * k30_31 / default))+1.0 * ( 1 /default ) * (default * (K27me3K36me1 * k31_30 / default))-1.0 * ( 1 /default ) * (default * (K27me3K36me0 * (inflowp * dilution) / default)),
-    D(K27me1K36me0) ~ +1.0 * ( 1 /default ) * (default * (K27me0K36me0 * k00_10 / default))-1.0 * ( 1 /default ) * (default * (K27me1K36me0 * k10_00 / default))-1.0 * ( 1 /default ) * (default * (K27me1K36me0 * k10_11 / default))+1.0 * ( 1 /default ) * (default * (K27me1K36me1 * k11_10 / default))-1.0 * ( 1 /default ) * (default * (K27me1K36me0 * k10_20 / default))+1.0 * ( 1 /default ) * (default * (K27me2K36me0 * k20_10 / default))-1.0 * ( 1 /default ) * (default * (K27me1K36me0 * (inflowp * dilution) / default))    ]
+    D(K27me1K36me0) ~ +1.0 * ( 1 /default ) * (default * (K27me0K36me0 * k00_10 / default))-1.0 * ( 1 /default ) * (default * (K27me1K36me0 * k10_00 / default))-1.0 * ( 1 /default ) * (default * (K27me1K36me0 * k10_11 / default))+1.0 * ( 1 /default ) * (default * (K27me1K36me1 * k11_10 / default))-1.0 * ( 1 /default ) * (default * (K27me1K36me0 * k10_20 / default))+1.0 * ( 1 /default ) * (default * (K27me2K36me0 * k20_10 / default))-1.0 * ( 1 /default ) * (default * (K27me1K36me0 * (inflowp * dilution) / default))
+    ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -58,7 +63,8 @@ function getODEModel_model_Zheng_PNAS2012()
     K27me0K36me3 => 0.0504935214807544,
     K27me3K36me1 => 0.00250831034920277,
     K27me3K36me0 => 0.00330168411604165,
-    K27me1K36me0 => 0.00165412810279407]
+    K27me1K36me0 => 0.00165412810279407
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -108,7 +114,8 @@ function getODEModel_model_Zheng_PNAS2012()
     k22_23 => 0.0501463279005419,
     k10_20 => 1.0000000000005e-5,
     inflowp => 0.0309160767779193,
-    k32_22 => 1.28866373067424]
+    k32_22 => 1.28866373067424
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

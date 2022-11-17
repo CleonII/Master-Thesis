@@ -6,16 +6,19 @@ function getODEModel_model_Isensee_JCB2018()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t pAC(t) Rp8_Br_cAMPS(t) Rp8_pCPT_cAMPS(t) PDE(t) Rp_cAMPS(t) RII_2(t) RIIp_Rp8_Br_cAMPS_C_2(t) cAMP(t) RIIp_Sp8_Br_cAMPS_C_2(t) IBMX(t) AC_Fsk(t) RIIp_C_2(t) Sp8_Br_cAMPS(t) RII_C_2(t) RIIp_Sp8_Br_cAMPS_2(t) Csub(t) Csub_H89(t) AC(t) RIIp_cAMP_2(t) pAC_Fsk(t) RIIp_Rp8_pCPT_cAMPS_C_2(t) pPDE(t) RIIp_Rp_cAMPS_C_2(t) RIIp_2(t) RIIp_cAMP_C_2(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [pAC, Rp8_Br_cAMPS, Rp8_pCPT_cAMPS, PDE, Rp_cAMPS, RII_2, RIIp_Rp8_Br_cAMPS_C_2, cAMP, RIIp_Sp8_Br_cAMPS_C_2, IBMX, AC_Fsk, RIIp_C_2, Sp8_Br_cAMPS, RII_C_2, RIIp_Sp8_Br_cAMPS_2, Csub, Csub_H89, AC, RIIp_cAMP_2, pAC_Fsk, RIIp_Rp8_pCPT_cAMPS_C_2, pPDE, RIIp_Rp_cAMPS_C_2, RIIp_2, RIIp_cAMP_C_2]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
     ModelingToolkit.@variables Rp_cAMPS_pAB(t) H89(t) Fsk(t) IBMXex(t) Rp8_Br_cAMPS_pAB(t) Rp8_pCPT_cAMPS_pAB(t) fourABnOH(t) Sp8_Br_cAMPS_AM(t)
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters ki_Rp8_pCPT_cAMPS_pAB xi_b_Rp_cAMPS RII2_total H89_level fourABnOH_incubation_time KD_Fsk kdeg_cAMP_free Rp8_Br_cAMPS_pAB_level xi_KD_Rp8_Br_cAMPS kf_PDE_Csub Sp8_Br_cAMPS_AM_level xi_kf_RII_C_2__RII_2 kf_RIIp_2__RII_2 kf_cAMP IBMX_time Rp_cAMPS_pAB_incubation_time kf_H89 kf_RII_C_2__RII_2 kf_RII_C_2__RIIp_C_2 xi_i_Rp8_pCPT_cAMPS_pAB xi_pAC fourABnOH_level ki_Sp8_Br_cAMPS_AM xi_b_Sp8_Br_cAMPS xi_b_Rp8_Br_cAMPS H89_time kdeg_cAMP xi_AC_cAMP_Fsk xi_b_Rp8_pCPT_cAMPS ki_Rp_cAMPS_pAB xi_i_Rp_cAMPS_pAB KD_PDE_Csub ki_IBMX Fsk_time Rp8_pCPT_cAMPS_pAB_incubation_time PDE_total ki_Rp8_Br_cAMPS_pAB xi_kf_RII_2__RII_C_2 default xi_i_Rp8_Br_cAMPS_pAB Sp8_Br_cAMPS_AM_time xi_KD_Rp8_pCPT_cAMPS kp_AC xi_pPDE xi_KD_Rp_cAMPS Rp8_Br_cAMPS_pAB_incubation_time AC_total kf_RIIp_C_2__RII_C_2 xi_KD_Sp8_Br_cAMPS nuc kf_RIIp_cAMP_C_2__RIIp_2 KD_cAMP KD_IBMX kf_Fsk xi_i_Sp8_Br_cAMPS_AM cyt KD_H89 ks_AC_cAMP Rp8_pCPT_cAMPS_pAB_level Rp_cAMPS_pAB_level kf_RII_2__RII_C_2 Fsk_level kdp_AC IBMX_level
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [ki_Rp8_pCPT_cAMPS_pAB, xi_b_Rp_cAMPS, RII2_total, H89_level, fourABnOH_incubation_time, KD_Fsk, kdeg_cAMP_free, Rp8_Br_cAMPS_pAB_level, xi_KD_Rp8_Br_cAMPS, kf_PDE_Csub, Sp8_Br_cAMPS_AM_level, xi_kf_RII_C_2__RII_2, kf_RIIp_2__RII_2, kf_cAMP, IBMX_time, Rp_cAMPS_pAB_incubation_time, kf_H89, kf_RII_C_2__RII_2, kf_RII_C_2__RIIp_C_2, xi_i_Rp8_pCPT_cAMPS_pAB, xi_pAC, fourABnOH_level, ki_Sp8_Br_cAMPS_AM, xi_b_Sp8_Br_cAMPS, xi_b_Rp8_Br_cAMPS, H89_time, kdeg_cAMP, xi_AC_cAMP_Fsk, xi_b_Rp8_pCPT_cAMPS, ki_Rp_cAMPS_pAB, xi_i_Rp_cAMPS_pAB, KD_PDE_Csub, ki_IBMX, Fsk_time, Rp8_pCPT_cAMPS_pAB_incubation_time, PDE_total, ki_Rp8_Br_cAMPS_pAB, xi_kf_RII_2__RII_C_2, default, xi_i_Rp8_Br_cAMPS_pAB, Sp8_Br_cAMPS_AM_time, xi_KD_Rp8_pCPT_cAMPS, kp_AC, xi_pPDE, xi_KD_Rp_cAMPS, Rp8_Br_cAMPS_pAB_incubation_time, AC_total, kf_RIIp_C_2__RII_C_2, xi_KD_Sp8_Br_cAMPS, nuc, kf_RIIp_cAMP_C_2__RIIp_2, KD_cAMP, KD_IBMX, kf_Fsk, xi_i_Sp8_Br_cAMPS_AM, cyt, KD_H89, ks_AC_cAMP, Rp8_pCPT_cAMPS_pAB_level, Rp_cAMPS_pAB_level, kf_RII_2__RII_C_2, Fsk_level, kdp_AC, IBMX_level]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -58,11 +61,10 @@ function getODEModel_model_Isensee_JCB2018()
     Rp8_Br_cAMPS_pAB ~ Rp8_Br_cAMPS_pAB_level * ifelse(t - Rp8_Br_cAMPS_pAB_incubation_time < 0, 0, 1),
     Rp8_pCPT_cAMPS_pAB ~ Rp8_pCPT_cAMPS_pAB_level * ifelse(t - Rp8_pCPT_cAMPS_pAB_incubation_time < 0, 0, 1),
     fourABnOH ~ fourABnOH_level * ifelse(t - fourABnOH_incubation_time < 0, 0, 1),
-    Sp8_Br_cAMPS_AM ~ Sp8_Br_cAMPS_AM_level * ifelse(t - Sp8_Br_cAMPS_AM_time < 0, 0, 1),
-    D(dummyVariable) ~ 1e-60*( +H89_time+RII2_total+fourABnOH_incubation_time+IBMX_time+Rp_cAMPS_pAB_incubation_time+Fsk_time+Rp8_pCPT_cAMPS_pAB_incubation_time+PDE_total+default+Sp8_Br_cAMPS_AM_time+Rp8_Br_cAMPS_pAB_incubation_time+AC_total+nuc)
+    Sp8_Br_cAMPS_AM ~ Sp8_Br_cAMPS_AM_level * ifelse(t - Sp8_Br_cAMPS_AM_time < 0, 0, 1)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -90,8 +92,8 @@ function getODEModel_model_Isensee_JCB2018()
     pPDE => 0.0,
     RIIp_Rp_cAMPS_C_2 => 0.0,
     RIIp_2 => 0.133979505944916,
-    RIIp_cAMP_C_2 => 0.00541202870022029,
-    dummyVariable => 0.0]
+    RIIp_cAMP_C_2 => 0.00541202870022029
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -158,7 +160,8 @@ function getODEModel_model_Isensee_JCB2018()
     kf_RII_2__RII_C_2 => 1.26077939273477,
     Fsk_level => 0.0,
     kdp_AC => 0.0,
-    IBMX_level => 0.0]
+    IBMX_level => 0.0
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

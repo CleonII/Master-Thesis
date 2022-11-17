@@ -1,6 +1,6 @@
 function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
-	Infected, Recovered, Susceptible, dummyVariable= u 
+	Infected, Recovered, Susceptible= u 
 	gamma_NY, Ro_NY, Io_NY = dynPar 
 	gamma_CA_C = paramData.paramVal[2] 
 	Ro_CA_C = paramData.paramVal[4] 
@@ -24,19 +24,18 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	gamma_CA, Trigger_NY, gamma_NY, Lockdown_NY_end, Lockdown_CA_end, Ro_NY, Lockdown_NY_start, Trigger_Lockdown, Ro_CA, Lockdown_CA_start, Io_CA, Pop_CA, Pop_NY, Io_NY = paramVec 
+	Lockdown_NY_end, Pop_CA, Io_CA, Pop_NY, Io_NY, Trigger_NY, USA___CA__NY, Lockdown_CA_start, gamma_NY, Trigger_Lockdown, Ro_NY, Lockdown_CA_end, gamma_CA, Ro_CA, Lockdown_NY_start = paramVec 
 
 	Infected = ( Io_CA * ( 1 - Trigger_NY ) + Io_NY * Trigger_NY ) / ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) ) 
 	Recovered = 0.0 
 	Susceptible = ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) + ( - Io_CA * ( 1 - Trigger_NY ) - Io_NY * Trigger_NY ) / ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) ) ) / ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) ) 
-	dummyVariable = 0.0 
 
-	u0Vec .= Infected, Recovered, Susceptible, dummyVariable
+	u0Vec .= Infected, Recovered, Susceptible
 end
 
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
-	Infected, Recovered, Susceptible, dummyVariable= u 
+	Infected, Recovered, Susceptible= u 
 	gamma_NY, Ro_NY, Io_NY = dynPar 
 	gamma_CA_C = paramData.paramVal[2] 
 	Ro_CA_C = paramData.paramVal[4] 

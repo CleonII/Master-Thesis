@@ -1,6 +1,6 @@
 function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
-	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp, dummyVariable= u 
+	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp= u 
 	k1a, k1aBasic, k1b, k1c, k1d, k1e, k1f, k1g, k1r, k21, k22, k3, km2, km3 = dynPar 
 
 	if observableId == "IR1_P" 
@@ -22,7 +22,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	k1g, k1d, k1c, k1a, k1b, k1r, k1aBasic, k1e, k1f, k21, km2, k22, km3, k3, insulin_time_1, insulin_time_2, insulin_dose_2, insulin_dose_1, k_IRSiP_DosR, default = paramVec 
+	k1c, k21, k1g, insulin_dose_2, k1a, insulin_dose_1, k1aBasic, k1d, insulin_time_1, insulin_time_2, cyt, k22, default, k1r, k1f, k1b, k3, km2, k1e, k_IRSiP_DosR, km3 = paramVec 
 
 	IRp = 1.7629010620181e-9 
 	IR = 9.94957642787569 
@@ -33,14 +33,13 @@ function evalU0!(u0Vec, paramVec)
 	IRi = 0.0330151891862681 
 	IRSiP = 0.133006512986336 
 	Xp = 0.000158005126497888 
-	dummyVariable = 0.0 
 
-	u0Vec .= IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp, dummyVariable
+	u0Vec .= IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp
 end
 
-function evalSd!(u, t, sdPar, dynPar, nonDynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
-	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp, dummyVariable= u 
+	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp= u 
 	k1a, k1aBasic, k1b, k1c, k1d, k1e, k1f, k1g, k1r, k21, k22, k3, km2, km3 = dynPar 
 
 	if observableId == "IR1_P" 

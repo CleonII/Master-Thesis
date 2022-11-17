@@ -6,15 +6,18 @@ function getODEModel_model_Crauste_CellSystems2017()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t Naive(t) Pathogen(t) LateEffector(t) EarlyEffector(t) Memory(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [Naive, Pathogen, LateEffector, EarlyEffector, Memory]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters mu_LL delta_NE mu_PE mu_P mu_PL delta_EL mu_EE default mu_N rho_E delta_LM rho_P mu_LE
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [mu_LL, delta_NE, mu_PE, mu_P, mu_PL, delta_EL, mu_EE, default, mu_N, rho_E, delta_LM, rho_P, mu_LE]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -29,11 +32,10 @@ function getODEModel_model_Crauste_CellSystems2017()
     D(Pathogen) ~ +1.0 * ( 1 /default ) * ((Pathogen)^(2) * rho_P)-1.0 * ( 1 /default ) * (EarlyEffector * Pathogen * mu_PE)-1.0 * ( 1 /default ) * (LateEffector * Pathogen * mu_PL)-1.0 * ( 1 /default ) * (Pathogen * mu_P),
     D(LateEffector) ~ +1.0 * ( 1 /default ) * (EarlyEffector * delta_EL)-1.0 * ( 1 /default ) * ((LateEffector)^(2) * mu_LL)-1.0 * ( 1 /default ) * (EarlyEffector * LateEffector * mu_LE)-1.0 * ( 1 /default ) * (LateEffector * delta_LM),
     D(EarlyEffector) ~ +1.0 * ( 1 /default ) * (Naive * Pathogen * delta_NE)+1.0 * ( 1 /default ) * (EarlyEffector * Pathogen * rho_E)-1.0 * ( 1 /default ) * ((EarlyEffector)^(2) * mu_EE)-1.0 * ( 1 /default ) * (EarlyEffector * delta_EL),
-    D(Memory) ~ +1.0 * ( 1 /default ) * (LateEffector * delta_LM),
-    D(dummyVariable) ~ 1e-60*( +default)
+    D(Memory) ~ +1.0 * ( 1 /default ) * (LateEffector * delta_LM)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -41,8 +43,8 @@ function getODEModel_model_Crauste_CellSystems2017()
     Pathogen => 1.0,
     LateEffector => 0.0,
     EarlyEffector => 0.0,
-    Memory => 0.0,
-    dummyVariable => 0.0]
+    Memory => 0.0
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -58,7 +60,8 @@ function getODEModel_model_Crauste_CellSystems2017()
     rho_E => 0.507415703707752,
     delta_LM => 0.0225806365892933,
     rho_P => 0.126382288121756,
-    mu_LE => 1.00000000000005e-10]
+    mu_LE => 1.00000000000005e-10
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

@@ -6,15 +6,18 @@ function getODEModel_model_Elowitz_Nature2000()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t X_protein(t) GFP_mRNA(t) Y_mRNA(t) X_mRNA(t) Z_mRNA(t) Z_protein(t) Y_protein(t) GFP(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters tau_mRNA tps_repr init_GFP n_Hill init_Y_mRNA init_Z_mRNA init_X_protein init_Y_protein tau_mRNA_GFP eff init_Z_protein tau_prot_GFP eff_GFP tps_active init_GFP_mRNA KM init_X_mRNA tau_prot cell
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [tau_mRNA, tps_repr, init_GFP, n_Hill, init_Y_mRNA, init_Z_mRNA, init_X_protein, init_Y_protein, tau_mRNA_GFP, eff, init_Z_protein, tau_prot_GFP, eff_GFP, tps_active, init_GFP_mRNA, KM, init_X_mRNA, tau_prot, cell]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -32,11 +35,10 @@ function getODEModel_model_Elowitz_Nature2000()
     D(Z_mRNA) ~ -1.0 * ( 1 /cell ) * (cell * (Z_mRNA * log(2) / tau_mRNA))+1.0 * ( 1 /cell ) * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (Y_protein)^(n_Hill)))),
     D(Z_protein) ~ +1.0 * ( 1 /cell ) * (cell * (Z_mRNA * eff / tau_mRNA))-1.0 * ( 1 /cell ) * (cell * (Z_protein * log(2) / tau_prot)),
     D(Y_protein) ~ +1.0 * ( 1 /cell ) * (cell * (Y_mRNA * eff / tau_mRNA))-1.0 * ( 1 /cell ) * (cell * (Y_protein * log(2) / tau_prot)),
-    D(GFP) ~ +1.0 * ( 1 /cell ) * (cell * (GFP_mRNA * eff_GFP / tau_mRNA_GFP))-1.0 * ( 1 /cell ) * (cell * (GFP * log(2) / tau_prot_GFP))+1.0 * ( 1 /cell ) * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (X_protein)^(n_Hill)))),
-    D(dummyVariable) ~ 1e-60*( +init_X_protein+init_GFP+init_GFP_mRNA+init_Y_mRNA+init_Y_protein+init_Z_protein+init_X_mRNA+init_Z_mRNA)
+    D(GFP) ~ +1.0 * ( 1 /cell ) * (cell * (GFP_mRNA * eff_GFP / tau_mRNA_GFP))-1.0 * ( 1 /cell ) * (cell * (GFP * log(2) / tau_prot_GFP))+1.0 * ( 1 /cell ) * (cell * (60 * tps_repr - (KM)^(n_Hill) * (60 * tps_repr - 60 * tps_active) / ((KM)^(n_Hill) + (X_protein)^(n_Hill))))
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -47,8 +49,8 @@ function getODEModel_model_Elowitz_Nature2000()
     Z_mRNA => init_Z_mRNA,
     Z_protein => init_Z_protein,
     Y_protein => init_Y_protein,
-    GFP => init_GFP,
-    dummyVariable => 0.0]
+    GFP => init_GFP
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -70,7 +72,8 @@ function getODEModel_model_Elowitz_Nature2000()
     KM => 1.00013184764194e-5,
     init_X_mRNA => 2.55665758135759,
     tau_prot => 5.35926527470063,
-    cell => 1.0]
+    cell => 1.0
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

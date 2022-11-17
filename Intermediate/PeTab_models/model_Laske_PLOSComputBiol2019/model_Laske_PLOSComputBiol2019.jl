@@ -6,15 +6,18 @@ function getODEModel_model_Laske_PLOSComputBiol2019()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t P_PA(t) Vp_cyt(t) Vp_nuc(t) P_NA(t) R_C_RdRp(t) R_M6(t) P_NEP(t) V_end(t) B_att_Hi(t) R_M5(t) Vp_cyt_M1(t) V_rel(t) R_C(t) Vp_nuc_M1(t) Cp(t) V_att_Lo(t) V_att_Hi(t) B_att_Lo(t) P_HA(t) P_M1(t) R_M1(t) P_M2(t) R_M7(t) P_NP(t) V_ex(t) R_M4(t) R_M8(t) R_V_RdRp(t) R_M2(t) R_V(t) P_B2(t) P_RdRp(t) R_M3(t) P_B1(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters k_deg_R_RdRp ModelValue_104 ModelValue_63 ModelValue_114 ModelValue_108 ModelValue_64 L6 k_end N_P_RdRp D_rib ModelValue_111 ModelValue_107 k_rel ModelValue_105 compartment L1 K_eq_Hi N_P_NP L2 ModelValue_113 k_bind_M1 ModelValue_116 F_Spl7 k_deg_Rnp N_P_NA K_eq_Lo ModelValue_101 k_exp_Vp_nuc_M1 ModelValue_79 ModelValue_69 ModelValue_90 ModelValue_91 ModelValue_103 N_P_M1 k_syn_R_M L8 ModelValue_84 ModelValue_85 ModelValue_115 k_att_Lo k_fus N_P_HA k_deg_R N_P_NEP k_bind_RdRp ModelValue_80 ModelValue_89 k_RdRp L5 N_P_M2 k_syn_R_V L4 ModelValue_87 k_bind_NP L3 k_imp ModelValue_106 F_Spl8 k_deg_R_M k_syn_P ModelValue_82 k_syn_R_C L7 K_V_rel ModelValue_86 ModelValue_102 F_fus k_att_Hi ModelValue_88
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [k_deg_R_RdRp, ModelValue_104, ModelValue_63, ModelValue_114, ModelValue_108, ModelValue_64, L6, k_end, N_P_RdRp, D_rib, ModelValue_111, ModelValue_107, k_rel, ModelValue_105, compartment, L1, K_eq_Hi, N_P_NP, L2, ModelValue_113, k_bind_M1, ModelValue_116, F_Spl7, k_deg_Rnp, N_P_NA, K_eq_Lo, ModelValue_101, k_exp_Vp_nuc_M1, ModelValue_79, ModelValue_69, ModelValue_90, ModelValue_91, ModelValue_103, N_P_M1, k_syn_R_M, L8, ModelValue_84, ModelValue_85, ModelValue_115, k_att_Lo, k_fus, N_P_HA, k_deg_R, N_P_NEP, k_bind_RdRp, ModelValue_80, ModelValue_89, k_RdRp, L5, N_P_M2, k_syn_R_V, L4, ModelValue_87, k_bind_NP, L3, k_imp, ModelValue_106, F_Spl8, k_deg_R_M, k_syn_P, ModelValue_82, k_syn_R_C, L7, K_V_rel, ModelValue_86, ModelValue_102, F_fus, k_att_Hi, ModelValue_88]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -58,11 +61,10 @@ function getODEModel_model_Laske_PLOSComputBiol2019()
     D(P_B2) ~ +1.0 * ( 1 /compartment ) * (compartment * (ModelValue_80 / ModelValue_82) * R_M1)-1.0 * ( 1 /compartment ) * (compartment * k_RdRp * P_B1 * P_B2 * P_PA),
     D(P_RdRp) ~ -1.0 * ( 1 /compartment ) * (compartment * k_bind_RdRp * R_C * P_RdRp)-1.0 * ( 1 /compartment ) * (compartment * k_bind_RdRp * R_V * P_RdRp)+1.0 * ( 1 /compartment ) * (compartment * k_RdRp * P_B1 * P_B2 * P_PA)-37.0 * ( 1 /compartment ) * (compartment * (k_rel * Vp_cyt_M1 * P_RdRp * P_HA * P_NP * P_NA * P_M1 * P_M2 * P_NEP / ((P_RdRp + (ModelValue_107 * ModelValue_101)) * (P_HA + (ModelValue_107 * ModelValue_102)) * (P_NP + (ModelValue_107 * ModelValue_106)) * (P_NA + (ModelValue_107 * ModelValue_104)) * (P_M1 + (ModelValue_107 * ModelValue_103)) * (P_M2 + (ModelValue_107 * ModelValue_113)) * (P_NEP + (ModelValue_107 * ModelValue_105))))),
     D(R_M3) ~ +1.0 * ( 1 /compartment ) * (compartment * (ModelValue_79 / ModelValue_86 / 8) * Vp_nuc)-1.0 * ( 1 /compartment ) * (compartment * (ModelValue_80 / ModelValue_82) * R_M3)+1.0 * ( 1 /compartment ) * (compartment * (ModelValue_80 / ModelValue_82) * R_M3)-1.0 * ( 1 /compartment ) * (compartment * k_deg_R_M * R_M3),
-    D(P_B1) ~ +1.0 * ( 1 /compartment ) * (compartment * (ModelValue_80 / ModelValue_82) * R_M2)-1.0 * ( 1 /compartment ) * (compartment * k_RdRp * P_B1 * P_B2 * P_PA),
-    D(dummyVariable) ~ 1e-60*( +L1+N_P_M2+N_P_M1+K_eq_Hi+L4+L8+k_syn_R_M+N_P_NP+L2+L6+L3+N_P_RdRp+D_rib+F_Spl8+F_Spl7+k_syn_P+k_att_Lo+k_fus+N_P_HA+K_eq_Lo+K_V_rel+L7+N_P_NA+N_P_NEP+F_fus+k_att_Hi+L5)
+    D(P_B1) ~ +1.0 * ( 1 /compartment ) * (compartment * (ModelValue_80 / ModelValue_82) * R_M2)-1.0 * ( 1 /compartment ) * (compartment * k_RdRp * P_B1 * P_B2 * P_PA)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -99,8 +101,8 @@ function getODEModel_model_Laske_PLOSComputBiol2019()
     P_B2 => 0.0,
     P_RdRp => 0.0,
     R_M3 => 0.0,
-    P_B1 => 0.0,
-    dummyVariable => 0.0]
+    P_B1 => 0.0
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -172,7 +174,8 @@ function getODEModel_model_Laske_PLOSComputBiol2019()
     ModelValue_102 => 500.0,
     F_fus => 0.51,
     k_att_Hi => 0.0809,
-    ModelValue_88 => 1540.0]
+    ModelValue_88 => 1540.0
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

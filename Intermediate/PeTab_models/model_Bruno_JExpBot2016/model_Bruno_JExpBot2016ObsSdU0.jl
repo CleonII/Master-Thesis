@@ -1,6 +1,6 @@
 function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
-	b10, bio, ohbio, zea, bcry, ohb10, bcar, dummyVariable= u 
+	b10, bio, ohbio, zea, bcry, ohb10, bcar= u 
 	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, k5, kb1, kb2, kc1, kc2, kc4, szea = dynPar 
 
 	if observableId == "ob10" 
@@ -31,7 +31,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	kb1, kb1_multiplier, kc1, kc1_multiplier, kb2_multiplier, kb2, kc2, kc2_multiplier, k5_multiplier, kc4_multiplier, k5, kc4, init_ohb10, init_bcry, init_zea, init_bcar, init_b10 = paramVec 
+	kc2_multiplier, init_zea, kc4_multiplier, cyt, k5_multiplier, kc1_multiplier, init_b10, init_bcry, kb1_multiplier, kb2_multiplier, kc1, kc4, init_ohb10, init_bcar, kc2, kb2, k5, kb1 = paramVec 
 
 	b10 = init_b10 
 	bio = 0.0 
@@ -40,14 +40,13 @@ function evalU0!(u0Vec, paramVec)
 	bcry = init_bcry 
 	ohb10 = init_ohb10 
 	bcar = init_bcar 
-	dummyVariable = 0.0 
 
-	u0Vec .= b10, bio, ohbio, zea, bcry, ohb10, bcar, dummyVariable
+	u0Vec .= b10, bio, ohbio, zea, bcry, ohb10, bcar
 end
 
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
-	b10, bio, ohbio, zea, bcry, ohb10, bcar, dummyVariable= u 
+	b10, bio, ohbio, zea, bcry, ohb10, bcar= u 
 	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, k5, kb1, kb2, kc1, kc2, kc4, szea = dynPar 
 
 	if observableId == "ob10" 

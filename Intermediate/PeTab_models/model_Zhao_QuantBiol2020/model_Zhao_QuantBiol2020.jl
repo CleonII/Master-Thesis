@@ -6,15 +6,18 @@ function getODEModel_model_Zhao_QuantBiol2020()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t Quarantined_Infected(t) Confirmed_Infected(t) Susceptible(t) Unquarantined_Infected(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [Quarantined_Infected, Confirmed_Infected, Susceptible, Unquarantined_Infected]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters Total_Pop_Hubei R_Stage_I_Wuhan gamma_2_Stage_III_Wuhan Total_Pop_China Trigger_Wuhan gamma_1_Stage_I_China gamma_1_Stage_I_Hubei sigma R_Stage_II_Wuhan R_Stage_II_China gamma_1_Stage_I_Wuhan gamma_2_Stage_II_Wuhan Trigger_China gamma_2_Stage_II_China R_Stage_III_Wuhan Trigger_Stage_I gamma_2_Stage_I_Wuhan R_Stage_I_China Trigger_Stage_III gamma_1_Stage_II_China gamma_1_Stage_III_Wuhan gamma_2_Stage_I_China Trigger_Stage_II R_Stage_II_Hubei Total_Pop_Wuhan gamma_1_Stage_II_Wuhan gamma_2_Stage_I_Hubei R_Stage_I_Hubei gamma_1_Stage_II_Hubei Trigger_Hubei gamma_2_Stage_II_Hubei China
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [Total_Pop_Hubei, R_Stage_I_Wuhan, gamma_2_Stage_III_Wuhan, Total_Pop_China, Trigger_Wuhan, gamma_1_Stage_I_China, gamma_1_Stage_I_Hubei, sigma, R_Stage_II_Wuhan, R_Stage_II_China, gamma_1_Stage_I_Wuhan, gamma_2_Stage_II_Wuhan, Trigger_China, gamma_2_Stage_II_China, R_Stage_III_Wuhan, Trigger_Stage_I, gamma_2_Stage_I_Wuhan, R_Stage_I_China, Trigger_Stage_III, gamma_1_Stage_II_China, gamma_1_Stage_III_Wuhan, gamma_2_Stage_I_China, Trigger_Stage_II, R_Stage_II_Hubei, Total_Pop_Wuhan, gamma_1_Stage_II_Wuhan, gamma_2_Stage_I_Hubei, R_Stage_I_Hubei, gamma_1_Stage_II_Hubei, Trigger_Hubei, gamma_2_Stage_II_Hubei, China]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -28,19 +31,18 @@ function getODEModel_model_Zhao_QuantBiol2020()
     D(Quarantined_Infected) ~ +1.0 * ( 1 /China ) * (China * (Trigger_Wuhan * (Trigger_Stage_I * gamma_1_Stage_I_Wuhan + Trigger_Stage_II * gamma_1_Stage_II_Wuhan + Trigger_Stage_III * gamma_1_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_1_Stage_I_Hubei + Trigger_Stage_II * gamma_1_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_1_Stage_I_China + Trigger_Stage_II * gamma_1_Stage_II_China)) * Unquarantined_Infected)-1.0 * ( 1 /China ) * (China * ((Trigger_Wuhan * (Trigger_Stage_I * gamma_2_Stage_I_Wuhan + Trigger_Stage_II * gamma_2_Stage_II_Wuhan + Trigger_Stage_III * gamma_2_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_2_Stage_I_Hubei + Trigger_Stage_II * gamma_2_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_2_Stage_I_China + Trigger_Stage_II * gamma_2_Stage_II_China)) + (1 - (Trigger_Wuhan * (Trigger_Stage_I * gamma_2_Stage_I_Wuhan + Trigger_Stage_II * gamma_2_Stage_II_Wuhan + Trigger_Stage_III * gamma_2_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_2_Stage_I_Hubei + Trigger_Stage_II * gamma_2_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_2_Stage_I_China + Trigger_Stage_II * gamma_2_Stage_II_China))) * sigma) * Quarantined_Infected),
     D(Confirmed_Infected) ~ +1.0 * ( 1 /China ) * (China * ((Trigger_Wuhan * (Trigger_Stage_I * gamma_2_Stage_I_Wuhan + Trigger_Stage_II * gamma_2_Stage_II_Wuhan + Trigger_Stage_III * gamma_2_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_2_Stage_I_Hubei + Trigger_Stage_II * gamma_2_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_2_Stage_I_China + Trigger_Stage_II * gamma_2_Stage_II_China)) + (1 - (Trigger_Wuhan * (Trigger_Stage_I * gamma_2_Stage_I_Wuhan + Trigger_Stage_II * gamma_2_Stage_II_Wuhan + Trigger_Stage_III * gamma_2_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_2_Stage_I_Hubei + Trigger_Stage_II * gamma_2_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_2_Stage_I_China + Trigger_Stage_II * gamma_2_Stage_II_China))) * sigma) * Quarantined_Infected),
     D(Susceptible) ~ -1.0 * ( 1 /China ) * (China * (((Trigger_Wuhan * (Trigger_Stage_I * R_Stage_I_Wuhan + Trigger_Stage_II * R_Stage_II_Wuhan + Trigger_Stage_III * R_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * R_Stage_I_Hubei + Trigger_Stage_II * R_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * R_Stage_I_China + Trigger_Stage_II * R_Stage_II_China)) * (Trigger_Wuhan * (Trigger_Stage_I * gamma_1_Stage_I_Wuhan + Trigger_Stage_II * gamma_1_Stage_II_Wuhan + Trigger_Stage_III * gamma_1_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_1_Stage_I_Hubei + Trigger_Stage_II * gamma_1_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_1_Stage_I_China + Trigger_Stage_II * gamma_1_Stage_II_China))) * Susceptible * Unquarantined_Infected / (Trigger_Wuhan * Total_Pop_Wuhan + Trigger_Hubei * Total_Pop_Hubei + Trigger_China * Total_Pop_China))),
-    D(Unquarantined_Infected) ~ +1.0 * ( 1 /China ) * (China * (((Trigger_Wuhan * (Trigger_Stage_I * R_Stage_I_Wuhan + Trigger_Stage_II * R_Stage_II_Wuhan + Trigger_Stage_III * R_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * R_Stage_I_Hubei + Trigger_Stage_II * R_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * R_Stage_I_China + Trigger_Stage_II * R_Stage_II_China)) * (Trigger_Wuhan * (Trigger_Stage_I * gamma_1_Stage_I_Wuhan + Trigger_Stage_II * gamma_1_Stage_II_Wuhan + Trigger_Stage_III * gamma_1_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_1_Stage_I_Hubei + Trigger_Stage_II * gamma_1_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_1_Stage_I_China + Trigger_Stage_II * gamma_1_Stage_II_China))) * Susceptible * Unquarantined_Infected / (Trigger_Wuhan * Total_Pop_Wuhan + Trigger_Hubei * Total_Pop_Hubei + Trigger_China * Total_Pop_China)))-1.0 * ( 1 /China ) * (China * (Trigger_Wuhan * (Trigger_Stage_I * gamma_1_Stage_I_Wuhan + Trigger_Stage_II * gamma_1_Stage_II_Wuhan + Trigger_Stage_III * gamma_1_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_1_Stage_I_Hubei + Trigger_Stage_II * gamma_1_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_1_Stage_I_China + Trigger_Stage_II * gamma_1_Stage_II_China)) * Unquarantined_Infected),
-    D(dummyVariable) ~ 1e-60*( +Total_Pop_Hubei+Trigger_Stage_I+Total_Pop_Wuhan+Total_Pop_China+Trigger_Wuhan+Trigger_Hubei+Trigger_China+Trigger_Stage_III+Trigger_Stage_II)
+    D(Unquarantined_Infected) ~ +1.0 * ( 1 /China ) * (China * (((Trigger_Wuhan * (Trigger_Stage_I * R_Stage_I_Wuhan + Trigger_Stage_II * R_Stage_II_Wuhan + Trigger_Stage_III * R_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * R_Stage_I_Hubei + Trigger_Stage_II * R_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * R_Stage_I_China + Trigger_Stage_II * R_Stage_II_China)) * (Trigger_Wuhan * (Trigger_Stage_I * gamma_1_Stage_I_Wuhan + Trigger_Stage_II * gamma_1_Stage_II_Wuhan + Trigger_Stage_III * gamma_1_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_1_Stage_I_Hubei + Trigger_Stage_II * gamma_1_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_1_Stage_I_China + Trigger_Stage_II * gamma_1_Stage_II_China))) * Susceptible * Unquarantined_Infected / (Trigger_Wuhan * Total_Pop_Wuhan + Trigger_Hubei * Total_Pop_Hubei + Trigger_China * Total_Pop_China)))-1.0 * ( 1 /China ) * (China * (Trigger_Wuhan * (Trigger_Stage_I * gamma_1_Stage_I_Wuhan + Trigger_Stage_II * gamma_1_Stage_II_Wuhan + Trigger_Stage_III * gamma_1_Stage_III_Wuhan) + Trigger_Hubei * (Trigger_Stage_I * gamma_1_Stage_I_Hubei + Trigger_Stage_II * gamma_1_Stage_II_Hubei) + Trigger_China * (Trigger_Stage_I * gamma_1_Stage_I_China + Trigger_Stage_II * gamma_1_Stage_II_China)) * Unquarantined_Infected)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
     Quarantined_Infected => Trigger_Wuhan * (Trigger_Stage_I * 0 + Trigger_Stage_II * 0 + Trigger_Stage_III * 5000) + Trigger_Hubei * (Trigger_Stage_I * 0 + Trigger_Stage_II * 1500) + Trigger_China * (Trigger_Stage_I * 0 + Trigger_Stage_II * 2000),
     Confirmed_Infected => Trigger_Wuhan * (Trigger_Stage_I * 258 + Trigger_Stage_II * 2000 + Trigger_Stage_III * 36000) + Trigger_Hubei * (Trigger_Stage_I * 0 + Trigger_Stage_II * 1600) + Trigger_China * (Trigger_Stage_I * 0 + Trigger_Stage_II * 4000),
     Susceptible => (Trigger_Wuhan * Total_Pop_Wuhan + Trigger_Hubei * Total_Pop_Hubei + Trigger_China * Total_Pop_China),
-    Unquarantined_Infected => Trigger_Wuhan * (Trigger_Stage_I * 258 + Trigger_Stage_II * 15270 + Trigger_Stage_III * 4000) + Trigger_Hubei * (Trigger_Stage_I * 270 + Trigger_Stage_II * 5700) + Trigger_China * (Trigger_Stage_I * 291 + Trigger_Stage_II * 2800),
-    dummyVariable => 0.0]
+    Unquarantined_Infected => Trigger_Wuhan * (Trigger_Stage_I * 258 + Trigger_Stage_II * 15270 + Trigger_Stage_III * 4000) + Trigger_Hubei * (Trigger_Stage_I * 270 + Trigger_Stage_II * 5700) + Trigger_China * (Trigger_Stage_I * 291 + Trigger_Stage_II * 2800)
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -75,7 +77,8 @@ function getODEModel_model_Zhao_QuantBiol2020()
     gamma_1_Stage_II_Hubei => 0.488,
     Trigger_Hubei => 0.0,
     gamma_2_Stage_II_Hubei => 0.1914,
-    China => 1.0]
+    China => 1.0
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

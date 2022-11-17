@@ -6,15 +6,18 @@ function getODEModel_model_Borghans_BiophysChem1997()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t A_state(t) Y_state(t) Z_state(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [A_state, Y_state, Z_state]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters v0 Ky Vm3 K2 Kz v1 Vm2 beta_par init_Y_state extracellular n_par K_par Kd cytosol epsilon_par intravesicular Kp Kf init_A_state Vd init_Z_state Vp Ka
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [v0, Ky, Vm3, K2, Kz, v1, Vm2, beta_par, init_Y_state, extracellular, n_par, K_par, Kd, cytosol, epsilon_par, intravesicular, Kp, Kf, init_A_state, Vd, init_Z_state, Vp, Ka]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -27,18 +30,17 @@ function getODEModel_model_Borghans_BiophysChem1997()
     eqs = [
     D(A_state) ~ +1.0 * ( 1 /cytosol ) * (cytosol * Vp * beta_par)-1.0 * ( 1 /cytosol ) * (cytosol * ((A_state)^(2) * Vd * (Z_state)^(n_par) / (((Kd)^(n_par) + (Z_state)^(n_par)) * ((A_state)^(2) + (Kp)^(2)))))-1.0 * ( 1 /cytosol ) * (cytosol * A_state * epsilon_par),
     D(Y_state) ~ +1.0 * ( 1 /intravesicular ) * (cytosol * (Vm2 * (Z_state)^(2) / ((K2)^(2) + (Z_state)^(2))))-1.0 * ( 1 /intravesicular ) * (intravesicular * ((A_state)^(4) * Vm3 * (Y_state)^(2) * (Z_state)^(4) / (((A_state)^(4) + (Ka)^(4)) * ((Ky)^(2) + (Y_state)^(2)) * ((Kz)^(4) + (Z_state)^(4)))))-1.0 * ( 1 /intravesicular ) * (intravesicular * Kf * Y_state),
-    D(Z_state) ~ +1.0 * ( 1 /cytosol ) * (cytosol * (v0 + beta_par * v1))-1.0 * ( 1 /cytosol ) * (cytosol * (Vm2 * (Z_state)^(2) / ((K2)^(2) + (Z_state)^(2))))+1.0 * ( 1 /cytosol ) * (intravesicular * ((A_state)^(4) * Vm3 * (Y_state)^(2) * (Z_state)^(4) / (((A_state)^(4) + (Ka)^(4)) * ((Ky)^(2) + (Y_state)^(2)) * ((Kz)^(4) + (Z_state)^(4)))))+1.0 * ( 1 /cytosol ) * (intravesicular * Kf * Y_state)-1.0 * ( 1 /cytosol ) * (cytosol * K_par * Z_state),
-    D(dummyVariable) ~ 1e-60*( +init_Y_state+extracellular+init_A_state+init_Z_state)
+    D(Z_state) ~ +1.0 * ( 1 /cytosol ) * (cytosol * (v0 + beta_par * v1))-1.0 * ( 1 /cytosol ) * (cytosol * (Vm2 * (Z_state)^(2) / ((K2)^(2) + (Z_state)^(2))))+1.0 * ( 1 /cytosol ) * (intravesicular * ((A_state)^(4) * Vm3 * (Y_state)^(2) * (Z_state)^(4) / (((A_state)^(4) + (Ka)^(4)) * ((Ky)^(2) + (Y_state)^(2)) * ((Kz)^(4) + (Z_state)^(4)))))+1.0 * ( 1 /cytosol ) * (intravesicular * Kf * Y_state)-1.0 * ( 1 /cytosol ) * (cytosol * K_par * Z_state)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
     A_state => init_A_state,
     Y_state => init_Y_state,
-    Z_state => init_Z_state,
-    dummyVariable => 0.0]
+    Z_state => init_Z_state
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -64,7 +66,8 @@ function getODEModel_model_Borghans_BiophysChem1997()
     Vd => 92.8739300577965,
     init_Z_state => 0.0879205244255038,
     Vp => 2.75685784345759,
-    Ka => 0.197593940310187]
+    Ka => 0.197593940310187
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

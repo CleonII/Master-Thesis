@@ -6,15 +6,18 @@ function getODEModel_model_Lucarelli_CellSystems2018()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t ppS3_ppS3_ppS3(t) ppS3_S4_S4(t) geneH(t) geneI(t) geneJ(t) TGFb_pRec(t) geneE(t) S4(t) ppS2_ppS2_ppS2(t) geneK(t) pS2(t) pS3(t) geneC(t) ppS2_ppS2_ppS3(t) geneF(t) S4_S4_S4(t) TGFb(t) S3(t) S2(t) S2_S4_S4(t) ppS3_ppS3_S4(t) geneB(t) ppS3(t) geneA(t) geneD(t) ppS2_S4_S4(t) geneL(t) ppS2_ppS3_S4(t) geneG(t) Rec(t) ppS2_ppS2_S4(t) ppS2_ppS3_ppS3(t) ppS2(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [ppS3_ppS3_ppS3, ppS3_S4_S4, geneH, geneI, geneJ, TGFb_pRec, geneE, S4, ppS2_ppS2_ppS2, geneK, pS2, pS3, geneC, ppS2_ppS2_ppS3, geneF, S4_S4_S4, TGFb, S3, S2, S2_S4_S4, ppS3_ppS3_S4, geneB, ppS3, geneA, geneD, ppS2_S4_S4, geneL, ppS2_ppS3_S4, geneG, Rec, ppS2_ppS2_S4, ppS2_ppS3_ppS3, ppS2]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters geneC_inh3 geneJ_act1 geneG_inh1 init_Rec geneC_act3 geneA_inh2 geneK_turn geneA_act3 geneI_act2 geneA_act2 geneD_inh2 k_223 k_233 geneB_act1 S_dephosphos geneG_act1 geneH_inh2 geneI_act1 geneB_inh3 geneI_inh2 geneC_turn geneJ_inh1 geneK_act3 geneJ_inh3 geneG_inh3 geneC_act2 init_TGFb geneL_inh1 geneE_inh3 geneF_act3 cell geneF_inh1 geneD_act3 geneE_act2 geneD_inh3 k_234 geneH_act2 geneA_turn geneL_act1 geneH_act1 geneL_inh2 geneB_turn init_S4 geneL_inh3 khomo2 geneK_act2 geneA_inh3 geneJ_act2 geneI_inh3 geneD_act1 geneJ_turn geneG_act3 geneL_act2 Rec_act geneI_act3 k_224 pRec_degind geneE_inh2 geneF_inh2 geneC_act1 geneD_inh1 k_344 init_S3 geneI_inh1 geneL_turn geneF_act2 k_on_u geneE_inh1 geneH_act3 geneH_inh1 geneK_inh3 geneE_act1 geneA_inh1 geneB_inh1 geneH_inh3 geneD_turn S_dephos geneL_act3 S_phos geneG_turn geneA_act1 geneI_turn khomo3 geneC_inh1 geneG_act2 init_S2 geneK_inh2 k_334 geneB_inh2 geneH_turn geneJ_inh2 khomo4 geneB_act2 geneF_turn geneJ_act3 geneK_inh1 geneB_act3 geneK_act1 geneE_turn geneE_act3 geneG_inh2 kdiss_SS k_244 geneD_act2 geneF_inh3 geneF_act1 geneC_inh2
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [geneC_inh3, geneJ_act1, geneG_inh1, init_Rec, geneC_act3, geneA_inh2, geneK_turn, geneA_act3, geneI_act2, geneA_act2, geneD_inh2, k_223, k_233, geneB_act1, S_dephosphos, geneG_act1, geneH_inh2, geneI_act1, geneB_inh3, geneI_inh2, geneC_turn, geneJ_inh1, geneK_act3, geneJ_inh3, geneG_inh3, geneC_act2, init_TGFb, geneL_inh1, geneE_inh3, geneF_act3, cell, geneF_inh1, geneD_act3, geneE_act2, geneD_inh3, k_234, geneH_act2, geneA_turn, geneL_act1, geneH_act1, geneL_inh2, geneB_turn, init_S4, geneL_inh3, khomo2, geneK_act2, geneA_inh3, geneJ_act2, geneI_inh3, geneD_act1, geneJ_turn, geneG_act3, geneL_act2, Rec_act, geneI_act3, k_224, pRec_degind, geneE_inh2, geneF_inh2, geneC_act1, geneD_inh1, k_344, init_S3, geneI_inh1, geneL_turn, geneF_act2, k_on_u, geneE_inh1, geneH_act3, geneH_inh1, geneK_inh3, geneE_act1, geneA_inh1, geneB_inh1, geneH_inh3, geneD_turn, S_dephos, geneL_act3, S_phos, geneG_turn, geneA_act1, geneI_turn, khomo3, geneC_inh1, geneG_act2, init_S2, geneK_inh2, k_334, geneB_inh2, geneH_turn, geneJ_inh2, khomo4, geneB_act2, geneF_turn, geneJ_act3, geneK_inh1, geneB_act3, geneK_act1, geneE_turn, geneE_act3, geneG_inh2, kdiss_SS, k_244, geneD_act2, geneF_inh3, geneF_act1, geneC_inh2]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -57,11 +60,10 @@ function getODEModel_model_Lucarelli_CellSystems2018()
     D(Rec) ~ -1.0 * ( 1 /cell ) * (cell * Rec * Rec_act * TGFb),
     D(ppS2_ppS2_S4) ~ +1.0 * ( 1 /cell ) * (cell * S4 * k_224 * (ppS2)^(2))-1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS2_S4),
     D(ppS2_ppS3_ppS3) ~ +1.0 * ( 1 /cell ) * (cell * k_233 * ppS2 * (ppS3)^(2))-1.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2_ppS3_ppS3)-1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS3_ppS3),
-    D(ppS2) ~ -3.0 * ( 1 /cell ) * (cell * khomo2 * (ppS2)^(3))+2.0 * ( 1 /cell ) * (cell * 3 * S_dephosphos * ppS2_ppS2_ppS2)+1.0 * ( 1 /cell ) * (cell * S2 * S_phos * TGFb_pRec)-1.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2)-2.0 * ( 1 /cell ) * (cell * k_223 * (ppS2)^(2) * ppS3)+1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS2_ppS3)+2.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2_ppS2_ppS3)-2.0 * ( 1 /cell ) * (cell * S4 * k_224 * (ppS2)^(2))+1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS2_S4)-1.0 * ( 1 /cell ) * (cell * k_233 * ppS2 * (ppS3)^(2))+1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS3_ppS3)-1.0 * ( 1 /cell ) * (cell * (S4)^(2) * k_244 * ppS2)-1.0 * ( 1 /cell ) * (cell * S4 * k_234 * ppS2 * ppS3)+1.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2_ppS3_S4),
-    D(dummyVariable) ~ 1e-60*( +init_S4+init_Rec+init_TGFb+init_S2+init_S3)
+    D(ppS2) ~ -3.0 * ( 1 /cell ) * (cell * khomo2 * (ppS2)^(3))+2.0 * ( 1 /cell ) * (cell * 3 * S_dephosphos * ppS2_ppS2_ppS2)+1.0 * ( 1 /cell ) * (cell * S2 * S_phos * TGFb_pRec)-1.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2)-2.0 * ( 1 /cell ) * (cell * k_223 * (ppS2)^(2) * ppS3)+1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS2_ppS3)+2.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2_ppS2_ppS3)-2.0 * ( 1 /cell ) * (cell * S4 * k_224 * (ppS2)^(2))+1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS2_S4)-1.0 * ( 1 /cell ) * (cell * k_233 * ppS2 * (ppS3)^(2))+1.0 * ( 1 /cell ) * (cell * 2 * S_dephosphos * ppS2_ppS3_ppS3)-1.0 * ( 1 /cell ) * (cell * (S4)^(2) * k_244 * ppS2)-1.0 * ( 1 /cell ) * (cell * S4 * k_234 * ppS2 * ppS3)+1.0 * ( 1 /cell ) * (cell * S_dephosphos * ppS2_ppS3_S4)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -97,8 +99,8 @@ function getODEModel_model_Lucarelli_CellSystems2018()
     Rec => init_Rec,
     ppS2_ppS2_S4 => 0.0,
     ppS2_ppS3_ppS3 => 0.0,
-    ppS2 => 0.0,
-    dummyVariable => 0.0]
+    ppS2 => 0.0
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -208,7 +210,8 @@ function getODEModel_model_Lucarelli_CellSystems2018()
     geneD_act2 => 0.000268942132758932,
     geneF_inh3 => 0.0,
     geneF_act1 => 998.299919973209,
-    geneC_inh2 => 0.018441582221635]
+    geneC_inh2 => 0.018441582221635
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

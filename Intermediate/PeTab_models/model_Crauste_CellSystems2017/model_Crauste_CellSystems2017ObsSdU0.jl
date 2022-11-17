@@ -1,6 +1,6 @@
 function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
-	Naive, Pathogen, LateEffector, EarlyEffector, Memory, dummyVariable= u 
+	Naive, Pathogen, LateEffector, EarlyEffector, Memory= u 
 	delta_EL, delta_LM, delta_NE, mu_EE, mu_LE, mu_LL, mu_N, mu_P, mu_PE, mu_PL, rho_E, rho_P = dynPar 
 
 	if observableId == "observable_EarlyEffector" 
@@ -23,21 +23,20 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	default, delta_NE, mu_N, mu_P, mu_PE, rho_P, mu_PL, mu_LE, delta_EL, mu_LL, delta_LM, rho_E, mu_EE = paramVec 
+	mu_LL, delta_NE, mu_PE, mu_P, mu_PL, delta_EL, mu_EE, default, mu_N, rho_E, delta_LM, rho_P, mu_LE = paramVec 
 
 	Naive = 8090.0 
 	Pathogen = 1.0 
 	LateEffector = 0.0 
 	EarlyEffector = 0.0 
 	Memory = 0.0 
-	dummyVariable = 0.0 
 
-	u0Vec .= Naive, Pathogen, LateEffector, EarlyEffector, Memory, dummyVariable
+	u0Vec .= Naive, Pathogen, LateEffector, EarlyEffector, Memory
 end
 
-function evalSd!(u, t, sdPar, dynPar, nonDynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
-	Naive, Pathogen, LateEffector, EarlyEffector, Memory, dummyVariable= u 
+	Naive, Pathogen, LateEffector, EarlyEffector, Memory= u 
 	delta_EL, delta_LM, delta_NE, mu_EE, mu_LE, mu_LL, mu_N, mu_P, mu_PE, mu_PL, rho_E, rho_P = dynPar 
 
 	if observableId == "observable_EarlyEffector" 

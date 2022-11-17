@@ -6,16 +6,19 @@ function getODEModel_model_Giordano_Nature2020()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t CumulativeDiagnosed(t) Infected(t) Extinct(t) Diagnosed(t) DiagnosedHealed(t) Ailing(t) Healed(t) Recognized(t) Susceptible(t) Threatened(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [CumulativeDiagnosed, Infected, Extinct, Diagnosed, DiagnosedHealed, Ailing, Healed, Recognized, Susceptible, Threatened]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
     ModelingToolkit.@variables nu(t) lam(t) mu(t) delta(t) sigma(t) kappa(t) xi(t) alpha(t) zeta(t) eta(t) rho(t) beta(t) epsilon(t) gamma(t)
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters rho_22 nu_0 delta_4 beta_22 zeta_50 rho_38 gamma_28 xi_22 kappa_0 epsilon_50 nu_22 alpha_0 xi_0 mu_22 eta_22 xi_50 beta_4 lam_22 initalTimeManual xi_38 epsilon_12 epsilon_38 sigma_38 epsilon_0 delta_50 Italy mu_50 eta_38 lam_50 kappa_50 kappa_38 gamma_50 tau alpha_28 mu_0 theta zeta_22 kappa_22 rho_0 gamma_0 sigma_22 eta_50 delta_22 eta_0 zeta_0 zeta_38 alpha_4 rho_50 alpha_50 sigma_50 nu_50 gamma_4 beta_0 lam_0 beta_50 alpha_22 delta_0 gamma_22 sigma_0
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [rho_22, nu_0, delta_4, beta_22, zeta_50, rho_38, gamma_28, xi_22, kappa_0, epsilon_50, nu_22, alpha_0, xi_0, mu_22, eta_22, xi_50, beta_4, lam_22, initalTimeManual, xi_38, epsilon_12, epsilon_38, sigma_38, epsilon_0, delta_50, Italy, mu_50, eta_38, lam_50, kappa_50, kappa_38, gamma_50, tau, alpha_28, mu_0, theta, zeta_22, kappa_22, rho_0, gamma_0, sigma_22, eta_50, delta_22, eta_0, zeta_0, zeta_38, alpha_4, rho_50, alpha_50, sigma_50, nu_50, gamma_4, beta_0, lam_0, beta_50, alpha_22, delta_0, gamma_22, sigma_0]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -49,11 +52,10 @@ function getODEModel_model_Giordano_Nature2020()
     rho ~ ifelse(t <= 22 + initalTimeManual, rho_0, 0) + (ifelse(t > 22 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 38, 1.0, 0.0)) * (rho_22) + (1 - (ifelse(t > 22 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 38, 1.0, 0.0))) * (0) + (ifelse(t > 38 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0)) * (rho_38) + (1 - (ifelse(t > 38 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0))) * (0) + ifelse(t > 50 + initalTimeManual, rho_50, 0),
     beta ~ ifelse(t <= 4 + initalTimeManual, beta_0, 0) + (ifelse(t > 4 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 22, 1.0, 0.0)) * (beta_4) + (1 - (ifelse(t > 4 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 22, 1.0, 0.0))) * (0) + (ifelse(t > 22 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0)) * (beta_22) + (1 - (ifelse(t > 22 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0))) * (0) + ifelse(t > 50 + initalTimeManual, beta_50, 0),
     epsilon ~ ifelse(t <= 12 + initalTimeManual, epsilon_0, 0) + (ifelse(t > 12 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 38, 1.0, 0.0)) * (epsilon_12) + (1 - (ifelse(t > 12 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 38, 1.0, 0.0))) * (0) + (ifelse(t > 38 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0)) * (epsilon_38) + (1 - (ifelse(t > 38 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0))) * (0) + ifelse(t > 50 + initalTimeManual, epsilon_50, 0),
-    gamma ~ ifelse(t <= 4 + initalTimeManual, gamma_0, 0) + (ifelse(t > 4 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 22, 1.0, 0.0)) * (gamma_4) + (1 - (ifelse(t > 4 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 22, 1.0, 0.0))) * (0) + (ifelse(t > 22 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 28, 1.0, 0.0)) * (gamma_22) + (1 - (ifelse(t > 22 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 28, 1.0, 0.0))) * (0) + (ifelse(t > 28 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0)) * (gamma_28) + (1 - (ifelse(t > 28 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0))) * (0) + ifelse(t > 50 + initalTimeManual, gamma_50, 0),
-    D(dummyVariable) ~ 1e-60*( +rho_22+nu_0+delta_4+beta_22+zeta_50+rho_38+gamma_28+epsilon_50+xi_22+kappa_0+nu_22+alpha_0+xi_0+mu_22+eta_22+xi_50+beta_4+lam_22+initalTimeManual+xi_38+epsilon_12+epsilon_38+sigma_38+epsilon_0+delta_50+mu_50+eta_38+lam_50+kappa_50+kappa_38+gamma_50+alpha_28+mu_0+zeta_22+kappa_22+rho_0+gamma_0+sigma_22+eta_50+delta_22+eta_0+zeta_0+zeta_38+alpha_4+rho_50+alpha_50+sigma_50+nu_50+gamma_4+beta_0+lam_0+beta_50+alpha_22+delta_0+gamma_22+sigma_0)
+    gamma ~ ifelse(t <= 4 + initalTimeManual, gamma_0, 0) + (ifelse(t > 4 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 22, 1.0, 0.0)) * (gamma_4) + (1 - (ifelse(t > 4 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 22, 1.0, 0.0))) * (0) + (ifelse(t > 22 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 28, 1.0, 0.0)) * (gamma_22) + (1 - (ifelse(t > 22 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 28, 1.0, 0.0))) * (0) + (ifelse(t > 28 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0)) * (gamma_28) + (1 - (ifelse(t > 28 + initalTimeManual, 1.0, 0.0)) * (ifelse(t <= initalTimeManual + 50, 1.0, 0.0))) * (0) + ifelse(t > 50 + initalTimeManual, gamma_50, 0)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -66,8 +68,8 @@ function getODEModel_model_Giordano_Nature2020()
     Healed => 0.0,
     Recognized => 3.33333333e-8,
     Susceptible => 0.9999963,
-    Threatened => 0.0,
-    dummyVariable => 0.0]
+    Threatened => 0.0
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -129,7 +131,8 @@ function getODEModel_model_Giordano_Nature2020()
     alpha_22 => 0.36,
     delta_0 => 0.011,
     gamma_22 => 0.2,
-    sigma_0 => 0.017]
+    sigma_0 => 0.017
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

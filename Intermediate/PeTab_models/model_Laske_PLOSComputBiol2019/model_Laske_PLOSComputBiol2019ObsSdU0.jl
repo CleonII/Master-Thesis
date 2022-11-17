@@ -1,6 +1,6 @@
-function evalYmod(u, t, dynPar, obsPar, paramData, observableId, mapObsParam) 
+function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
-	P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1, dummyVariable= u 
+	P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1= u 
 	k_imp, k_syn_R_M, k_syn_R_C, k_syn_R_V, k_bind_M1, k_rel = dynPar 
 
 	F_rnp_nuc = RNP_nuc / (RNP_nuc + RNP_cyt) * 100
@@ -73,7 +73,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	ModelValue_82, k_RdRp, ModelValue_80, k_imp, k_fus, k_deg_Rnp, k_bind_NP, k_bind_M1, k_rel, ModelValue_104, ModelValue_105, ModelValue_101, ModelValue_106, ModelValue_103, ModelValue_113, ModelValue_102, ModelValue_107, k_bind_RdRp, k_deg_R_RdRp, ModelValue_89, k_deg_R_M, ModelValue_79, k_exp_Vp_nuc_M1, ModelValue_111, ModelValue_69, k_end, ModelValue_116, ModelValue_114, ModelValue_63, k_att_Hi, ModelValue_88, k_syn_R_C, k_deg_R, ModelValue_115, ModelValue_64, k_att_Lo, ModelValue_108, ModelValue_84, ModelValue_90, ModelValue_87, ModelValue_91, ModelValue_85, k_syn_R_V, ModelValue_86, N_P_NEP, L5, D_rib, N_P_M1, N_P_NA, L4, N_P_RdRp, F_Spl7, N_P_HA, K_eq_Lo, L3, L6, K_V_rel, F_Spl8, L1, L7, N_P_M2, L8, L2, k_syn_P, k_syn_R_M, K_eq_Hi, N_P_NP, F_fus = paramVec 
+	k_deg_R_RdRp, ModelValue_104, ModelValue_63, ModelValue_114, ModelValue_108, ModelValue_64, L6, k_end, N_P_RdRp, D_rib, ModelValue_111, ModelValue_107, k_rel, ModelValue_105, compartment, L1, K_eq_Hi, N_P_NP, L2, ModelValue_113, k_bind_M1, ModelValue_116, F_Spl7, k_deg_Rnp, N_P_NA, K_eq_Lo, ModelValue_101, k_exp_Vp_nuc_M1, ModelValue_79, ModelValue_69, ModelValue_90, ModelValue_91, ModelValue_103, N_P_M1, k_syn_R_M, L8, ModelValue_84, ModelValue_85, ModelValue_115, k_att_Lo, k_fus, N_P_HA, k_deg_R, N_P_NEP, k_bind_RdRp, ModelValue_80, ModelValue_89, k_RdRp, L5, N_P_M2, k_syn_R_V, L4, ModelValue_87, k_bind_NP, L3, k_imp, ModelValue_106, F_Spl8, k_deg_R_M, k_syn_P, ModelValue_82, k_syn_R_C, L7, K_V_rel, ModelValue_86, ModelValue_102, F_fus, k_att_Hi, ModelValue_88 = paramVec 
 
 	P_PA = 0.0 
 	Vp_cyt = 0.0 
@@ -109,14 +109,13 @@ function evalU0!(u0Vec, paramVec)
 	P_RdRp = 0.0 
 	R_M3 = 0.0 
 	P_B1 = 0.0 
-	dummyVariable = 0.0 
 
-	u0Vec .= P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1, dummyVariable
+	u0Vec .= P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1
 end
 
-function evalSd!(u, t, sdPar, dynPar, paramData, observableId, mapSdParam) 
+function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
-	P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1, dummyVariable= u 
+	P_PA, Vp_cyt, Vp_nuc, P_NA, R_C_RdRp, R_M6, P_NEP, V_end, B_att_Hi, R_M5, Vp_cyt_M1, V_rel, R_C, Vp_nuc_M1, Cp, V_att_Lo, V_att_Hi, B_att_Lo, P_HA, P_M1, R_M1, P_M2, R_M7, P_NP, V_ex, R_M4, R_M8, R_V_RdRp, R_M2, R_V, P_B2, P_RdRp, R_M3, P_B1= u 
 	k_imp, k_syn_R_M, k_syn_R_C, k_syn_R_V, k_bind_M1, k_rel = dynPar 
 
 	if observableId == "RM5" 

@@ -6,16 +6,19 @@ function getODEModel_model_Oliveira_NatCommun2021()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t Hospital(t) Symptomatic(t) Cumulative_cases(t) Asymptomatic(t) Exposed(t) ICU(t) Recovered(t) Deaths(t) Susceptible(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
     ModelingToolkit.@variables beta(t)
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters asymptomatic_init_concentration beta_2_multiplier t_2 gamma_u exposed_init_concentration omega_u kappa h_hosp_rate xi delta_ t_1 beta_0 symptomatic_init_concentration Interior mu_u omega_h mu_h beta_2 beta_1 population p_symp_rate gamma_s gamma_h gamma_a
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [asymptomatic_init_concentration, beta_2_multiplier, t_2, gamma_u, exposed_init_concentration, omega_u, kappa, h_hosp_rate, xi, delta_, t_1, beta_0, symptomatic_init_concentration, Interior, mu_u, omega_h, mu_h, beta_2, beta_1, population, p_symp_rate, gamma_s, gamma_h, gamma_a]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -35,11 +38,10 @@ function getODEModel_model_Oliveira_NatCommun2021()
     D(Recovered) ~ +1.0 * ( 1 /Interior ) * (Interior * gamma_a * Asymptomatic)+1.0 * ( 1 /Interior ) * (Interior * ((1 - h_hosp_rate) * gamma_s) * Symptomatic)+1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * (1 - mu_h) * gamma_h) * Hospital),
     D(Deaths) ~ +1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * mu_h * gamma_h) * Hospital)+1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_u) * mu_u * gamma_u) * ICU),
     D(Susceptible) ~ -1.0 * ( 1 /Interior ) * (Interior * (beta * Susceptible * (Symptomatic + delta_ * Asymptomatic) / population)),
-    beta ~ ifelse(t < t_1, beta_0, ifelse(t < t_2, beta_1, beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier))),
-    D(dummyVariable) ~ 1e-60*( +asymptomatic_init_concentration+beta_1+symptomatic_init_concentration+exposed_init_concentration+beta_2_multiplier+t_2+population+t_1+beta_0+beta_2)
+    beta ~ ifelse(t < t_1, beta_0, ifelse(t < t_2, beta_1, beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -51,8 +53,8 @@ function getODEModel_model_Oliveira_NatCommun2021()
     ICU => 0.0,
     Recovered => 0.0,
     Deaths => 0.0,
-    Susceptible => population * (1 - asymptomatic_init_concentration - exposed_init_concentration - symptomatic_init_concentration),
-    dummyVariable => 0.0]
+    Susceptible => population * (1 - asymptomatic_init_concentration - exposed_init_concentration - symptomatic_init_concentration)
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -79,7 +81,8 @@ function getODEModel_model_Oliveira_NatCommun2021()
     p_symp_rate => 0.2,
     gamma_s => 0.25,
     gamma_h => 0.131351606436,
-    gamma_a => 0.285714]
+    gamma_a => 0.285714
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

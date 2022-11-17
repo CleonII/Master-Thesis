@@ -59,7 +59,7 @@ function getSolAlgebraicSS(peTabModel::PeTabModel, solver, tol::Float64, a::T1, 
     solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, 2)
 
     # Set model parameter values to ensure initial steady state 
-    odeProb.p[1], odeProb.p[5], odeProb.p[3], odeProb.p[6] = a, b, c, d
+    odeProb.p[5], odeProb.p[3], odeProb.p[1], odeProb.p[6] = a, b, c, d
     odeProb.u0[1] = a / b + ( a * c ) / ( b * d ) # x0
     odeProb.u0[2] = a / d # y0
 

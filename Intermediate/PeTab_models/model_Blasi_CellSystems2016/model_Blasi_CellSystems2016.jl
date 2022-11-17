@@ -6,15 +6,18 @@ function getODEModel_model_Blasi_CellSystems2016()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t x_k5k12k16(t) x_k8(t) x_k16(t) x_0ac(t) x_k12(t) x_k5k8(t) x_k5k12(t) x_k12k16(t) x_k8k12k16(t) x_k5(t) x_k5k16(t) x_k5k8k12(t) x_k8k12(t) x_4ac(t) x_k8k16(t) x_k5k8k16(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters a_k5_k5k12 a_k8 d default a_k12k16_k8k12k16 a_basal a_k5k12_k5k8k12 a_k8k12k16_4ac a_k12_k5k12 a_k16_k12k16
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [a_k5_k5k12, a_k8, d, default, a_k12k16_k8k12k16, a_basal, a_k5k12_k5k8k12, a_k8k12k16_4ac, a_k12_k5k12, a_k16_k12k16]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -40,11 +43,10 @@ function getODEModel_model_Blasi_CellSystems2016()
     D(x_k8k12) ~ +1.0 * ( 1 /default ) * ((a_basal) * x_k8 - d * x_k8k12)+1.0 * ( 1 /default ) * ((a_basal) * x_k12 - d * x_k8k12)-1.0 * ( 1 /default ) * ((a_basal) * x_k8k12 - d * x_k5k8k12)-1.0 * ( 1 /default ) * ((a_basal) * x_k8k12 - d * x_k8k12k16),
     D(x_4ac) ~ +1.0 * ( 1 /default ) * ((a_basal) * x_k5k8k12 - d * x_4ac)+1.0 * ( 1 /default ) * ((a_basal) * x_k5k8k16 - d * x_4ac)+1.0 * ( 1 /default ) * ((a_basal) * x_k5k12k16 - d * x_4ac)+1.0 * ( 1 /default ) * (a_k8k12k16_4ac * x_k8k12k16 - d * x_4ac),
     D(x_k8k16) ~ +1.0 * ( 1 /default ) * ((a_basal) * x_k8 - d * x_k8k16)+1.0 * ( 1 /default ) * ((a_basal) * x_k16 - d * x_k8k16)-1.0 * ( 1 /default ) * ((a_basal) * x_k8k16 - d * x_k5k8k16)-1.0 * ( 1 /default ) * ((a_basal) * x_k8k16 - d * x_k8k12k16),
-    D(x_k5k8k16) ~ +1.0 * ( 1 /default ) * ((a_basal) * x_k5k8 - d * x_k5k8k16)+1.0 * ( 1 /default ) * ((a_basal) * x_k5k16 - d * x_k5k8k16)+1.0 * ( 1 /default ) * ((a_basal) * x_k8k16 - d * x_k5k8k16)-1.0 * ( 1 /default ) * ((a_basal) * x_k5k8k16 - d * x_4ac),
-    D(dummyVariable) ~ 1e-60*( +default)
+    D(x_k5k8k16) ~ +1.0 * ( 1 /default ) * ((a_basal) * x_k5k8 - d * x_k5k8k16)+1.0 * ( 1 /default ) * ((a_basal) * x_k5k16 - d * x_k5k8k16)+1.0 * ( 1 /default ) * ((a_basal) * x_k8k16 - d * x_k5k8k16)-1.0 * ( 1 /default ) * ((a_basal) * x_k5k8k16 - d * x_4ac)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -63,8 +65,8 @@ function getODEModel_model_Blasi_CellSystems2016()
     x_k8k12 => 0.0,
     x_4ac => 0.0,
     x_k8k16 => 0.0,
-    x_k5k8k16 => 0.0,
-    dummyVariable => 0.0]
+    x_k5k8k16 => 0.0
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -77,7 +79,8 @@ function getODEModel_model_Blasi_CellSystems2016()
     a_k5k12_k5k8k12 => 0.325,
     a_k8k12k16_4ac => 3.5917,
     a_k12_k5k12 => 0.552,
-    a_k16_k12k16 => 0.696]
+    a_k16_k12k16 => 0.696
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

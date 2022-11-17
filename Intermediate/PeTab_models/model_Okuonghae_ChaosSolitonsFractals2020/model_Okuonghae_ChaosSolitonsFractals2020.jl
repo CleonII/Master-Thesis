@@ -6,15 +6,18 @@ function getODEModel_model_Okuonghae_ChaosSolitonsFractals2020()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t detected_cumulative(t) symptomatic(t) asymptomatic(t) detected(t) exposed(t) deceased(t) recovered(t) susceptible(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [detected_cumulative, symptomatic, asymptomatic, detected, exposed, deceased, recovered, susceptible]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters psi nu gamma_i asymptomatic_start delta symptomatic_start sigma theta Lagos alpha d_0 transmission_rate_effective eps exposed_start gamma_0 d_D gamma_a
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [psi, nu, gamma_i, asymptomatic_start, delta, symptomatic_start, sigma, theta, Lagos, alpha, d_0, transmission_rate_effective, eps, exposed_start, gamma_0, d_D, gamma_a]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -32,11 +35,10 @@ function getODEModel_model_Okuonghae_ChaosSolitonsFractals2020()
     D(exposed) ~ +1.0 * ( 1 /Lagos ) * (Lagos * (transmission_rate_effective * (1 - eps) * (1 - delta) * (alpha * asymptomatic + symptomatic) / ((asymptomatic + detected + exposed + recovered + susceptible + symptomatic) - detected)) * susceptible)-1.0 * ( 1 /Lagos ) * (Lagos * (sigma * (1 - nu) * exposed))-1.0 * ( 1 /Lagos ) * (Lagos * (sigma * nu * exposed)),
     D(deceased) ~ +1.0 * ( 1 /Lagos ) * (Lagos * d_0 * symptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * d_D * detected),
     D(recovered) ~ +1.0 * ( 1 /Lagos ) * (Lagos * gamma_0 * symptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * gamma_a * asymptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * gamma_i * detected),
-    D(susceptible) ~ -1.0 * ( 1 /Lagos ) * (Lagos * (transmission_rate_effective * (1 - eps) * (1 - delta) * (alpha * asymptomatic + symptomatic) / ((asymptomatic + detected + exposed + recovered + susceptible + symptomatic) - detected)) * susceptible),
-    D(dummyVariable) ~ 1e-60*( +exposed_start+asymptomatic_start+symptomatic_start)
+    D(susceptible) ~ -1.0 * ( 1 /Lagos ) * (Lagos * (transmission_rate_effective * (1 - eps) * (1 - delta) * (alpha * asymptomatic + symptomatic) / ((asymptomatic + detected + exposed + recovered + susceptible + symptomatic) - detected)) * susceptible)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -47,8 +49,8 @@ function getODEModel_model_Okuonghae_ChaosSolitonsFractals2020()
     exposed => exposed_start,
     deceased => 0.0,
     recovered => 0.0,
-    susceptible => 1.4367982e7,
-    dummyVariable => 0.0]
+    susceptible => 1.4367982e7
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -68,7 +70,8 @@ function getODEModel_model_Okuonghae_ChaosSolitonsFractals2020()
     exposed_start => 441.0,
     gamma_0 => 0.13978,
     d_D => 0.015,
-    gamma_a => 0.13978]
+    gamma_a => 0.13978
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

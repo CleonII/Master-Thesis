@@ -6,16 +6,19 @@ function getODEModel_model_Fujita_SciSignal2010()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t pAkt_S6(t) pAkt(t) pS6(t) EGFR(t) pEGFR_Akt(t) pEGFR(t) Akt(t) S6(t) EGF_EGFR(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [pAkt_S6, pAkt, pS6, EGFR, pEGFR_Akt, pEGFR, Akt, S6, EGF_EGFR]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
     ModelingToolkit.@variables EGF(t)
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters EGF_end reaction_5_k1 reaction_2_k2 init_AKT init_EGFR EGF_rate EGFR_turnover reaction_1_k1 reaction_1_k2 reaction_8_k1 reaction_4_k1 reaction_6_k1 reaction_2_k1 init_S6 reaction_7_k1 reaction_9_k1 reaction_3_k1 reaction_5_k2 Cell EGF_0
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [EGF_end, reaction_5_k1, reaction_2_k2, init_AKT, init_EGFR, EGF_rate, EGFR_turnover, reaction_1_k1, reaction_1_k2, reaction_8_k1, reaction_4_k1, reaction_6_k1, reaction_2_k1, init_S6, reaction_7_k1, reaction_9_k1, reaction_3_k1, reaction_5_k2, Cell, EGF_0]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -35,11 +38,10 @@ function getODEModel_model_Fujita_SciSignal2010()
     D(Akt) ~ -1.0 * ( 1 /Cell ) * (Cell * (Akt * pEGFR * reaction_2_k1 - pEGFR_Akt * reaction_2_k2))+1.0 * ( 1 /Cell ) * (Cell * pAkt * reaction_7_k1),
     D(S6) ~ -1.0 * ( 1 /Cell ) * (Cell * (S6 * pAkt * reaction_5_k1 - pAkt_S6 * reaction_5_k2))+1.0 * ( 1 /Cell ) * (Cell * pS6 * reaction_8_k1),
     D(EGF_EGFR) ~ +1.0 * ( 1 /Cell ) * (Cell * (EGF * EGFR * reaction_1_k1 - EGF_EGFR * reaction_1_k2))-1.0 * ( 1 /Cell ) * (Cell * EGF_EGFR * reaction_9_k1),
-    EGF ~ ifelse(t <= EGF_end, EGF_rate * t + EGF_0, 0),
-    D(dummyVariable) ~ 1e-60*( +init_S6+EGF_end+init_EGFR+init_AKT+EGF_rate+EGF_0)
+    EGF ~ ifelse(t <= EGF_end, EGF_rate * t + EGF_0, 0)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -51,8 +53,8 @@ function getODEModel_model_Fujita_SciSignal2010()
     pEGFR => 0.0,
     Akt => init_AKT,
     S6 => init_S6,
-    EGF_EGFR => 0.0,
-    dummyVariable => 0.0]
+    EGF_EGFR => 0.0
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -75,7 +77,8 @@ function getODEModel_model_Fujita_SciSignal2010()
     reaction_3_k1 => 0.454840577578597,
     reaction_5_k2 => 0.000404055756190126,
     Cell => 1.0,
-    EGF_0 => 0.0]
+    EGF_0 => 0.0
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

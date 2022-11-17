@@ -6,15 +6,18 @@ function getODEModel_model_Schwen_PONE2014()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t IR2(t) IR2in(t) Rec2(t) IR1in(t) Uptake1(t) Uptake2(t) InsulinFragments(t) IR1(t) Rec1(t) Ins(t) BoundUnspec(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [IR2, IR2in, Rec2, IR1in, Uptake1, Uptake2, InsulinFragments, IR1, Rec1, Ins, BoundUnspec]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters ka1 ini_R2fold kout ini_R1 kout_frag koff_unspec kin ka2fold kin2 kd1 kon_unspec init_Ins kd2fold ExtracellularMedium kout2
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [ka1, ini_R2fold, kout, ini_R1, kout_frag, koff_unspec, kin, ka2fold, kin2, kd1, kon_unspec, init_Ins, kd2fold, ExtracellularMedium, kout2]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -35,11 +38,10 @@ function getODEModel_model_Schwen_PONE2014()
     D(IR1) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec1 * ka1)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kd1)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kin)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1in * kout),
     D(Rec1) ~ -1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec1 * ka1)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kd1)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1in * kout_frag),
     D(Ins) ~ -1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec1 * ka1)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * Rec2 * ka1 * ka2fold)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * kon_unspec)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * BoundUnspec * koff_unspec)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR1 * kd1)+1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * IR2 * kd1 * kd2fold),
-    D(BoundUnspec) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * kon_unspec)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * BoundUnspec * koff_unspec),
-    D(dummyVariable) ~ 1e-60*( +init_Ins+ini_R2fold+ini_R1)
+    D(BoundUnspec) ~ +1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * Ins * kon_unspec)-1.0 * ( 1 /ExtracellularMedium ) * (ExtracellularMedium * BoundUnspec * koff_unspec)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -53,8 +55,8 @@ function getODEModel_model_Schwen_PONE2014()
     IR1 => 0.0,
     Rec1 => ini_R1,
     Ins => init_Ins,
-    BoundUnspec => 0.0,
-    dummyVariable => 0.0]
+    BoundUnspec => 0.0
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -72,7 +74,8 @@ function getODEModel_model_Schwen_PONE2014()
     init_Ins => 0.0,
     kd2fold => 9.61850107655493,
     ExtracellularMedium => 1.0,
-    kout2 => 0.0529079560976487]
+    kout2 => 0.0529079560976487
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

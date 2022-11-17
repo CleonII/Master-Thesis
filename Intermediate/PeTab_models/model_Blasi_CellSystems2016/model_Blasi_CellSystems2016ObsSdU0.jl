@@ -1,6 +1,6 @@
 function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
-	x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16, dummyVariable= u 
+	x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16= u 
 	a_basal, a_k8, a_k5_k5k12, a_k12_k5k12, a_k16_k12k16, a_k5k12_k5k8k12, a_k12k16_k8k12k16, a_k8k12k16_4ac = dynPar 
 	d_C = paramData.paramVal[9] 
 
@@ -72,7 +72,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	a_basal, d, default, a_k8, a_k16_k12k16, a_k12_k5k12, a_k5k12_k5k8k12, a_k5_k5k12, a_k12k16_k8k12k16, a_k8k12k16_4ac = paramVec 
+	a_k5_k5k12, a_k8, d, default, a_k12k16_k8k12k16, a_basal, a_k5k12_k5k8k12, a_k8k12k16_4ac, a_k12_k5k12, a_k16_k12k16 = paramVec 
 
 	x_k5k12k16 = 0.0 
 	x_k8 = 0.0 
@@ -90,14 +90,13 @@ function evalU0!(u0Vec, paramVec)
 	x_4ac = 0.0 
 	x_k8k16 = 0.0 
 	x_k5k8k16 = 0.0 
-	dummyVariable = 0.0 
 
-	u0Vec .= x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16, dummyVariable
+	u0Vec .= x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16
 end
 
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
-	x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16, dummyVariable= u 
+	x_k5k12k16, x_k8, x_k16, x_0ac, x_k12, x_k5k8, x_k5k12, x_k12k16, x_k8k12k16, x_k5, x_k5k16, x_k5k8k12, x_k8k12, x_4ac, x_k8k16, x_k5k8k16= u 
 	a_basal, a_k8, a_k5_k5k12, a_k12_k5k12, a_k16_k12k16, a_k5k12_k5k8k12, a_k12k16_k8k12k16, a_k8k12k16_4ac = dynPar 
 	d_C = paramData.paramVal[9] 
 

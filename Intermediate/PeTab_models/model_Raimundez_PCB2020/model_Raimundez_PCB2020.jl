@@ -6,16 +6,19 @@ function getODEModel_model_Raimundez_PCB2020()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t EGFR(t) pPI3K(t) MMET_METinh_2(t) pMAPK(t) MMET_2(t) pEGFR_EGF_2(t) pEGFR_EGF_2_i(t) pMPI3K(t) EGFR_EGF_2(t) MMET(t) pMMET_2(t) RAS_GTP(t) pMMET_2_i(t) pMMET_pEGFR_i(t) MMET_MMET_METinh(t) pAKT(t) EGFR_EGF(t) MMET_METinh(t) MMET_EGFR(t) EGFR_CET(t) pMMET_pEGFR(t) EGFR_MMET_METinh(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [EGFR, pPI3K, MMET_METinh_2, pMAPK, MMET_2, pEGFR_EGF_2, pEGFR_EGF_2_i, pMPI3K, EGFR_EGF_2, MMET, pMMET_2, RAS_GTP, pMMET_2_i, pMMET_pEGFR_i, MMET_MMET_METinh, pAKT, EGFR_EGF, MMET_METinh, MMET_EGFR, EGFR_CET, pMMET_pEGFR, EGFR_MMET_METinh]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
     ModelingToolkit.@variables CET(t) METinh(t) EGF(t)
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters d_ksyn_EGFR__fm_2_hm xi_kexp_pMMET_2_i d_ka_RAS__pEGFR_EGF_2__MKN1_2_HS746T d_ka_MAPK__MKN1_2_HS746T ki_RAS__MKN1 d_ka_AKT__MKN1_2_HS746T KD_EGFR_CET xi_ka_PI3K_pMMET_2 d_MAPKtotal__fm_2_hm d_ksyn_MMET__fm_2_hm ka_PI3K__basal d_kimp_pEGFR_EGF_2__MKN1_2_HS746T d_AKTtotal__fm_2_hm KD_METinh xi_ki_MPI3K d_kexp_pEGFR_EGF_2_i__MKN1_2_HS746T d_ksyn_EGFR__MKN1_2_HS746T d_MPI3Ktotal__fm_2_hm d_kdeg_membran__MKN1_2_HS746T MPI3Ktotal__MKN1_fm KD_EGFR_EGF kexp_pEGFR_EGF_2_i__MKN1 CET_level kbin_EGFR_EGF ksyn_EGFR__MKN1_fm xi_kdeg_pMMET_pEGFR_i d_ki_PI3K__MKN1_2_HS746T xi_kpho_MMET_EGFR MAPKtotal__MKN1_fm xi_kexp_pMMET_pEGFR_i d_RAStotal__MKN1_2_HS746T kpho_EGFR_EGF ka_MAPK__MKN1 kpho_MMET_EGFR full_medium xi_ka_RAS_pMMET_2 xi_kimp_pMMET_pEGFR xi_kdeg_pMMET_2_i ka_RAS__basal__MKN1 d_RAStotal__fm_2_hm kdim_MMET MKN1 ksyn_MMET__HS746T_fm kdim_MMET_EGFR ka_PI3K__pEGFR_EGF_2 kdeg_membran__MKN1 HS746T d_ki_RAS__MKN1_2_HS746T EGF_level kdim_EGFR_EGF kbin_EGFR_CET ka_AKT__MKN1 d_ki_AKT__MKN1_2_HS746T PI3Ktotal__HS746T_fm ki_PI3K__MKN1 kpho_MMET AKTtotal__MKN1_fm xi_kimp_pMMET_2 relative_ksyn_EGFR ka_RAS__pEGFR_EGF_2__MKN1 ki_MAPK cyt kimp_pEGFR_EGF_2__MKN1 d_AKTtotal__MKN1_2_HS746T ki_AKT__MKN1 RAStotal__MKN1_fm d_PI3Ktotal__fm_2_hm xi_ka_PI3K_pMMET_pEGFR xi_kdim_MMET_EGFR xi_kpho_MMET METinh_level kdim_MMETinh d_MAPKtotal__MKN1_2_HS746T xi_ka_RAS_pMMET_pEGFR kdeg_pEGFR_EGF_2_i__MKN1 xi_kdim_MMET d_kdeg_pEGFR_EGF_2_i__MKN1_2_HS746T d_ka_RAS__basal__MKN1_2_HS746T hunger_medium
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [d_ksyn_EGFR__fm_2_hm, xi_kexp_pMMET_2_i, d_ka_RAS__pEGFR_EGF_2__MKN1_2_HS746T, d_ka_MAPK__MKN1_2_HS746T, ki_RAS__MKN1, d_ka_AKT__MKN1_2_HS746T, KD_EGFR_CET, xi_ka_PI3K_pMMET_2, d_MAPKtotal__fm_2_hm, d_ksyn_MMET__fm_2_hm, ka_PI3K__basal, d_kimp_pEGFR_EGF_2__MKN1_2_HS746T, d_AKTtotal__fm_2_hm, KD_METinh, xi_ki_MPI3K, d_kexp_pEGFR_EGF_2_i__MKN1_2_HS746T, d_ksyn_EGFR__MKN1_2_HS746T, d_MPI3Ktotal__fm_2_hm, d_kdeg_membran__MKN1_2_HS746T, MPI3Ktotal__MKN1_fm, KD_EGFR_EGF, kexp_pEGFR_EGF_2_i__MKN1, CET_level, kbin_EGFR_EGF, ksyn_EGFR__MKN1_fm, xi_kdeg_pMMET_pEGFR_i, d_ki_PI3K__MKN1_2_HS746T, xi_kpho_MMET_EGFR, MAPKtotal__MKN1_fm, xi_kexp_pMMET_pEGFR_i, d_RAStotal__MKN1_2_HS746T, kpho_EGFR_EGF, ka_MAPK__MKN1, kpho_MMET_EGFR, full_medium, xi_ka_RAS_pMMET_2, xi_kimp_pMMET_pEGFR, xi_kdeg_pMMET_2_i, ka_RAS__basal__MKN1, d_RAStotal__fm_2_hm, kdim_MMET, MKN1, ksyn_MMET__HS746T_fm, kdim_MMET_EGFR, ka_PI3K__pEGFR_EGF_2, kdeg_membran__MKN1, HS746T, d_ki_RAS__MKN1_2_HS746T, EGF_level, kdim_EGFR_EGF, kbin_EGFR_CET, ka_AKT__MKN1, d_ki_AKT__MKN1_2_HS746T, PI3Ktotal__HS746T_fm, ki_PI3K__MKN1, kpho_MMET, AKTtotal__MKN1_fm, xi_kimp_pMMET_2, relative_ksyn_EGFR, ka_RAS__pEGFR_EGF_2__MKN1, ki_MAPK, cyt, kimp_pEGFR_EGF_2__MKN1, d_AKTtotal__MKN1_2_HS746T, ki_AKT__MKN1, RAStotal__MKN1_fm, d_PI3Ktotal__fm_2_hm, xi_ka_PI3K_pMMET_pEGFR, xi_kdim_MMET_EGFR, xi_kpho_MMET, METinh_level, kdim_MMETinh, d_MAPKtotal__MKN1_2_HS746T, xi_ka_RAS_pMMET_pEGFR, kdeg_pEGFR_EGF_2_i__MKN1, xi_kdim_MMET, d_kdeg_pEGFR_EGF_2_i__MKN1_2_HS746T, d_ka_RAS__basal__MKN1_2_HS746T, hunger_medium]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -50,37 +53,36 @@ function getODEModel_model_Raimundez_PCB2020()
     D(EGFR_MMET_METinh) ~ +1.0 * ( 1 /cyt ) * (cyt * EGFR * MMET_METinh * kdim_MMET_EGFR * xi_kdim_MMET_EGFR),
     CET ~ 6.86 * CET_level * ifelse(t < 0, 0, 1),
     METinh ~ METinh_level * ifelse(t < 0, 0, 1),
-    EGF ~ 0.161 * EGF_level * ifelse(t < 0, 0, 1),
-    D(dummyVariable) ~ 1e-60*( +full_medium)
+    EGF ~ 0.161 * EGF_level * ifelse(t < 0, 0, 1)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
-    EGFR => 0,
-    pPI3K => 0,
-    MMET_METinh_2 => 0,
-    pMAPK => 0,
-    MMET_2 => 0,
-    pEGFR_EGF_2 => 0,
-    pEGFR_EGF_2_i => 0,
-    pMPI3K => 0,
-    EGFR_EGF_2 => 0,
-    MMET => 0,
-    pMMET_2 => 0,
-    RAS_GTP => 0,
-    pMMET_2_i => 0,
-    pMMET_pEGFR_i => 0,
-    MMET_MMET_METinh => 0,
-    pAKT => 0,
-    EGFR_EGF => 0,
-    MMET_METinh => 0,
-    MMET_EGFR => 0,
-    EGFR_CET => 0,
-    pMMET_pEGFR => 0,
-    EGFR_MMET_METinh => 0,
-    dummyVariable => 0.0]
+    EGFR => 0.0,
+    pPI3K => 0.0,
+    MMET_METinh_2 => 0.0,
+    pMAPK => 0.0,
+    MMET_2 => 0.0,
+    pEGFR_EGF_2 => 0.0,
+    pEGFR_EGF_2_i => 0.0,
+    pMPI3K => 0.0,
+    EGFR_EGF_2 => 0.0,
+    MMET => 0.0,
+    pMMET_2 => 0.0,
+    RAS_GTP => 0.0,
+    pMMET_2_i => 0.0,
+    pMMET_pEGFR_i => 0.0,
+    MMET_MMET_METinh => 0.0,
+    pAKT => 0.0,
+    EGFR_EGF => 0.0,
+    MMET_METinh => 0.0,
+    MMET_EGFR => 0.0,
+    EGFR_CET => 0.0,
+    pMMET_pEGFR => 0.0,
+    EGFR_MMET_METinh => 0.0
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -162,7 +164,8 @@ function getODEModel_model_Raimundez_PCB2020()
     xi_kdim_MMET => 0.974771379091693,
     d_kdeg_pEGFR_EGF_2_i__MKN1_2_HS746T => 2.99999999999997,
     d_ka_RAS__basal__MKN1_2_HS746T => 0.0,
-    hunger_medium => 1.0]
+    hunger_medium => 1.0
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 

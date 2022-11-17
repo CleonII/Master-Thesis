@@ -1,6 +1,6 @@
 function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
-	Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible, dummyVariable= u 
+	Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible= u 
 	beta_0, beta_1, beta_2, t_1, t_2, delta_, h_hosp_rate, gamma_h, gamma_u, exposed_init_concentration, asymptomatic_init_concentration, symptomatic_init_concentration = dynPar 
 	p_symp_rate_C = paramData.paramVal[1] 
 	kappa_C = paramData.paramVal[2] 
@@ -27,7 +27,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	gamma_u, xi, gamma_s, omega_u, mu_h, gamma_h, omega_h, h_hosp_rate, mu_u, kappa, p_symp_rate, Interior, gamma_a, delta_, population, beta_2, t_1, beta_2_multiplier, t_2, beta_0, beta_1, symptomatic_init_concentration, exposed_init_concentration, asymptomatic_init_concentration = paramVec 
+	asymptomatic_init_concentration, beta_2_multiplier, t_2, gamma_u, exposed_init_concentration, omega_u, kappa, h_hosp_rate, xi, delta_, t_1, beta_0, symptomatic_init_concentration, Interior, mu_u, omega_h, mu_h, beta_2, beta_1, population, p_symp_rate, gamma_s, gamma_h, gamma_a = paramVec 
 
 	Hospital = 0.0 
 	Symptomatic = population * symptomatic_init_concentration 
@@ -38,14 +38,13 @@ function evalU0!(u0Vec, paramVec)
 	Recovered = 0.0 
 	Deaths = 0.0 
 	Susceptible = population * ( 1 - asymptomatic_init_concentration - exposed_init_concentration - symptomatic_init_concentration ) 
-	dummyVariable = 0.0 
 
-	u0Vec .= Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible, dummyVariable
+	u0Vec .= Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible
 end
 
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
-	Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible, dummyVariable= u 
+	Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible= u 
 	beta_0, beta_1, beta_2, t_1, t_2, delta_, h_hosp_rate, gamma_h, gamma_u, exposed_init_concentration, asymptomatic_init_concentration, symptomatic_init_concentration = dynPar 
 	p_symp_rate_C = paramData.paramVal[1] 
 	kappa_C = paramData.paramVal[2] 

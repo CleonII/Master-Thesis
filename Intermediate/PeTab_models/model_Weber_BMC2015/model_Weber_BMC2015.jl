@@ -6,16 +6,19 @@ function getODEModel_model_Weber_BMC2015()
     ### Define independent and dependent variables
     ModelingToolkit.@variables t CERTERa(t) PI4K3B(t) CERT(t) CERTTGNa(t) PKDDAGa(t) PKD(t) PI4K3Ba(t)
 
+    ### Store dependent variables in array for ODESystem command
+    stateArray = [CERTERa, PI4K3B, CERT, CERTTGNa, PKDDAGa, PKD, PI4K3Ba]
+
     ### Define variable parameters
 
     ### Define potential algebraic variables
     ModelingToolkit.@variables u6(t) u4(t) u3(t) u5(t)
 
-    ### Define dummy variable
-    ModelingToolkit.@variables dummyVariable(t)
-
     ### Define parameters
     ModelingToolkit.@parameters a21 m33 kb_NB142_70_dose a22 kb_NB142_70_time p12 p33 s31 PdBu_dose a12 p22 a33 p13 cyt pu5 pu2 p31 pu4 PdBu_time s12 m11 m31 u2 Ect_Expr_PI4K3beta_flag a11 p32 p21 pu6 s21 pu3 m22 p11 Ect_Expr_CERT_flag a31 a32
+
+    ### Store parameters in array for ODESystem command
+    parameterArray = [a21, m33, kb_NB142_70_dose, a22, kb_NB142_70_time, p12, p33, s31, PdBu_dose, a12, p22, a33, p13, cyt, pu5, pu2, p31, pu4, PdBu_time, s12, m11, m31, u2, Ect_Expr_PI4K3beta_flag, a11, p32, p21, pu6, s21, pu3, m22, p11, Ect_Expr_CERT_flag, a31, a32]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -36,11 +39,10 @@ function getODEModel_model_Weber_BMC2015()
     u6 ~ kb_NB142_70_dose * ifelse(t - kb_NB142_70_time < 0, 0, 1),
     u4 ~ ifelse(t < 0, 0, Ect_Expr_CERT_flag),
     u3 ~ ifelse(t < 0, 0, Ect_Expr_PI4K3beta_flag),
-    u5 ~ ifelse(t - PdBu_time < 0, 0, PdBu_dose),
-    D(dummyVariable) ~ 1e-60*( +PdBu_time+Ect_Expr_CERT_flag+Ect_Expr_PI4K3beta_flag+kb_NB142_70_time+PdBu_dose)
+    u5 ~ ifelse(t - PdBu_time < 0, 0, PdBu_dose)
     ]
 
-    @named sys = ODESystem(eqs)
+    @named sys = ODESystem(eqs, t, stateArray, parameterArray)
 
     ### Initial species concentrations ###
     initialSpeciesValues = [
@@ -50,8 +52,8 @@ function getODEModel_model_Weber_BMC2015()
     CERTTGNa => 4.20828286681e7,
     PKDDAGa => 123.8608,
     PKD => 466534.7994,
-    PI4K3Ba => 332054.5041,
-    dummyVariable => 0.0]
+    PI4K3Ba => 332054.5041
+    ]
 
     ### SBML file parameter values ###
     trueParameterValues = [
@@ -77,7 +79,7 @@ function getODEModel_model_Weber_BMC2015()
     s12 => 88884.6918603076,
     m11 => 9.99999999999902e9,
     m31 => 9.98783985509162e9,
-    u2 => 0,
+    u2 => 0.0,
     Ect_Expr_PI4K3beta_flag => 0.0,
     a11 => 0.183516872816456,
     p32 => 17.1128427194665,
@@ -89,7 +91,8 @@ function getODEModel_model_Weber_BMC2015()
     p11 => 4.23578569731751,
     Ect_Expr_CERT_flag => 0.0,
     a31 => 0.140427319109888,
-    a32 => 0.00010000000000001]
+    a32 => 0.00010000000000001
+    ]
 
     return sys, initialSpeciesValues, trueParameterValues
 
