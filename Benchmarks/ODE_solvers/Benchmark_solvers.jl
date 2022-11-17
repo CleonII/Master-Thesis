@@ -113,6 +113,11 @@ function getSolverInfo(sparseList::Bool, solversCheck)
                         Rodas5(), "Rodas5_S", "stiff", "OrdinaryDiffEq",
                         Rodas4P(), "Rodas4P_S", "stiff", "OrdinaryDiffEq",
                         QNDF(), "QNDF_S", "stiff", "OrdinaryDiffEq",
+                        KenCarp4(), "KenCarp4_S", "stiff", "OrdinaryDiffEq",
+                        FBDF(), "FBDF_S", "stiff", "OrdinaryDiffEq",
+                        Rosenbrock23(), "Rosenbrock23_S", "stiff", "OrdinaryDiffEq",
+                        Rodas4(), "Rodas4_S", "stiff", "OrdinaryDiffEq",
+                        TRBDF2(), "TRBDF2_S", "stiff", "OrdinaryDiffEq",
                         RadauIIA5(linsolve=lSolver1), "RadauIIA5_KLU_S", "stiff", "OrdinaryDiffEq",
                         Rodas5(linsolve=lSolver1), "Rodas5_KLU_S", "stiff", "OrdinaryDiffEq",
                         Rodas4P(linsolve=lSolver1), "Rodas4P_KLU_S", "stiff", "OrdinaryDiffEq",
@@ -343,6 +348,15 @@ if ARGS[1] == "compare_fabian"
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
         runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(1), solversCheck=solversCheck, tolsCheck=tolsTry)    
+    end
+
+    # Now try with sparse Jacobian 
+    solversCheckSparse = ["KenCarp4_S", "FBDF_S", "QNDF_S", "Rosenbrock23_S", "TRBDF2_S", "RadauIIA5_S", "Rodas4_S", "CVODE_BDF_KLU_S", "Rodas5_S"]
+    for i in eachindex(modelListTry)
+        modelName = modelListTry[i]
+        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
+        peTabModel = setUpPeTabModel(modelName, dirModel)
+        runBenchmarkOdeSolvers(peTabModel, pathSave, true, nTimesRepat=UInt(1), solversCheck=solversCheckSparse, tolsCheck=tolsTry)    
     end
 
 end
