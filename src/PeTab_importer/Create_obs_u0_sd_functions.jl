@@ -29,7 +29,7 @@ function createFileYmodSdU0(modelName::String,
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
     
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
-    paramIndices = getIndicesParam(paramData, measurementData, odeSys)
+    paramIndices = getIndicesParam(paramData, measurementData, odeSys, experimentalConditionsFile)
     
     createYmodFunction(modelName, dirModel, stateNames, paramData, paramIndices.namesDynParam, paramIndices.namesNonDynParam, observablesDataFile)
     println("Done with Ymod function")

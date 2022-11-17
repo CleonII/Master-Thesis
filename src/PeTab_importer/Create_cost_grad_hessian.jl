@@ -33,7 +33,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     simulationInfo = getSimulationInfo(measurementDataFile, measurementData, absTolSS=absTolSS, relTolSS=relTolSS)
 
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
-    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem)
+    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
@@ -43,11 +43,11 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     odeProb = remake(odeProb, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
 
     # Functions to map experimental conditions and parameters correctly to the ODE model 
-    changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, parameterData, experimentalConditionsFile, peTabModel)
+    changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, parameterData, experimentalConditionsFile, peTabModel, paramEstIndices)
     changeModelParamUse! = (pVec, u0Vec, paramEst, paramEstNames) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstNames, paramEstIndices, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
-    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, tol, onlySaveAtTobs=true)
+    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, tol, onlySaveAtTobs=true)
     solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, changeToExperimentalCondUse!, measurementDataFile, measurementData, simulationInfo, solver, tol, tol, onlySaveAtTobs=true)
 
     evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
@@ -317,9 +317,9 @@ function calcLogLikSolveODE(dynamicParamEst,
     # If computing hessian or gradient store ODE solution in arrary with dual numbers, else use 
     # solution array with floats
     if calcHessDynParam == true || calcGradDynParam == true
-        success = solveOdeModelAllCondUse!(simulationInfo.solArrayGrad, odeProbUse)
+        success = solveOdeModelAllCondUse!(simulationInfo.solArrayGrad, odeProbUse, dynamicParamEstUse)
     else
-        success = solveOdeModelAllCondUse!(simulationInfo.solArray, odeProbUse)
+        success = solveOdeModelAllCondUse!(simulationInfo.solArray, odeProbUse, dynamicParamEstUse)
     end
     if success != true
         println("Failed to solve ODE model")
@@ -520,6 +520,7 @@ function changeModelParam!(paramVecOdeModel,
     paramMapUse = convert.(Pair{Num, eltype(paramVecOdeModel)}, peTabModel.paramMap)
     # TODO: Precompute this step 
     parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
+    shouldChange::Array{Bool, 1} = fill(false, length(paramVecEst))
 
     # Keep correct indices in ParamMap (for downstream computations when changing experimental conditions)
     # TODO : Check if this can be removed
@@ -537,13 +538,12 @@ function changeModelParam!(paramVecOdeModel,
             if typeof(valChangeToFloat) <: AbstractFloat
                 peTabModel.paramMap[i_param] = Pair(peTabModel.paramMap[i_param].first, valChangeToFloat) 
             end
-        else
-            println("Error : Simulation parameter to change not found for experimental condition $expID")
+            shouldChange[i] = true
         end
     end
 
     # Use ModellingToolkit and u0 function to correctly map parameters to ODE-system 
-    paramVecOdeModel[paramIndices.iMapDynParam] .= paramVecEst
+    paramVecOdeModel[paramIndices.iMapDynParam] .= paramVecEst[shouldChange]
     peTabModel.evalU0!(stateVecOdeModel, paramVecOdeModel) 
     
     return nothing

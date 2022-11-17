@@ -18,7 +18,8 @@
 """
 function getIndicesParam(paramData::ParamData, 
                          measurementData::MeasurementData, 
-                         odeSystem::ODESystem)::ParameterIndices
+                         odeSystem::ODESystem, 
+                         experimentalConditionsFile::DataFrame)::ParameterIndices
 
     namesObsParam = getIdEst(measurementData.obsParam, paramData)
     isObsParam = [paramData.parameterID[i] in namesObsParam for i in eachindex(paramData.parameterID)]
@@ -29,9 +30,11 @@ function getIndicesParam(paramData::ParamData,
     # Parameters not entering the ODE system (or initial values), are not noise-parameter or observable 
     # parameters, but appear in SD and/or OBS functions. Must be tagged specifically as we do 
     # want to compute gradients for these given a fixed ODE solution.
+    condSpecificDynParam = identityCondSpecificDynParam(odeSystem, paramData, experimentalConditionsFile)
     isNonDynamicParam = (paramData.shouldEst .&& .!isSdParam .&& .!isObsParam)
     namesNonDynamicParam = paramData.parameterID[isNonDynamicParam]
     namesNonDynamicParam = namesNonDynamicParam[findall(x -> x ∉ (string.(parameters(odeSystem))), namesNonDynamicParam)]
+    namesNonDynamicParam = namesNonDynamicParam[findall(x -> x ∉ condSpecificDynParam, namesNonDynamicParam)]
     isNonDynamicParam = [paramData.parameterID[i] in namesNonDynamicParam for i in eachindex(paramData.parameterID)]
 
     isDynamicParam = (paramData.shouldEst .&& .!isNonDynamicParam .&& .!isSdParam .&& .!isObsParam)
@@ -65,6 +68,7 @@ function getIndicesParam(paramData::ParamData,
     # Set up a map for changing ODEProblem model parameters when doing parameter estimation 
     namesAllString = string.(parameters(odeSystem)) 
     iMapDynParam = [findfirst(x -> x == namesParamDyn[i], namesAllString) for i in eachindex(namesParamDyn)]
+    iMapDynParam = convert(Array{Integer, 1}, iMapDynParam[.!isnothing.(iMapDynParam)])
 
     paramIndicies = ParameterIndices(iDynPar, 
                                      iObsPar, 
@@ -214,4 +218,40 @@ function getIdEst(idsInStr::Array{String, 1}, paramData::ParamData)
     end
 
     return idVec
+end
+
+
+# Identifaying dynamic parameters to estimate, where the dynamic parameters are only used for some specific 
+# experimental conditions.
+function identityCondSpecificDynParam(odeSystem::ODESystem,
+                                      parameterData::ParamData, 
+                                      experimentalConditionsFile::DataFrame)::Array{String, 1}
+
+    allOdeParamNames = string.(parameters(odeSystem))
+    paramShouldEst = parameterData.parameterID[parameterData.shouldEst]
+
+    # List of parameters who are dynamic parameters but we use specific parameters for specific experimental 
+    # conditions.
+    notNonDynParam = Array{String, 1}(undef, 0)
+
+    # Extract which columns contain actual parameter values 
+    colNames = names(experimentalConditionsFile)
+    iStart = colNames[2] == "conditionName" ? 3 : 2
+    i = iStart
+
+    # Identify parameters who are a part of the ODE system (but only used for specific experimental conditions)
+    for i in iStart:ncol(experimentalConditionsFile)
+
+        if colNames[i] ∉ allOdeParamNames
+            println("Problem : Parameter ", colNames[i], " should be in the ODE model as it dicates an experimental condition")
+        end
+
+        for j in 1:nrow(experimentalConditionsFile)
+            if (expCondVar = string(experimentalConditionsFile[j, i])) ∈ paramShouldEst
+                notNonDynParam = vcat(notNonDynParam, expCondVar)
+            end
+        end
+    end
+
+    return unique(notNonDynParam)
 end

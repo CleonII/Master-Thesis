@@ -1,8 +1,7 @@
 function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, mapObsParam) 
 
 	b10, bio, ohbio, zea, bcry, ohb10, bcar, dummyVariable= u 
-	k5, kb1, kb2, kc1, kc2, kc4 = dynPar 
-	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, szea = nonDynParam 
+	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, k5, kb1, kb2, kc1, kc2, kc4, szea = dynPar 
 
 	if observableId == "ob10" 
 		return b10 
@@ -49,8 +48,7 @@ end
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	b10, bio, ohbio, zea, bcry, ohb10, bcar, dummyVariable= u 
-	k5, kb1, kb2, kc1, kc2, kc4 = dynPar 
-	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, szea = nonDynParam 
+	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, k5, kb1, kb2, kc1, kc2, kc4, szea = dynPar 
 
 	if observableId == "ob10" 
 		noiseParameter1_ob10 = getObsOrSdParam(sdPar, mapSdParam)
