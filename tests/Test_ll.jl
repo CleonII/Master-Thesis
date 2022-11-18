@@ -39,7 +39,7 @@ passTest = true
 
 # Bachman model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
-peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel)
+peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = cost + (418.40573341425295)
@@ -51,7 +51,7 @@ end
 
 # Beer model - Currently we do not support parameter estimation for models with condition specific parameters to estimate
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Beer_MolBioSystems2014/"
-peTabModel = setUpPeTabModel("model_Beer_MolBioSystems2014", dirModel)
+peTabModel = setUpPeTabModel("model_Beer_MolBioSystems2014", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = cost + (58622.9145631413)
@@ -63,7 +63,7 @@ end
 
 # Boehm model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Boehm_JProteomeRes2014/"
-peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel)
+peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = cost + (-138.22199693517703)
@@ -75,7 +75,7 @@ end
 
 # Brännmark model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Brannmark_JBC2010/"
-peTabModel = setUpPeTabModel("model_Brannmark_JBC2010", dirModel)
+peTabModel = setUpPeTabModel("model_Brannmark_JBC2010", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (-141.889113770537))
@@ -87,7 +87,7 @@ end
 
 # Bruno model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Bruno_JExpBot2016/"
-peTabModel = setUpPeTabModel("model_Bruno_JExpBot2016", dirModel)
+peTabModel = setUpPeTabModel("model_Bruno_JExpBot2016", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost - (-46.688176988431806))
@@ -108,7 +108,7 @@ end
 
 # Crauste model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Crauste_CellSystems2017/"
-peTabModel = setUpPeTabModel("model_Crauste_CellSystems2017", dirModel)
+peTabModel = setUpPeTabModel("model_Crauste_CellSystems2017", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (-190.96521897435176))
@@ -120,7 +120,7 @@ end
 
 # Elowitz model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Elowitz_Nature2000/"
-peTabModel = setUpPeTabModel("model_Elowitz_Nature2000", dirModel)
+peTabModel = setUpPeTabModel("model_Elowitz_Nature2000", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (63.20279991419332))
@@ -132,7 +132,7 @@ end
 
 # Fiedler model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Fiedler_BMC2016/"
-peTabModel = setUpPeTabModel("model_Fiedler_BMC2016", dirModel)
+peTabModel = setUpPeTabModel("model_Fiedler_BMC2016", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-9)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (58.58390161681))
@@ -144,7 +144,7 @@ end
 
 # Fujita model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Fujita_SciSignal2010/"
-peTabModel = setUpPeTabModel("model_Fujita_SciSignal2010", dirModel)
+peTabModel = setUpPeTabModel("model_Fujita_SciSignal2010", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (53.08377736998929))
@@ -156,7 +156,7 @@ end
 
 # Isensee model - Break code check why 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Isensee_JCB2018/"
-peTabModel = setUpPeTabModel("model_Isensee_JCB2018", dirModel)
+peTabModel = setUpPeTabModel("model_Isensee_JCB2018", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-9)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (-3949.375966548649))
@@ -168,7 +168,7 @@ end
 
 # Lucarelli - Breaks code by the same reason as above 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Lucarelli_CellSystems2018/"
-peTabModel = setUpPeTabModel("model_Lucarelli_CellSystems2018", dirModel)
+peTabModel = setUpPeTabModel("model_Lucarelli_CellSystems2018", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (-1681.6059879426584))
@@ -189,7 +189,7 @@ cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 
 # Sneyd model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Sneyd_PNAS2002/"
-peTabModel = setUpPeTabModel("model_Sneyd_PNAS2002", dirModel)
+peTabModel = setUpPeTabModel("model_Sneyd_PNAS2002", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (319.79177818768756))
@@ -201,7 +201,7 @@ end
 
 # Weber model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Weber_BMC2015/"
-peTabModel = setUpPeTabModel("model_Weber_BMC2015", dirModel)
+peTabModel = setUpPeTabModel("model_Weber_BMC2015", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (-296.2017922646865))
@@ -213,11 +213,16 @@ end
 
 # Zheng model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Zheng_PNAS2012/"
-peTabModel = setUpPeTabModel("model_Zheng_PNAS2012", dirModel)
+peTabModel = setUpPeTabModel("model_Zheng_PNAS2012", dirModel, verbose=false)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 diff = abs(cost + (278.33353271001477))
 if diff > 1e-3
     println("Does not pass ll-test for Zheng model")
     passTest = false
+end
+
+
+if passTest
+    println("Passes ll-test")
 end

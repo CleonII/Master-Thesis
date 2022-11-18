@@ -14,25 +14,35 @@
 
     TODO : Example  
 """
-function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::Bool=false)::PeTabModel
+function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::Bool=false, verbose::Bool=true)::PeTabModel
 
     # Sanity check user input 
     modelFileXml = dirModel * modelName * ".xml"
     modelFileJl = dirModel * modelName * ".jl"
     if !isdir(dirModel)
-        @printf("Model directory %s does not exist\n", dirModel)
+        if verbose
+            @printf("Model directory %s does not exist\n", dirModel)
+        end
     end
     if !isfile(modelFileXml)
-        @printf("Model directory does not contain xml-file with name %s\n", modelName * "xml")
+        if verbose
+            @printf("Model directory does not contain xml-file with name %s\n", modelName * "xml")
+        end
     end
     # If Julia model file does exists build it 
     if !isfile(modelFileJl) && forceBuildJlFile == false
-        @printf("Julia model file does not exist - will build it\n")
+        if verbose
+            @printf("Julia model file does not exist - will build it\n")
+        end
         XmlToModellingToolkit(modelFileXml, modelName, dirModel)
     elseif isfile(modelFileJl) && forceBuildJlFile == false
-        @printf("Julia model file exists at %s - will not rebuild it\n", modelFileJl)
+        if verbose
+            @printf("Julia model file exists at %s - will not rebuild it\n", modelFileJl)
+        end
     elseif forceBuildJlFile == true
-        @printf("By user option rebuilds Julia model file\n")
+        if verbose
+            @printf("By user option rebuilds Julia model file\n")
+        end
         if isfile(modelFileJl)
             rm(modelFileJl)
         end
@@ -58,10 +68,17 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
     # Build functions for observables, sd and u0 if does not exist and include
     pathObsSdU0 = dirModel * modelName * "ObsSdU0.jl"
     if !isfile(pathObsSdU0)
-        @printf("File for yMod, U0 and Sd does not exist - building it\n")
+        if verbose && forceBuildJlFile == false
+            @printf("File for yMod, U0 and Sd does not exist - building it\n")
+        end
+        if verbose && forceBuildJlFile == true
+            @printf("By user option will rebuild Ymod, Sd and u0\n")
+        end
         createFileYmodSdU0(modelName, dirModel, odeSysUse, stateMap)
     else
-        @printf("File for yMod, U0 and Sd does exist - will not rebuild it\n")
+        if verbose
+            @printf("File for yMod, U0 and Sd does exist - will not rebuild it\n")
+        end
     end
     include(pathObsSdU0)
 

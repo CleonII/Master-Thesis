@@ -70,6 +70,8 @@ function getIndicesParam(paramData::ParamData,
     iMapDynParam = [findfirst(x -> x == namesParamDyn[i], namesAllString) for i in eachindex(namesParamDyn)]
     iMapDynParam = convert(Array{Integer, 1}, iMapDynParam[.!isnothing.(iMapDynParam)])
 
+    mapExpCond = getMapExpCond(peTabModel, namesAllString, measurementData, paramData, experimentalConditionsFile, namesParamDyn, namesParamEst)
+
     paramIndicies = ParameterIndices(iDynPar, 
                                      iObsPar, 
                                      iSdPar, 
@@ -85,7 +87,8 @@ function getIndicesParam(paramData::ParamData,
                                      indexSdParamMap, 
                                      mapArrayObsParam, 
                                      mapArraySdParam, 
-                                     iMapDynParam)
+                                     iMapDynParam, 
+                                     mapExpCond)
 
     return paramIndicies
 end
@@ -254,4 +257,83 @@ function identityCondSpecificDynParam(odeSystem::ODESystem,
     end
 
     return unique(notNonDynParam)
+end
+
+
+# A mapping experimental map for experimental conditions 
+function getMapExpCond(peTabModel::PeTabModel,
+                       namesAllString::Array{String, 1}, 
+                       measurementData::MeasurementData, 
+                       paramData::ParamData, 
+                       experimentalConditionsFile::DataFrame, 
+                       namesParamDyn::Array{String, 1}, 
+                       namesParamEst::Array{String, 1})::Array{MapExpCond, 1}
+
+
+    allExpCond = unique(vcat(measurementData.preEqCond, measurementData.simCond))
+    stateNamesStr = replace.(string.(peTabModel.stateNames), "(t)" => "")
+
+    i_start = "conditionName" in names(experimentalConditionsFile) ? 3 : 2
+    paramStateChange = names(experimentalConditionsFile)[i_start:end]
+
+    mapExpCondArr = Array{MapExpCond, 1}(undef, length(allExpCond))
+
+    for i in 1:nrow(experimentalConditionsFile)
+
+        expCondParamConstVal::Array{Float64, 1} = Array{Float64, 1}(undef, 0)
+        iOdeProbParamConstVal::Array{Int, 1} = Array{Int, 1}(undef, 0)
+        expCondStateConstVal::Array{Float64, 1} = Array{Float64, 1}(undef, 0)
+        iOdeProbStateConstVal::Array{Int, 1} = Array{Int, 1}(undef, 0)
+        iDynEstVec::Array{Int, 1} = Array{Int, 1}(undef, 0)
+        iOdeProbDynParam::Array{Int, 1} = Array{Int, 1}(undef, 0)
+
+        rowI = string.(collect(experimentalConditionsFile[i, i_start:end]))
+        condID = experimentalConditionsFile[i, 1]
+        
+        for j in eachindex(rowI)
+        
+            # When the experimental condition parameters is a number it can either be a number to set a parameter 
+            # or state to.
+            if isNumber(rowI[j]) 
+                if paramStateChange[j] ∈ namesAllString
+                    expCondParamConstVal = vcat(expCondParamConstVal, parse(Float64, rowI[j]))
+                    iOdeProbParamConstVal = vcat(iOdeProbParamConstVal, findfirst(x -> x == paramStateChange[j], namesAllString))
+                elseif paramStateChange[j] ∈ stateNamesStr
+                    expCondStateConstVal = vcat(expCondStateConstVal, parse(Float64, rowI[j]))
+                    iOdeProbStateConstVal = vcat(iOdeProbStateConstVal, findfirst(x -> x == paramStateChange[j], stateNamesStr))
+                else
+                    println("Error : Cannot build map for experimental condition ", paramStateChange[j])
+                end
+                continue
+            end
+            
+            # In case we are changing to one of the parameters we are estimating 
+            if rowI[j] ∈ namesParamDyn
+                iDynEstVec = vcat(iDynEstVec, findfirst(x -> x == rowI[j], namesParamEst))
+                iOdeProbDynParam = vcat(iOdeProbDynParam, findfirst(x -> x == paramStateChange[j], namesAllString))
+                continue
+            end
+
+            # In case rowI is a parameter (but that is constant)
+        if rowI[j] ∈ paramData.parameterID
+                iVal = findfirst(x -> x == rowI[j], paramData.parameterID)
+                expCondParamConstVal = vcat(expCondParamConstVal, paramData.paramVal[iVal])
+                iOdeProbParamConstVal = vcat(iOdeProbParamConstVal, findfirst(x -> x == paramStateChange[j], namesAllString))
+                continue
+            end
+
+            # If we reach this far something is off
+            println("Could not map parameters for condition $condID  parameters", rowI[j])
+        end
+
+        mapExpCondArr[i] = MapExpCond(string.(condID), 
+                                    expCondParamConstVal, 
+                                    iOdeProbParamConstVal, 
+                                    expCondStateConstVal, 
+                                    iOdeProbStateConstVal, 
+                                    iDynEstVec, 
+                                    iOdeProbDynParam)
+    end
+
+    return mapExpCondArr
 end

@@ -170,6 +170,18 @@ struct ParamMap{T1<:Array{<:AbstractFloat, 1}}
 end
 
 
+struct MapExpCond{T1 <: Vector{<:AbstractFloat}, 
+                  T2 <: Vector{<:Integer}}
+    idExpCond::String
+    expCondParamConstVal::T1 
+    iOdeProbParamConstVal::T2
+    expCondStateConstVal::T1 
+    iOdeProbStateConstVal::T2
+    iDynEstVec::T2
+    iOdeProbDynParam::T2
+end
+
+
 """
     ParameterIndices
 
@@ -195,7 +207,8 @@ struct ParameterIndices{T1<:Array{<:Integer, 1},
                         T2<:Array{<:String, 1}, 
                         T3<:Array{<:UInt32, 1}, 
                         T4<:Array{<:ParamMap, 1}, 
-                        T5<:Array{<:Integer, 1}}
+                        T5<:Array{<:Integer, 1}, 
+                        T6<:Array{<:MapExpCond, 1}}
 
     iDynParam::T1
     iObsParam::T1
@@ -213,4 +226,5 @@ struct ParameterIndices{T1<:Array{<:Integer, 1},
     mapArrayObsParam::T4
     mapArraySdParam::T4
     iMapDynParam::T5
+    mapExpCond::T6
 end

@@ -43,7 +43,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     odeProb = remake(odeProb, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
 
     # Functions to map experimental conditions and parameters correctly to the ODE model 
-    changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, parameterData, experimentalConditionsFile, peTabModel, paramEstIndices)
+    changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
     changeModelParamUse! = (pVec, u0Vec, paramEst, paramEstNames) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstNames, paramEstIndices, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
