@@ -196,107 +196,6 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
 end
 
 
-"""
-    solveOdeModelAllExperimentalCond(prob::ODEProblem, 
-                                     changeToExperimentalCondUse!::Function, 
-                                     measurementData::DataFrame,
-                                     simulationInfo::SimulationInfo,
-                                     solver,
-                                     tol::Float64;
-                                     nTSave::Int64=0, 
-                                     denseSol::Bool=true)
-
-    Solve a PeTab ODE model for all experimental conditions specified in the PeTab experimentaCondition-file 
-    and return each ODE-soluation into solArray. Arguments the same as for `solveOdeModelAllExperimentalCond!`
-     
-    See also: [`solveOdeModelAllExperimentalCond!`]
-"""
-function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem, 
-                                               conditionId::String,
-                                               changeToExperimentalCondUse!::Function, 
-                                               measurementDataFile::DataFrame,
-                                               measurementData::MeasurementData,
-                                               simulationInfo::SimulationInfo,
-                                               solver, 
-                                               absTol::Float64, 
-                                               relTol::Float64;
-                                               nTSave::Int64=0, 
-                                               onlySaveAtTobs::Bool=false,
-                                               denseSol::Bool=true)
-
-    # In case the model is first simulated to a steady state 
-    local success = true
-    if simulationInfo.simulateSS == true
-
-        firstExpId = measurementData.preEqCond[measurementData.iPerConditionId[conditionId][1]]
-        shiftExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
-            
-        # Whether or not we only want to save solution at observed time-points 
-        if onlySaveAtTobs == true
-            nTSave = 0
-            # Extract t-save point for specific condition ID 
-            tSave = simulationInfo.tVecSave[conditionId]
-        else
-            tSave=Float64[]
-        end
-
-        t_max_ss = getTimeMax(measurementDataFile, shiftExpId)
-        sol = solveOdeSS(prob, 
-                         changeToExperimentalCondUse!, 
-                         firstExpId, 
-                         shiftExpId, 
-                         absTol, 
-                         relTol,
-                         t_max_ss, 
-                         solver, 
-                         tSave=tSave,
-                         nTSave=nTSave, 
-                         denseSol=denseSol, 
-                         absTolSS=simulationInfo.absTolSS, 
-                         relTolSS=simulationInfo.relTolSS)
-
-        if sol.retcode != :Success
-            sucess = false
-        end
-
-    # In case the model is not first simulated to a steady state 
-    elseif simulationInfo.simulateSS == false
-
-        firstExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
-        tSave = simulationInfo.tVecSave[conditionId]
-        t_max = getTimeMax(measurementDataFile, firstExpId)
-
-        changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
-        probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
-
-        # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
-        # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
-        if !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
-            solveCall = (probArg) -> solve(probArg, solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=dense, 
-                callback=TerminateSteadyState(absTolSS, relTolSS))
-        elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
-            solveCall = (probArg) -> solve(probArg, 
-                                           solver, 
-                                           abstol=absTol, 
-                                           reltol=relTol, 
-                                           saveat=tSave, 
-                                           sensealg=ForwardDiffSensitivity())
-        else
-            println("Error : Solver option does not exist")        
-        end
-
-        sol = solveCall(probUse)
-
-        if !(sol.retcode == :Success || sol.retcode == :Terminated)
-            sucess = false
-        end
-    end
-    
-    return sol, success
-end
-
-
-
 function solveOdeModelAllExperimentalCond(prob::ODEProblem, 
                                           changeToExperimentalCondUse!::Function, 
                                           measurementData::DataFrame,
@@ -333,6 +232,80 @@ function solveOdeModelAllExperimentalCond(prob::ODEProblem,
     return solArray, success
 end
 
+
+function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem, 
+                                               conditionId::String,
+                                               dynParamEst,
+                                               changeToExperimentalCondUsePre!::Function, 
+                                               measurementDataFile::DataFrame,
+                                               measurementData::MeasurementData,
+                                               simulationInfo::SimulationInfo,
+                                               solver, 
+                                               absTol::Float64, 
+                                               relTol::Float64)
+
+    changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeToExperimentalCondUsePre!(pVec, u0Vec, expID, dynParamEst)                                               
+
+    # In case the model is first simulated to a steady state 
+    local success = true
+    if simulationInfo.simulateSS == true
+
+        firstExpId = measurementData.preEqCond[measurementData.iPerConditionId[conditionId][1]]
+        shiftExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
+        tSave = simulationInfo.tVecSave[conditionId]            
+        
+        t_max_ss = getTimeMax(measurementDataFile, shiftExpId)
+        sol = solveOdeSS(prob, 
+                         changeToExperimentalCondUse!, 
+                         firstExpId, 
+                         shiftExpId, 
+                         absTol, 
+                         relTol,
+                         t_max_ss, 
+                         solver, 
+                         tSave=tSave,
+                         absTolSS=simulationInfo.absTolSS, 
+                         relTolSS=simulationInfo.relTolSS)
+
+        if sol.retcode != :Success
+            sucess = false
+        end
+
+    # In case the model is not first simulated to a steady state 
+    elseif simulationInfo.simulateSS == false
+
+        firstExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
+        tSave = simulationInfo.tVecSave[conditionId]
+        t_max = getTimeMax(measurementDataFile, firstExpId)
+        t_max_use = isinf(t_max) ? 1e8 : t_max
+
+        changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
+        probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
+
+        # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
+        # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
+        if !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
+            solveCall = (probArg) -> solve(probArg, solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=dense, 
+                callback=TerminateSteadyState(absTolSS, relTolSS))
+        elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
+            solveCall = (probArg) -> solve(probArg, 
+                                           solver, 
+                                           abstol=absTol, 
+                                           reltol=relTol, 
+                                           saveat=tSave)
+        else
+            println("Error : Solver option does not exist")        
+        end
+
+        sol = solveCall(probUse)
+
+        if !(sol.retcode == :Success || sol.retcode == :Terminated)
+            sucess = false
+        end
+    end
+    
+    return sol, success
+end
 
 
 """
@@ -627,6 +600,27 @@ function changeExperimentalCond!(paramVec,
 end
 
 
+"""
+    getRowExpId(expId::String, data::DataFrame; colSearch="conditionId") 
+
+    Small helper function to get which row in a DataFrame corresponds to specific ExpId 
+"""
+function getRowExpId(expId::String, data::DataFrame; colSearch="conditionId") 
+    return findfirst(x -> x == expId, data[!, colSearch])
+end
+
+
+"""
+    getTimeMax(measurementData::DataFrame, expId::String)::Float64
+
+    Small helper function to get the time-max value for a specific simulationConditionId when simulating 
+    the PeTab ODE-model 
+"""
+function getTimeMax(measurementData::DataFrame, expId::String)::Float64
+    return Float64(maximum(measurementData[findall(x -> x == expId, measurementData[!, "simulationConditionId"]), "time"]))
+end
+
+
 # Change experimental condition when running parameter estimation 
 function changeExperimentalCondEst!(paramVec, 
                                     stateVec, 
@@ -637,7 +631,6 @@ function changeExperimentalCondEst!(paramVec,
                                     peTabModel::PeTabModel, 
                                     paramEstIndices::ParameterIndices)
 
-    # TODO : Several things can be precomputed for this function
 
     # When computing the gradient the paramMap must be able to handle dual 
     # numbers, hence creating a paramMapUse
@@ -736,26 +729,4 @@ function changeExperimentalCondEst!(paramVec,
     end
 
     return nothing
-end
-
-
-
-"""
-    getRowExpId(expId::String, data::DataFrame; colSearch="conditionId") 
-
-    Small helper function to get which row in a DataFrame corresponds to specific ExpId 
-"""
-function getRowExpId(expId::String, data::DataFrame; colSearch="conditionId") 
-    return findfirst(x -> x == expId, data[!, colSearch])
-end
-
-
-"""
-    getTimeMax(measurementData::DataFrame, expId::String)::Float64
-
-    Small helper function to get the time-max value for a specific simulationConditionId when simulating 
-    the PeTab ODE-model 
-"""
-function getTimeMax(measurementData::DataFrame, expId::String)::Float64
-    return Float64(maximum(measurementData[findall(x -> x == expId, measurementData[!, "simulationConditionId"]), "time"]))
 end

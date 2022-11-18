@@ -48,7 +48,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
 
     # Set up function which solves the ODE model for all conditions and stores result 
     solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, tol, onlySaveAtTobs=true)
-    solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, changeToExperimentalCondUse!, measurementDataFile, measurementData, simulationInfo, solver, tol, tol, onlySaveAtTobs=true)
+    solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, changeToExperimentalCondUse!, measurementDataFile, measurementData, simulationInfo, solver, tol, tol)
 
     evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
     evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAtCondZygoteUse)
@@ -60,7 +60,6 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcHessian=true)
     evalHess = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(_evalHess, paramVec)) end
     
-    # TODO: Move this to another function 
     # Lower and upper bounds for parameters to estimate 
     namesParamEst = paramEstIndices.namesParamEst
     lowerBounds = [parameterData.lowerBounds[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)] 
@@ -516,10 +515,44 @@ function changeModelParam!(paramVecOdeModel,
                            paramIndices::ParameterIndices,
                            peTabModel::PeTabModel)
 
+    shouldChange = _changeModelParam(paramVecEst, paramEstNames, peTabModel)
+
+    # Use ModellingToolkit and u0 function to correctly map parameters to ODE-system 
+    paramVecOdeModel[paramIndices.iMapDynParam] .= paramVecEst[shouldChange]
+    peTabModel.evalU0!(stateVecOdeModel, paramVecOdeModel) 
+    
+    return nothing
+end
+
+
+function getPosInArray(val::Integer, arr::Array{Integer, 1})::Integer
+    return findfirst(x -> x == val, arr)
+end
+
+function changeModelParam(paramVecOdeModel, 
+                          paramVecEst,
+                          paramEstNames::Array{String, 1},
+                          paramIndices::ParameterIndices,
+                          peTabModel::PeTabModel)
+
+    shouldChange = _changeModelParam(paramVecEst, paramEstNames, peTabModel)
+    shouldChange = findall(x -> x == true, shouldChange)
+    newParamVecOdeModel = [ifelse(i in paramIndices.iMapDynParam, paramVecEst[shouldChange[getPosInArray(i, paramIndices.iMapDynParam)]], paramVecOdeModel[i]) for i in eachindex(paramVecOdeModel)]
+
+    # Use ModellingToolkit and u0 function to correctly map parameters to ODE-system 
+    paramVecOdeModel[paramIndices.iMapDynParam] .= paramVecEst[shouldChange]
+    stateVecOdeModel = peTabModel.evalU0(newParamVecOdeModel) 
+    
+    return paramVecOdeModel, stateVecOdeModel
+end
+
+
+function _changeModelParam(paramVecEst,
+                           paramEstNames::Array{String, 1},
+                           peTabModel::PeTabModel)::Array{Bool, 1}
+
     # Allow the code to propegate dual numbers for gradients 
-    paramMapUse = convert.(Pair{Num, eltype(paramVecOdeModel)}, peTabModel.paramMap)
-    # TODO: Precompute this step 
-    parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
+    parameterNamesStr = string.([peTabModel.paramMap[i].first for i in eachindex(peTabModel.paramMap)])
     shouldChange::Array{Bool, 1} = fill(false, length(paramVecEst))
 
     # Keep correct indices in ParamMap (for downstream computations when changing experimental conditions)
@@ -533,7 +566,6 @@ function changeModelParam!(paramVecOdeModel,
         
         i_param = findfirst(x -> x == paramChangeName, parameterNamesStr)
         if !isnothing(i_param)
-            paramMapUse[i_param] = Pair(paramMapUse[i_param].first, valChangeTo) 
             # Update reference paramMap 
             if typeof(valChangeToFloat) <: AbstractFloat
                 peTabModel.paramMap[i_param] = Pair(peTabModel.paramMap[i_param].first, valChangeToFloat) 
@@ -541,52 +573,8 @@ function changeModelParam!(paramVecOdeModel,
             shouldChange[i] = true
         end
     end
-
-    # Use ModellingToolkit and u0 function to correctly map parameters to ODE-system 
-    paramVecOdeModel[paramIndices.iMapDynParam] .= paramVecEst[shouldChange]
-    peTabModel.evalU0!(stateVecOdeModel, paramVecOdeModel) 
     
-    return nothing
-end
-
-function changeModelParam(paramVecOdeModel, 
-                          stateVecOdeModel,
-                          paramVecEst,
-                          paramEstNames::Array{String, 1},
-                          paramIndices::ParameterIndices,
-                          peTabModel::PeTabModel)
-
-    # Allow the code to propegate dual numbers for gradients 
-    paramMapUse = convert.(Pair{Num, eltype(paramVecOdeModel)}, peTabModel.paramMap)
-    # TODO: Precompute this step 
-    parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
-
-    # Keep correct indices in ParamMap (for downstream computations when changing experimental conditions)
-    # TODO : Check if this can be removed
-    for i in eachindex(paramEstNames)
-        
-        paramChangeName = paramEstNames[i]
-        valChangeTo = paramVecEst[i]
-        # Propegate dual numbers correctly. In the reference paramMap want to have floats (not duals)
-        valChangeToFloat = typeof(valChangeTo) <: Union{ForwardDiff.Dual, ForwardDiff.Dual{<:ForwardDiff.Dual}} ? valChangeTo.value : valChangeTo
-        
-        i_param = findfirst(x -> x == paramChangeName, parameterNamesStr)
-        if !isnothing(i_param)
-            paramMapUse[i_param] = Pair(paramMapUse[i_param].first, valChangeTo) 
-            # Update reference paramMap 
-            if typeof(valChangeToFloat) <: AbstractFloat
-                peTabModel.paramMap[i_param] = Pair(peTabModel.paramMap[i_param].first, valChangeToFloat) 
-            end
-        else
-            println("Error : Simulation parameter to change not found for experimental condition $expID")
-        end
-    end
-
-    # Use ModellingToolkit and u0 function to correctly map parameters to ODE-system 
-    paramVecOdeModel[paramIndices.iMapDynParam] .= paramVecEst
-    peTabModel.evalU0!(stateVecOdeModel, paramVecOdeModel) 
-    
-    return nothing
+    return shouldChange
 end
 
 
@@ -673,11 +661,13 @@ function calcCostZygote(paramVecEst,
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
     obsParEst = paramVecEst[paramIndices.iObsParam]
     sdParamEst = paramVecEst[paramIndices.iSdParam]
+    nonDynamicParamEst = paramVecEst[paramIndices.iNonDynParam]
 
     # Correctly transform parameter if, for example, they are on the log-scale.
     dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
     sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
     obsParEstUse = transformParamVec(obsParEst, paramIndices.namesObsParam, parameterData)
+    nonDynamicParamEstUse = transformParamVec(nonDynamicParamEst, paramIndices.namesNonDynParam, parameterData)
 
     odeProbUse = remake(odeProb, p = convert.(eltype(dynamicParamEstUse), odeProb.p), u0 = convert.(eltype(dynamicParamEstUse), odeProb.u0))
     changeModelParamUse!(odeProbUse.p, odeProbUse.u0, dynamicParamEstUse, paramIndices.namesDynParam)
@@ -688,14 +678,14 @@ function calcCostZygote(paramVecEst,
     for conditionID in keys(measurementData.iPerConditionId)
         
         # Solve ODE system 
-        odeSol, success = solveOdeModelAllCondZygoteUse(odeProbUse, conditionID)
+        odeSol, success = solveOdeModelAllCondZygoteUse(odeProbUse, conditionID, dynamicParamEstUse)
         if success != true
             println("Failed to solve ODE system")
             return Inf
         end
 
         logLik += calcLogLikExpCond(odeSol, dynamicParamEstUse, sdParamEstUse, obsParEstUse, 
-                                    peTabModel, conditionID, paramIndices,
+                                    nonDynamicParamEstUse, peTabModel, conditionID, paramIndices,
                                     measurementData, parameterData, false)
 
         if isinf(logLik)

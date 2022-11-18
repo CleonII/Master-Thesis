@@ -166,7 +166,6 @@ if diff > 1e-2
 end
 
 
-
 # Lucarelli - Breaks code by the same reason as above 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Lucarelli_CellSystems2018/"
 peTabModel = setUpPeTabModel("model_Lucarelli_CellSystems2018", dirModel)
@@ -222,40 +221,3 @@ if diff > 1e-3
     println("Does not pass ll-test for Zheng model")
     passTest = false
 end
-
-
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Beer_MolBioSystems2014/"
-peTabModel = setUpPeTabModel("model_Beer_MolBioSystems2014", dirModel)
-a = 1
-
-# Process PeTab files into type-stable Julia structs 
-experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-parameterData = processParameterData(parameterDataFile)
-measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-simulationInfo = getSimulationInfo(measurementDataFile, measurementData)
-
-# Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
-paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
-
-setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
-
-# The time-span 5e3 is overwritten when performing actual forward simulations 
-odeProb = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=false)
-odeProb = remake(odeProb, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
-
-# Functions to map experimental conditions and parameters correctly to the ODE model 
-changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, parameterData, experimentalConditionsFile, peTabModel)
-changeModelParamUse! = (pVec, u0Vec, paramEst, paramEstNames) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstNames, paramEstIndices, peTabModel)
-
-# Set up function which solves the ODE model for all conditions and stores result 
-solveOdeModelAllCondUse! = (solArrayArg, odeProbArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, tol, onlySaveAtTobs=true)
-
-# The starting problem is to correctly identify dynamic parameters between conditions (to build the correct dynParamEst vector).
-# Then the second problem to properly allow to ODE solver to realise it must the vector to estimate. I will not have to worry 
-# about the transformation (it is handled anyway). 
-# i) Fix function looking up for which parameters are dynamic (walk through the experimentalConditionsFile)
-# ii) Write change experimentalCond function that can look into dynamic-param vector 
-# iii) Integrate this new function into the optimisaiton 
-
-
-
