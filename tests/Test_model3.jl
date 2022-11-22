@@ -160,7 +160,9 @@ end
 
 function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, absTolSS=1e-12, relTolSS=1e-10)
+    solver = Rodas4P(autodiff=false)
+    tol = 1e-12
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, absTolSS=1e-12, relTolSS=1e-10, sensealg=ForwardDiffSensitivity())
     calcCostAlg = (paramVec) -> calcCostAlgebraic(paramVec, peTabModel, solver, tol)
 
     Random.seed!(123)
@@ -181,12 +183,31 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             return false
         end
 
+        # Evaluate cost for Zygote 
+        costZygote = peTabOpt.evalFZygote(paramVec)
+        sqDiffCostZygote = (costPeTab - costAlg)^2
+        if sqDiffCostZygote > 1e-4
+            @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
+            @printf("Does not pass test on cost\n")
+            return false
+        end
+
         # Evaluate gradient 
         gradAlg = ForwardDiff.gradient(calcCostAlg, paramVec)
-        grad = zeros(4); peTabOpt.evalGradF(grad, paramVec)
+        grad = zeros(4)
+        peTabOpt.evalGradF(grad, paramVec)
         sqDiffGrad = sum((grad - gradAlg).^2)
         if sqDiffGrad > 1e-4
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+            @printf("Does not pass test on gradient\n")
+            return false
+        end
+
+        # Evaluate gradient via Zygote 
+        gradZygote = Zygote.gradient(peTabOpt.evalFZygote, paramVec)[1]
+        sqDiffGradZygote = sum((gradZygote - gradAlg).^2)
+        if sqDiffGradZygote > 1e-4
+            @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
             @printf("Does not pass test on gradient\n")
             return false
         end
@@ -205,6 +226,8 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
+            @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
+            @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
         end
     end
 

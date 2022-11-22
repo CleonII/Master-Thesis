@@ -3,6 +3,9 @@
 # TODO: Pre-compute better with indices and when extracting the t-max value.
 
 
+using DiffEqCallbacks
+
+
 """
     solveOdeModelAtFileValues(peTabModel::PeTabModel)
 
@@ -233,6 +236,15 @@ function solveOdeModelAllExperimentalCond(prob::ODEProblem,
 end
 
 
+function MyTerminateSteadyState(abstol, reltol; min_t = nothing)
+
+    test = DiffEqCallbacks.allDerivPass                                
+    condition = (u, t, integrator) -> test(integrator, abstol, reltol, min_t)
+    affect! = (integrator) -> terminate!(integrator)
+    DiscreteCallback(condition, affect!; save_positions = (true, true))
+end
+
+
 # Solve the ODE system for one experimental conditions in a Zygote compatible manner.
 function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem, 
                                                conditionId::String,
@@ -256,17 +268,37 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
         shiftExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
         tSave = simulationInfo.tVecSave[conditionId]            
         
-        sol = solveOdeSS(prob, 
-                         changeToExperimentalCondUse!, 
-                         firstExpId, 
-                         shiftExpId, 
-                         absTol, 
-                         relTol,
-                         t_max, 
-                         solver, 
-                         tSave=tSave,
-                         absTolSS=simulationInfo.absTolSS, 
-                         relTolSS=simulationInfo.relTolSS)
+        # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
+        # The preequilibration simulations are terminated upon a steady state using the TerminateSteadyState callback.
+        solveCallPost = (prob) -> solve(prob, 
+                                        solver, 
+                                        abstol=absTol, 
+                                        reltol=relTol, 
+                                        saveat=tSave,
+                                        sensealg=sensealg)
+    
+        u0Pre = prob.u0[:]                                        
+        pUsePre, u0UsePre = changeToExperimentalCondUse(prob.p, prob.u0, firstExpId)
+        probUsePre = remake(prob, tspan=(0.0, 1e8), u0 = convert.(eltype(dynParamEst), u0UsePre), p = convert.(eltype(dynParamEst), pUsePre))
+        ssProb = SteadyStateProblem(probUsePre)
+        solSS = solve(ssProb, DynamicSS(solver, abstol=simulationInfo.absTolSS, reltol=simulationInfo.relTolSS), abstol=absTol, reltol=relTol)
+
+        # Terminate if a steady state was not reached in preequilibration simulations 
+        if solSS.retcode != :Success
+            return sol_pre, false
+        end
+
+        # Change to parameters for the post steady state parameters 
+        pUsePost, u0UsePostTmp = changeToExperimentalCondUse(prob.p, prob.u0, shiftExpId)
+        
+        # Given the standard the experimentaCondition-file can change the initial values for a state 
+        # whose value was changed in the preequilibration-simulation. The experimentalCondition
+        # value is prioritized by only changing u0 to the steady state value for those states  
+        # that were not affected by change to shiftExpId.
+        hasNotChanged = (u0UsePostTmp .== u0Pre)
+        u0UsePost = [hasNotChanged[i] == true ? solSS[i] : u0UsePostTmp[i] for i in eachindex(u0UsePostTmp)]
+        probUsePost = remake(prob, tspan=(0.0, t_max), u0 = convert.(eltype(dynParamEst), u0UsePost), p = convert.(eltype(dynParamEst), pUsePost))
+        sol = solveCallPost(probUsePost)
 
         if sol.retcode != :Success
             sucess = false

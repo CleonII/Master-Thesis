@@ -356,27 +356,3 @@ if passTest == true
 else
     @printf("Did not pass test for different adjoints\n")
 end
-
-
-
-function myTest1(p)
-
-    foo = [[1.2, 3.0], [3.0, 3.0]]
-
-    sum1 = sum(sum(foo[1]) .* exp.(p))
-    sum2 = sum(sum(foo[2]) .* p)
-    return sum1 + sum2
-end
-
-pArg = [1, 2, 3, 4]
-myTest1(pArg)
-grad = Zygote.gradient(myTest1, pArg)
-
-
-A = Vector{Any}(undef, 0)
-A = vcat(A, [1.0])
-A = vcat(A, [2.0, 2.0, 2.0])
-
-maps = peTabOpt.evalF.paramEstIndices.mapExpCond
-
-foo = 

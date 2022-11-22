@@ -101,14 +101,15 @@ struct MeasurementData{T1<:Array{<:AbstractFloat, 1},
                        T2<:Array{<:String, 1}, 
                        T3<:Array{<:Symbol, 1}, 
                        T4<:Dict, 
-                       T5<:Array{<:Integer, 1}}
+                       T5<:Array{<:Integer, 1}, 
+                       T6<:Array{<:Union{<:String, <:AbstractFloat}, 1}}
                     
     yObsNotTransformed::T1
     yObsTransformed::T1
     tObs::T1
     observebleID::T2
     conditionId::T2  # Sum of pre-eq + simulation-cond id 
-    sdParams::T2
+    sdParams::T6
     transformData::T3 # Only done once 
     obsParam::T2
     tVecSave::T4

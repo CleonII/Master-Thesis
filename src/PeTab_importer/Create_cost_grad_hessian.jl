@@ -516,8 +516,8 @@ function calcLogLikExpCond(odeSol::ODESolution,
         yMod = peTabModel.evalYmod(odeSolAtT, t, dynamicParamEst, obsPar, nonDynParamEst, parameterData, measurementData.observebleID[i], mapObsParam) 
 
         # Compute associated SD-value or extract said number if it is known 
-        if isNumber(measurementData.sdParams[i])
-            sdVal = parse(Float64, measurementData.sdParams[i])
+        if typeof(measurementData.sdParams[i]) <: AbstractFloat
+            sdVal = measurementData.sdParams[i]
         else
             mapSdParam = paramIndices.mapArraySdParam[paramIndices.indexSdParamMap[i]]
             sdVal = peTabModel.evalSd!(odeSolAtT, t, sdParamEst, dynamicParamEst, nonDynParamEst, parameterData, measurementData.observebleID[i], mapSdParam)

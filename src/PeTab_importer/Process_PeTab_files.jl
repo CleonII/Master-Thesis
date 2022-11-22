@@ -217,10 +217,14 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     else
         sdObs = measurementData[!, "noiseParameters"]
     end
-    sdParams::Array{String, 1} = Array{String, 1}(undef, nObs)
+    sdParams::Array{Union{String, Float64}, 1} = Array{Union{String, Float64}, 1}(undef, nObs)
     for i in eachindex(sdObs)
         if ismissing(sdObs[i]) 
             sdParams[i] = ""
+        elseif typeof(sdObs[i]) <:AbstractString && isNumber(sdObs[i])
+            sdParams[i] = parse(Float64, sdObs[i])
+        elseif typeof(sdObs[i]) <:Real
+            sdParams[i] = sdObs[i]
         else
             sdParams[i] = string(sdObs[i])
         end

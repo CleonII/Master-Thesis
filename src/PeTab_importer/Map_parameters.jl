@@ -99,10 +99,10 @@ function getIndicesParam(paramData::ParamData,
 end
 
 
-function buildMapParameters(keysMap::Array{String, 1},
+function buildMapParameters(keysMap::T1,
                             measurementData::MeasurementData,
                             parameterData::ParamData,
-                            buildObsParam::Bool)::Array{ParamMap, 1}
+                            buildObsParam::Bool)::Array{ParamMap, 1} where T1<:Array{<:Union{<:String, <:AbstractFloat}, 1}
 
     
     mapEntries::Array{ParamMap, 1} = Array{ParamMap, 1}(undef, length(keysMap))
@@ -117,6 +117,9 @@ function buildMapParameters(keysMap::Array{String, 1},
     # index in obsParamVecEst-vector depending on the observable parameters should be estimated or not.
     for i in eachindex(keysMap)
         if isempty(keysMap[i])
+            mapEntries[i] = ParamMap(Array{Bool, 1}(undef, 0), Array{UInt32, 1}(undef, 0), Array{Float64, 1}(undef, 0), UInt32(0))
+
+        elseif typeof(keysMap[i]) <: AbstractFloat
             mapEntries[i] = ParamMap(Array{Bool, 1}(undef, 0), Array{UInt32, 1}(undef, 0), Array{Float64, 1}(undef, 0), UInt32(0))
 
         elseif !isempty(keysMap[i])
@@ -209,11 +212,13 @@ end
 
 
 # Helper function for extracting Observable parameter when computing the cost. Will be heavily altered as slow.
-function getIdEst(idsInStr::Array{String, 1}, paramData::ParamData)
+function getIdEst(idsInStr::T1, paramData::ParamData) where T1<:Array{<:Union{<:String, <:AbstractFloat}, 1}
     idVec = String[]
 
     for i in eachindex(idsInStr)
         if isempty(idsInStr[i])
+            continue
+        elseif typeof(idsInStr[i]) <: AbstractFloat
             continue
         else
             idsInStrSplit = split(idsInStr[i], ';')
