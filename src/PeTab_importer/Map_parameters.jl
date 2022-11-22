@@ -65,12 +65,16 @@ function getIndicesParam(paramData::ParamData,
     mapArrayObsParam = buildMapParameters(keysObsMap, measurementData, paramData, true)
     mapArraySdParam = buildMapParameters(keysSdMap, measurementData, paramData, false)
 
-    # Set up a map for changing ODEProblem model parameters when doing parameter estimation 
     namesAllString = string.(parameters(odeSystem)) 
-    iMapDynParam = [findfirst(x -> x == namesParamDyn[i], namesAllString) for i in eachindex(namesParamDyn)]
-    iMapDynParam = convert(Array{Integer, 1}, iMapDynParam[.!isnothing.(iMapDynParam)])
 
-    mapExpCond = getMapExpCond(peTabModel, namesAllString, measurementData, paramData, experimentalConditionsFile, namesParamDyn, namesParamEst)
+    # Set up a map for changing ODEProblem model parameters when doing parameter estimation  
+    iDynParamInSys = [findfirst(x -> x == namesParamDyn[i], namesAllString) for i in eachindex(namesParamDyn)]
+    iDynParamInSys = convert(Array{Integer, 1}, iDynParamInSys[.!isnothing.(iDynParamInSys)])
+    iDynParamInVecEst = convert(Array{Integer, 1}, [findfirst(x -> x == namesAllString[iSys], namesParamEst) for iSys in iDynParamInSys])
+    mapDynParEst = MapDynParEst(iDynParamInSys, iDynParamInVecEst)
+
+    # Set up a map for changing between experimental conditions 
+    mapExpCond, constParamPerCond = getMapExpCond(odeSystem, namesAllString, measurementData, paramData, experimentalConditionsFile, namesParamDyn, namesParamEst)
 
     paramIndicies = ParameterIndices(iDynPar, 
                                      iObsPar, 
@@ -87,8 +91,9 @@ function getIndicesParam(paramData::ParamData,
                                      indexSdParamMap, 
                                      mapArrayObsParam, 
                                      mapArraySdParam, 
-                                     iMapDynParam, 
-                                     mapExpCond)
+                                     mapDynParEst, 
+                                     mapExpCond, 
+                                     constParamPerCond)
 
     return paramIndicies
 end
@@ -158,6 +163,16 @@ end
 
 function getObsOrSdParam(paramVec, paramMap::ParamMap)
 
+    # Helper function to in a non-mutating way map SD-parameters in non-mutating way 
+    function mapParamEst(iWal)
+        whichI = sum(paramMap.shouldEst[1:iWal])
+        return paramMap.indexUse[whichI]
+    end
+    function mapParamConst(iWal)
+        whichI = sum(.!paramMap.shouldEst[1:iWal])
+        return whichI
+    end
+
     # In case of no SD/observable parameter exit function
     if paramMap.nParam == 0
         return
@@ -178,13 +193,14 @@ function getObsOrSdParam(paramVec, paramMap::ParamMap)
     if nParamEst == paramMap.nParam
         return paramVec[paramMap.indexUse]
 
-    # Computaionally most demanding case. Keep in mind for future code optimizaiton.
+    # Computaionally most demanding case. Here a subset (or all) of the parameters 
+    # are to be estimated. Thus important that valsRetRet is correct type and this 
+    # the code is non-mutating (to support Zygote)
     elseif nParamEst > 0
-        valsRet = Array{eltype(paramVec), 1}(undef, paramMap.nParam) 
-        valsRet[paramMap.shouldEst] .= paramVec[paramMap.indexUse]
-        valsRet[.!paramMap.shouldEst] .= paramMap.valuesConst
-        return valsRet
-        
+        valsRet = [paramMap.shouldEst[i] == true ? paramVec[mapParamEst(i)] : 0.0 for i in 1:paramMap.nParam]
+        valsRetRet = [paramMap.shouldEst[i] == false ? paramMap.valuesConst[mapParamConst(i)] : valsRet[i] for i in 1:paramMap.nParam]
+        return valsRetRet
+    
     # In no parameter are estimated can return constant values as floats 
     else
         return paramMap.valuesConst
@@ -261,22 +277,23 @@ end
 
 
 # A mapping experimental map for experimental conditions 
-function getMapExpCond(peTabModel::PeTabModel,
+function getMapExpCond(odeSystem::ODESystem,
                        namesAllString::Array{String, 1}, 
                        measurementData::MeasurementData, 
                        paramData::ParamData, 
                        experimentalConditionsFile::DataFrame, 
                        namesParamDyn::Array{String, 1}, 
-                       namesParamEst::Array{String, 1})::Array{MapExpCond, 1}
+                       namesParamEst::Array{String, 1})
 
 
     allExpCond = unique(vcat(measurementData.preEqCond, measurementData.simCond))
-    stateNamesStr = replace.(string.(peTabModel.stateNames), "(t)" => "")
+    stateNamesStr = replace.(string.(states(odeSystem), "(t)" => ""))
 
     i_start = "conditionName" in names(experimentalConditionsFile) ? 3 : 2
     paramStateChange = names(experimentalConditionsFile)[i_start:end]
 
     mapExpCondArr = Array{MapExpCond, 1}(undef, length(allExpCond))
+    condIdName = Array{String, 1}(undef, length(allExpCond))
 
     for i in 1:nrow(experimentalConditionsFile)
 
@@ -289,6 +306,7 @@ function getMapExpCond(peTabModel::PeTabModel,
 
         rowI = string.(collect(experimentalConditionsFile[i, i_start:end]))
         condID = experimentalConditionsFile[i, 1]
+        condIdName[i] = string(condID)
         
         for j in eachindex(rowI)
         
@@ -326,14 +344,20 @@ function getMapExpCond(peTabModel::PeTabModel,
             println("Could not map parameters for condition $condID  parameters", rowI[j])
         end
 
-        mapExpCondArr[i] = MapExpCond(string.(condID), 
-                                    expCondParamConstVal, 
-                                    iOdeProbParamConstVal, 
-                                    expCondStateConstVal, 
-                                    iOdeProbStateConstVal, 
-                                    iDynEstVec, 
-                                    iOdeProbDynParam)
+        mapExpCondArr[i] = MapExpCond(string(condID),
+                                      expCondParamConstVal, 
+                                      iOdeProbParamConstVal, 
+                                      expCondStateConstVal, 
+                                      iOdeProbStateConstVal, 
+                                      iDynEstVec, 
+                                      iOdeProbDynParam)                                    
     end
 
-    return mapExpCondArr
+    # In order to prevent Zygote from trying to find rules for the struct 
+    # mapExpCond the constant parameter values accross experimental conditions 
+    # are stored in a Vector{Vector} from which they can be retrevied. 
+    # TODO: Check if needed 
+    constParamPerCond = [mapExpCondArr[i].expCondParamConstVal[:] for i in eachindex(mapExpCondArr)] # Copy to avoid any potential issues
+
+    return mapExpCondArr, constParamPerCond
 end

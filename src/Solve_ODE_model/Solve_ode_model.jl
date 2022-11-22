@@ -102,7 +102,7 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                     tSave=Float64[]
                 end
 
-                t_max_ss = getTimeMax(measurementData, shiftExpId)
+                t_max_ss = simulationInfo.tMaxForwardSim[k]
                 solArray[k] = solveOdeSS(prob, 
                                          changeToExperimentalCondUse!, 
                                          firstExpId, 
@@ -143,7 +143,7 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                 tSave=Float64[]
             end
 
-            t_max = getTimeMax(measurementData, firstExpId)
+            t_max = simulationInfo.tMaxForwardSim[i]
             solArray[i] = solveOdeNoSS(prob, 
                                        changeToExperimentalCondUse!, 
                                        firstExpId, 
@@ -233,18 +233,20 @@ function solveOdeModelAllExperimentalCond(prob::ODEProblem,
 end
 
 
+# Solve the ODE system for one experimental conditions in a Zygote compatible manner.
 function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem, 
                                                conditionId::String,
                                                dynParamEst,
-                                               changeToExperimentalCondUsePre!::Function, 
-                                               measurementDataFile::DataFrame,
+                                               t_max,
+                                               changeToExperimentalCondUsePre::Function, 
                                                measurementData::MeasurementData,
                                                simulationInfo::SimulationInfo,
                                                solver, 
                                                absTol::Float64, 
-                                               relTol::Float64)
+                                               relTol::Float64, 
+                                               sensealg)
 
-    changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeToExperimentalCondUsePre!(pVec, u0Vec, expID, dynParamEst)                                               
+    changeToExperimentalCondUse = (pVec, u0Vec, expID) -> changeToExperimentalCondUsePre(pVec, u0Vec, expID, dynParamEst)                                               
 
     # In case the model is first simulated to a steady state 
     local success = true
@@ -254,14 +256,13 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
         shiftExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
         tSave = simulationInfo.tVecSave[conditionId]            
         
-        t_max_ss = getTimeMax(measurementDataFile, shiftExpId)
         sol = solveOdeSS(prob, 
                          changeToExperimentalCondUse!, 
                          firstExpId, 
                          shiftExpId, 
                          absTol, 
                          relTol,
-                         t_max_ss, 
+                         t_max, 
                          solver, 
                          tSave=tSave,
                          absTolSS=simulationInfo.absTolSS, 
@@ -276,30 +277,39 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
 
         firstExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
         tSave = simulationInfo.tVecSave[conditionId]
-        t_max = getTimeMax(measurementDataFile, firstExpId)
         t_max_use = isinf(t_max) ? 1e8 : t_max
 
-        changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
-        probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
+        pUse, u0Use = changeToExperimentalCondUse(prob.p, prob.u0, firstExpId)
+        probUse = remake(prob, tspan=(0.0, t_max_use), u0 = convert.(eltype(dynParamEst), u0Use), p = convert.(eltype(dynParamEst), pUse))
 
         # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
         # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
         if !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
-            solveCall = (probArg) -> solve(probArg, solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=dense, 
-                callback=TerminateSteadyState(absTolSS, relTolSS))
-        elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
             solveCall = (probArg) -> solve(probArg, 
                                            solver, 
                                            abstol=absTol, 
                                            reltol=relTol, 
-                                           saveat=tSave)
+                                           save_on=false,
+                                           save_end=true, 
+                                           dense=dense, 
+                                           callback=TerminateSteadyState(absTolSS, relTolSS))
+
+        elseif !(typeof(solver) <: Vector{Symbol}) && !isinf(t_max)
+            solveCall = (probArg) -> solve(probArg, 
+                                           solver, 
+                                           p = pUse,
+                                           u0 = u0Use,
+                                           abstol=absTol, 
+                                           reltol=relTol, 
+                                           saveat=tSave, 
+                                           sensealg=sensealg)
         else
             println("Error : Solver option does not exist")        
         end
-
+        
         sol = solveCall(probUse)
 
-        if !(sol.retcode == :Success || sol.retcode == :Terminated)
+        if typeof(sol) <: ODESolution && !(sol.retcode == :Success || sol.retcode == :Terminated)
             sucess = false
         end
     end
@@ -610,19 +620,8 @@ function getRowExpId(expId::String, data::DataFrame; colSearch="conditionId")
 end
 
 
-"""
-    getTimeMax(measurementData::DataFrame, expId::String)::Float64
-
-    Small helper function to get the time-max value for a specific simulationConditionId when simulating 
-    the PeTab ODE-model 
-"""
-function getTimeMax(measurementData::DataFrame, expId::String)::Float64
-    return Float64(maximum(measurementData[findall(x -> x == expId, measurementData[!, "simulationConditionId"]), "time"]))
-end
-
-
 # Change experimental condition when running parameter estimation. A lot of heavy lifting here is done by 
-# an index which correctly maps parameters between experimental conditions.
+# an index which correctly maps parameters for an experimental condition to the ODE model.
 function changeExperimentalCondEst!(paramVec, 
                                     stateVec, 
                                     expID::String, 
@@ -630,8 +629,8 @@ function changeExperimentalCondEst!(paramVec,
                                     peTabModel::PeTabModel, 
                                     paramEstIndices::ParameterIndices)
 
-    whichExpMap = findfirst(x -> x == expID, [paramEstIndices.mapExpCond[i].idExpCond for i in eachindex(paramEstIndices.mapExpCond)])
-    expMap = paramEstIndices.mapExpCond[whichExpMap]
+    whichExpMap = findfirst(x -> x == expID, [paramEstIndices.mapExpCond[i].condID for i in eachindex(paramEstIndices.mapExpCond)])
+    expMap = paramEstIndices.mapExpCond[whichExpMap] 
 
     # Constant parameters 
     paramVec[expMap.iOdeProbParamConstVal] .= expMap.expCondParamConstVal
@@ -649,3 +648,44 @@ function changeExperimentalCondEst!(paramVec,
 
     return nothing
 end                                 
+
+
+function changeExperimentalCondEst(paramVec, 
+                                   stateVec, 
+                                   expID::String, 
+                                   dynParamEst,
+                                   peTabModel::PeTabModel, 
+                                   paramEstIndices::ParameterIndices)
+
+    whichExpMap = findfirst(x -> x == expID, [paramEstIndices.mapExpCond[i].condID for i in eachindex(paramEstIndices.mapExpCond)])
+    expMap = paramEstIndices.mapExpCond[whichExpMap] 
+    constParamCond = paramEstIndices.constParamPerCond[whichExpMap]
+    
+    # For a non-mutating way of mapping constant parameters 
+    function mapConstantParam(iUse::Integer, expMap)
+        whichIndex = findfirst(x -> x == iUse, expMap.iOdeProbParamConstVal)
+        return whichIndex
+    end
+    # For a non-mutating mapping of parameters to estimate 
+    function mapParamToEst(iUse::Integer, expMap)
+        whichIndex = findfirst(x -> x == iUse, expMap.iOdeProbDynParam)
+        return expMap.iDynEstVec[whichIndex]
+    end
+    
+    # Constant parameters 
+    paramVecRet = [i ∈ expMap.iOdeProbParamConstVal ? constParamCond[mapConstantParam(i, expMap)] : paramVec[i] for i in eachindex(paramVec)]
+    
+    # Parameters to estimate 
+    paramVecRetRet = [i ∈ expMap.iOdeProbDynParam ? dynParamEst[mapParamToEst(i, expMap)] : paramVecRet[i] for i in eachindex(paramVec)]    
+    
+    # When using AD as Zygote we must use the non-mutating version of evalU0
+    stateVecRet = peTabModel.evalU0(paramVecRetRet) 
+
+    # In case an experimental condition maps directly to the initial value of a state. 
+    # To fix if above works.
+    if !isempty(expMap.expCondStateConstVal)
+        stateVec[iOdeProbStateConstVal] .= expCondStateConstVal
+    end
+
+    return paramVecRetRet, stateVecRet
+end     

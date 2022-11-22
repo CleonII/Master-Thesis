@@ -9,6 +9,7 @@ using Random
 using LinearAlgebra
 using Distributions
 using Printf
+using SciMLSensitivity
 
 
 # Relevant PeTab structs for compuations 
@@ -34,7 +35,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 """
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity())
 
     # Parameter values to test gradient at 
     paramVals = CSV.read(pwd() * "/tests/Bachman/Params.csv", DataFrame)
@@ -71,9 +72,31 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
+        costZygote = peTabOpt.evalFZygote(paramVec)
+        sqDiffZygote = (costZygote - costPython[i])^2
+        if sqDiffZygote > 1e-5
+            @printf("sqDiffCostZygote = %.3e\n", sqDiffZygote)
+            @printf("Does not pass test on cost for Zygote\n")
+            return false
+        end
+
+        # This currently takes considerble time (hence it does not run for all passes)
+        if i == 1
+            gradZygote = Zygote.gradient(peTabOpt.evalFZygote, paramVec)[1]
+            gradPython = collect(gradPythonMat[i, :])
+            sqDiffGradZygote = sum((gradZygote - gradPython[iUse]).^2) 
+            if sqDiffGradZygote > 1e-5
+                @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
+                @printf("Does not pass test on gradient from Zygote\n")
+                return false
+            end
+            @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
+        end
+
         if printRes == true
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+            @printf("sqDiffCostZygote = %.3e\n", sqDiffZygote)
         end
     end
 
@@ -83,7 +106,7 @@ end
 
 peTabModel = setUpPeTabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/")
 
-passTest = compareAgainstPyPesto(peTabModel, QNDF(), 1e-12, printRes=true)
+passTest = compareAgainstPyPesto(peTabModel, Rodas5(), 1e-12, printRes=true)
 if passTest == true
     @printf("Passed test Bachaman against PyPesto\n")
 else

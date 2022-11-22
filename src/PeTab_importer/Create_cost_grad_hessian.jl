@@ -22,6 +22,7 @@ using Zygote
 function setUpCostGradHess(peTabModel::PeTabModel, 
                            solver, 
                            tol::Float64; 
+                           sensealg=ForwardDiffSensitivity(),
                            sparseJac::Bool=false, 
                            absTolSS::Float64=1e-8, 
                            relTolSS::Float64=1e-6)::PeTabOpt
@@ -44,14 +45,16 @@ function setUpCostGradHess(peTabModel::PeTabModel,
 
     # Functions to map experimental conditions and parameters correctly to the ODE model 
     changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
-    changeModelParamUse! = (pVec, u0Vec, paramEst, paramEstNames) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstNames, paramEstIndices, peTabModel)
+    changeToExperimentalCondUse = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
+    changeModelParamUse! = (pVec, u0Vec, paramEst) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstIndices, peTabModel)
+    changeModelParamUse = (pVec, paramEst) -> changeModelParam(pVec, paramEst, paramEstIndices, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
     solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, tol, onlySaveAtTobs=true)
-    solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, changeToExperimentalCondUse!, measurementDataFile, measurementData, simulationInfo, solver, tol, tol)
+    solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementData, simulationInfo, solver, tol, tol, sensealg)
 
     evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
-    evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAtCondZygoteUse)
+    evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse)
     evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
     evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
     # This is subtle. When computing the hessian via autodiff it is important that the ODE-solution arrary with dual 
@@ -311,7 +314,7 @@ function calcLogLikSolveODE(dynamicParamEst,
     nonDynParamEstUse = transformParamVec(nonDynParamEst, paramIndices.namesNonDynParam, parameterData)
 
     odeProbUse = remake(odeProb, p = convert.(eltype(dynamicParamEstUse), odeProb.p), u0 = convert.(eltype(dynamicParamEstUse), odeProb.u0))
-    changeModelParamUse!(odeProbUse.p, odeProbUse.u0, dynamicParamEstUse, paramIndices.namesDynParam)
+    changeModelParamUse!(odeProbUse.p, odeProbUse.u0, dynamicParamEstUse)
     
     # If computing hessian or gradient store ODE solution in arrary with dual numbers, else use 
     # solution array with floats
@@ -432,6 +435,61 @@ function calcLogLik(dynamicParamEst,
 end
 
 
+# Computes the likelihood in such a in a Zygote compatible way, which mainly means that no arrays are mutated.
+function calcCostZygote(paramVecEst,
+                        odeProb::ODEProblem,  
+                        peTabModel::PeTabModel,
+                        simulationInfo::SimulationInfo,
+                        paramIndices::ParameterIndices,
+                        measurementData::MeasurementData,
+                        parameterData::ParamData,
+                        changeModelParamUse::Function,
+                        solveOdeModelAllCondZygoteUse::Function)
+                                                            
+    # Correctly map paramVecEst to dynmaic, observable and sd param. The vectors, 
+    # e.g dynamicParamEst, are distinct copies so transforming them will not change 
+    # paramVecEst.
+    dynamicParamEst = paramVecEst[paramIndices.iDynParam]
+    obsParEst = paramVecEst[paramIndices.iObsParam]
+    sdParamEst = paramVecEst[paramIndices.iSdParam]
+    nonDynamicParamEst = paramVecEst[paramIndices.iNonDynParam]
+
+    # Correctly transform parameter if, for example, they are on the log-scale.
+    dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
+    sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
+    obsParEstUse = transformParamVec(obsParEst, paramIndices.namesObsParam, parameterData)
+    nonDynamicParamEstUse = transformParamVec(nonDynamicParamEst, paramIndices.namesNonDynParam, parameterData)
+
+    pOdeSysUse, u0Use = changeModelParamUse(odeProb.p, dynamicParamEstUse)
+    odeProbUse = remake(odeProb, p = convert.(eltype(paramVecEst), pOdeSysUse), u0 = convert.(eltype(paramVecEst), u0Use))
+    
+    # Compute yMod and sd-val by looping through all experimental conditons. At the end 
+    # update the likelihood 
+    logLik = convert(eltype(paramVecEst), 0.0)
+    for conditionID in keys(measurementData.iPerConditionId)
+        
+        # Solve ODE system 
+        whichTMax = findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)
+        tMax = simulationInfo.tMaxForwardSim[whichTMax]
+        
+        odeSol, success = solveOdeModelAllCondZygoteUse(odeProbUse, conditionID, dynamicParamEstUse, tMax)
+        if success != true
+            return Inf
+        end
+
+        logLik += calcLogLikExpCond(odeSol, dynamicParamEstUse, sdParamEstUse, obsParEstUse, 
+                                    nonDynamicParamEstUse, peTabModel, conditionID, paramIndices,
+                                    measurementData, parameterData, false)
+
+        if isinf(logLik)
+            return logLik
+        end
+    end
+
+    return logLik
+end
+
+
 function calcLogLikExpCond(odeSol::ODESolution,
                            dynamicParamEst,
                            sdParamEst, 
@@ -508,73 +566,36 @@ end
      
     See also: [`setUpCostGradHess`]
 """
-function changeModelParam!(paramVecOdeModel, 
-                           stateVecOdeModel,
+function changeModelParam!(pOdeSys, 
+                           u0,
                            paramVecEst,
-                           paramEstNames::Array{String, 1},
                            paramIndices::ParameterIndices,
                            peTabModel::PeTabModel)
 
-    shouldChange = _changeModelParam(paramVecEst, paramEstNames, peTabModel)
-
-    # Use ModellingToolkit and u0 function to correctly map parameters to ODE-system 
-    paramVecOdeModel[paramIndices.iMapDynParam] .= paramVecEst[shouldChange]
-    peTabModel.evalU0!(stateVecOdeModel, paramVecOdeModel) 
+    mapDynParam = paramIndices.mapDynParEst
+    pOdeSys[mapDynParam.iDynParamInSys] .= paramVecEst[mapDynParam.iDynParamInVecEst]
+    peTabModel.evalU0!(u0, pOdeSys) 
     
     return nothing
 end
 
 
-function getPosInArray(val::Integer, arr::Array{Integer, 1})::Integer
-    return findfirst(x -> x == val, arr)
-end
-
-function changeModelParam(paramVecOdeModel, 
+function changeModelParam(pOdeSys, 
                           paramVecEst,
-                          paramEstNames::Array{String, 1},
                           paramIndices::ParameterIndices,
                           peTabModel::PeTabModel)
 
-    shouldChange = _changeModelParam(paramVecEst, paramEstNames, peTabModel)
-    shouldChange = findall(x -> x == true, shouldChange)
-    newParamVecOdeModel = [ifelse(i in paramIndices.iMapDynParam, paramVecEst[shouldChange[getPosInArray(i, paramIndices.iMapDynParam)]], paramVecOdeModel[i]) for i in eachindex(paramVecOdeModel)]
-
-    # Use ModellingToolkit and u0 function to correctly map parameters to ODE-system 
-    paramVecOdeModel[paramIndices.iMapDynParam] .= paramVecEst[shouldChange]
-    stateVecOdeModel = peTabModel.evalU0(newParamVecOdeModel) 
-    
-    return paramVecOdeModel, stateVecOdeModel
-end
-
-
-function _changeModelParam(paramVecEst,
-                           paramEstNames::Array{String, 1},
-                           peTabModel::PeTabModel)::Array{Bool, 1}
-
-    # Allow the code to propegate dual numbers for gradients 
-    parameterNamesStr = string.([peTabModel.paramMap[i].first for i in eachindex(peTabModel.paramMap)])
-    shouldChange::Array{Bool, 1} = fill(false, length(paramVecEst))
-
-    # Keep correct indices in ParamMap (for downstream computations when changing experimental conditions)
-    # TODO : Check if this can be removed
-    for i in eachindex(paramEstNames)
-        
-        paramChangeName = paramEstNames[i]
-        valChangeTo = paramVecEst[i]
-        # Propegate dual numbers correctly. In the reference paramMap want to have floats (not duals)
-        valChangeToFloat = typeof(valChangeTo) <: Union{ForwardDiff.Dual, ForwardDiff.Dual{<:ForwardDiff.Dual}} ? valChangeTo.value : valChangeTo
-        
-        i_param = findfirst(x -> x == paramChangeName, parameterNamesStr)
-        if !isnothing(i_param)
-            # Update reference paramMap 
-            if typeof(valChangeToFloat) <: AbstractFloat
-                peTabModel.paramMap[i_param] = Pair(peTabModel.paramMap[i_param].first, valChangeToFloat) 
-            end
-            shouldChange[i] = true
-        end
+    # Helper function to not-inplace map parameters 
+    function mapParamToEst(iUse::Integer, mapDynParam::MapDynParEst)
+        whichIndex = findfirst(x -> x == iUse, mapDynParam.iDynParamInSys)
+        return mapDynParam.iDynParamInVecEst[whichIndex]
     end
+
+    mapDynParam = paramIndices.mapDynParEst
+    pOdeSysRet = [i ∈ mapDynParam.iDynParamInSys ? paramVecEst[mapParamToEst(i, mapDynParam)] : pOdeSys[i] for i in eachindex(pOdeSys)]
+    u0Ret = peTabModel.evalU0(pOdeSysRet) 
     
-    return shouldChange
+    return pOdeSysRet, u0Ret   
 end
 
 
@@ -609,25 +630,18 @@ end
 
     Helper function which returns a transformed parameter vector with parameters specied in namesParam according to the 
     transformation for said parameter specifid in paramData.shouldTransform. In case revTransform is true 
-    performs the inverse parameter transformation (e.g exp10 instead of log10)
+    performs the inverse parameter transformation (e.g exp10 instead of log10). 
+
+    The function is fully compatible with Zygote.
 """
 function transformParamVec(paramVec, 
                            namesParam::Array{String, 1}, 
                            paramData::ParamData; 
                            revTransform::Bool=false)
     
-    shouldTransform = zeros(Float64, length(paramVec))
-    shouldNotTransform = ones(Float64, length(paramVec))
-    @inbounds for i in eachindex(paramVec)
-        iParam = findfirst(x -> x == namesParam[i], paramData.parameterID)
-        if isnothing(iParam)
-            println("Warning : Could not find paramID for $namesParam")
-        end
-        if paramData.logScale[iParam]
-            shouldTransform[i] = 1.0
-            shouldNotTransform[i] = 0.0
-        end
-    end
+    iParam = [findfirst(x -> x == namesParam[i], paramData.parameterID) for i in eachindex(namesParam)]
+    shouldTransform = [paramData.logScale[i] == true ? true : false for i in iParam]
+    shouldNotTransform = .!shouldTransform
 
     if revTransform == false
         return exp10.(paramVec) .* shouldTransform .+ paramVec .* shouldNotTransform
@@ -639,59 +653,4 @@ end
 
 function dualVecToFloatVec(dualVec::T1)::Vector{Float64} where T1<:Vector{<:ForwardDiff.Dual}
     return [dualVec[i].value for i in eachindex(dualVec)]
-end
-
-
-# Compute the in such a way that we can backpropagate the solution via Zygote and use overloading in 
-# sol to compute the gradient with a plateu of different approaches
-function calcCostZygote(paramVecEst,
-                        odeProb::ODEProblem,  
-                        peTabModel::PeTabModel,
-                        simulationInfo::SimulationInfo,
-                        paramIndices::ParameterIndices,
-                        measurementData::MeasurementData,
-                        parameterData::ParamData,
-                        changeModelParamUse!::Function,
-                        solveOdeModelAllCondZygoteUse::Function)::Real
-                                                            
-
-    # Correctly map paramVecEst to dynmaic, observable and sd param. The vectors, 
-    # e.g dynamicParamEst, are distinct copies so transforming them will not change 
-    # paramVecEst.
-    dynamicParamEst = paramVecEst[paramIndices.iDynParam]
-    obsParEst = paramVecEst[paramIndices.iObsParam]
-    sdParamEst = paramVecEst[paramIndices.iSdParam]
-    nonDynamicParamEst = paramVecEst[paramIndices.iNonDynParam]
-
-    # Correctly transform parameter if, for example, they are on the log-scale.
-    dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
-    sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
-    obsParEstUse = transformParamVec(obsParEst, paramIndices.namesObsParam, parameterData)
-    nonDynamicParamEstUse = transformParamVec(nonDynamicParamEst, paramIndices.namesNonDynParam, parameterData)
-
-    odeProbUse = remake(odeProb, p = convert.(eltype(dynamicParamEstUse), odeProb.p), u0 = convert.(eltype(dynamicParamEstUse), odeProb.u0))
-    changeModelParamUse!(odeProbUse.p, odeProbUse.u0, dynamicParamEstUse, paramIndices.namesDynParam)
-
-    # Compute yMod and sd-val by looping through all experimental conditons. At the end 
-    # update the likelihood 
-    logLik = 0.0
-    for conditionID in keys(measurementData.iPerConditionId)
-        
-        # Solve ODE system 
-        odeSol, success = solveOdeModelAllCondZygoteUse(odeProbUse, conditionID, dynamicParamEstUse)
-        if success != true
-            println("Failed to solve ODE system")
-            return Inf
-        end
-
-        logLik += calcLogLikExpCond(odeSol, dynamicParamEstUse, sdParamEstUse, obsParEstUse, 
-                                    nonDynamicParamEstUse, peTabModel, conditionID, paramIndices,
-                                    measurementData, parameterData, false)
-
-        if isinf(logLik)
-            return Inf
-        end
-    end
-
-    return logLik
 end

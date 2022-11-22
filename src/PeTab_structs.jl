@@ -29,6 +29,7 @@ struct PeTabModel{T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}},
     modelName::String
     evalYmod::Function 
     evalU0!::Function
+    evalU0::Function
     evalSd!::Function
     odeSystem::ODESystem 
     paramMap::T1
@@ -135,10 +136,12 @@ struct SimulationInfo{T1<:Array{<:String, 1},
                       T2<:Vector{<:Vector{String}},
                       T3<:Bool,
                       T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}, 
-                      T5<:Dict}
+                      T5<:Dict, 
+                      T6<:Array{<:AbstractFloat, 1}}
     firstExpIds::T1
     shiftExpIds::T2
     conditionIdSol::T1
+    tMaxForwardSim::T6
     simulateSS::T3
     solArray::T4
     solArrayGrad::T4
@@ -172,13 +175,19 @@ end
 
 struct MapExpCond{T1 <: Vector{<:AbstractFloat}, 
                   T2 <: Vector{<:Integer}}
-    idExpCond::String
+    condID::String
     expCondParamConstVal::T1 
     iOdeProbParamConstVal::T2
     expCondStateConstVal::T1 
     iOdeProbStateConstVal::T2
     iDynEstVec::T2
     iOdeProbDynParam::T2
+end
+
+
+struct MapDynParEst{T1 <: Vector{<:Integer}}
+    iDynParamInSys::T1
+    iDynParamInVecEst::T1
 end
 
 
@@ -207,8 +216,9 @@ struct ParameterIndices{T1<:Array{<:Integer, 1},
                         T2<:Array{<:String, 1}, 
                         T3<:Array{<:UInt32, 1}, 
                         T4<:Array{<:ParamMap, 1}, 
-                        T5<:Array{<:Integer, 1}, 
-                        T6<:Array{<:MapExpCond, 1}}
+                        T5<:MapDynParEst, 
+                        T6<:Array{<:MapExpCond, 1}, 
+                        T7<:Array{<:Array{<:AbstractFloat, 1}, 1}}
 
     iDynParam::T1
     iObsParam::T1
@@ -225,6 +235,7 @@ struct ParameterIndices{T1<:Array{<:Integer, 1},
     indexSdParamMap::T3
     mapArrayObsParam::T4
     mapArraySdParam::T4
-    iMapDynParam::T5
+    mapDynParEst::T5
     mapExpCond::T6
+    constParamPerCond::T7
 end

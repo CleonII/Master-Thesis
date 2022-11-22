@@ -16,6 +16,7 @@ using LinearAlgebra
 using Distributions
 using Printf
 using Calculus
+using SciMLSensitivity
 
 
 # Relevant PeTab structs for compuations 

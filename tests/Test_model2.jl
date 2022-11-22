@@ -22,6 +22,7 @@ using Ipopt
 using Optim
 using NLopt
 using LineSearches
+using SciMLSensitivity
 
 
 # Relevant PeTab structs for compuations 
@@ -155,7 +156,7 @@ end
 """
 function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
     
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity())
 
     Random.seed!(123)
     createCube(peTabOpt, 5)
@@ -186,6 +187,24 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             return false
         end
 
+        # Evalute Zygote cost function 
+        costPeTab = peTabOpt.evalFZygote(paramVec)
+        sqDiffCostZygote = (costPeTab - costAnalytic)^2
+        if sqDiffCostZygote > 1e-6
+            @printf("sqDiffCost = %.3e\n", sqDiffCost)
+            @printf("Does not pass test on cost for Zygote cost function\n")
+            return false
+        end
+
+        # Evalute gradient obtained via Zygote and sensealg 
+        gradZygoteSensealg = Zygote.gradient(peTabOpt.evalFZygote, paramVec)[1]
+        sqDiffGradZygote = sum((gradAnalytic - gradZygoteSensealg).^2)
+        if sqDiffGradZygote > 1e-6
+            @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+            @printf("Does not pass test on gradient with Zygote\n")
+            return false
+        end
+
         # Evaluate hessian 
         hessAnalytic = ForwardDiff.hessian(calcCostAnalytic, paramVec)
         hessNumeric = zeros(nParam, nParam); peTabOpt.evalHess(hessNumeric, paramVec)
@@ -200,6 +219,8 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
+            @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
+            @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
         end
     end
 

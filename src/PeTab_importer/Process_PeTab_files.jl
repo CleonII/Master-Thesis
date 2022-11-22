@@ -67,7 +67,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
 
     # Build functions for observables, sd and u0 if does not exist and include
     pathObsSdU0 = dirModel * modelName * "ObsSdU0.jl"
-    if !isfile(pathObsSdU0)
+    if !isfile(pathObsSdU0) || forceBuildJlFile == true
         if verbose && forceBuildJlFile == false
             @printf("File for yMod, U0 and Sd does not exist - building it\n")
         end
@@ -85,6 +85,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
     peTabModel = PeTabModel(modelName,
                             evalYmod,
                             evalU0!,
+                            evalU0,
                             evalSd!,
                             odeSysUse,
                             paramMap,
@@ -281,6 +282,16 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
 end
 
 
+"""
+    getTimeMax(measurementData::DataFrame, expId::String)::Float64
+
+    Small helper function to get the time-max value for a specific simulationConditionId when simulating 
+    the PeTab ODE-model 
+"""
+function getTimeMax(measurementData::DataFrame, expId::String)::Float64
+    return Float64(maximum(measurementData[findall(x -> x == expId, measurementData[!, "simulationConditionId"]), "time"]))
+end
+
 
 """
     getSimulationInfo(measurementData::DataFrame)::SimulationInfo
@@ -344,6 +355,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
     # Array with conition-ID for each foward simulations. As we always solve the ODE in the same order this can 
     # be pre-computed.
     conditionIdSol = Array{String, 1}(undef, nForwardSol)
+    tMaxForwardSim = Array{Float64, 1}(undef, nForwardSol)
     if simulateSS == true
         k = 1
         for i in eachindex(firstExpIds)
@@ -351,6 +363,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
                 firstExpId = firstExpIds[i]
                 shiftExpId = shiftExpIds[i][j]
                 conditionIdSol[k] = firstExpId * shiftExpId
+                tMaxForwardSim[k] = getTimeMax(measurementDataFile, shiftExpId)
                 k +=1
             end
         end
@@ -358,6 +371,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
         for i in eachindex(firstExpIds)    
             firstExpId = firstExpIds[i]
             conditionIdSol[i] = firstExpId
+            tMaxForwardSim[i] = getTimeMax(measurementDataFile, firstExpId)
         end
 
     end
@@ -365,6 +379,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
     simulationInfo = SimulationInfo(firstExpIds, 
                                     shiftExpIds, 
                                     conditionIdSol, 
+                                    tMaxForwardSim,
                                     simulateSS,
                                     solArray, 
                                     solArrayGrad, 

@@ -29,6 +29,7 @@ using Distributions
 using Printf
 using Ipopt
 using Optim
+using SciMLSensitivity
 
 
 # Relevant PeTab structs for compuations 

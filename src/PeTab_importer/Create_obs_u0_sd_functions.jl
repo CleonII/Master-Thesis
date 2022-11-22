@@ -35,8 +35,12 @@ function createFileYmodSdU0(modelName::String,
     println("Done with Ymod function")
     println("")
     
-    createU0Function(modelName, dirModel, paramData, string.(parameterNames), stateMap)
-    println("Done with u0 function")
+    createU0Function(modelName, dirModel, paramData, string.(parameterNames), stateMap, inPlace=true)
+    println("Done with u0 function in-place")
+    println("")
+
+    createU0Function(modelName, dirModel, paramData, string.(parameterNames), stateMap, inPlace=false)
+    println("Done with u0 function not in-place")
     println("")
 
     createSdFunction(modelName, dirModel, paramData, stateNames, paramIndices.namesDynParam, paramIndices.namesNonDynParam, observablesDataFile)
@@ -156,11 +160,16 @@ function createU0Function(modelName::String,
                           dirModel::String, 
                           paramData::ParamData, 
                           namesParameter::Array{String, 1}, 
-                          stateMap)
+                          stateMap;
+                          inPlace::Bool=true)
 
     io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "a")
 
-    write(io, "\n\nfunction evalU0!(u0Vec, paramVec) \n\n")
+    if inPlace == true
+        write(io, "\n\nfunction evalU0!(u0Vec, paramVec) \n\n")
+    else
+        write(io, "\n\nfunction evalU0(paramVec) \n\n")
+    end
 
     # Extract all model parameters (constant and none-constant) and write to file 
     paramDynStr = "\t"
@@ -183,12 +192,25 @@ function createU0Function(modelName::String,
     write(io, stateExpWrite * "\n")
 
     # Ensure the states in correct order are written to u0 
-    stateStr = "\tu0Vec .= "
-    for i in eachindex(stateNames)
-        stateStr *= stateNames[i] * ", "
+    # In place version where we mutate stateVec 
+    if inPlace == true
+        stateStr = "\tu0Vec .= "
+        for i in eachindex(stateNames)
+            stateStr *= stateNames[i] * ", "
+        end
+        stateStr = stateStr[1:end-2]
+        write(io, stateStr)
+
+    # Where we return the entire initial value vector 
+    elseif inPlace == false
+        stateStr = "\t return ["
+        for i in eachindex(stateNames)
+            stateStr *= stateNames[i] * ", "
+        end
+        stateStr = stateStr[1:end-2]
+        stateStr *= "]"
+        write(io, stateStr)
     end
-    stateStr = stateStr[1:end-2]
-    write(io, stateStr)
 
     strClose = "\nend"
     write(io, strClose)

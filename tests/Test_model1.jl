@@ -16,6 +16,8 @@ using Random
 using LinearAlgebra
 using Distributions
 using Printf
+using Zygote
+using SciMLSensitivity
 
 
 # Relevant PeTab structs for compuations 
@@ -181,7 +183,7 @@ end
 """
 function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity())
 
     Random.seed!(123)
     createCube(peTabOpt, 5)
@@ -202,6 +204,15 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             return false
         end
 
+        # Evalute Zygote cost function 
+        costPeTab = peTabOpt.evalFZygote(paramVec)
+        sqDiffCostZygote = (costPeTab - costAnalytic)^2
+        if sqDiffCostZygote > 1e-6
+            @printf("sqDiffCost = %.3e\n", sqDiffCost)
+            @printf("Does not pass test on cost for Zygote cost function\n")
+            return false
+        end
+
         # Evaluate gradient 
         gradAnalytic = ForwardDiff.gradient(calcCostAnalytic, paramVec)
         gradNumeric = zeros(nParam); peTabOpt.evalGradF(gradNumeric, paramVec)
@@ -209,6 +220,15 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
         if sqDiffGrad > 1e-6
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("Does not pass test on gradient\n")
+            return false
+        end
+
+        # Evalute gradient obtained via Zygote and sensealg 
+        gradZygoteSensealg = Zygote.gradient(peTabOpt.evalFZygote, paramVec)[1]
+        sqDiffGradZygote = sum((gradAnalytic - gradZygoteSensealg).^2)
+        if sqDiffGradZygote > 1e-6
+            @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+            @printf("Does not pass test on gradient with Zygote\n")
             return false
         end
 
@@ -226,11 +246,92 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
+            @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
+            @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
         end
     end
 
     return true
 end
+
+
+# Test different adjoint approaches 
+function testDifferentAdjoints(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
+
+    peTabOpt1 = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity())
+    peTabOpt2 = setUpCostGradHess(peTabModel, solver, tol, sensealg = QuadratureAdjoint())
+    peTabOpt3 = setUpCostGradHess(peTabModel, solver, tol, sensealg = InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))
+    peTabOpt4 = setUpCostGradHess(peTabModel, solver, tol, sensealg = BacksolveAdjoint())
+    peTabOpt5 = setUpCostGradHess(peTabModel, solver, tol, sensealg = ReverseDiffAdjoint())
+
+    Random.seed!(123)
+    createCube(peTabOpt1, 5)
+    cube = Matrix(CSV.read(peTabOpt1.pathCube, DataFrame))
+
+    paramVec = cube[1, :]
+    gradAnalytic = ForwardDiff.gradient(calcCostAnalytic, paramVec)
+
+    gradZygoteSensealg = Zygote.gradient(peTabOpt1.evalFZygote, paramVec)[1]
+    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
+    if sqDiffGrad > 1e-6
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Does not pass test on gradient with ForwardDiffSensitivity\n")
+        return false
+    elseif printRes == true
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Pass test on gradient with ForwardDiffSensitivity\n")
+    end
+
+    gradZygoteSensealg = Zygote.gradient(peTabOpt2.evalFZygote, paramVec)[1]
+    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
+    if sqDiffGrad > 1e-6
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Does not pass test on gradient with QuadratureAdjoint\n")
+        return false
+    elseif printRes == true
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Pass test on gradient with QuadratureAdjoint\n")
+    end
+
+    gradZygoteSensealg = Zygote.gradient(peTabOpt3.evalFZygote, paramVec)[1]
+    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
+    if sqDiffGrad > 1e-6
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Does not pass test on gradient with InterpolatingAdjoint(autojacvec=ReverseDiffVJP())\n")
+        return false
+    elseif printRes == true
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Pass test on gradient with InterpolatingAdjoint(autojacvec=ReverseDiffVJP())\n")
+    end
+
+    gradZygoteSensealg = Zygote.gradient(peTabOpt4.evalFZygote, paramVec)[1]
+    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
+    if sqDiffGrad > 1e-6
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Does not pass test on gradient with BacksolveAdjoint\n")
+        return false
+    elseif printRes == true
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Pass test on gradient with BacksolveAdjoint\n")
+    end
+
+    # Currently breaks because ReverseDiff procues an array as output (will have to fix)
+    #=
+    gradZygoteSensealg = Zygote.gradient(peTabOpt5.evalFZygote, paramVec)[1]
+    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
+    if sqDiffGrad > 1e-6
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Does not pass test on gradient with ReverseDiffAdjoint\n")
+        return false
+    elseif printRes == true
+        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+        @printf("Pass test on gradient with ReverseDiffAdjoint\n")
+    end
+    =#
+
+    return true
+end
+
 
 
 peTabModel = setUpPeTabModel("Test_model1", pwd() * "/tests/Test_model1/", forceBuildJlFile=true)
@@ -248,3 +349,34 @@ if passTest == true
 else
     @printf("Did not pass test for cost, gradient and hessian\n")
 end
+
+passTest = testDifferentAdjoints(peTabModel, Vern9(), 1e-12, printRes=true)
+if passTest == true
+    @printf("Passed test for different adjoints\n")
+else
+    @printf("Did not pass test for different adjoints\n")
+end
+
+
+
+function myTest1(p)
+
+    foo = [[1.2, 3.0], [3.0, 3.0]]
+
+    sum1 = sum(sum(foo[1]) .* exp.(p))
+    sum2 = sum(sum(foo[2]) .* p)
+    return sum1 + sum2
+end
+
+pArg = [1, 2, 3, 4]
+myTest1(pArg)
+grad = Zygote.gradient(myTest1, pArg)
+
+
+A = Vector{Any}(undef, 0)
+A = vcat(A, [1.0])
+A = vcat(A, [2.0, 2.0, 2.0])
+
+maps = peTabOpt.evalF.paramEstIndices.mapExpCond
+
+foo = 

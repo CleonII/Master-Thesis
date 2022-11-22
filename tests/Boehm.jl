@@ -9,6 +9,8 @@ using Random
 using LinearAlgebra
 using Distributions
 using Printf
+using SciMLSensitivity
+using Zygote
 
 
 # Relevant PeTab structs for compuations 
@@ -35,7 +37,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 """
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity())
 
     paramVals = CSV.read(pwd() * "/tests/Boehm/Params.csv", DataFrame)
     paramMat = paramVals[!, Not([:Id, :ratio, :specC17])]
@@ -65,9 +67,28 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
+        costZygote = peTabOpt.evalFZygote(paramVec)
+        sqDiffZygote = (costZygote - costPython[i])^2
+        if sqDiffZygote > 1e-5
+            @printf("sqDiffCostZygote = %.3e\n", sqDiffZygote)
+            @printf("Does not pass test on cost for Zygote\n")
+            return false
+        end
+
+        gradZygote = Zygote.gradient(peTabOpt.evalFZygote, paramVec)[1]
+        gradPython = collect(gradPythonMat[i, :])
+        sqDiffGradZygote = sum((gradZygote - gradPython).^2)
+        if sqDiffGradZygote > 1e-5
+            @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
+            @printf("Does not pass test on gradient from Zygote\n")
+            return false
+        end
+
         if printRes == true
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+            @printf("sqDiffCostZygote = %.3e\n", sqDiffZygote)
+            @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
         end
     end
 
@@ -75,7 +96,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
 end
 
 
-peTabModel = setUpPeTabModel("Boehm_JProteomeRes2014", pwd() * "/tests/Boehm/")
+peTabModel = setUpPeTabModel("Boehm_JProteomeRes2014", pwd() * "/tests/Boehm/", forceBuildJlFile=true)
 
 passTest = compareAgainstPyPesto(peTabModel, Rodas4P(), 1e-12, printRes=true)
 if passTest == true
