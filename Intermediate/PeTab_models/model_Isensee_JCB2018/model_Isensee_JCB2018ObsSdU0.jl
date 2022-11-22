@@ -67,6 +67,39 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= pAC, Rp8_Br_cAMPS, Rp8_pCPT_cAMPS, PDE, Rp_cAMPS, RII_2, RIIp_Rp8_Br_cAMPS_C_2, cAMP, RIIp_Sp8_Br_cAMPS_C_2, IBMX, AC_Fsk, RIIp_C_2, Sp8_Br_cAMPS, RII_C_2, RIIp_Sp8_Br_cAMPS_2, Csub, Csub_H89, AC, RIIp_cAMP_2, pAC_Fsk, RIIp_Rp8_pCPT_cAMPS_C_2, pPDE, RIIp_Rp_cAMPS_C_2, RIIp_2, RIIp_cAMP_C_2
 end
 
+function evalU0(paramVec) 
+
+	ki_Rp8_pCPT_cAMPS_pAB, xi_b_Rp_cAMPS, RII2_total, H89_level, fourABnOH_incubation_time, KD_Fsk, kdeg_cAMP_free, Rp8_Br_cAMPS_pAB_level, xi_KD_Rp8_Br_cAMPS, kf_PDE_Csub, Sp8_Br_cAMPS_AM_level, xi_kf_RII_C_2__RII_2, kf_RIIp_2__RII_2, kf_cAMP, IBMX_time, Rp_cAMPS_pAB_incubation_time, kf_H89, kf_RII_C_2__RII_2, kf_RII_C_2__RIIp_C_2, xi_i_Rp8_pCPT_cAMPS_pAB, xi_pAC, fourABnOH_level, ki_Sp8_Br_cAMPS_AM, xi_b_Sp8_Br_cAMPS, xi_b_Rp8_Br_cAMPS, H89_time, kdeg_cAMP, xi_AC_cAMP_Fsk, xi_b_Rp8_pCPT_cAMPS, ki_Rp_cAMPS_pAB, xi_i_Rp_cAMPS_pAB, KD_PDE_Csub, ki_IBMX, Fsk_time, Rp8_pCPT_cAMPS_pAB_incubation_time, PDE_total, ki_Rp8_Br_cAMPS_pAB, xi_kf_RII_2__RII_C_2, default, xi_i_Rp8_Br_cAMPS_pAB, Sp8_Br_cAMPS_AM_time, xi_KD_Rp8_pCPT_cAMPS, kp_AC, xi_pPDE, xi_KD_Rp_cAMPS, Rp8_Br_cAMPS_pAB_incubation_time, AC_total, kf_RIIp_C_2__RII_C_2, xi_KD_Sp8_Br_cAMPS, nuc, kf_RIIp_cAMP_C_2__RIIp_2, KD_cAMP, KD_IBMX, kf_Fsk, xi_i_Sp8_Br_cAMPS_AM, cyt, KD_H89, ks_AC_cAMP, Rp8_pCPT_cAMPS_pAB_level, Rp_cAMPS_pAB_level, kf_RII_2__RII_C_2, Fsk_level, kdp_AC, IBMX_level = paramVec 
+
+	pAC = 0.0 
+	Rp8_Br_cAMPS = 0.0 
+	Rp8_pCPT_cAMPS = 0.0 
+	PDE = 1.0 
+	Rp_cAMPS = 0.0 
+	RII_2 = 0.057671482854616 
+	RIIp_Rp8_Br_cAMPS_C_2 = 0.0 
+	cAMP = 0.0575218758977949 
+	RIIp_Sp8_Br_cAMPS_C_2 = 0.0 
+	IBMX = 0.0 
+	AC_Fsk = 0.0 
+	RIIp_C_2 = 0.287974352643203 
+	Sp8_Br_cAMPS = 0.0 
+	RII_C_2 = 0.514562213223039 
+	RIIp_Sp8_Br_cAMPS_2 = 0.0 
+	Csub = 0.192051405433538 
+	Csub_H89 = 0.0 
+	AC = 1.0 
+	RIIp_cAMP_2 = 0.000400416634006059 
+	pAC_Fsk = 0.0 
+	RIIp_Rp8_pCPT_cAMPS_C_2 = 0.0 
+	pPDE = 0.0 
+	RIIp_Rp_cAMPS_C_2 = 0.0 
+	RIIp_2 = 0.133979505944916 
+	RIIp_cAMP_C_2 = 0.00541202870022029 
+
+	 return [pAC, Rp8_Br_cAMPS, Rp8_pCPT_cAMPS, PDE, Rp_cAMPS, RII_2, RIIp_Rp8_Br_cAMPS_C_2, cAMP, RIIp_Sp8_Br_cAMPS_C_2, IBMX, AC_Fsk, RIIp_C_2, Sp8_Br_cAMPS, RII_C_2, RIIp_Sp8_Br_cAMPS_2, Csub, Csub_H89, AC, RIIp_cAMP_2, pAC_Fsk, RIIp_Rp8_pCPT_cAMPS_C_2, pPDE, RIIp_Rp_cAMPS_C_2, RIIp_2, RIIp_cAMP_C_2]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	pAC, Rp8_Br_cAMPS, Rp8_pCPT_cAMPS, PDE, Rp_cAMPS, RII_2, RIIp_Rp8_Br_cAMPS_C_2, cAMP, RIIp_Sp8_Br_cAMPS_C_2, IBMX, AC_Fsk, RIIp_C_2, Sp8_Br_cAMPS, RII_C_2, RIIp_Sp8_Br_cAMPS_2, Csub, Csub_H89, AC, RIIp_cAMP_2, pAC_Fsk, RIIp_Rp8_pCPT_cAMPS_C_2, pPDE, RIIp_Rp_cAMPS_C_2, RIIp_2, RIIp_cAMP_C_2= u 

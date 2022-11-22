@@ -340,6 +340,47 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= ppS3_ppS3_ppS3, ppS3_S4_S4, geneH, geneI, geneJ, TGFb_pRec, geneE, S4, ppS2_ppS2_ppS2, geneK, pS2, pS3, geneC, ppS2_ppS2_ppS3, geneF, S4_S4_S4, TGFb, S3, S2, S2_S4_S4, ppS3_ppS3_S4, geneB, ppS3, geneA, geneD, ppS2_S4_S4, geneL, ppS2_ppS3_S4, geneG, Rec, ppS2_ppS2_S4, ppS2_ppS3_ppS3, ppS2
 end
 
+function evalU0(paramVec) 
+
+	geneC_inh3, geneJ_act1, geneG_inh1, init_Rec, geneC_act3, geneA_inh2, geneK_turn, geneA_act3, geneI_act2, geneA_act2, geneD_inh2, k_223, k_233, geneB_act1, S_dephosphos, geneG_act1, geneH_inh2, geneI_act1, geneB_inh3, geneI_inh2, geneC_turn, geneJ_inh1, geneK_act3, geneJ_inh3, geneG_inh3, geneC_act2, init_TGFb, geneL_inh1, geneE_inh3, geneF_act3, cell, geneF_inh1, geneD_act3, geneE_act2, geneD_inh3, k_234, geneH_act2, geneA_turn, geneL_act1, geneH_act1, geneL_inh2, geneB_turn, init_S4, geneL_inh3, khomo2, geneK_act2, geneA_inh3, geneJ_act2, geneI_inh3, geneD_act1, geneJ_turn, geneG_act3, geneL_act2, Rec_act, geneI_act3, k_224, pRec_degind, geneE_inh2, geneF_inh2, geneC_act1, geneD_inh1, k_344, init_S3, geneI_inh1, geneL_turn, geneF_act2, k_on_u, geneE_inh1, geneH_act3, geneH_inh1, geneK_inh3, geneE_act1, geneA_inh1, geneB_inh1, geneH_inh3, geneD_turn, S_dephos, geneL_act3, S_phos, geneG_turn, geneA_act1, geneI_turn, khomo3, geneC_inh1, geneG_act2, init_S2, geneK_inh2, k_334, geneB_inh2, geneH_turn, geneJ_inh2, khomo4, geneB_act2, geneF_turn, geneJ_act3, geneK_inh1, geneB_act3, geneK_act1, geneE_turn, geneE_act3, geneG_inh2, kdiss_SS, k_244, geneD_act2, geneF_inh3, geneF_act1, geneC_inh2 = paramVec 
+
+	ppS3_ppS3_ppS3 = 0.0 
+	ppS3_S4_S4 = 0.0 
+	geneH = 1.0 
+	geneI = 1.0 
+	geneJ = 1.0 
+	TGFb_pRec = 0.0 
+	geneE = 1.0 
+	S4 = init_S4 
+	ppS2_ppS2_ppS2 = 0.0 
+	geneK = 1.0 
+	pS2 = 0.0 
+	pS3 = 0.0 
+	geneC = 1.0 
+	ppS2_ppS2_ppS3 = 0.0 
+	geneF = 1.0 
+	S4_S4_S4 = 0.0 
+	TGFb = init_TGFb 
+	S3 = init_S3 
+	S2 = init_S2 
+	S2_S4_S4 = 0.0 
+	ppS3_ppS3_S4 = 0.0 
+	geneB = 1.0 
+	ppS3 = 0.0 
+	geneA = 1.0 
+	geneD = 1.0 
+	ppS2_S4_S4 = 0.0 
+	geneL = 1.0 
+	ppS2_ppS3_S4 = 0.0 
+	geneG = 1.0 
+	Rec = init_Rec 
+	ppS2_ppS2_S4 = 0.0 
+	ppS2_ppS3_ppS3 = 0.0 
+	ppS2 = 0.0 
+
+	 return [ppS3_ppS3_ppS3, ppS3_S4_S4, geneH, geneI, geneJ, TGFb_pRec, geneE, S4, ppS2_ppS2_ppS2, geneK, pS2, pS3, geneC, ppS2_ppS2_ppS3, geneF, S4_S4_S4, TGFb, S3, S2, S2_S4_S4, ppS3_ppS3_S4, geneB, ppS3, geneA, geneD, ppS2_S4_S4, geneL, ppS2_ppS3_S4, geneG, Rec, ppS2_ppS2_S4, ppS2_ppS3_ppS3, ppS2]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	ppS3_ppS3_ppS3, ppS3_S4_S4, geneH, geneI, geneJ, TGFb_pRec, geneE, S4, ppS2_ppS2_ppS2, geneK, pS2, pS3, geneC, ppS2_ppS2_ppS3, geneF, S4_S4_S4, TGFb, S3, S2, S2_S4_S4, ppS3_ppS3_S4, geneB, ppS3, geneA, geneD, ppS2_S4_S4, geneL, ppS2_ppS3_S4, geneG, Rec, ppS2_ppS2_S4, ppS2_ppS3_ppS3, ppS2= u 

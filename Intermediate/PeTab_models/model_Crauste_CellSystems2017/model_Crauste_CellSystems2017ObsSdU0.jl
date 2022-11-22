@@ -34,6 +34,19 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Naive, Pathogen, LateEffector, EarlyEffector, Memory
 end
 
+function evalU0(paramVec) 
+
+	mu_LL, delta_NE, mu_PE, mu_P, mu_PL, delta_EL, mu_EE, default, mu_N, rho_E, delta_LM, rho_P, mu_LE = paramVec 
+
+	Naive = 8090.0 
+	Pathogen = 1.0 
+	LateEffector = 0.0 
+	EarlyEffector = 0.0 
+	Memory = 0.0 
+
+	 return [Naive, Pathogen, LateEffector, EarlyEffector, Memory]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	Naive, Pathogen, LateEffector, EarlyEffector, Memory= u 

@@ -3,7 +3,7 @@
 
     Check if a string x is a number (Float).
 """
-function isNumber(x::String)::Bool
+function isNumber(x::AbstractString)::Bool
     re1 = r"^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)$" # Picks up scientific notation
     re2 = r"^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$"
     return (occursin(re1, x) || occursin(re2, x))

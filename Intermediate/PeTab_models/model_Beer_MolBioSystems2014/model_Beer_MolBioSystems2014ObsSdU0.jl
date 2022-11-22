@@ -25,6 +25,18 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Glu, cGlu, Ind, Bac
 end
 
+function evalU0(paramVec) 
+
+	kdegi, medium, Bacmax, ksyn, kdim, tau, init_Bac, beta = paramVec 
+
+	Glu = 10.0 
+	cGlu = 0.0 
+	Ind = 0.0 
+	Bac = init_Bac 
+
+	 return [Glu, cGlu, Ind, Bac]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	Glu, cGlu, Ind, Bac= u 

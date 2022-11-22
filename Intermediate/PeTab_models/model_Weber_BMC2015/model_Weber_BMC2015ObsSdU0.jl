@@ -61,6 +61,21 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= CERTERa, PI4K3B, CERT, CERTTGNa, PKDDAGa, PKD, PI4K3Ba
 end
 
+function evalU0(paramVec) 
+
+	a21, m33, kb_NB142_70_dose, a22, kb_NB142_70_time, p12, p33, s31, PdBu_dose, a12, p22, a33, p13, cyt, pu5, pu2, p31, pu4, PdBu_time, s12, m11, m31, u2, Ect_Expr_PI4K3beta_flag, a11, p32, p21, pu6, s21, pu3, m22, p11, Ect_Expr_CERT_flag, a31, a32 = paramVec 
+
+	CERTERa = 3.19483885902e7 
+	PI4K3B = 1.5775405394e6 
+	CERT = 160797.7364 
+	CERTTGNa = 4.20828286681e7 
+	PKDDAGa = 123.8608 
+	PKD = 466534.7994 
+	PI4K3Ba = 332054.5041 
+
+	 return [CERTERa, PI4K3B, CERT, CERTTGNa, PKDDAGa, PKD, PI4K3Ba]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	CERTERa, PI4K3B, CERT, CERTTGNa, PKDDAGa, PKD, PI4K3Ba= u 

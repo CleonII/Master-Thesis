@@ -26,6 +26,22 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP
 end
 
+function evalU0(paramVec) 
+
+	tau_mRNA, tps_repr, init_GFP, n_Hill, init_Y_mRNA, init_Z_mRNA, init_X_protein, init_Y_protein, tau_mRNA_GFP, eff, init_Z_protein, tau_prot_GFP, eff_GFP, tps_active, init_GFP_mRNA, KM, init_X_mRNA, tau_prot, cell = paramVec 
+
+	X_protein = init_X_protein 
+	GFP_mRNA = init_GFP_mRNA 
+	Y_mRNA = init_Y_mRNA 
+	X_mRNA = init_X_mRNA 
+	Z_mRNA = init_Z_mRNA 
+	Z_protein = init_Z_protein 
+	Y_protein = init_Y_protein 
+	GFP = init_GFP 
+
+	 return [X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP= u 

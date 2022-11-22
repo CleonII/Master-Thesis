@@ -136,6 +136,39 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= p1EpoRpJAK2, pSTAT5, EpoRJAK2_CIS, SOCS3nRNA4, SOCS3RNA, SHP1, STAT5, EpoRJAK2, CISnRNA1, SOCS3nRNA1, SOCS3nRNA2, CISnRNA3, CISnRNA4, SOCS3, CISnRNA5, SOCS3nRNA5, SOCS3nRNA3, SHP1Act, npSTAT5, p12EpoRpJAK2, p2EpoRpJAK2, CIS, EpoRpJAK2, CISnRNA2, CISRNA
 end
 
+function evalU0(paramVec) 
+
+	STAT5Exp, STAT5Imp, init_SOCS3_multiplier, EpoRCISRemove, STAT5ActEpoR, SHP1ActEpoR, JAK2EpoRDeaSHP1, CISTurn, SOCS3Turn, init_EpoRJAK2_CIS, SOCS3Inh, ActD, init_CIS_multiplier, cyt, CISRNAEqc, JAK2ActEpo, Epo, SOCS3oe, CISInh, SHP1Dea, SOCS3EqcOE, CISRNADelay, init_SHP1, CISEqcOE, EpoRActJAK2, SOCS3RNAEqc, CISEqc, SHP1ProOE, SOCS3RNADelay, init_STAT5, CISoe, CISRNATurn, init_SHP1_multiplier, init_EpoRJAK2, nuc, EpoRCISInh, STAT5ActJAK2, SOCS3RNATurn, SOCS3Eqc = paramVec 
+
+	p1EpoRpJAK2 = 0.0 
+	pSTAT5 = 0.0 
+	EpoRJAK2_CIS = init_EpoRJAK2_CIS 
+	SOCS3nRNA4 = 0.0 
+	SOCS3RNA = 0.0 
+	SHP1 = init_SHP1 * ( 1 + SHP1ProOE * init_SHP1_multiplier ) 
+	STAT5 = init_STAT5 
+	EpoRJAK2 = init_EpoRJAK2 
+	CISnRNA1 = 0.0 
+	SOCS3nRNA1 = 0.0 
+	SOCS3nRNA2 = 0.0 
+	CISnRNA3 = 0.0 
+	CISnRNA4 = 0.0 
+	SOCS3 = SOCS3Eqc * SOCS3EqcOE * init_SOCS3_multiplier 
+	CISnRNA5 = 0.0 
+	SOCS3nRNA5 = 0.0 
+	SOCS3nRNA3 = 0.0 
+	SHP1Act = 0.0 
+	npSTAT5 = 0.0 
+	p12EpoRpJAK2 = 0.0 
+	p2EpoRpJAK2 = 0.0 
+	CIS = CISEqc * CISEqcOE * init_CIS_multiplier 
+	EpoRpJAK2 = 0.0 
+	CISnRNA2 = 0.0 
+	CISRNA = 0.0 
+
+	 return [p1EpoRpJAK2, pSTAT5, EpoRJAK2_CIS, SOCS3nRNA4, SOCS3RNA, SHP1, STAT5, EpoRJAK2, CISnRNA1, SOCS3nRNA1, SOCS3nRNA2, CISnRNA3, CISnRNA4, SOCS3, CISnRNA5, SOCS3nRNA5, SOCS3nRNA3, SHP1Act, npSTAT5, p12EpoRpJAK2, p2EpoRpJAK2, CIS, EpoRpJAK2, CISnRNA2, CISRNA]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	p1EpoRpJAK2, pSTAT5, EpoRJAK2_CIS, SOCS3nRNA4, SOCS3RNA, SHP1, STAT5, EpoRJAK2, CISnRNA1, SOCS3nRNA1, SOCS3nRNA2, CISnRNA3, CISnRNA4, SOCS3, CISnRNA5, SOCS3nRNA5, SOCS3nRNA3, SHP1Act, npSTAT5, p12EpoRpJAK2, p2EpoRpJAK2, CIS, EpoRpJAK2, CISnRNA2, CISRNA= u 

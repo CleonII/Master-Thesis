@@ -37,6 +37,23 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp
 end
 
+function evalU0(paramVec) 
+
+	k1c, k21, k1g, insulin_dose_2, k1a, insulin_dose_1, k1aBasic, k1d, insulin_time_1, insulin_time_2, cyt, k22, default, k1r, k1f, k1b, k3, km2, k1e, k_IRSiP_DosR, km3 = paramVec 
+
+	IRp = 1.7629010620181e-9 
+	IR = 9.94957642787569 
+	IRins = 0.0173972221725393 
+	IRiP = 1.11590026152296e-5 
+	IRS = 9.86699348701367 
+	X = 9.99984199487351 
+	IRi = 0.0330151891862681 
+	IRSiP = 0.133006512986336 
+	Xp = 0.000158005126497888 
+
+	 return [IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp= u 

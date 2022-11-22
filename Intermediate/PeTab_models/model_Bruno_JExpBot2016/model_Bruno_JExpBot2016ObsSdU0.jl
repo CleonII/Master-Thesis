@@ -44,6 +44,21 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= b10, bio, ohbio, zea, bcry, ohb10, bcar
 end
 
+function evalU0(paramVec) 
+
+	kc2_multiplier, init_zea, kc4_multiplier, cyt, k5_multiplier, kc1_multiplier, init_b10, init_bcry, kb1_multiplier, kb2_multiplier, kc1, kc4, init_ohb10, init_bcar, kc2, kb2, k5, kb1 = paramVec 
+
+	b10 = init_b10 
+	bio = 0.0 
+	ohbio = 0.0 
+	zea = init_zea 
+	bcry = init_bcry 
+	ohb10 = init_ohb10 
+	bcar = init_bcar 
+
+	 return [b10, bio, ohbio, zea, bcry, ohb10, bcar]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	b10, bio, ohbio, zea, bcry, ohb10, bcar= u 

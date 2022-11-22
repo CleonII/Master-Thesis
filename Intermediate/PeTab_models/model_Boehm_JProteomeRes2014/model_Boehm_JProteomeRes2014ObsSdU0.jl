@@ -35,6 +35,22 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB
 end
 
+function evalU0(paramVec) 
+
+	ratio, k_imp_homo, k_exp_hetero, cyt, k_phos, specC17, Epo_degradation_BaF3, k_exp_homo, nuc, k_imp_hetero = paramVec 
+
+	STAT5A = 207.6 * ratio 
+	pApA = 0.0 
+	nucpApB = 0.0 
+	nucpBpB = 0.0 
+	STAT5B = 207.6 - 207.6 * ratio 
+	pApB = 0.0 
+	nucpApA = 0.0 
+	pBpB = 0.0 
+
+	 return [STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB= u 

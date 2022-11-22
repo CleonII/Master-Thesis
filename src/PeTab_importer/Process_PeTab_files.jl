@@ -224,7 +224,7 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
         elseif typeof(sdObs[i]) <:AbstractString && isNumber(sdObs[i])
             sdParams[i] = parse(Float64, sdObs[i])
         elseif typeof(sdObs[i]) <:Real
-            sdParams[i] = sdObs[i]
+            sdParams[i] = convert(Float64, sdObs[i])
         else
             sdParams[i] = string(sdObs[i])
         end
