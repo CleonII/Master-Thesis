@@ -24,6 +24,18 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Vni, V, Vin, Tstar
 end
 
+function evalU0(paramVec) 
+
+	c, T0, default, K0, NN, delta = paramVec 
+
+	Vni = 0.0 
+	V = 1.86e6 
+	Vin = 1.86e6 
+	Tstar = 15061.32075 
+
+	 return [Vni, V, Vin, Tstar]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	Vni, V, Vin, Tstar= u 

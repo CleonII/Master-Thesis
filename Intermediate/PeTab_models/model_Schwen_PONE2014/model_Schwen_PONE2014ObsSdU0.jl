@@ -44,6 +44,25 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= IR2, IR2in, Rec2, IR1in, Uptake1, Uptake2, InsulinFragments, IR1, Rec1, Ins, BoundUnspec
 end
 
+function evalU0(paramVec) 
+
+	ka1, ini_R2fold, kout, ini_R1, kout_frag, koff_unspec, kin, ka2fold, kin2, kd1, kon_unspec, init_Ins, kd2fold, ExtracellularMedium, kout2 = paramVec 
+
+	IR2 = 0.0 
+	IR2in = 0.0 
+	Rec2 = ini_R1 * ini_R2fold 
+	IR1in = 0.0 
+	Uptake1 = 0.0 
+	Uptake2 = 0.0 
+	InsulinFragments = 0.0 
+	IR1 = 0.0 
+	Rec1 = ini_R1 
+	Ins = init_Ins 
+	BoundUnspec = 0.0 
+
+	 return [IR2, IR2in, Rec2, IR1in, Uptake1, Uptake2, InsulinFragments, IR1, Rec1, Ins, BoundUnspec]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	IR2, IR2in, Rec2, IR1in, Uptake1, Uptake2, InsulinFragments, IR1, Rec1, Ins, BoundUnspec= u 

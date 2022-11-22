@@ -29,6 +29,22 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= detected_cumulative, symptomatic, asymptomatic, detected, exposed, deceased, recovered, susceptible
 end
 
+function evalU0(paramVec) 
+
+	psi, nu, gamma_i, asymptomatic_start, delta, symptomatic_start, sigma, theta, Lagos, alpha, d_0, transmission_rate_effective, eps, exposed_start, gamma_0, d_D, gamma_a = paramVec 
+
+	detected_cumulative = 1.0 
+	symptomatic = symptomatic_start 
+	asymptomatic = asymptomatic_start 
+	detected = 1.0 
+	exposed = exposed_start 
+	deceased = 0.0 
+	recovered = 0.0 
+	susceptible = 1.4367982e7 
+
+	 return [detected_cumulative, symptomatic, asymptomatic, detected, exposed, deceased, recovered, susceptible]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	detected_cumulative, symptomatic, asymptomatic, detected, exposed, deceased, recovered, susceptible= u 
