@@ -291,16 +291,16 @@ function getMapExpCond(odeSystem::ODESystem,
                        namesParamEst::Array{String, 1})
 
 
-    allExpCond = unique(vcat(measurementData.preEqCond, measurementData.simCond))
+    lenExpCond = nrow(experimentalConditionsFile)
     stateNamesStr = replace.(string.(states(odeSystem), "(t)" => ""))
 
     i_start = "conditionName" in names(experimentalConditionsFile) ? 3 : 2
     paramStateChange = names(experimentalConditionsFile)[i_start:end]
 
-    mapExpCondArr = Array{MapExpCond, 1}(undef, length(allExpCond))
-    condIdName = Array{String, 1}(undef, length(allExpCond))
+    mapExpCondArr = Array{MapExpCond, 1}(undef, lenExpCond)
+    condIdName = Array{String, 1}(undef, lenExpCond)
 
-    for i in 1:nrow(experimentalConditionsFile)
+    for i in 1:lenExpCond
 
         expCondParamConstVal::Array{Float64, 1} = Array{Float64, 1}(undef, 0)
         iOdeProbParamConstVal::Array{Int, 1} = Array{Int, 1}(undef, 0)

@@ -18,14 +18,20 @@ include(pwd() * "/src/SBML/Process_rules.jl")
     The SBML importer goes via libsbml in Python and currently likelly only 
     works with SBML level 3. 
 """
-function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::String)
+function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::String; writeToFile=true::Bool)
 
     libsbml = pyimport("libsbml")
     reader = libsbml.SBMLReader()
 
     document = reader[:readSBML](pathXml)
     model = document[:getModel]() # Get the model
-    writeODEModelToFile(libsbml, model, modelName, dirModel)
+    modelDict = buildODEModelDictionary(libsbml, model, modelName, dirModel)
+
+    if writeToFile
+        writeODEModelToFile(modelDict)
+    end
+
+    return modelDict
 
 end
 
@@ -139,7 +145,7 @@ function processInitialAssignment(libsbml, model, modelDict::Dict, baseFunctions
 end
 
 
-function writeODEModelToFile(libsbml, model, modelName, path)
+function buildODEModelDictionary(libsbml, model, modelName, path)
 
     # Nested dictionaries to store relevant model data:
     # i) Model parameters (constant during for a simulation)
@@ -148,6 +154,7 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     # iv) Model function (functions in the SBML file we rewrite to Julia syntax)
     # v) Model rules (rules defined in the SBML model we rewrite to Julia syntax)
     # vi) Model derivatives (derivatives defined by the SBML model)
+
     modelDict = Dict()    
     modelDict["states"] = Dict()
     modelDict["parameters"] = Dict()
@@ -159,7 +166,8 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     modelDict["eventDict"] = Dict()
     modelDict["discreteEventDict"] = Dict()
     modelDict["inputFunctions"] = Dict()
-     
+    modelDict["metaData"] = Dict()
+
     # Mathemathical base functions (can be expanded if needed)
     baseFunctions = ["exp", "log", "log2", "log10", "sin", "cos", "tan", "pi"]
     stringOfEvents = ""
@@ -300,13 +308,36 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         end
     end
 
+    # Metadata: Number of parameters and species, modelname and path
+    modelDict["metaData"]["parameters"] = length(model[:getListOfParameters]())
+    modelDict["metaData"]["species"] = length(model[:getListOfSpecies]())
+    modelDict["metaData"]["modelName"] = modelName
+    modelDict["metaData"]["modelPath"] = path
+    # temporary storage, will be restructured
+    modelDict["metaData"]["stringOfEvents"] = stringOfEvents
+    modelDict["metaData"]["discreteEventString"] = discreteEventString
+    
+    return modelDict
+end
+
+"""
+    writeODEModelToFile(modelDict)
+
+    Takes a modelDict as defined by buildODEModelDictionary
+    and creates a Julia ModelingToolkit file and stores 
+    the resulting file in dirModel with name modelName.jl. 
+
+"""
+function writeODEModelToFile(modelDict)
     ### Writing to file 
+    modelName = modelDict["metaData"]["modelName"]
+    path = modelDict["metaData"]["modelPath"]
     modelFile = open(path * "/" * modelName * ".jl", "w")
 
     println(modelFile, "# Model name: " * modelName)
 
-    println(modelFile, "# Number of parameters: " * string(length(model[:getListOfParameters]())))
-    println(modelFile, "# Number of species: " * string(length(model[:getListOfSpecies]())))
+    println(modelFile, "# Number of parameters: " * string(modelDict["metaData"]["parameters"]))
+    println(modelFile, "# Number of species: " * string(modelDict["metaData"]["species"]))
     println(modelFile, "function getODEModel_" * modelName * "()")
 
     println(modelFile, "")
@@ -320,11 +351,13 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     println(modelFile, "")
     println(modelFile, "    ### Store dependent variables in array for ODESystem command")
     defineVariables = "    stateArray = ["
-    for key in keys(modelDict["states"])
-        defineVariables = defineVariables * key * ", "
+    for (index, key) in enumerate(keys(modelDict["states"]))
+        if index < length(modelDict["states"])
+            defineVariables = defineVariables * key * ", "
+        else
+            defineVariables = defineVariables * key * "]"
+        end
     end
-    # Replace the last ", " with a "]"
-    defineVariables = defineVariables[1:end-2] * "]"
     println(modelFile, defineVariables)
 
     println(modelFile, "")
@@ -346,7 +379,7 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         end
         println(modelFile, defineVariableParameters)
     end
-    
+
     println(modelFile, "")
     println(modelFile, "    ### Define parameters")
     defineParameters = "    ModelingToolkit.@parameters"
@@ -358,11 +391,13 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     println(modelFile, "")
     println(modelFile, "    ### Store parameters in array for ODESystem command")
     defineParameters = "    parameterArray = ["
-    for key in keys(modelDict["parameters"])
-        defineParameters = defineParameters * key * ", "
+    for (index, key) in enumerate(keys(modelDict["parameters"]))
+        if index < length(modelDict["parameters"])
+           defineParameters = defineParameters * key * ", "
+        else
+           defineParameters = defineParameters * key * "]"
+        end
     end
-    # Replace the last ", " with a "]"
-    defineParameters = defineParameters[1:end-2] * "]"
     println(modelFile, defineParameters)
 
     println(modelFile, "")
@@ -370,6 +405,10 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     println(modelFile, "    D = Differential(t)")
 
     println(modelFile, "")
+
+    # temporary, will be changed
+    stringOfEvents = modelDict["metaData"]["stringOfEvents"]
+    discreteEventString = modelDict["metaData"]["discreteEventString"]
     println(modelFile, "    ### Continious events ###")
     if length(stringOfEvents) > 0
         println(modelFile, "    continuous_events = [")
@@ -384,7 +423,7 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         println(modelFile, "    " * discreteEventString)
         println(modelFile, "    ]")
     end
-    
+
     println(modelFile, "")
     println(modelFile, "    ### Derivatives ###")
     println(modelFile, "    eqs = [")
@@ -460,5 +499,5 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         
     close(modelFile)
 
-    return modelDict
+
 end

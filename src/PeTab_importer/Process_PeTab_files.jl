@@ -34,7 +34,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
         if verbose
             @printf("Julia model file does not exist - will build it\n")
         end
-        XmlToModellingToolkit(modelFileXml, modelName, dirModel)
+        modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel)
     elseif isfile(modelFileJl) && forceBuildJlFile == false
         if verbose
             @printf("Julia model file exists at %s - will not rebuild it\n", modelFileJl)
@@ -46,7 +46,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
         if isfile(modelFileJl)
             rm(modelFileJl)
         end
-        XmlToModellingToolkit(modelFileXml, modelName, dirModel)
+        modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel)
     end
 
     # Extract ODE-system and mapping of maps of how to map parameters to states and model parmaeters 
@@ -74,7 +74,10 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
         if verbose && forceBuildJlFile == true
             @printf("By user option will rebuild Ymod, Sd and u0\n")
         end
-        createFileYmodSdU0(modelName, dirModel, odeSysUse, stateMap)
+        if !@isdefined modelDict
+            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, false)
+        end
+        createFileYmodSdU0(modelName, dirModel, odeSysUse, stateMap, modelDict)
     else
         if verbose
             @printf("File for yMod, U0 and Sd does exist - will not rebuild it\n")
