@@ -23,6 +23,7 @@ using Optim
 using NLopt
 using LineSearches
 using SciMLSensitivity
+using Zygote
 
 
 # Relevant PeTab structs for compuations 
@@ -237,6 +238,9 @@ end
 """
 function testOptimizer(peTabModel::PeTabModel, solver, tol)
 
+    solver = Rodas4P()
+    tol = 1e-9
+
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
 
     Random.seed!(123)
@@ -247,14 +251,19 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     ipoptProbHessApprox, iterArrHessApprox = createIpoptProb(peTabOpt, hessianUse=:blockAutoDiff)
     ipoptProbBfgs, iterArrBfgs = createIpoptProb(peTabOpt, hessianUse=:LBFGS)
     ipoptProbAutoHess, iterArrAutoHess = createIpoptProb(peTabOpt, hessianUse=:autoDiff)
-
+    Ipopt.AddIpoptNumOption(ipoptProbAutoHess, "acceptable_tol", 1e-8)
+    
     # Fides optimizers 
-    runFidesHess = setUpFides(peTabOpt, :autoDiff; verbose=0)
-    runFidesHessBlock = setUpFides(peTabOpt, :blockAutoDiff; verbose=0)
+    runFidesHess = setUpFides(peTabOpt, :autoDiff; verbose=0, 
+                              options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}")
+    runFidesHessBlock = setUpFides(peTabOpt, :blockAutoDiff; verbose=0, 
+                                   options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}")
 
     # Optim optimizers 
     optimProbHessApprox = createOptimProb(peTabOpt, IPNewton(), hessianUse=:blockAutoDiff)
-    optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff)
+    optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff, 
+                                        options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
+                                                              successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
     optimProbBFGS = createOptimProb(peTabOpt, BFGS())
     optimProbLBFGS = createOptimProb(peTabOpt, LBFGS())
 

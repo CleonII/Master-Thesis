@@ -74,20 +74,38 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
     end
     pathSave = dirRes * "Benchmark_result_fides.csv"
 
+    # The termination criteria are set to match Optim which terminates based on;
+    # abs(f - f_prev) ≤ f_tol*abs(f), f_tol = 1e-8
+    # norm(x - x_prev) ≤ x_tot, x_tol = 0.0
+    # norm(grad) ≤ gtol, gtol=1e-6
+    # Optim dictates the termination criteria as it has the least flexible termination 
+    # criteria. Ipopt terminates on entirely different basis (so hard to compare)
+
     # Ipopt optimizers 
     ipoptProbHessApprox, iterArrHessApprox = createIpoptProb(peTabOpt, hessianUse=:blockAutoDiff)
     ipoptProbBfgs, iterArrBfgs = createIpoptProb(peTabOpt, hessianUse=:LBFGS)
     ipoptProbAutoHess, iterArrAutoHess = createIpoptProb(peTabOpt, hessianUse=:autoDiff)
+    Ipopt.AddIpoptNumOption(ipoptProbHessApprox, "acceptable_tol", 1e-8)
+    Ipopt.AddIpoptNumOption(ipoptProbBfgs, "acceptable_tol", 1e-8)
+    Ipopt.AddIpoptNumOption(ipoptProbAutoHess, "acceptable_tol", 1e-8)
+    
     # Optim optimizers 
-    optimProbHessApprox = createOptimProb(peTabOpt, IPNewton(), hessianUse=:blockAutoDiff)
-    optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff)
+    optimProbHessApprox = createOptimProb(peTabOpt, IPNewton(), hessianUse=:blockAutoDiff, 
+                                          options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
+                                                                successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
+    optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff, 
+                                        options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
+                                                              successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
     optimProbLBFGS = createOptimProb(peTabOpt, LBFGS())
+    
     # NLopt optimizers 
     NLoptLBFGS = createNLoptProb(peTabOpt, :LD_LBFGS, verbose=false)
-    NLoptTNewton = createNLoptProb(peTabOpt, :LD_TNEWTON_PRECOND_RESTART, verbose=false)
-    # Fides Optmizers 
-    FidesAutoHess = setUpFides(peTabOpt, :autoDiff; verbose=0)
-    FidesAutoHessBlock = setUpFides(peTabOpt, :blockAutoDiff; verbose=0)
+    
+    # Fides 
+    FidesAutoHess = setUpFides(peTabOpt, :autoDiff; verbose=0, 
+                               options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}")
+    FidesAutoHessBlock = setUpFides(peTabOpt, :blockAutoDiff; verbose=0, 
+                                    options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}")
 
     # Make sure to activate allocation of required arrays for Ipopt solvers, and to compile 
     # gradient and required hessian functions to avoid bias in run-times for benchmark. 

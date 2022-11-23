@@ -15,10 +15,17 @@
 """
 function createOptimProb(peTabOpt::PeTabOpt,
                          optimAlg;
-                         hessianUse::Symbol=:blockAutoDiff)
+                         hessianUse::Symbol=:blockAutoDiff, 
+                         options=Optim.Options(iterations = 1000, 
+                                               show_trace = false, 
+                                               allow_f_increases=true, 
+                                               successive_f_tol = 3, 
+                                               f_tol=1e-8, 
+                                               g_tol=1e-6, 
+                                               x_tol=0.0))
     
     if typeof(optimAlg) <: IPNewton
-        return createOptimInteriorNewton(peTabOpt, hessianUse=hessianUse)
+        return createOptimInteriorNewton(peTabOpt, hessianUse=hessianUse, options=options)
     elseif typeof(optimAlg) <: LBFGS || typeof(optimAlg) <: BFGS || typeof(optimAlg) <: ConjugateGradient
         return createOptimFminbox(peTabOpt, optimAlg)
     else
@@ -38,7 +45,8 @@ end
     with blockAutoDiff (:blockAutoDiff). 
 """
 function createOptimInteriorNewton(peTabOpt::PeTabOpt;
-                                   hessianUse::Symbol=:blockAutoDiff)
+                                   hessianUse::Symbol=:blockAutoDiff, 
+                                   options)
                                    
     lowerBounds = peTabOpt.lowerBounds
     upperBounds = peTabOpt.upperBounds
@@ -68,10 +76,7 @@ function createOptimInteriorNewton(peTabOpt::PeTabOpt;
                                                                      dfc, 
                                                                      p0, 
                                                                      IPNewton(), 
-                                                                     Optim.Options(iterations = 1000, 
-                                                                                   show_trace = showTrace, 
-                                                                                   allow_f_increases=true, 
-                                                                                   successive_f_tol = 3))
+                                                                     options)
                                          end
 
     return evalOptim

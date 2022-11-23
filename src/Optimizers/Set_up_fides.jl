@@ -4,10 +4,10 @@ import Pkg
 
 function setUpFides(peTabOpt::PeTabOpt,
                     autoDiffHess::Symbol; 
-                    fidesHessApprox=py"None", 
+                    fidesHessApprox=py"None"o, 
                     verbose::Integer=1,
-                    options=py"{'maxiter' : 1000}",
-                    funargs=py"None",
+                    options=py"{'maxiter' : 1000}"o,
+                    funargs=py"None"o,
                     resfun::Bool=false)
 
     nParam = length(peTabOpt.lowerBounds)
@@ -26,7 +26,7 @@ function setUpFides(peTabOpt::PeTabOpt,
         println("User provided : $autoDiffHess")
     end
 
-    if fidesHessApprox == py"None" && autoDiffHess == :None
+    if fidesHessApprox == py"None"o && autoDiffHess == :None
         println("Error : User must provide either a fides hessian approximation or specify if the hessian should 
                  be computed via autodiff.")
     end 
@@ -42,11 +42,11 @@ function setUpFides(peTabOpt::PeTabOpt,
     end
 
     fidesObj = setUpFidesClass(fidesFunc, peTabOpt.upperBounds, peTabOpt.lowerBounds, 
-                               verbose=verbose, 
-                               options=options, 
-                               funargs=funargs, 
-                               hessian_update=fidesHessApprox, 
-                               resfun=resfun)
+                               verbose, 
+                               options, 
+                               funargs, 
+                               fidesHessApprox, 
+                               resfun)
 
     return fidesObj
 end
@@ -54,12 +54,12 @@ end
 
 function setUpFidesClass(fun, 
                          ub, 
-                         lb;   
-                         verbose::Integer=1,
-                         options=py"None",
-                         funargs=py"None",
-                         hessian_update=py"None", 
-                         resfun::Bool=false)
+                         lb,   
+                         verbose,
+                         options,
+                         funargs,
+                         hessian_update,
+                         resfun::Bool)
 
     py"""
     import numpy as np
