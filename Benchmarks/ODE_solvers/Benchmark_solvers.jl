@@ -13,6 +13,7 @@ using LinearAlgebra
 using Distributions
 using Printf
 using Plots
+using SciMLSensitivity
 using BenchmarkTools
 
 
