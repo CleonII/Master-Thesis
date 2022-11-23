@@ -75,7 +75,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
             @printf("By user option will rebuild Ymod, Sd and u0\n")
         end
         if !@isdefined modelDict
-            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, false)
+            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, writeToFile=false)
         end
         createFileYmodSdU0(modelName, dirModel, odeSysUse, stateMap, modelDict)
     else
