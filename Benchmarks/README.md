@@ -6,7 +6,7 @@ This file describes how to run the parameter estimation benchmark for the suppor
 
 Assuming that you have cloned this directory the correct Julia environment for Linux can be set up by can be set up via a local installation;
 
-1. Download the folder with [Julia 1.8.2](https://julialang.org/downloads/). 
+1. Download the folder with [Julia 1.8.3](https://julialang.org/downloads/). 
 2. Extract the [tar-archive](https://xkcd.com/1168/).
 3. In the terminal go to the root directory of the Julia PeTab importer (where the Manifest.toml and Project.toml are) and launch Julia via in the terminal by: `path_julia_folder/bin/julia`
 4. In the Julia prompt press **]** which will activate the [package manager](https://pkgdocs.julialang.org/v1/environments/). In the pacakge manager : 
@@ -31,7 +31,7 @@ conda env create -f PeTab.yml -n your_env_name
 
 ## Running ODE solver benchmark
 
-To run the benchmark Boehm, Borghans, Bruno, Crauste, Elowitz, Fiedler, and Fujita models in the project root-directory run:
+To run the benchmark Borghans, Crauste, Fiedler, Sneyd, Bruno, Elowitz, Boehm, Schwen and Lucarelli models in the project root-directory run:
 
 ~~~
 path_julia_folder/bin/julia --project=. Benchmarks/ODE_solvers/Benchmark_solvers.jl compare_fabian
