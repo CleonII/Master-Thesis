@@ -11,6 +11,7 @@ using Distributions
 using Printf
 using SciMLSensitivity
 using Zygote
+using BenchmarkTools
 
 
 # Relevant PeTab structs for compuations 
@@ -75,7 +76,8 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
-        gradZygote = Zygote.gradient(peTabOpt.evalFZygote, paramVec)[1]
+        gradZygote = zeros(nParam)
+        peTabOpt.evalGradFZygote(gradZygote, paramVec)
         gradPython = collect(gradPythonMat[i, :])
         sqDiffGradZygote = sum((gradZygote - gradPython).^2)
         if sqDiffGradZygote > 1e-5

@@ -260,6 +260,9 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
 
     changeToExperimentalCondUse = (pVec, u0Vec, expID) -> changeToExperimentalCondUsePre(pVec, u0Vec, expID, dynParamEst)                                               
 
+    # For storing ODE solution (required for split gradient computations)
+    whichCondID = findfirst(x -> x == conditionId, simulationInfo.conditionIdSol)
+
     # In case the model is first simulated to a steady state 
     local success = true
     if simulationInfo.simulateSS == true
@@ -340,6 +343,8 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
         end
         
         sol = solveCall(probUse)
+
+        Zygote.@ignore simulationInfo.solArray[whichCondID] = sol
 
         if typeof(sol) <: ODESolution && !(sol.retcode == :Success || sol.retcode == :Terminated)
             sucess = false

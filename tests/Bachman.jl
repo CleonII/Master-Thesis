@@ -10,6 +10,8 @@ using LinearAlgebra
 using Distributions
 using Printf
 using SciMLSensitivity
+using BenchmarkTools
+using Zygote
 
 
 # Relevant PeTab structs for compuations 
@@ -35,6 +37,8 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 """
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
+    solver = Rodas5()
+    tol = 1e-9
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity())
 
     # Parameter values to test gradient at 
@@ -82,9 +86,10 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
 
         # This currently takes considerble time (hence it does not run for all passes)
         if i == 1
-            gradZygote = Zygote.gradient(peTabOpt.evalFZygote, paramVec)[1]
+            gradZygote = zeros(length(paramVec))
+            peTabOpt.evalGradFZygote(gradZygote, paramVec)
             gradPython = collect(gradPythonMat[i, :])
-            sqDiffGradZygote = sum((gradZygote - gradPython[iUse]).^2) 
+            sqDiffGradZygote = sum((gradZygote - gradPython[iUse]).^2)
             if sqDiffGradZygote > 1e-5
                 @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
                 @printf("Does not pass test on gradient from Zygote\n")

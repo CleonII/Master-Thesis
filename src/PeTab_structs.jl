@@ -49,6 +49,7 @@ struct PeTabOpt{T1 <: Integer,
     evalF::Function
     evalFZygote::Function
     evalGradF::Function
+    evalGradFZygote::Function
     evalHess::Function
     evalHessApprox::Function
     nParamEst::T1

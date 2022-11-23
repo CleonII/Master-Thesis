@@ -55,8 +55,12 @@ function setUpCostGradHess(peTabModel::PeTabModel,
 
     evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
     evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse)
+    
     evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
+    evalGradFZygote = (grad, paramVecEst) -> calcGradZygote!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse)
+    
     evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
+    
     # This is subtle. When computing the hessian via autodiff it is important that the ODE-solution arrary with dual 
     # numbers is used, else dual numbers will be present when computing the cost which will crash the code when taking 
     # the gradient of non-dynamic parameters in optim. 
@@ -78,6 +82,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     peTabOpt = PeTabOpt(evalF, 
                         evalFZygote,
                         evalGradF, 
+                        evalGradFZygote,
                         evalHess,
                         evalHessApprox, 
                         length(namesParamEst), 
@@ -435,7 +440,7 @@ function calcLogLik(dynamicParamEst,
 end
 
 
-# Computes the likelihood in such a in a Zygote compatible way, which mainly means that no arrays are mutated.
+
 function calcCostZygote(paramVecEst,
                         odeProb::ODEProblem,  
                         peTabModel::PeTabModel,
@@ -445,7 +450,7 @@ function calcCostZygote(paramVecEst,
                         parameterData::ParamData,
                         changeModelParamUse::Function,
                         solveOdeModelAllCondZygoteUse::Function)
-                                                            
+    
     # Correctly map paramVecEst to dynmaic, observable and sd param. The vectors, 
     # e.g dynamicParamEst, are distinct copies so transforming them will not change 
     # paramVecEst.
@@ -454,18 +459,94 @@ function calcCostZygote(paramVecEst,
     sdParamEst = paramVecEst[paramIndices.iSdParam]
     nonDynamicParamEst = paramVecEst[paramIndices.iNonDynParam]
 
+    logLik = calcLogLikZygote(dynamicParamEst,
+                              sdParamEst,
+                              obsParEst,
+                              nonDynamicParamEst,
+                              odeProb,
+                              peTabModel,
+                              simulationInfo,
+                              paramIndices,
+                              measurementData,
+                              parameterData,
+                              changeModelParamUse,
+                              solveOdeModelAllCondZygoteUse)
+
+    return logLik                          
+end
+
+
+function calcGradZygote!(grad::T1, 
+                         paramVecEst::T2, 
+                         odeProb::ODEProblem,  
+                         peTabModel::PeTabModel,
+                         simulationInfo::SimulationInfo,
+                         paramIndices::ParameterIndices,
+                         measurementData::MeasurementData,
+                         parameterData::ParamData, 
+                         changeModelParamUse::Function, 
+                         solveOdeModelAllCondZygoteUse::Function) where {T1<:Array{<:AbstractFloat, 1}, 
+                                                                         T2<:Vector{<:Real}}
+    
+    # Split input into observeble and dynamic parameters 
+    dynamicParamEst = paramVecEst[paramIndices.iDynParam]
+    obsParEst = paramVecEst[paramIndices.iObsParam]
+    sdParamEst = paramVecEst[paramIndices.iSdParam]
+    noneDynParamEst = paramVecEst[paramIndices.iNonDynParam]
+    namesSdParam = paramIndices.namesSdParam
+    namesObsParam = paramIndices.namesObsParam
+    namesNonDynParam = paramVecEst[paramIndices.namesNonDynParam]
+    namesSdObsNonDynPar = paramIndices.namesSdObsNonDynPar
+
+    # Calculate gradient seperately for dynamic and non dynamic parameter. This seems to considerble help Zygote 
+    # if the model is large enough (which I guess has to with how the derivatives are overloaded when calling sol)
+
+    # I have tried to decrease run time here with chunking without success (deafult value performs best). Might be 
+    # worth to look into a parellisation over the chunks (as for larger models each call takes relatively long time). 
+    # Also parellisation of the chunks should be faster than paralellisation over experimental condtions.
+    calcCostDyn = (x) -> calcLogLikZygote(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAllCondZygoteUse)
+    grad[paramIndices.iDynParam] .= Zygote.gradient(calcCostDyn, dynamicParamEst)[1]
+
+    # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
+    # of both Sd and Obs param is used to account for this. This is not a worry for non-dynamic parameters.
+    paramNotOdeSys = paramVecEst[paramIndices.iSdObsNonDynPar]
+    iSdUse = [findfirst(x -> x == namesSdParam[i], namesSdObsNonDynPar) for i in eachindex(namesSdParam)]
+    iObsUse = [findfirst(x -> x == namesObsParam[i],  namesSdObsNonDynPar) for i in eachindex(namesObsParam)]
+    iNonDynUse = [findfirst(x -> x == namesNonDynParam[i],  namesSdObsNonDynPar) for i in eachindex(namesNonDynParam)]
+
+    # This is subtle. By using Zygote-ignore when solving the ODE the ODE solution is stored in simulationInfo.solArray
+    # which can be used to compute the gradient for the non-dynamic parameters without having to resolve the ODE system.
+    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=false)
+    @views ReverseDiff.gradient!(grad[paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
+end
+
+
+# Computes the likelihood in such a in a Zygote compatible way, which mainly means that no arrays are mutated.
+function calcLogLikZygote(dynamicParamEst,
+                          sdParamEst,
+                          obsParEst,
+                          nonDynamicParamEst,
+                          odeProb::ODEProblem,  
+                          peTabModel::PeTabModel,
+                          simulationInfo::SimulationInfo,
+                          paramIndices::ParameterIndices,
+                          measurementData::MeasurementData,
+                          parameterData::ParamData,
+                          changeModelParamUse::Function,
+                          solveOdeModelAllCondZygoteUse::Function)
+
     # Correctly transform parameter if, for example, they are on the log-scale.
     dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
     sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
     obsParEstUse = transformParamVec(obsParEst, paramIndices.namesObsParam, parameterData)
-    nonDynamicParamEstUse = transformParamVec(nonDynamicParamEst, paramIndices.namesNonDynParam, parameterData)
-
+    nonDynamicParamEstUse = transformParamVec(nonDynamicParamEst, paramIndices.namesNonDynParam, parameterData)                          
+                                                            
     pOdeSysUse, u0Use = changeModelParamUse(odeProb.p, dynamicParamEstUse)
-    odeProbUse = remake(odeProb, p = convert.(eltype(paramVecEst), pOdeSysUse), u0 = convert.(eltype(paramVecEst), u0Use))
+    odeProbUse = remake(odeProb, p = convert.(eltype(dynamicParamEstUse), pOdeSysUse), u0 = convert.(eltype(dynamicParamEstUse), u0Use))
     
     # Compute yMod and sd-val by looping through all experimental conditons. At the end 
     # update the likelihood 
-    logLik = convert(eltype(paramVecEst), 0.0)
+    logLik = convert(eltype(dynamicParamEstUse), 0.0)
     for conditionID in keys(measurementData.iPerConditionId)
         
         # Solve ODE system 
