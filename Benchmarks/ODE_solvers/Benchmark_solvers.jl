@@ -332,14 +332,14 @@ end
 if ARGS[1] == "compare_fabian"
 
     dirSave = pwd() * "/Intermediate/Benchmarks/ODE_solvers/"
-    pathSave = dirSave * "Compare_against_Fabian.csv"
+    pathSave = dirSave * "Compare_against_Fabian2.csv"
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
-    modelListTry = ["model_Boehm_JProteomeRes2014", "model_Borghans_BiophysChem1997", "model_Bruno_JExpBot2016", 
+    modelListTry = ["model_Borghans_BiophysChem1997", "model_Bruno_JExpBot2016", "model_Schwen_PONE2014", 
                     "model_Crauste_CellSystems2017", "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", 
-                    "model_Fujita_SciSignal2010"]
+                    "model_Boehm_JProteomeRes2014", "model_Sneyd_PNAS2002", "model_Lucarelli_CellSystems2018"]
     tolsTry = [(1e-8, 1e-8), (1e-16, 1e-8)]            
     solversCheck = ["KenCarp4", "FBDF", "QNDF", "Rosenbrock23", "TRBDF2", "RadauIIA5", "Rodas4", "CVODE_BDF_default", "Rodas5"]
 
@@ -347,7 +347,7 @@ if ARGS[1] == "compare_fabian"
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(1), solversCheck=solversCheck, tolsCheck=tolsTry)    
+        runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(3), solversCheck=solversCheck, tolsCheck=tolsTry)    
     end
 
     # Now try with sparse Jacobian 
@@ -356,7 +356,7 @@ if ARGS[1] == "compare_fabian"
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathSave, true, nTimesRepat=UInt(1), solversCheck=solversCheckSparse, tolsCheck=tolsTry)    
+        runBenchmarkOdeSolvers(peTabModel, pathSave, true, nTimesRepat=UInt(3), solversCheck=solversCheckSparse, tolsCheck=tolsTry)    
     end
 
 end
