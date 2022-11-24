@@ -393,6 +393,45 @@ function solveOdeSS(prob::ODEProblem,
                     absTolSS::Float64=1e-8, 
                     relTolSS::Float64=1e-6)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
+    solveCallPre, solveCallPost = getSolCallSolveOdeSS(absTol, relTol, t_max_ss, solver, tSave, nTSave, denseSol, absTolSS, relTolSS)
+
+    # Change to parameters for the preequilibration simulations 
+    changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
+    u0_pre = deepcopy(prob.u0)
+    prob = remake(prob, tspan = (0.0, 1e8), p = prob.p[:], u0 = prob.u0[:])
+
+    # Terminate if a steady state was not reached in preequilibration simulations 
+    sol_pre = solveCallPre(prob)
+    if sol_pre.retcode != :Terminated
+        return sol_pre
+    end
+
+    # Change to parameters for the post steady state parameters 
+    changeToExperimentalCondUse!(prob.p, prob.u0, shiftExpId)
+    # Sometimes the experimentaCondition-file changes the initial values for a state 
+    # whose value was changed in the preequilibration-simulation. The experimentaCondition
+    # value is prioritized by only changing u0 to the steady state value for those states  
+    # that were not affected by change to shiftExpId.
+    has_not_changed = (prob.u0 .== u0_pre)
+    prob.u0[has_not_changed] .= sol_pre.u[end][has_not_changed]
+    prob = remake(prob, tspan = (0.0, t_max_ss))
+    
+    sol = solveCallPost(prob)
+
+    return sol
+end
+
+
+function getSolCallSolveOdeSS(absTol::Float64, 
+                              relTol::Float64, 
+                              t_max_ss::Float64,
+                              solver, 
+                              tSave, 
+                              nTSave, 
+                              denseSol::Bool, 
+                              absTolSS::Float64, 
+                              relTolSS::Float64)
+
     # Sanity check input. Can provide either nTsave (points to save solution at) or tSave (time points to saveat)
     if length(tSave) != 0 && nTSave != 0
         println("Error : Can only provide tSave (vector to save at) or nTSave as saveat argument to solvers")
@@ -422,31 +461,9 @@ function solveOdeSS(prob::ODEProblem,
         solveCallPost = (prob) -> solve(prob, solver, abstol=absTol, reltol=relTol, saveat=saveAtVec, dense=dense)
     end
 
-    # Change to parameters for the preequilibration simulations 
-    changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
-    u0_pre = deepcopy(prob.u0)
-    prob = remake(prob, tspan = (0.0, 1e8), p = prob.p[:], u0 = prob.u0[:])
-
-    # Terminate if a steady state was not reached in preequilibration simulations 
-    sol_pre = solveCallPre(prob)
-    if sol_pre.retcode != :Terminated
-        return sol_pre
-    end
-
-    # Change to parameters for the post steady state parameters 
-    changeToExperimentalCondUse!(prob.p, prob.u0, shiftExpId)
-    # Sometimes the experimentaCondition-file changes the initial values for a state 
-    # whose value was changed in the preequilibration-simulation. The experimentaCondition
-    # value is prioritized by only changing u0 to the steady state value for those states  
-    # that were not affected by change to shiftExpId.
-    has_not_changed = (prob.u0 .== u0_pre)
-    prob.u0[has_not_changed] .= sol_pre.u[end][has_not_changed]
-    prob = remake(prob, tspan = (0.0, t_max_ss))
-    
-    sol = solveCallPost(prob)
-
-    return sol
+    return solveCallPre, solveCallPost
 end
+
 
 
 """
@@ -482,6 +499,28 @@ function solveOdeNoSS(prob::ODEProblem,
                       absTolSS::Float64=1e-8, 
                       relTolSS::Float64=1e-6)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
+    # Account for different solver algorithms, and if end-time is infinity 
+    solveCall = getSolCallSolveOdeNoSS(absTol, relTol, t_max, solver, tSave, nTSave, denseSol, absTolSS, relTolSS)
+
+    # Change parameters to those for the specific experimental condition 
+    probUse = getOdeProbSolveOdeNoSS(prob, changeToExperimentalCondUse!, firstExpId, t_max)
+
+    sol = solveCall(probUse)
+
+    return sol
+end
+
+
+function getSolCallSolveOdeNoSS(absTol::Float64, 
+                                relTol::Float64, 
+                                t_max::Float64,
+                                solver, 
+                                tSave, 
+                                nTSave, 
+                                denseSol::Bool, 
+                                absTolSS::Float64, 
+                                relTolSS::Float64)::Function
+
     # Sanity check input. Can only provide either nTsave (points to save solution at) or tSave (number of points to save)
     if length(tSave) != 0 && nTSave != 0
         println("Error : Can only provide tSave (vector to save at) or nTSave as saveat argument to solvers")
@@ -497,11 +536,6 @@ function solveOdeNoSS(prob::ODEProblem,
     else
         dense = false
     end
-
-    # Change to parameters to the relevant experimental condition 
-    t_max_use = isinf(t_max) ? 1e6 : t_max
-    changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
-    probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
@@ -519,9 +553,21 @@ function solveOdeNoSS(prob::ODEProblem,
         println("Error : Solver option does not exist")        
     end
 
-    sol = solveCall(probUse)
+    return solveCall
+end
 
-    return sol
+
+function getOdeProbSolveOdeNoSS(prob::ODEProblem, 
+                                changeToExperimentalCondUse!::Function, 
+                                firstExpId::String, 
+                                t_max::Float64)::ODEProblem
+
+    # Change to parameters to the relevant experimental condition 
+    t_max_use = isinf(t_max) ? 1e8 : t_max
+    changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
+    probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
+
+    return probUse
 end
 
 

@@ -15,6 +15,7 @@ using Printf
 using Plots
 using SciMLSensitivity
 using BenchmarkTools
+using Zygote
 
 
 # Relevant PeTab structs for compuations 
@@ -23,6 +24,7 @@ include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 # Functions for solving ODE system 
 include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
 include(joinpath(pwd(), "src", "Solve_ODE_model", "Check_accuracy_ode_solver.jl"))
+include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_benchmark.jl"))
 
 # PeTab importer to get cost, grad etc 
 include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
@@ -209,6 +211,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
     end
 
     for i in 1:size(solverInfoMat)[1]
+
         solver = solverInfoMat[i, 1]
         solverNames = solverInfoMat[i, 2]
         solverType = solverInfoMat[i, 3]
@@ -221,8 +224,6 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
 
                 absTol, relTol = tol            
                 benchRunTime = Vector{Float64}(undef, nTimesRepat)
-                benchMemory = Vector{Float64}(undef, nTimesRepat)
-                benchAllocs = Vector{Float64}(undef, nTimesRepat)
 
                 # Check the accuracy of the ODE solver by comparing with high accuracy solution. In case the squared sum 
                 # error cannot be computed the solver crashed and run time is not profiled.
@@ -237,17 +238,12 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                     
                 if solverSuccess
                     for i in 1:nTimesRepat
-                        b = @benchmark solveOdeModelAllExperimentalCond($odeProb, $changeToExperimentalCondUse!, $measurementDataFile, $simulationInfo, $solver, $absTol, $relTol, nTSave=100) samples=1 evals=1
-                        bMin = minimum(b)
-                        benchRunTime[i] = bMin.time # microsecond
-                        benchMemory[i] = bMin.memory # bytes
-                        benchAllocs[i] = bMin.allocs # number of allocations
+                        status, runTime = solveOdeModelAllExperimentalCondBench(odeProb, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, absTol, relTol, nTSave=100) 
+                        benchRunTime[i] = runTime # nanosecond
                         GC.gc(); GC.gc();GC.gc()
                     end
                 else
                     benchRunTime .= NaN
-                    benchMemory .= NaN
-                    benchAllocs .= NaN
                 end
                 dataSave = DataFrame(model = peTabModel.modelName, 
                                      solver = solverNames, 
@@ -259,8 +255,6 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                                      abstol = absTol, 
                                      success = solverSuccess, 
                                      runTime = benchRunTime, 
-                                     memory = benchMemory, 
-                                     allocs = benchAllocs,
                                      sqDiff = sqDiffSolver, 
                                      iteration = 1:nTimesRepat)
                 if isfile(pathFileSave)
@@ -284,8 +278,6 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                                      abstol = relTol, 
                                      success = false, 
                                      runTime = NaN,
-                                     memory = NaN, 
-                                     allocs = NaN,
                                      sqDiff = Inf, 
                                      iteration = 1:nTimesRepat)                
                 if isfile(pathFileSave)
@@ -333,7 +325,7 @@ end
 if ARGS[1] == "compare_fabian"
 
     dirSave = pwd() * "/Intermediate/Benchmarks/ODE_solvers/"
-    pathSave = dirSave * "Compare_against_Fabian2.csv"
+    pathSave = dirSave * "Compare_against_Fabian3.csv"
     if !isdir(dirSave)
         mkpath(dirSave)
     end
@@ -341,14 +333,14 @@ if ARGS[1] == "compare_fabian"
     modelListTry = ["model_Borghans_BiophysChem1997", "model_Bruno_JExpBot2016", "model_Schwen_PONE2014", 
                     "model_Crauste_CellSystems2017", "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", 
                     "model_Boehm_JProteomeRes2014", "model_Sneyd_PNAS2002", "model_Lucarelli_CellSystems2018"]
-    tolsTry = [(1e-8, 1e-8), (1e-16, 1e-8)]            
+    tolsTry = [(1e-16, 1e-8)]            
     solversCheck = ["KenCarp4", "FBDF", "QNDF", "Rosenbrock23", "TRBDF2", "RadauIIA5", "Rodas4", "CVODE_BDF_default", "Rodas5"]
 
     for i in eachindex(modelListTry)
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(3), solversCheck=solversCheck, tolsCheck=tolsTry)    
+        runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(1), solversCheck=solversCheck, tolsCheck=tolsTry)    
     end
 
     # Now try with sparse Jacobian 

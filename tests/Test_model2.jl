@@ -255,9 +255,9 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     
     # Fides optimizers 
     runFidesHess = setUpFides(peTabOpt, :autoDiff; verbose=0, 
-                              options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}")
+                              options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
     runFidesHessBlock = setUpFides(peTabOpt, :blockAutoDiff; verbose=0, 
-                                   options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}")
+                                   options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
 
     # Optim optimizers 
     optimProbHessApprox = createOptimProb(peTabOpt, IPNewton(), hessianUse=:blockAutoDiff)

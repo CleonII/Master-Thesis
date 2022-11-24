@@ -30,6 +30,7 @@ using Printf
 using Ipopt
 using Optim
 using SciMLSensitivity
+using Zygote
 
 
 # Relevant PeTab structs for compuations 
