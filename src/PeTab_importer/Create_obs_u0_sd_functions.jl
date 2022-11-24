@@ -5,7 +5,8 @@
     createFileYmodSdU0(modelName::String, 
                        dirModel::String, 
                        odeSys::ODESystem, 
-                       stateMap)
+                       stateMap,
+                       modelDict)
 
     For a PeTab model with name modelName with all PeTab-files in dirModel and associated 
     ModellingToolkit ODESystem (with its stateMap) build a file containing a functions for 
@@ -18,7 +19,8 @@
 function createFileYmodSdU0(modelName::String, 
                             dirModel::String, 
                             odeSys::ODESystem, 
-                            stateMap)
+                            stateMap,
+                            modelDict)
                             
     parameterNames = parameters(odeSys)
     stateNames = states(odeSys)
@@ -31,7 +33,7 @@ function createFileYmodSdU0(modelName::String,
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
     paramIndices = getIndicesParam(paramData, measurementData, odeSys, experimentalConditionsFile)
     
-    createYmodFunction(modelName, dirModel, stateNames, paramData, paramIndices.namesDynParam, paramIndices.namesNonDynParam, observablesDataFile)
+    createYmodFunction(modelName, dirModel, stateNames, paramData, paramIndices.namesDynParam, paramIndices.namesNonDynParam, observablesDataFile, modelDict)
     println("Done with Ymod function")
     println("")
     
@@ -55,13 +57,16 @@ end
                        stateNames, 
                        paramData::ParamData, 
                        namesParamDyn::Array{String, 1}, 
-                       observablesData::DataFrame)
+                       observablesData::DataFrame,
+                       modelDict)
 
     For modelName create a function for computing yMod by translating the observablesData
     PeTab-file into Julia syntax. 
 
     To correctly create the function the state-names, names of dynamic parameters to estiamte 
     (namesDynParam) and PeTab parameter-file (to get constant parameters) data are needed. 
+
+    The modelDict is used to define explicit rules to the Ymod file.
 """
 function createYmodFunction(modelName::String, 
                             dirModel::String, 
@@ -69,7 +74,8 @@ function createYmodFunction(modelName::String,
                             paramData::ParamData, 
                             namesParamDyn::Array{String, 1}, 
                             namesNonDynParam::Array{String, 1},
-                            observablesData::DataFrame)
+                            observablesData::DataFrame,
+                            modelDict)
 
     io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "w")
     
@@ -116,6 +122,13 @@ function createYmodFunction(modelName::String,
     paramConstStr *= "\n"
     write(io, paramConstStr)
 
+    # Create namesExplicitRules, if length(modelDict["modelRuleFunctions"]) = 0 this becomes a String[].
+    namesExplicitRules = Array{String, 1}(undef,length(modelDict["modelRuleFunctions"]))
+    # Extract the keys from the modelRuleFunctions
+    for (index, key) in enumerate(keys(modelDict["modelRuleFunctions"]))
+        namesExplicitRules[index] = key
+    end
+    
     # Write the formula of each observable to file
     observableIDs = String.(observablesData[!, "observableId"])
     strObserveble = ""
@@ -131,10 +144,24 @@ function createYmodFunction(modelName::String,
         end 
 
         # Translate the formula for the observable to Julia syntax 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, namesExplicitRules)
         strObserveble *= "\t\t" * "return " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
     end
+
+    # Extracts the explicit rules that have keys among the observables.
+    # Writes them before the observable functions.
+    explicitRules = ""
+    for (key,value) in modelDict["modelRuleFunctions"]
+        if occursin(" " * key * " ", strObserveble)
+            explicitRules *= "\t" * key * " = " * value[2] * "\n"
+        end
+    end
+    if length(explicitRules)>0
+        explicitRules *= "\n"
+        write(io, explicitRules)
+    end
+
     write(io, strObserveble)
 
     strClose = "end"
@@ -186,7 +213,7 @@ function createU0Function(modelName::String,
     for i in eachindex(stateMap)
         stateName = stateNames[i]
         stateExp = replace(string(stateMap[i].second), " " => "")
-        stateFormula = peTabFormulaToJulia(stateExp, stateNames, paramData, namesParameter, String[])
+        stateFormula = peTabFormulaToJulia(stateExp, stateNames, paramData, namesParameter, String[], String[])
         stateExpWrite *= "\t" * stateName * " = " * stateFormula * "\n"
     end
     write(io, stateExpWrite * "\n")
@@ -300,7 +327,7 @@ function createSdFunction(modelName::String,
             strObserveble *= "\t\t" * noiseParam * " = getObsOrSdParam(sdPar, mapSdParam)\n" 
         end 
 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
         strObserveble *= "\t\t" * "return " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
     end
@@ -313,14 +340,14 @@ end
 
 
 """
-    peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1})::String
-
+    peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1}, namesExplicitRules::Array{String, 1})::String
     Translate a peTab formula (e.g for observable or for sd-parameter) into Julia syntax and output the result 
     as a string.
 
     State-names, namesParamDyn and paramData are all required to correctly identify states and parameters in the formula.
+    namesExplicitRules is optional and is only set if there are any explicit rules in the SBML-file.
 """
-function peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1})::String
+function peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1}, namesExplicitRules::Array{String, 1})::String
 
     # Characters directly translate to Julia and characters that also are assumed to terminate a word (e.g state and parameter)
     charDirectTranslate = ['(', ')', '+', '-', '/', '*', '^'] 
@@ -338,7 +365,7 @@ function peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, 
             # Get word (e.g param, state, math-operation or number)
             word, iNew = getWord(formula, i, charDirectTranslate)
             # Translate word to Julia syntax 
-            formulaJulia *= wordToJuliaSyntax(word, stateNames, paramData, namesParamDyn, namesNonDynParam)
+            formulaJulia *= wordToJuliaSyntax(word, stateNames, paramData, namesParamDyn, namesNonDynParam, namesExplicitRules)
             i = iNew
 
             # Special case where we have multiplication
@@ -408,16 +435,20 @@ end
     wordToJuliaSyntax(wordTranslate::String, 
                            stateNames,
                            paramData::ParamData, 
-                           namesParamDyn::Array{String, 1})::String
+                           namesParamDyn::Array{String, 1},
+                           namesExplicitRules::Array{String, 1})::String
 
     Translate a word (state, parameter, math-expression or number) into Julia syntax 
     when building Ymod, U0 and Sd functions.
+    namesExplicitRules is optional and is only set if there are any explicit rules in the SBML-file.
+
 """
 function wordToJuliaSyntax(wordTranslate::String, 
                            stateNames,
                            paramData::ParamData, 
                            namesParamDyn::Array{String, 1}, 
-                           namesNonDynParam::Array{String, 1})::String
+                           namesNonDynParam::Array{String, 1},
+                           namesExplicitRules::Array{String, 1})::String
 
     # List of mathemathical operations that are accpeted and will be translated 
     # into Julia syntax (t is assumed to be time)
@@ -438,6 +469,10 @@ function wordToJuliaSyntax(wordTranslate::String,
     end
 
     if wordTranslate in namesNonDynParam
+        wordJuliaSyntax *= wordTranslate
+    end
+
+    if wordTranslate in namesExplicitRules
         wordJuliaSyntax *= wordTranslate
     end
 
