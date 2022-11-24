@@ -61,35 +61,13 @@ function getArguments(functionAsString, dictionary::Dict, baseFunctions::Vector{
 end
 
 
-# replaces a word, "toReplace" in functions with another word, "replacer. 
+# replaces a word, "toReplace" in functions with another word, "replacer". 
 # Often used to change "time" to "t"
 # Makes sure not to change for example "time1" or "shift_time"
 function replaceWith(oldString, toReplace, replacer)
-    if oldString == toReplace
-        return replacer
-    end
-    newString = oldString
-    i = 1
-    while i < length(newString)
-        indices = findnext(toReplace, newString, i)
-        if indices === nothing
-            break
-        end
-        if indices[1] == 1
-            if newString[indices[end]+1] in [' ', ',', ')']
-                newString = newString[1:indices[1]-1] * replacer * newString[indices[end]+1:end]
-            end
-        elseif indices[end] == length(newString)
-            if newString[indices[1]-1] in [' ', '(', '-', '+']
-                newString = newString[1:indices[1]-1] * replacer * newString[indices[end]+1:end]
-            end
-        else
-            if newString[indices[1]-1] in [' ', ',', '(', '-', '+'] && newString[indices[end]+1] in [' ', ')', ',']
-                newString = newString[1:indices[1]-1] * replacer * newString[indices[end]+1:end]
-            end
-        end
-        i = indices[1] + 1
-    end
+    
+    varFrom = Regex("(\\b" * toReplace * "\\b)")
+    newString = replace(oldString, varFrom => replacer)
     return newString
 end
 
