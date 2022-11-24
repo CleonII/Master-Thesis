@@ -118,41 +118,15 @@ end
 # When processing rules into function this function rewrites any function defined rules inside into 
 # a function. 
 function rewriteFunctionOfFunction(functionAsString, funcNameArgFormula)
-    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' ', ','], keepempty = false)
-    existingFunctions = keys(funcNameArgFormula)
+
     newFunctionString = functionAsString
-    for part in parts
-        if part in existingFunctions
-            funcArgs = "(" * funcNameArgFormula[part][1] * ")"
-            funcFormula = "(" * funcNameArgFormula[part][2] * ")"
-            i = 1
-            while i < length(newFunctionString)
-                indices = findnext(part, newFunctionString, i)
-                if indices[1] == 1 && indices[end] == length(newFunctionString)
-                    newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                    break
-                end
-                if indices[1] == 1
-                    if newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                        break
-                    end
-                elseif indices[end] == length(newFunctionString)
-                    if newFunctionString[indices[1]-1] in [' ', '(']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                        break
-                    end
-                else
-                    if newFunctionString[indices[1]-1] in [' ', '('] && newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                        break
-                    end
-                end
-                i = indices[end] + 1
-            end
-        end
+    for (key,value) in funcNameArgFormula
+        varFrom = Regex("(\\b" *key* "\\b)")
+        funcFormula = "(" * value[2] * ")"
+        newFunctionString = replace(newFunctionString, varFrom => funcFormula)
     end
     return newFunctionString
+
 end
 
 
@@ -291,36 +265,13 @@ end
 
 # Insert the function definitions for newly defined functions. 
 function insertFunctionDefinitions(functionAsString, funcNameArgFormula)
-    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' ', ','], keepempty = false)
-    existingFunctions = keys(funcNameArgFormula)
+
     newFunctionString = functionAsString
-    for part in parts
-        if part in existingFunctions
-            funcFormula = "(" * funcNameArgFormula[part][2] * ")"
-            i = 1
-            while i < length(newFunctionString)
-                indices = findnext(part, newFunctionString, i)
-                if indices === nothing
-                    break
-                end
-                if indices[1] == 1 && indices[end] == length(newFunctionString)
-                    newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                elseif indices[1] == 1
-                    if newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                    end
-                elseif indices[end] == length(newFunctionString)
-                    if newFunctionString[indices[1]-1] in [' ', '(', '-', '+']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                    end
-                else
-                    if newFunctionString[indices[1]-1] in [' ', '(', '-', '+'] && newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                    end
-                end
-                i = indices[1] + 1
-            end
-        end
+    for (key,value) in funcNameArgFormula
+        varFrom = Regex("(\\b" *key* "\\b)")
+        funcFormula = "(" * value[2] * ")"
+        newFunctionString = replace(newFunctionString, varFrom => funcFormula)
     end
+
     return newFunctionString
 end
