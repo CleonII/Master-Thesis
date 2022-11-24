@@ -69,6 +69,7 @@ function replaceWith(oldString, toReplace, replacer)
     varFrom = Regex("(\\b" * toReplace * "\\b)")
     newString = replace(oldString, varFrom => replacer)
     return newString
+
 end
 
 
@@ -108,77 +109,51 @@ function rewriteFunctionOfFunction(functionAsString, funcNameArgFormula)
 end
 
 
-# Will substitute the function definition for the formula given by the model with the arguments 
-# when the funciton is a rule that has been rewritten into a rule.
-# given to the function used instead of the general arguments in contrast to rewriteFunctionOfFunction. 
-# Main goal, inser models formulas when producing the model equations.
-function insertModelDefineFunctions(functionsAsString, modelFuncNameArgFormula, baseFunctions)
-    newFunctionsAsString = functionsAsString
-    possibleModelFunctions = split(getArguments(functionsAsString, baseFunctions), ", ")
-    for possibleModelFunction in possibleModelFunctions 
-        if possibleModelFunction in keys(modelFuncNameArgFormula)
-            modelFuncArguments, modelFuncFormula = modelFuncNameArgFormula[possibleModelFunction]
-            modelFuncArguments = split(modelFuncArguments, ", ")
-            i = 1
-            while i <= length(newFunctionsAsString)
-                next = findnext(possibleModelFunction*"(", newFunctionsAsString, i)
-                if next === nothing
-                    break
-                end
-                startIndex = next[1]
-                iStart = next[end] + 1
-                endIndex = findEndOffunction(newFunctionsAsString, iStart)
-                modelFunction = newFunctionsAsString[startIndex:endIndex]
-                argumentString = modelFunction[length(possibleModelFunction)+2:end-1]
-                arguments = split(argumentString, ", ", keepempty = false)
-                newFunction = modelFuncFormula
-                for (aIndex, arg) in enumerate(arguments)
-                    j = 1
-                    while j <= length(newFunction)
-                        indices = findnext(modelFuncArguments[aIndex], newFunction, j)
-                        if indices === nothing
-                            break
-                        end
-                        if indices[1] == 1 && indices[end] == length(newFunction)
-                            if occursin(" ", arg)
-                                newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                            else
-                                newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                            end
-                        elseif indices[1] == 1
-                            if newFunction[indices[end]+1] in [' ', ')']
-                                if occursin(" ", arg)
-                                    newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                                else
-                                    newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                                end
-                            end
-                        elseif indices[end] == length(newFunction)
-                            if newFunction[indices[1]-1] in [' ', '(']
-                                if occursin(" ", arg)
-                                    newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                                else
-                                    newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                                end
-                            end
-                        else
-                            if newFunction[indices[1]-1] in [' ', '('] && newFunction[indices[end]+1] in [' ', ')']
-                                if occursin(" ", arg)
-                                    newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                                else
-                                    newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                                end
-                            end
-                        end
-                        j = indices[end] + 1
-                    end
-                end
-                newFunctionsAsString = newFunctionsAsString[1:startIndex-1] * "(" * newFunction * ")" * newFunctionsAsString[startIndex + length(modelFunction):end]
-                i = startIndex + 1
+# Substitutes the function with the formula given by the model, but replaces
+# the names of the variables in the formula with the input variable names.
+# e.g. If fun(a) = a^2 then "constant * fun(b)" will be rewritten as 
+# "constant * b^2"
+# Main goal, insert model formulas when producing the model equations.
+function insertModelDefineFunctions(functionAsString, funcNameArgFormula, baseFunctions)
+
+    newFunctionsAsString = functionAsString
+    
+    for (key,value) in funcNameArgFormula
+        # The string we wish to insert when the correct replacement has been made.
+        replaceStr = value[2]
+    
+        # Finds the old input arguments, removes spaces and puts them in a list
+        replaceFrom = split(replace(value[1]," "=>""),",")
+        
+        # Finds the first time the function is present in the string
+        # and captures the name and input arguments used there.
+        # Assumes that the function is not called with different 
+        # arguments in different parts of the same line.
+        varFrom = Regex("\\b(" * key * ")+\\((.*?)\\)")
+        mtc = match(varFrom, functionAsString)
+        
+        if !isnothing(mtc)
+            # capture contains two elements 
+            # 1) the captured function name 
+            # 2) the captured arguments of the function
+            captures = mtc.captures
+            # Takes the new input arguments removes spaces and puts them in a list
+            replaceTo = split(replace(captures[2]," "=>""),",")
+            
+            # Replace each variable used in the formula with the 
+            # variable name used as input for the function.
+            for ind in eachindex(replaceTo)
+                replaceStr = replace(replaceStr, Regex("(\\b" * replaceFrom[ind] * "\\b)") => replaceTo[ind])
             end
+
+            # Replace function(input) with formula where each variable in formula has the correct name.
+            newFunctionsAsString = replace(newFunctionsAsString, captures[1] * "(" * captures[2] * ")" => "(" * replaceStr * ")")
+
         end
     end
+
     return newFunctionsAsString
+
 end
 
 

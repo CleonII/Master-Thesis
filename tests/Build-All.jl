@@ -57,8 +57,6 @@ modelNames = ["model_Alkan_SciSignal2018",
  "model_Zhao_QuantBiol2020",
  "model_Zheng_PNAS2012"]
 
-#modelNames = ["model_Blasi_CellSystems2016"]
-
 # Bara modeller med explicit rules
 #modelNames = ["model_Giordano_Nature2020",
 # "model_Laske_PLOSComputBiol2019",
