@@ -340,7 +340,7 @@ if ARGS[1] == "compare_fabian"
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(1), solversCheck=solversCheck, tolsCheck=tolsTry)    
+        runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(3), solversCheck=solversCheck, tolsCheck=tolsTry)    
     end
 
     # Now try with sparse Jacobian 

@@ -13,6 +13,8 @@ using Ipopt
 using Optim
 using NLopt
 using BenchmarkTools
+using Zygote
+using SciMLSensitivity
 
 
 # Relevant PeTab structs for computations 
@@ -103,9 +105,9 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
     
     # Fides 
     FidesAutoHess = setUpFides(peTabOpt, :autoDiff; verbose=0, 
-                               options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}")
+                               options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
     FidesAutoHessBlock = setUpFides(peTabOpt, :blockAutoDiff; verbose=0, 
-                                    options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}")
+                                    options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
 
     # Make sure to activate allocation of required arrays for Ipopt solvers, and to compile 
     # gradient and required hessian functions to avoid bias in run-times for benchmark. 
