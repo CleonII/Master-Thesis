@@ -40,7 +40,7 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
 
                 # Terminate if a steady state was not reached in preequilibration simulations 
                 sol_pre = solveCallPre(prob)
-                b = @benchmark sol_pre = $solveCallPre(prob) samples=1 evals=1
+                b = @elapsed sol_pre = solveCallPre(prob)
                 simulationInfo.solArray[i] = sol
                 runTime += minimum(b).time
                 
@@ -59,9 +59,9 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
                 prob = remake(prob, tspan = (0.0, t_max_ss))
                 
                 sol = solveCallPost(prob) 
-                b = @benchmark sol = $solveCallPost($prob) samples=1 evals=1
+                b = @elapsed sol = solveCallPost(prob) 
                 simulationInfo.solArray[i] = sol
-                runTime += minimum(b).time
+                runTime += b
                 simulationInfo.solArray[k] = sol
 
                 if simulationInfo.solArray[k].retcode != :Success
@@ -98,9 +98,9 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
             probUse = getOdeProbSolveOdeNoSS(prob, changeToExperimentalCondUse!, firstExpId, t_max)
 
             sol = solveCall(probUse)
-            b = @benchmark sol = $solveCall($probUse) samples=1 evals=1
+            b = @elapsed sol = solveCall(probUse) 
             simulationInfo.solArray[i] = sol
-            runTime += minimum(b).time
+            runTime += b
 
             if !(simulationInfo.solArray[i].retcode == :Success || simulationInfo.solArray[i].retcode == :Terminated)
                 sucess = false

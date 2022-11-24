@@ -37,7 +37,7 @@ To run the benchmark Borghans, Crauste, Fiedler, Sneyd, Bruno, Elowitz, Boehm, S
 path_julia_folder/bin/julia --project=. Benchmarks/ODE_solvers/Benchmark_solvers.jl compare_fabian
 ~~~
 
-The ODE solvers tested are KenCarp4, FBDF, QNDF, Rosenbrock23, TRBDF2, RadauIIA5, Rodas4, CVODE_BDF, "Rodas5" using two tolerance options; (abstol=1e-8, reltol=1e-8) and (abstol=1e-16, reltol=1e-8). For each solver and tolerance option we measure the run-time (wall-time) three times (three repetitions).
+The ODE solvers tested are KenCarp4, FBDF, QNDF, Rosenbrock23, TRBDF2, RadauIIA5, Rodas4, CVODE_BDF, "Rodas5" using two tolerance options; (abstol=1e-16, reltol=1e-8). For each solver and tolerance option we measure the run-time (wall-time) three times (three repetitions).
 
 The parameter values used for the ODE benchmark are the same as the nominal values in the PEtab files from [here](https://github.com/Benchmarking-Initiative/Benchmark-Models-PEtab), and the ODE:s are solved for all experimental conditions for which there are measurement data. For each model the benchmark pipeline computes a high accuracy solution of the ODE using BigFloatm abstol=1e-16, and reltol=1e-16 which can take some time.
 
@@ -45,7 +45,7 @@ The result from the parameter estimation is automatically stored in *Intermediat
 
 ## Running parameter estimation benchmark
 
-Currently the benchmark can run for the **Boehm**, **Bachmann**, **Brännmark** and **Fujita** models. To run the benchmark in terminal from the root project directory run:
+Currently, the benchmark can run for the **Boehm**, **Bachmann**, **Brännmark** and **Fujita** models. To run the benchmark in terminal from the root project directory run:
 
 ~~~
 path_julia_folder/bin/julia --project=. Benchmarks/Parameter_estimation/Run_benchmark.jl model_name
@@ -66,6 +66,30 @@ loadFidesFromPython("path_to_python_for_conda_env")
 Where `path_to_python_for_conda_env` is the path to python executable for the Conda environment with the Fides installation. I know this is a bit suboptimal, but using Python within Julia can be tricky easy :).
 
 The result from the parameter estimation is automatically stored in *Intermediate/Benchmarks/Parameter_estimation/Model_name/Benchmark_result.csv* in a [Tidy-format](https://www.jstatsoft.org/article/view/v059i10).
+
+### Termination criteria
+
+Currently the termination criteria are set such that Optim (Interior Point Newton) and Fides terminate on the same criteria. Optim has three termination criteria;
+
+1. $|f - f_{prev}| \leq f_{tol}*|f|$
+2. $||x - x_{prev}|| ≤ x_{tol}$
+3. $|| \nabla f || \leq g_{tol}$
+
+And to match Optim and Fides I have for Fides set; 
+
+~~~
+options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 
+            'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
+~~~
+
+and for Optim set;
+
+~~~
+options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
+                      successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0)
+~~~
+
+As Ipopt terminates based on [different criteria](https://coin-or.github.io/Ipopt/OPTIONS.html) I set the tolerance and acceptable tolerance to 1e-8. 
 
 ### Changing parameter estimation options
 
