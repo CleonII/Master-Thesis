@@ -61,13 +61,13 @@ function getArguments(functionAsString, dictionary::Dict, baseFunctions::Vector{
 end
 
 
-# replaces a word, "toReplace" in functions with another word, "replacer". 
+# Replaces a word, "replaceFrom" in functions with another word, "replaceTo". 
 # Often used to change "time" to "t"
 # Makes sure not to change for example "time1" or "shift_time"
-function replaceWith(oldString, toReplace, replacer)
+function replaceWholeWord(oldString, replaceFrom, replaceTo)
     
-    varFrom = Regex("(\\b" * toReplace * "\\b)")
-    newString = replace(oldString, varFrom => replacer)
+    replaceFromRegex = Regex("(\\b" * replaceFrom * "\\b)")
+    newString = replace(oldString, replaceFromRegex => replaceTo)
     return newString
 
 end
@@ -94,17 +94,17 @@ function findEndOffunction(functionAsString, iStart)
 end
 
 
-# When processing rules into function this function rewrites any function defined rules inside into 
-# a function. 
-function rewriteFunctionOfFunction(functionAsString, funcNameArgFormula)
+# Replaces words in oldString given a dictionary replaceDict.
+# In the Dict, the key  is the word to replace and the second
+# value is the value to replace with.
+# Makes sure to only change whole words.
+function replaceWholeWordDict(oldString, replaceDict)
 
-    newFunctionString = functionAsString
-    for (key,value) in funcNameArgFormula
-        varFrom = Regex("(\\b" *key* "\\b)")
-        funcFormula = "(" * value[2] * ")"
-        newFunctionString = replace(newFunctionString, varFrom => funcFormula)
+    newString = oldString
+    for (key,value) in replaceDict
+        newString = replaceWholeWord(newString, key, "(" * value[2] * ")")
     end
-    return newFunctionString
+    return newString
 
 end
 
@@ -114,7 +114,7 @@ end
 # e.g. If fun(a) = a^2 then "constant * fun(b)" will be rewritten as 
 # "constant * b^2"
 # Main goal, insert model formulas when producing the model equations.
-function insertModelDefineFunctions(functionAsString, funcNameArgFormula, baseFunctions)
+function replaceFunctionWithFormula(functionAsString, funcNameArgFormula)
 
     newFunctionsAsString = functionAsString
     
@@ -143,7 +143,7 @@ function insertModelDefineFunctions(functionAsString, funcNameArgFormula, baseFu
             # Replace each variable used in the formula with the 
             # variable name used as input for the function.
             for ind in eachindex(replaceTo)
-                replaceStr = replace(replaceStr, Regex("(\\b" * replaceFrom[ind] * "\\b)") => replaceTo[ind])
+                replaceStr = replaceWholeWord(replaceStr, replaceFrom[ind], replaceTo[ind])
             end
 
             # Replace function(input) with formula where each variable in formula has the correct name.
@@ -213,18 +213,4 @@ function getSBMLFuncFormula(mathSBML, libsbml)
     functionFormula = removePowFunctions(functionFormula)
 
     return functionFormula
-end
-
-
-# Insert the function definitions for newly defined functions. 
-function insertFunctionDefinitions(functionAsString, funcNameArgFormula)
-
-    newFunctionString = functionAsString
-    for (key,value) in funcNameArgFormula
-        varFrom = Regex("(\\b" *key* "\\b)")
-        funcFormula = "(" * value[2] * ")"
-        newFunctionString = replace(newFunctionString, varFrom => funcFormula)
-    end
-
-    return newFunctionString
 end

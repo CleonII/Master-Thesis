@@ -49,7 +49,7 @@ function asTrigger(triggerFormula)
     end
     parts = splitBetween(strippedFormula, ',')
     if occursin("time", parts[1])
-        parts[1] = replaceWith(parts[1], "time", "t")
+        parts[1] = replaceWholeWord(parts[1], "time", "t")
     end
     expression = "[" * parts[1] * " ~ " * parts[2] * "]"
     return expression
@@ -59,8 +59,8 @@ end
 # Rewrites derivatives for a model by replacing functions, any lagging piecewise, and power functions.
 function rewriteDerivatives(derivativeAsString, modelDict, baseFunctions)
     newDerivativeAsString = derivativeAsString
-    newDerivativeAsString = insertModelDefineFunctions(newDerivativeAsString, modelDict["modelFunctions"], baseFunctions)
-    newDerivativeAsString = insertModelDefineFunctions(newDerivativeAsString, modelDict["modelRuleFunctions"], baseFunctions)
+    newDerivativeAsString = replaceFunctionWithFormula(newDerivativeAsString, modelDict["modelFunctions"])
+    newDerivativeAsString = replaceFunctionWithFormula(newDerivativeAsString, modelDict["modelRuleFunctions"])
     if occursin("pow(", newDerivativeAsString)
         newDerivativeAsString = removePowFunctions(newDerivativeAsString)
     end
@@ -68,8 +68,8 @@ function rewriteDerivatives(derivativeAsString, modelDict, baseFunctions)
         newDerivativeAsString = rewritePiecewiseToIfElse(newDerivativeAsString, "foo", modelDict, baseFunctions, retFormula=true)
     end
 
-    newDerivativeAsString = insertFunctionDefinitions(newDerivativeAsString, modelDict["modelFunctions"])
-    newDerivativeAsString = insertFunctionDefinitions(newDerivativeAsString, modelDict["modelRuleFunctions"])
+    newDerivativeAsString = replaceWholeWordDict(newDerivativeAsString, modelDict["modelFunctions"])
+    newDerivativeAsString = replaceWholeWordDict(newDerivativeAsString, modelDict["modelRuleFunctions"])
 
     return newDerivativeAsString
 end
@@ -115,7 +115,7 @@ function processInitialAssignment(libsbml, model, modelDict::Dict, baseFunctions
                 for arg in args
                     if arg in keys(modelDict["states"])
                         nestedVariables = true
-                        variableValue = replaceWith(variableValue, arg, modelDict["states"][arg])
+                        variableValue = replaceWholeWord(variableValue, arg, modelDict["states"][arg])
                     end
                 end
                 modelDict["states"][variable] = variableValue
@@ -134,7 +134,7 @@ function processInitialAssignment(libsbml, model, modelDict::Dict, baseFunctions
             for arg in args
                 if arg in keys(modelDict["parameters"])
                     nestedParameter = true
-                    parameterValue = replaceWith(parameterValue, arg, modelDict["parameters"][arg])
+                    parameterValue = replaceWholeWord(parameterValue, arg, modelDict["parameters"][arg])
                 end
             end
             modelDict["parameters"][parameter] = parameterValue
@@ -296,14 +296,14 @@ function buildODEModelDictionary(libsbml, model)
     isInODESys = falses(length(modelDict["parameters"]))
     for du in values(modelDict["derivatives"])
         for (i, pars) in enumerate(keys(modelDict["parameters"]))
-            if replaceWith(du, pars, "") !== du
+            if replaceWholeWord(du, pars, "") !== du
                 isInODESys[i] = true
             end
         end
     end
     for inputFunc in values(modelDict["inputFunctions"])
         for (i, pars) in enumerate(keys(modelDict["parameters"]))
-            if replaceWith(inputFunc, pars, "") !== inputFunc
+            if replaceWholeWord(inputFunc, pars, "") !== inputFunc
                 isInODESys[i] = true
             end
         end
