@@ -60,7 +60,6 @@ function getArguments(functionAsString, dictionary::Dict, baseFunctions::Vector{
     return [argumentString, includesFunction]
 end
 
-
 # Replaces a word, "replaceFrom" in functions with another word, "replaceTo". 
 # Often used to change "time" to "t"
 # Makes sure not to change for example "time1" or "shift_time"
@@ -72,26 +71,6 @@ function replaceWholeWord(oldString, replaceFrom, replaceTo)
 
 end
 
-
-# Finds the ending parenthesis of an argument and returns its position. 
-function findEndOffunction(functionAsString, iStart)
-    inParenthesis = 1
-    i = iStart
-    endIndex = i
-    while i <= length(functionAsString)
-        if functionAsString[i] == '('
-            inParenthesis += 1
-        elseif functionAsString[i] == ')'
-            inParenthesis -= 1
-        end
-        if inParenthesis == 0
-            endIndex = i
-            break
-        end
-        i += 1
-    end
-    return endIndex
-end
 
 
 # Replaces words in oldString given a dictionary replaceDict.
@@ -156,27 +135,29 @@ function replaceFunctionWithFormula(functionAsString, funcNameArgFormula)
 
 end
 
-
 # Rewrites pow(a,b) into a^b, which Julia can handle
-function removePowFunctions(functionAsString)
-    newFunctionAsString = functionAsString
-    i = 1
-    while i <= length(newFunctionAsString)
-        next = findnext("pow(", newFunctionAsString, i)
-        if next === nothing
-            break
-        end
-        startIndex = next[1]
-        iStart = next[end] + 1
-        endIndex = findEndOffunction(newFunctionAsString, iStart)
-        powFunction = newFunctionAsString[startIndex:endIndex]
-        powArguments = powFunction[5:end-1]
-        parts = splitBetween(powArguments, ',')
-        newPowFunction = "(" * parts[1] * ")^(" * parts[2] * ")"
-        newFunctionAsString = replace(newFunctionAsString, powFunction => newPowFunction, count = 1)
-        i = startIndex + 1
+function removePowFunctions(oldStr)
+    newStr = oldStr
+    # Finds all functions on the form "pow("
+    numberOfPowFuns = Regex("\\bpow\\(")
+    # Finds the offset after the parenthesis in "pow("
+    powerStartRegex = Regex("\\bpow\\(\\K")
+    # Matches parentheses to grab the arguments of the "pow(" function
+    matchParenthesesRegex = Regex("\\((?:[^)(]*(?R)?)*+\\)")
+    # Find position of outermost comma to find comma that separates the arguments 
+    findOutsideCommaRegex = Regex(",(?![^()]*\\))")
+    while !isnothing(match(numberOfPowFuns, newStr))
+        powerStart = match(powerStartRegex, newStr)
+        powerStartPos = powerStart.offset
+        insideOfPowerFun = match(matchParenthesesRegex, newStr[powerStartPos-1:end]).match
+        insideOfPowerFun = insideOfPowerFun[2:end-1]
+        outsideComma = match(findOutsideCommaRegex, insideOfPowerFun)
+        commaPos = outsideComma.offset
+        replaceFrom = "pow(" * insideOfPowerFun * ")"
+        replaceTo = "(" * insideOfPowerFun[1:commaPos-1] * ")^(" * replace(insideOfPowerFun[commaPos+1:end], " " => "") * ")"
+        newStr = replace(newStr, replaceFrom => replaceTo)
     end
-    return newFunctionAsString
+    return newStr
 end
 
 
