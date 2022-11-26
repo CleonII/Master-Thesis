@@ -80,9 +80,13 @@ end
 function replaceWholeWordDict(oldString, replaceDict)
 
     newString = oldString
+    regexReplaceDict = Dict()
     for (key,value) in replaceDict
-        newString = replaceWholeWord(newString, key, "(" * value[2] * ")")
+        replaceFromRegex = Regex("(\\b" * key * "\\b)")
+        regexReplaceDict[replaceFromRegex] = "(" * value[2] * ")"
     end
+    newString = replace(newString, regexReplaceDict...)
+
     return newString
 
 end
@@ -93,71 +97,71 @@ end
 # e.g. If fun(a) = a^2 then "constant * fun(b)" will be rewritten as 
 # "constant * b^2"
 # Main goal, insert model formulas when producing the model equations.
+# Example "fun1(fun2(a,b),fun3(c,d))" and Dict 
+# test["fun1"] = ["a,b","a^b"]
+# test["fun2"] = ["a,b","a*b"]
+# test["fun3"] = ["a,b","a+b"]
+# Gives ((a*b)^(c+d))
 function replaceFunctionWithFormula(functionAsString, funcNameArgFormula)
 
     newFunctionsAsString = functionAsString
     
     for (key,value) in funcNameArgFormula
-        # The string we wish to insert when the correct replacement has been made.
-        replaceStr = value[2]
-    
+        # Find commas not surrounded by parentheses.
+        # Used to split function arguments
+        # If input argument are "pow(a,b),c" the list becomes ["pow(a,b)","c"]
+        findOutsideCommaRegex = Regex(",(?![^()]*\\))")
         # Finds the old input arguments, removes spaces and puts them in a list
-        replaceFrom = split(replace(value[1]," "=>""),",")
-        
-        # Finds the first time the function is present in the string
-        # and captures the name and input arguments used there.
-        # Assumes that the function is not called with different 
-        # arguments in different parts of the same line.
-        varFrom = Regex("\\b(" * key * ")+\\((.*?)\\)")
-        mtc = match(varFrom, functionAsString)
-        
-        if !isnothing(mtc)
-            # capture contains two elements 
-            # 1) the captured function name 
-            # 2) the captured arguments of the function
-            captures = mtc.captures
-            # Takes the new input arguments removes spaces and puts them in a list
-            replaceTo = split(replace(captures[2]," "=>""),",")
+        replaceFrom = split(replace(value[1]," "=>""),findOutsideCommaRegex)
+
+        # Finds all functions on the form "funName("
+        numberOfFuns = Regex("\\b" * key * "\\(")
+        # Finds the offset after the parenthesis in "funName("
+        funStartRegex = Regex("\\b" * key * "\\(\\K")
+        # Matches parentheses pairs to grab the arguments of the "funName(" function
+        matchParenthesesRegex = Regex("\\((?:[^)(]*(?R)?)*+\\)")
+        while !isnothing(match(numberOfFuns, newFunctionsAsString))
+            # The string we wish to insert when the correct 
+            # replacement has been made.
+            # Must be resetted after each pass.
+            replaceStr = value[2]
+            # Extracts the function arguments
+            funStart = match(funStartRegex, newFunctionsAsString)
+            funStartPos = funStart.offset
+            insideOfFun = match(matchParenthesesRegex, newFunctionsAsString[funStartPos-1:end]).match
+            insideOfFun = insideOfFun[2:end-1]
+            replaceTo = split(replace(insideOfFun,", "=>","),findOutsideCommaRegex)
             
             # Replace each variable used in the formula with the 
             # variable name used as input for the function.
+            replaceDict = Dict()
             for ind in eachindex(replaceTo)
-                replaceStr = replaceWholeWord(replaceStr, replaceFrom[ind], replaceTo[ind])
+                replaceFromRegex = Regex("(\\b" * replaceFrom[ind] * "\\b)")
+                replaceDict[replaceFromRegex] = replaceTo[ind]
             end
+            replaceStr = replace(replaceStr, replaceDict...)
 
-            # Replace function(input) with formula where each variable in formula has the correct name.
-            newFunctionsAsString = replace(newFunctionsAsString, captures[1] * "(" * captures[2] * ")" => "(" * replaceStr * ")")
+            if key != "pow"
+                # Replace function(input) with formula where each variable in formula has the correct name.
+                newFunctionsAsString = replace(newFunctionsAsString, key * "(" * insideOfFun * ")" => "(" * replaceStr * ")")
+            else 
+                # Same as above, but skips extra parentheses around the entire power.
+                newFunctionsAsString = replace(newFunctionsAsString, key * "(" * insideOfFun * ")" => replaceStr)
+            end
 
         end
     end
-
     return newFunctionsAsString
-
 end
 
-# Rewrites pow(a,b) into a^b, which Julia can handle
+# Rewrites pow(base,exponent) into (base)^(exponent), which Julia can handle
 function removePowFunctions(oldStr)
-    newStr = oldStr
-    # Finds all functions on the form "pow("
-    numberOfPowFuns = Regex("\\bpow\\(")
-    # Finds the offset after the parenthesis in "pow("
-    powerStartRegex = Regex("\\bpow\\(\\K")
-    # Matches parentheses to grab the arguments of the "pow(" function
-    matchParenthesesRegex = Regex("\\((?:[^)(]*(?R)?)*+\\)")
-    # Find position of outermost comma to find comma that separates the arguments 
-    findOutsideCommaRegex = Regex(",(?![^()]*\\))")
-    while !isnothing(match(numberOfPowFuns, newStr))
-        powerStart = match(powerStartRegex, newStr)
-        powerStartPos = powerStart.offset
-        insideOfPowerFun = match(matchParenthesesRegex, newStr[powerStartPos-1:end]).match
-        insideOfPowerFun = insideOfPowerFun[2:end-1]
-        outsideComma = match(findOutsideCommaRegex, insideOfPowerFun)
-        commaPos = outsideComma.offset
-        replaceFrom = "pow(" * insideOfPowerFun * ")"
-        replaceTo = "(" * insideOfPowerFun[1:commaPos-1] * ")^(" * replace(insideOfPowerFun[commaPos+1:end], " " => "") * ")"
-        newStr = replace(newStr, replaceFrom => replaceTo)
-    end
+
+    powDict = Dict()
+    powDict["pow"] = ["base, exponent","(base)^(exponent)"]
+    newStr = replaceFunctionWithFormula(oldStr, powDict)
     return newStr
+
 end
 
 
