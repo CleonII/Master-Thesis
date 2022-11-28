@@ -241,3 +241,10 @@ struct ParameterIndices{T1<:Array{<:Integer, 1},
     mapExpCond::T6
     constParamPerCond::T7
 end
+
+
+struct PriorInfo
+    logpdf::Vector{Function}
+    priorOnParamScale::Vector{Bool}
+    hasPriors::Bool
+end

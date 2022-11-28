@@ -516,7 +516,7 @@ end
 function getObsParamStr(measurmentFormula::String)::String
     
     # Find all words on the form observableParameter
-    obsWords = [ match.match for match in eachmatch(r"observableParameter[0-9]_\w+", measurmentFormula) ]
+    obsWords = sort(unique([ match.match for match in eachmatch(r"observableParameter[0-9]_\w+", measurmentFormula) ]))
     obsWordStr = ""
     for i in eachindex(obsWords)
         if i != length(obsWords) 

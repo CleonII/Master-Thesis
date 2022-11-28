@@ -36,6 +36,9 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
     paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     
+    # Set up potential prior for the parameters to estimate 
+    priorInfo = getPriorInfo(paramEstIndices::ParameterIndices, parameterDataFile::DataFrame)::PriorInfo
+
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
 
@@ -53,18 +56,18 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, tol, tol, onlySaveAtTobs=true)
     solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementData, simulationInfo, solver, tol, tol, sensealg)
 
-    evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
-    evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse)
+    evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
+    evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
     
-    evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
-    evalGradFZygote = (grad, paramVecEst) -> calcGradZygote!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse)
+    evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
+    evalGradFZygote = (grad, paramVecEst) -> calcGradZygote!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
     
-    evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)
+    evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
     
     # This is subtle. When computing the hessian via autodiff it is important that the ODE-solution arrary with dual 
     # numbers is used, else dual numbers will be present when computing the cost which will crash the code when taking 
     # the gradient of non-dynamic parameters in optim. 
-    _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcHessian=true)
+    _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessian=true)
     evalHess = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(_evalHess, paramVec)) end
     
     # Lower and upper bounds for parameters to estimate 
@@ -129,7 +132,8 @@ function calcCost(paramVecEst,
                   measurementData::MeasurementData,
                   parameterData::ParamData,
                   changeModelParamUse!::Function,
-                  solveOdeModelAllCondUse!::Function;
+                  solveOdeModelAllCondUse!::Function, 
+                  priorInfo::PriorInfo;
                   calcHessian::Bool=false)
                                                             
 
@@ -140,7 +144,12 @@ function calcCost(paramVecEst,
     sdParamEst = paramVecEst[paramIndices.iSdParam]
     nonDynamicParamEst = paramVecEst[paramIndices.iNonDynParam]
 
-    logLik = calcLogLikSolveODE(dynamicParamEst, sdParamEst, obsParEst, nonDynamicParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcHessDynParam=calcHessian)
+    logLik = calcLogLikSolveODE(dynamicParamEst, sdParamEst, obsParEst, nonDynamicParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessDynParam=calcHessian)
+
+    if priorInfo.hasPriors == true
+        paramVecEstTransformed = transformParamVec(paramVecEst, paramIndices.namesParamEst, parameterData)
+        logLik += evalPriors(paramVecEst, paramVecEstTransformed, paramIndices.namesParamEst, paramIndices, priorInfo)
+    end
 
     return logLik
 end
@@ -176,8 +185,9 @@ function calcGradCost!(grad::T1,
                        measurementData::MeasurementData,
                        parameterData::ParamData, 
                        changeModelParamUse!::Function, 
-                       solveOdeModelAllCondUse!::Function) where {T1<:Array{<:AbstractFloat, 1}, 
-                                                                  T2<:Vector{<:Real}}
+                       solveOdeModelAllCondUse!::Function, 
+                       priorInfo::PriorInfo)    where {T1<:Array{<:AbstractFloat, 1}, 
+                                                       T2<:Vector{<:Real}}
     
     # Split input into observeble and dynamic parameters 
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
@@ -194,7 +204,7 @@ function calcGradCost!(grad::T1,
     # I have tried to decrease run time here with chunking without success (deafult value performs best). Might be 
     # worth to look into a parellisation over the chunks (as for larger models each call takes relatively long time). 
     # Also parellisation of the chunks should be faster than paralellisation over experimental condtions.
-    calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcGradDynParam=true)
+    calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcGradDynParam=true)
     grad[paramIndices.iDynParam] .= ForwardDiff.gradient(calcCostDyn, dynamicParamEst)::Vector{Float64}
 
     # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
@@ -205,7 +215,7 @@ function calcGradCost!(grad::T1,
     iNonDynUse = [findfirst(x -> x == namesNonDynParam[i],  namesSdObsNonDynPar) for i in eachindex(namesNonDynParam)]
 
     # TODO : Make choice of gradient availble 
-    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=true)
+    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, priorInfo, calcGradObsSdParam=true)
     @views ReverseDiff.gradient!(grad[paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
 end
 
@@ -239,8 +249,9 @@ function calcHessianApprox!(hessian::T1,
                             measurementData::MeasurementData,
                             parameterData::ParamData, 
                             changeModelParamUse!::Function,
-                            solveOdeModelAllCondUse!::Function) where {T1<:Array{<:AbstractFloat, 2}, 
-                                                                       T2<:Vector{<:Real}}
+                            solveOdeModelAllCondUse!::Function, 
+                            priorInfo::PriorInfo) where {T1<:Array{<:AbstractFloat, 2}, 
+                                                         T2<:Vector{<:Real}}
 
     # Avoid incorrect non-zero values 
     hessian .= 0.0
@@ -256,7 +267,7 @@ function calcHessianApprox!(hessian::T1,
     namesSdObsNonDynPar = paramIndices.namesSdObsNonDynPar
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
-    calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, calcHessDynParam=true)
+    calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessDynParam=true)
     hessian[paramIndices.iDynParam, paramIndices.iDynParam] .= ForwardDiff.hessian(calcCostDyn, dynamicParamEst)::Matrix{Float64}
 
     # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
@@ -267,7 +278,7 @@ function calcHessianApprox!(hessian::T1,
     iNonDynUse = [findfirst(x -> x == namesNonDynParam[i],  namesSdObsNonDynPar) for i in eachindex(namesNonDynParam)]
     
     # Compute hessian for none dynamic parameters 
-    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData)
+    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, priorInfo)
     @views ReverseDiff.hessian!(hessian[paramIndices.iSdObsNonDynPar, paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
 
 end
@@ -309,7 +320,8 @@ function calcLogLikSolveODE(dynamicParamEst,
                             measurementData ::MeasurementData, 
                             parameterData::ParamData, 
                             changeModelParamUse!::Function,
-                            solveOdeModelAllCondUse!::Function;
+                            solveOdeModelAllCondUse!::Function, 
+                            priorInfo::PriorInfo;
                             calcHessDynParam::Bool=false, 
                             calcGradDynParam::Bool=false)::Real
 
@@ -333,6 +345,10 @@ function calcLogLikSolveODE(dynamicParamEst,
     end
 
     logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParEstUse, nonDynParamEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcHessDynParam=calcHessDynParam, calcGradDynParam=calcGradDynParam)
+
+    if priorInfo.hasPriors == true && (calcHessDynParam || calcGradDynParam)        
+        logLik += evalPriors(dynamicParamEstUse, dynamicParamEst, paramIndices.namesDynParam, paramIndices, priorInfo)
+    end
 
     return logLik
 end
@@ -367,7 +383,8 @@ function calcLogLikNotSolveODE(dynamicParamEst::T1,
                                simulationInfo::SimulationInfo,
                                paramIndices::ParameterIndices,
                                measurementData::MeasurementData,
-                               parameterData::ParamData;
+                               parameterData::ParamData, 
+                               priorInfo::PriorInfo;
                                calcGradObsSdParam::Bool=false)::Real where T1<:Vector{<:Real}
 
     # To be able to use ReverseDiff sdParamEstUse and obsParamEstUse cannot be overwritten. 
@@ -379,6 +396,12 @@ function calcLogLikNotSolveODE(dynamicParamEst::T1,
 
     logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParamEstUse, nonDynParamEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=calcGradObsSdParam)
     
+    if priorInfo.hasPriors == true 
+        logLik += evalPriors(sdParamEstUse, sdParamEst, paramEstIndices.namesSdParam, paramIndices, priorInfo)
+        logLik += evalPriors(obsParamEstUse, obsParamEst, paramEstIndices.namesObsParam, paramIndices, priorInfo)
+        logLik += evalPriors(nonDynParamEstUse, nonDynParamEst, nonDynParamEst, paramIndices, priorInfo)
+    end
+
     return logLik
 end
 
@@ -449,7 +472,8 @@ function calcCostZygote(paramVecEst,
                         measurementData::MeasurementData,
                         parameterData::ParamData,
                         changeModelParamUse::Function,
-                        solveOdeModelAllCondZygoteUse::Function)
+                        solveOdeModelAllCondZygoteUse::Function, 
+                        priorInfo::PriorInfo)
     
     # Correctly map paramVecEst to dynmaic, observable and sd param. The vectors, 
     # e.g dynamicParamEst, are distinct copies so transforming them will not change 
@@ -470,7 +494,13 @@ function calcCostZygote(paramVecEst,
                               measurementData,
                               parameterData,
                               changeModelParamUse,
-                              solveOdeModelAllCondZygoteUse)
+                              solveOdeModelAllCondZygoteUse, 
+                              priorInfo)
+
+    if priorInfo.hasPriors == true
+        paramVecEstTransformed = transformParamVec(paramVecEst, paramIndices.namesParamEst, parameterData)
+        logLik += evalPriors(paramVecEst, paramVecEstTransformed, paramIndices.namesParamEst, paramIndices, priorInfo)
+    end                                  
 
     return logLik                          
 end
@@ -485,8 +515,9 @@ function calcGradZygote!(grad::T1,
                          measurementData::MeasurementData,
                          parameterData::ParamData, 
                          changeModelParamUse::Function, 
-                         solveOdeModelAllCondZygoteUse::Function) where {T1<:Array{<:AbstractFloat, 1}, 
-                                                                         T2<:Vector{<:Real}}
+                         solveOdeModelAllCondZygoteUse::Function, 
+                         priorInfo::PriorInfo) where {T1<:Array{<:AbstractFloat, 1}, 
+                                                      T2<:Vector{<:Real}}
     
     # Split input into observeble and dynamic parameters 
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
@@ -504,7 +535,7 @@ function calcGradZygote!(grad::T1,
     # I have tried to decrease run time here with chunking without success (deafult value performs best). Might be 
     # worth to look into a parellisation over the chunks (as for larger models each call takes relatively long time). 
     # Also parellisation of the chunks should be faster than paralellisation over experimental condtions.
-    calcCostDyn = (x) -> calcLogLikZygote(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAllCondZygoteUse)
+    calcCostDyn = (x) -> calcLogLikZygote(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAllCondZygoteUse, priorInfo, evalGradDyn=true)
     grad[paramIndices.iDynParam] .= Zygote.gradient(calcCostDyn, dynamicParamEst)[1]
 
     # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
@@ -516,7 +547,7 @@ function calcGradZygote!(grad::T1,
 
     # This is subtle. By using Zygote-ignore when solving the ODE the ODE solution is stored in simulationInfo.solArray
     # which can be used to compute the gradient for the non-dynamic parameters without having to resolve the ODE system.
-    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=false)
+    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, priorInfo, calcGradObsSdParam=false)
     @views ReverseDiff.gradient!(grad[paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
 end
 
@@ -533,7 +564,9 @@ function calcLogLikZygote(dynamicParamEst,
                           measurementData::MeasurementData,
                           parameterData::ParamData,
                           changeModelParamUse::Function,
-                          solveOdeModelAllCondZygoteUse::Function)
+                          solveOdeModelAllCondZygoteUse::Function, 
+                          priorInfo::PriorInfo; 
+                          evalGradDyn::Bool=false)::Real
 
     # Correctly transform parameter if, for example, they are on the log-scale.
     dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
@@ -565,6 +598,10 @@ function calcLogLikZygote(dynamicParamEst,
         if isinf(logLik)
             return logLik
         end
+    end
+
+    if priorInfo.hasPriors == true && evalGradDyn == true
+        logLik += evalPriors(dynamicParamEstUse, dynamicParamEst, paramEstIndices.namesDynParam, paramIndices, priorInfo)
     end
 
     return logLik
@@ -626,6 +663,38 @@ function calcLogLikExpCond(odeSol::ODESolution,
     end
 
     return logLik
+end
+
+
+# Evaluate contribution of potential prior to the final cost function value. Not mutating so works with both Zygote 
+# and forwardiff.
+function evalPriors(paramVecTransformed, 
+                    paramVecNotTransformed,
+                    namesParamVec::Array{String, 1}, 
+                    paramEstIndices::ParameterIndices, 
+                    priorInfo::PriorInfo)::Real
+
+    if priorInfo.hasPriors == false
+        return 0.0
+    end
+
+    k = 0
+    priorContribution = 0.0
+    for i in eachindex(paramVecNotTransformed)
+        iParam = findfirst(x -> x == namesParamVec[i], paramEstIndices.namesParamEst)
+        if priorInfo.priorOnParamScale[iParam] == true
+            pInput = paramVecTransformed[i]
+        else
+            pInput = paramVecNotTransformed[i]
+        end
+        priorContribution += priorInfo.logpdf[iParam](pInput)
+
+        if priorInfo.logpdf[iParam](pInput) != 0
+            k += 1
+        end
+    end
+
+    return priorContribution
 end
 
 

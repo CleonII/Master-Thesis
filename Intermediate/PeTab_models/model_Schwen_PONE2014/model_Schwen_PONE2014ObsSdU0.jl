@@ -4,22 +4,22 @@ function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, ma
 	ini_R1, ini_R2fold, ka1, ka2fold, kd1, kd2fold, kin, kin2, koff_unspec, kon_unspec, kout, kout2, kout_frag = dynPar 
 
 	if observableId == "observable_IR1" 
-		observableParameter2_observable_IR1, observableParameter1_observable_IR1 = getObsOrSdParam(obsPar, mapObsParam)
+		observableParameter1_observable_IR1, observableParameter2_observable_IR1 = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter2_observable_IR1 * ( IR1 + IR1in + observableParameter1_observable_IR1 ) 
 	end
 
 	if observableId == "observable_IR2" 
-		observableParameter2_observable_IR2, observableParameter1_observable_IR2 = getObsOrSdParam(obsPar, mapObsParam)
+		observableParameter1_observable_IR2, observableParameter2_observable_IR2 = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter2_observable_IR2 * ( IR2 + IR2in + observableParameter1_observable_IR2 ) 
 	end
 
 	if observableId == "observable_IRsum" 
-		observableParameter2_observable_IRsum, observableParameter1_observable_IRsum = getObsOrSdParam(obsPar, mapObsParam)
+		observableParameter1_observable_IRsum, observableParameter2_observable_IRsum = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter2_observable_IRsum * ( 0.605 * IR1 + 0.395 * IR2 + 0.605 * IR1in + 0.395 * IR2in + observableParameter1_observable_IRsum ) 
 	end
 
 	if observableId == "observable_Insulin" 
-		observableParameter1_observable_Insulin, observableParameter2_observable_Insulin, observableParameter3_observable_Insulin, observableParameter3_observable_Insulin, observableParameter4_observable_Insulin = getObsOrSdParam(obsPar, mapObsParam)
+		observableParameter1_observable_Insulin, observableParameter2_observable_Insulin, observableParameter3_observable_Insulin, observableParameter4_observable_Insulin = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_observable_Insulin + observableParameter2_observable_Insulin * ( Ins + InsulinFragments * observableParameter3_observable_Insulin ) / ( ( Ins + InsulinFragments * observableParameter3_observable_Insulin ) / observableParameter4_observable_Insulin + 1 ) 
 	end
 

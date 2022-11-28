@@ -416,3 +416,61 @@ function checkForPeTabFile(fileSearchFor::String, dirModel::String)::String
 
     return dirModel * filesDirModel[iUse[1]]
 end
+
+
+function getPriorInfo(paramEstIndices::ParameterIndices, parameterDataFile::DataFrame)::PriorInfo
+
+    if "objectivePriorType" ∉ names(parameterDataFile)
+        return PriorInfo(Array{Function, 1}(undef, 0), Bool[], false)
+    end
+
+    namesParamEst = paramEstIndices.namesParamEst
+    priorLogPdf = Array{Function, 1}(undef, length(namesParamEst))
+    priorOnParamScale = Array{Bool, 1}(undef, length(namesParamEst))
+    paramID = string.(parameterDataFile[!, "parameterId"])
+
+    contPrior = 0.0
+    for i in eachindex(namesParamEst)
+
+        iUse = findfirst(x -> x == namesParamEst[i], paramID)
+
+        priorF = parameterDataFile[iUse, "objectivePriorType"]
+        if ismissing(priorF)
+            priorLogPdf[i] = noPrior
+            priorOnParamScale[i] = false
+            continue
+        end
+
+        priorVal = parse.(Float64, split(parameterDataFile[iUse, "objectivePriorParameters"], ";"))
+
+        if priorF == "parameterScaleNormal"
+            contPrior += logpdf(Normal(priorVal[1], priorVal[2]), log10(parameterDataFile[iUse, "nominalValue"]))
+            priorLogPdf[i] = (p) -> logpdf(Normal(priorVal[1], priorVal[2]), p) 
+            priorOnParamScale[i] = true
+        elseif priorF == "parameterScaleLaplace"
+            priorLogPdf[i] = (p) -> logpdf(Laplace(priorVal[1], priorVal[2]), p) 
+            priorOnParamScale[i] = true
+        elseif priorF == "normal"
+            priorLogPdf[i] = (p) -> logpdf(Normal(priorVal[1], priorVal[2]), p) 
+            priorOnParamScale[i] = false
+        elseif priorF == "laplace"
+            priorLogPdf[i] = (p) -> logpdf(Laplace(priorVal[1], priorVal[2]), p) 
+            priorOnParamScale[i] = false
+        elseif priorF == "logNormal"
+            priorLogPdf[i] = (p) -> logpdf(LogNormal(priorVal[1], priorVal[2]), p) 
+            priorOnParamScale[i] = false
+        elseif priorF == "logLaplace"
+            println("Error : Julia does not yet have support for log-laplace")
+        else
+            println("Error : PeTab standard does not support a prior of type ", priorF)
+        end
+
+    end
+
+    return PriorInfo(priorLogPdf, priorOnParamScale, true)
+end
+# Helper function in case there is not any parameter priors 
+function noPrior(p::Real)::Real
+    return 0.0
+end
+

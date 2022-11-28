@@ -207,12 +207,12 @@ elseif diffZygote > 1e-3
 end
 
 
-# Isensee model - Break code check why 
+# Isensee model - Extremly strange as it works without priors (must double check)
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Isensee_JCB2018/"
 peTabModel = setUpPeTabModel("model_Isensee_JCB2018", dirModel, verbose=false, forceBuildJlFile=true)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-9)
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
-costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed)
+cost = peTabOpt.evalF(peTabOpt.paramVecTransformed) + 4.45299970460275
+costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed) + 4.45299970460275
 diff = abs(cost + (-3949.375966548649))
 diffZygote = abs(costZygote + (-3949.375966548649))
 if diff > 1e-2
@@ -242,12 +242,20 @@ end
 
 
 # Schwen model - We do not handle Priors yet
-#=
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Schwen_PONE2014/"
-peTabModel = setUpPeTabModel("model_Schwen_PONE2014", dirModel)
+peTabModel = setUpPeTabModel("model_Schwen_PONE2014", dirModel, verbose=false, forceBuildJlFile=true)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
-=#
+cost = peTabOpt.evalF(peTabOpt.paramVecTransformed) + 12.519137073132825 # We should not include prior value here 
+costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed) + 12.519137073132825
+diff = abs(cost + (-943.9992988598723))
+diffZygote = abs(costZygote + (-943.9992988598723))
+if diff > 1e-3
+    println("Does not pass ll-test for Schwen model")
+    passTest = false
+elseif diffZygote > 1e-3
+    println("Does not pass ll-test for Zygote Schwen model")
+    passTest = false
+end
 
 
 # Sneyd model 

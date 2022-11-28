@@ -47,7 +47,6 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
     costPython = (CSV.read(pwd() * "/tests/Boehm/Cost.csv", DataFrame))[!, :Cost]
     gradPythonMat = CSV.read(pwd() * "/tests/Boehm/Grad.csv", DataFrame)
     gradPythonMat = gradPythonMat[!, Not([:Id, :ratio, :specC17])]
-
     for i in 1:nrow(paramMat)
         paramVec = collect(paramMat[i, :])
 
