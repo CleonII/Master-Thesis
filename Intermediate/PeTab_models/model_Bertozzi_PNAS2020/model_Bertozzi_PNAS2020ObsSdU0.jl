@@ -33,6 +33,17 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Infected, Recovered, Susceptible
 end
 
+function evalU0(paramVec) 
+
+	Lockdown_NY_end, Pop_CA, Io_CA, Pop_NY, Io_NY, Trigger_NY, USA___CA__NY, Lockdown_CA_start, gamma_NY, Trigger_Lockdown, Ro_NY, Lockdown_CA_end, gamma_CA, Ro_CA, Lockdown_NY_start = paramVec 
+
+	Infected = ( Io_CA * ( 1 - Trigger_NY ) + Io_NY * Trigger_NY ) / ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) ) 
+	Recovered = 0.0 
+	Susceptible = ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) + ( - Io_CA * ( 1 - Trigger_NY ) - Io_NY * Trigger_NY ) / ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) ) ) / ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) ) 
+
+	 return [Infected, Recovered, Susceptible]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	Infected, Recovered, Susceptible= u 

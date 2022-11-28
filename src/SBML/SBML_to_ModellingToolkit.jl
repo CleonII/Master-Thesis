@@ -18,14 +18,20 @@ include(pwd() * "/src/SBML/Process_rules.jl")
     The SBML importer goes via libsbml in Python and currently likelly only 
     works with SBML level 3. 
 """
-function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::String)
+function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::String; writeToFile=true::Bool)
 
     libsbml = pyimport("libsbml")
     reader = libsbml.SBMLReader()
 
     document = reader[:readSBML](pathXml)
     model = document[:getModel]() # Get the model
-    writeODEModelToFile(libsbml, model, modelName, dirModel)
+    modelDict = buildODEModelDictionary(libsbml, model)
+
+    if writeToFile
+        writeODEModelToFile(modelDict, modelName, dirModel)
+    end
+
+    return modelDict
 
 end
 
@@ -43,7 +49,7 @@ function asTrigger(triggerFormula)
     end
     parts = splitBetween(strippedFormula, ',')
     if occursin("time", parts[1])
-        parts[1] = replaceWith(parts[1], "time", "t")
+        parts[1] = replaceWholeWord(parts[1], "time", "t")
     end
     expression = "[" * parts[1] * " ~ " * parts[2] * "]"
     return expression
@@ -53,8 +59,8 @@ end
 # Rewrites derivatives for a model by replacing functions, any lagging piecewise, and power functions.
 function rewriteDerivatives(derivativeAsString, modelDict, baseFunctions)
     newDerivativeAsString = derivativeAsString
-    newDerivativeAsString = insertModelDefineFunctions(newDerivativeAsString, modelDict["modelFunctions"], baseFunctions)
-    newDerivativeAsString = insertModelDefineFunctions(newDerivativeAsString, modelDict["modelRuleFunctions"], baseFunctions)
+    newDerivativeAsString = replaceFunctionWithFormula(newDerivativeAsString, modelDict["modelFunctions"])
+    newDerivativeAsString = replaceFunctionWithFormula(newDerivativeAsString, modelDict["modelRuleFunctions"])
     if occursin("pow(", newDerivativeAsString)
         newDerivativeAsString = removePowFunctions(newDerivativeAsString)
     end
@@ -62,8 +68,8 @@ function rewriteDerivatives(derivativeAsString, modelDict, baseFunctions)
         newDerivativeAsString = rewritePiecewiseToIfElse(newDerivativeAsString, "foo", modelDict, baseFunctions, retFormula=true)
     end
 
-    newDerivativeAsString = insertFunctionDefinitions(newDerivativeAsString, modelDict["modelFunctions"])
-    newDerivativeAsString = insertFunctionDefinitions(newDerivativeAsString, modelDict["modelRuleFunctions"])
+    newDerivativeAsString = replaceWholeWordDict(newDerivativeAsString, modelDict["modelFunctions"])
+    newDerivativeAsString = replaceWholeWordDict(newDerivativeAsString, modelDict["modelRuleFunctions"])
 
     return newDerivativeAsString
 end
@@ -109,7 +115,7 @@ function processInitialAssignment(libsbml, model, modelDict::Dict, baseFunctions
                 for arg in args
                     if arg in keys(modelDict["states"])
                         nestedVariables = true
-                        variableValue = replaceWith(variableValue, arg, modelDict["states"][arg])
+                        variableValue = replaceWholeWord(variableValue, arg, modelDict["states"][arg])
                     end
                 end
                 modelDict["states"][variable] = variableValue
@@ -128,7 +134,7 @@ function processInitialAssignment(libsbml, model, modelDict::Dict, baseFunctions
             for arg in args
                 if arg in keys(modelDict["parameters"])
                     nestedParameter = true
-                    parameterValue = replaceWith(parameterValue, arg, modelDict["parameters"][arg])
+                    parameterValue = replaceWholeWord(parameterValue, arg, modelDict["parameters"][arg])
                 end
             end
             modelDict["parameters"][parameter] = parameterValue
@@ -139,7 +145,7 @@ function processInitialAssignment(libsbml, model, modelDict::Dict, baseFunctions
 end
 
 
-function writeODEModelToFile(libsbml, model, modelName, path)
+function buildODEModelDictionary(libsbml, model)
 
     # Nested dictionaries to store relevant model data:
     # i) Model parameters (constant during for a simulation)
@@ -159,7 +165,10 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     modelDict["eventDict"] = Dict()
     modelDict["discreteEventDict"] = Dict()
     modelDict["inputFunctions"] = Dict()
-     
+    modelDict["stringOfEvents"] = Dict()
+    modelDict["discreteEventString"] = Dict()
+    modelDict["numOfParameters"] = Dict()
+    modelDict["numOfSpecies"] = Dict()
     # Mathemathical base functions (can be expanded if needed)
     baseFunctions = ["exp", "log", "log2", "log10", "sin", "cos", "tan", "pi"]
     stringOfEvents = ""
@@ -287,26 +296,43 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     isInODESys = falses(length(modelDict["parameters"]))
     for du in values(modelDict["derivatives"])
         for (i, pars) in enumerate(keys(modelDict["parameters"]))
-            if replaceWith(du, pars, "") !== du
+            if replaceWholeWord(du, pars, "") !== du
                 isInODESys[i] = true
             end
         end
     end
     for inputFunc in values(modelDict["inputFunctions"])
         for (i, pars) in enumerate(keys(modelDict["parameters"]))
-            if replaceWith(inputFunc, pars, "") !== inputFunc
+            if replaceWholeWord(inputFunc, pars, "") !== inputFunc
                 isInODESys[i] = true
             end
         end
     end
 
+    modelDict["stringOfEvents"] = stringOfEvents
+    modelDict["discreteEventString"] = discreteEventString
+    modelDict["numOfParameters"] =   string(length(model[:getListOfParameters]()))
+    modelDict["numOfSpecies"] =   string(length(model[:getListOfSpecies]()))
+    
+    return modelDict
+end
+
+"""
+    writeODEModelToFile(modelDict, modelName, dirModel)
+
+    Takes a modelDict as defined by buildODEModelDictionary
+    and creates a Julia ModelingToolkit file and stores 
+    the resulting file in dirModel with name modelName.jl. 
+
+"""
+function writeODEModelToFile(modelDict, modelName, dirModel)
     ### Writing to file 
-    modelFile = open(path * "/" * modelName * ".jl", "w")
+    modelFile = open(dirModel * "/" * modelName * ".jl", "w")
 
     println(modelFile, "# Model name: " * modelName)
 
-    println(modelFile, "# Number of parameters: " * string(length(model[:getListOfParameters]())))
-    println(modelFile, "# Number of species: " * string(length(model[:getListOfSpecies]())))
+    println(modelFile, "# Number of parameters: " * string(modelDict["numOfParameters"]))
+    println(modelFile, "# Number of species: " * string(modelDict["numOfSpecies"]))
     println(modelFile, "function getODEModel_" * modelName * "()")
 
     println(modelFile, "")
@@ -320,11 +346,13 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     println(modelFile, "")
     println(modelFile, "    ### Store dependent variables in array for ODESystem command")
     defineVariables = "    stateArray = ["
-    for key in keys(modelDict["states"])
-        defineVariables = defineVariables * key * ", "
+    for (index, key) in enumerate(keys(modelDict["states"]))
+        if index < length(modelDict["states"])
+            defineVariables = defineVariables * key * ", "
+        else
+            defineVariables = defineVariables * key * "]"
+        end
     end
-    # Replace the last ", " with a "]"
-    defineVariables = defineVariables[1:end-2] * "]"
     println(modelFile, defineVariables)
 
     println(modelFile, "")
@@ -358,17 +386,20 @@ function writeODEModelToFile(libsbml, model, modelName, path)
     println(modelFile, "")
     println(modelFile, "    ### Store parameters in array for ODESystem command")
     defineParameters = "    parameterArray = ["
-    for key in keys(modelDict["parameters"])
-        defineParameters = defineParameters * key * ", "
+    for (index, key) in enumerate(keys(modelDict["parameters"]))
+        if index < length(modelDict["parameters"])
+           defineParameters = defineParameters * key * ", "
+        else
+           defineParameters = defineParameters * key * "]"
+        end
     end
-    # Replace the last ", " with a "]"
-    defineParameters = defineParameters[1:end-2] * "]"
     println(modelFile, defineParameters)
 
     println(modelFile, "")
     println(modelFile, "    ### Define an operator for the differentiation w.r.t. time")
     println(modelFile, "    D = Differential(t)")
 
+    stringOfEvents = modelDict["stringOfEvents"]
     println(modelFile, "")
     println(modelFile, "    ### Continious events ###")
     if length(stringOfEvents) > 0
@@ -377,6 +408,7 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         println(modelFile, "    ]")
     end
 
+    discreteEventString = modelDict["discreteEventString"]
     println(modelFile, "")
     println(modelFile, "    ### Discrete events ###")
     if length(discreteEventString) > 0
@@ -460,5 +492,4 @@ function writeODEModelToFile(libsbml, model, modelName, path)
         
     close(modelFile)
 
-    return modelDict
 end

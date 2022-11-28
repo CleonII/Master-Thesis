@@ -1,7 +1,7 @@
 function getRuleFormula(rule)
     
     ruleFormula = rule[:getFormula]()
-    ruleFormula = replaceWith(ruleFormula, "time", "t") 
+    ruleFormula = replaceWholeWord(ruleFormula, "time", "t") 
     ruleFormula = removePowFunctions(ruleFormula)
     
     return ruleFormula
@@ -25,7 +25,7 @@ function processAssignmentRule!(modelDict::Dict, ruleFormula::String, ruleVariab
             modelDict["parameters"][ruleVariable] = ruleFormula
         else
             if includesFunction == true
-                ruleFormula = rewriteFunctionOfFunction(ruleFormula, modelDict["modelRuleFunctions"])
+                ruleFormula = replaceWholeWordDict(ruleFormula, modelDict["modelRuleFunctions"])
             end
             modelDict["modelRuleFunctions"][ruleVariable] = [arguments, ruleFormula]
 
@@ -51,7 +51,7 @@ function processRateRule!(modelDict::Dict, ruleFormula::String, ruleVariable::St
     else                
         arguments, includesFunction = getArguments(ruleFormula, modelDict["modelRuleFunctions"], baseFunctions)
         if arguments != "" && includesFunction == true
-            ruleFormula = rewriteFunctionOfFunction(ruleFormula, modelDict["modelRuleFunctions"])
+            ruleFormula = replaceWholeWordDict(ruleFormula, modelDict["modelRuleFunctions"])
         end
     end
 

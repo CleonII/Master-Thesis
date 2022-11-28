@@ -60,196 +60,108 @@ function getArguments(functionAsString, dictionary::Dict, baseFunctions::Vector{
     return [argumentString, includesFunction]
 end
 
-
-# replaces a word, "toReplace" in functions with another word, "replacer. 
+# Replaces a word, "replaceFrom" in functions with another word, "replaceTo". 
 # Often used to change "time" to "t"
 # Makes sure not to change for example "time1" or "shift_time"
-function replaceWith(oldString, toReplace, replacer)
-    if oldString == toReplace
-        return replacer
-    end
-    newString = oldString
-    i = 1
-    while i < length(newString)
-        indices = findnext(toReplace, newString, i)
-        if indices === nothing
-            break
-        end
-        if indices[1] == 1
-            if newString[indices[end]+1] in [' ', ',', ')']
-                newString = newString[1:indices[1]-1] * replacer * newString[indices[end]+1:end]
-            end
-        elseif indices[end] == length(newString)
-            if newString[indices[1]-1] in [' ', '(', '-', '+']
-                newString = newString[1:indices[1]-1] * replacer * newString[indices[end]+1:end]
-            end
-        else
-            if newString[indices[1]-1] in [' ', ',', '(', '-', '+'] && newString[indices[end]+1] in [' ', ')', ',']
-                newString = newString[1:indices[1]-1] * replacer * newString[indices[end]+1:end]
-            end
-        end
-        i = indices[1] + 1
-    end
+function replaceWholeWord(oldString, replaceFrom, replaceTo)
+    
+    replaceFromRegex = Regex("(\\b" * replaceFrom * "\\b)")
+    newString = replace(oldString, replaceFromRegex => replaceTo)
     return newString
+
 end
 
 
-# Finds the ending parenthesis of an argument and returns its position. 
-function findEndOffunction(functionAsString, iStart)
-    inParenthesis = 1
-    i = iStart
-    endIndex = i
-    while i <= length(functionAsString)
-        if functionAsString[i] == '('
-            inParenthesis += 1
-        elseif functionAsString[i] == ')'
-            inParenthesis -= 1
-        end
-        if inParenthesis == 0
-            endIndex = i
-            break
-        end
-        i += 1
+
+# Replaces words in oldString given a dictionary replaceDict.
+# In the Dict, the key  is the word to replace and the second
+# value is the value to replace with.
+# Makes sure to only change whole words.
+function replaceWholeWordDict(oldString, replaceDict)
+
+    newString = oldString
+    regexReplaceDict = Dict()
+    for (key,value) in replaceDict
+        replaceFromRegex = Regex("(\\b" * key * "\\b)")
+        regexReplaceDict[replaceFromRegex] = "(" * value[2] * ")"
     end
-    return endIndex
+    newString = replace(newString, regexReplaceDict...)
+
+    return newString
+
 end
 
 
-# When processing rules into function this function rewrites any function defined rules inside into 
-# a function. 
-function rewriteFunctionOfFunction(functionAsString, funcNameArgFormula)
-    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' ', ','], keepempty = false)
-    existingFunctions = keys(funcNameArgFormula)
-    newFunctionString = functionAsString
-    for part in parts
-        if part in existingFunctions
-            funcArgs = "(" * funcNameArgFormula[part][1] * ")"
-            funcFormula = "(" * funcNameArgFormula[part][2] * ")"
-            i = 1
-            while i < length(newFunctionString)
-                indices = findnext(part, newFunctionString, i)
-                if indices[1] == 1 && indices[end] == length(newFunctionString)
-                    newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                    break
-                end
-                if indices[1] == 1
-                    if newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                        break
-                    end
-                elseif indices[end] == length(newFunctionString)
-                    if newFunctionString[indices[1]-1] in [' ', '(']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                        break
-                    end
-                else
-                    if newFunctionString[indices[1]-1] in [' ', '('] && newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                        break
-                    end
-                end
-                i = indices[end] + 1
-            end
-        end
-    end
-    return newFunctionString
-end
+# Substitutes the function with the formula given by the model, but replaces
+# the names of the variables in the formula with the input variable names.
+# e.g. If fun(a) = a^2 then "constant * fun(b)" will be rewritten as 
+# "constant * b^2"
+# Main goal, insert model formulas when producing the model equations.
+# Example "fun1(fun2(a,b),fun3(c,d))" and Dict 
+# test["fun1"] = ["a,b","a^b"]
+# test["fun2"] = ["a,b","a*b"]
+# test["fun3"] = ["a,b","a+b"]
+# Gives ((a*b)^(c+d))
+function replaceFunctionWithFormula(functionAsString, funcNameArgFormula)
 
+    newFunctionsAsString = functionAsString
+    
+    for (key,value) in funcNameArgFormula
+        # Find commas not surrounded by parentheses.
+        # Used to split function arguments
+        # If input argument are "pow(a,b),c" the list becomes ["pow(a,b)","c"]
+        findOutsideCommaRegex = Regex(",(?![^()]*\\))")
+        # Finds the old input arguments, removes spaces and puts them in a list
+        replaceFrom = split(replace(value[1]," "=>""),findOutsideCommaRegex)
 
-# Will substitute the function definition for the formula given by the model with the arguments 
-# when the funciton is a rule that has been rewritten into a rule.
-# given to the function used instead of the general arguments in contrast to rewriteFunctionOfFunction. 
-# Main goal, inser models formulas when producing the model equations.
-function insertModelDefineFunctions(functionsAsString, modelFuncNameArgFormula, baseFunctions)
-    newFunctionsAsString = functionsAsString
-    possibleModelFunctions = split(getArguments(functionsAsString, baseFunctions), ", ")
-    for possibleModelFunction in possibleModelFunctions 
-        if possibleModelFunction in keys(modelFuncNameArgFormula)
-            modelFuncArguments, modelFuncFormula = modelFuncNameArgFormula[possibleModelFunction]
-            modelFuncArguments = split(modelFuncArguments, ", ")
-            i = 1
-            while i <= length(newFunctionsAsString)
-                next = findnext(possibleModelFunction*"(", newFunctionsAsString, i)
-                if next === nothing
-                    break
-                end
-                startIndex = next[1]
-                iStart = next[end] + 1
-                endIndex = findEndOffunction(newFunctionsAsString, iStart)
-                modelFunction = newFunctionsAsString[startIndex:endIndex]
-                argumentString = modelFunction[length(possibleModelFunction)+2:end-1]
-                arguments = split(argumentString, ", ", keepempty = false)
-                newFunction = modelFuncFormula
-                for (aIndex, arg) in enumerate(arguments)
-                    j = 1
-                    while j <= length(newFunction)
-                        indices = findnext(modelFuncArguments[aIndex], newFunction, j)
-                        if indices === nothing
-                            break
-                        end
-                        if indices[1] == 1 && indices[end] == length(newFunction)
-                            if occursin(" ", arg)
-                                newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                            else
-                                newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                            end
-                        elseif indices[1] == 1
-                            if newFunction[indices[end]+1] in [' ', ')']
-                                if occursin(" ", arg)
-                                    newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                                else
-                                    newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                                end
-                            end
-                        elseif indices[end] == length(newFunction)
-                            if newFunction[indices[1]-1] in [' ', '(']
-                                if occursin(" ", arg)
-                                    newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                                else
-                                    newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                                end
-                            end
-                        else
-                            if newFunction[indices[1]-1] in [' ', '('] && newFunction[indices[end]+1] in [' ', ')']
-                                if occursin(" ", arg)
-                                    newFunction = newFunction[1:indices[1]-1] * "(" * arg * ")" * newFunction[indices[end]+1:end]
-                                else
-                                    newFunction = newFunction[1:indices[1]-1] * arg * newFunction[indices[end]+1:end]
-                                end
-                            end
-                        end
-                        j = indices[end] + 1
-                    end
-                end
-                newFunctionsAsString = newFunctionsAsString[1:startIndex-1] * "(" * newFunction * ")" * newFunctionsAsString[startIndex + length(modelFunction):end]
-                i = startIndex + 1
+        # Finds all functions on the form "funName("
+        numberOfFuns = Regex("\\b" * key * "\\(")
+        # Finds the offset after the parenthesis in "funName("
+        funStartRegex = Regex("\\b" * key * "\\(\\K")
+        # Matches parentheses pairs to grab the arguments of the "funName(" function
+        matchParenthesesRegex = Regex("\\((?:[^)(]*(?R)?)*+\\)")
+        while !isnothing(match(numberOfFuns, newFunctionsAsString))
+            # The string we wish to insert when the correct 
+            # replacement has been made.
+            # Must be resetted after each pass.
+            replaceStr = value[2]
+            # Extracts the function arguments
+            funStart = match(funStartRegex, newFunctionsAsString)
+            funStartPos = funStart.offset
+            insideOfFun = match(matchParenthesesRegex, newFunctionsAsString[funStartPos-1:end]).match
+            insideOfFun = insideOfFun[2:end-1]
+            replaceTo = split(replace(insideOfFun,", "=>","),findOutsideCommaRegex)
+            
+            # Replace each variable used in the formula with the 
+            # variable name used as input for the function.
+            replaceDict = Dict()
+            for ind in eachindex(replaceTo)
+                replaceFromRegex = Regex("(\\b" * replaceFrom[ind] * "\\b)")
+                replaceDict[replaceFromRegex] = replaceTo[ind]
             end
+            replaceStr = replace(replaceStr, replaceDict...)
+
+            if key != "pow"
+                # Replace function(input) with formula where each variable in formula has the correct name.
+                newFunctionsAsString = replace(newFunctionsAsString, key * "(" * insideOfFun * ")" => "(" * replaceStr * ")")
+            else 
+                # Same as above, but skips extra parentheses around the entire power.
+                newFunctionsAsString = replace(newFunctionsAsString, key * "(" * insideOfFun * ")" => replaceStr)
+            end
+
         end
     end
     return newFunctionsAsString
 end
 
+# Rewrites pow(base,exponent) into (base)^(exponent), which Julia can handle
+function removePowFunctions(oldStr)
 
-# Rewrites pow(a,b) into a^b, which Julia can handle
-function removePowFunctions(functionAsString)
-    newFunctionAsString = functionAsString
-    i = 1
-    while i <= length(newFunctionAsString)
-        next = findnext("pow(", newFunctionAsString, i)
-        if next === nothing
-            break
-        end
-        startIndex = next[1]
-        iStart = next[end] + 1
-        endIndex = findEndOffunction(newFunctionAsString, iStart)
-        powFunction = newFunctionAsString[startIndex:endIndex]
-        powArguments = powFunction[5:end-1]
-        parts = splitBetween(powArguments, ',')
-        newPowFunction = "(" * parts[1] * ")^(" * parts[2] * ")"
-        newFunctionAsString = replace(newFunctionAsString, powFunction => newPowFunction, count = 1)
-        i = startIndex + 1
-    end
-    return newFunctionAsString
+    powDict = Dict()
+    powDict["pow"] = ["base, exponent","(base)^(exponent)"]
+    newStr = replaceFunctionWithFormula(oldStr, powDict)
+    return newStr
+
 end
 
 
@@ -286,41 +198,4 @@ function getSBMLFuncFormula(mathSBML, libsbml)
     functionFormula = removePowFunctions(functionFormula)
 
     return functionFormula
-end
-
-
-# Insert the function definitions for newly defined functions. 
-function insertFunctionDefinitions(functionAsString, funcNameArgFormula)
-    parts = split(functionAsString, ['(', ')', '/', '+', '-', '*', ' ', ','], keepempty = false)
-    existingFunctions = keys(funcNameArgFormula)
-    newFunctionString = functionAsString
-    for part in parts
-        if part in existingFunctions
-            funcFormula = "(" * funcNameArgFormula[part][2] * ")"
-            i = 1
-            while i < length(newFunctionString)
-                indices = findnext(part, newFunctionString, i)
-                if indices === nothing
-                    break
-                end
-                if indices[1] == 1 && indices[end] == length(newFunctionString)
-                    newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                elseif indices[1] == 1
-                    if newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                    end
-                elseif indices[end] == length(newFunctionString)
-                    if newFunctionString[indices[1]-1] in [' ', '(', '-', '+']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                    end
-                else
-                    if newFunctionString[indices[1]-1] in [' ', '(', '-', '+'] && newFunctionString[indices[end]+1] in [' ', ')']
-                        newFunctionString = newFunctionString[1:indices[1]-1] * funcFormula * newFunctionString[indices[end]+1:end]
-                    end
-                end
-                i = indices[1] + 1
-            end
-        end
-    end
-    return newFunctionString
 end

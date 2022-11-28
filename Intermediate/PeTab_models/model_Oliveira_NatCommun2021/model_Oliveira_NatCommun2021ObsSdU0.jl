@@ -42,6 +42,23 @@ function evalU0!(u0Vec, paramVec)
 	u0Vec .= Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible
 end
 
+function evalU0(paramVec) 
+
+	asymptomatic_init_concentration, beta_2_multiplier, t_2, gamma_u, exposed_init_concentration, omega_u, kappa, h_hosp_rate, xi, delta_, t_1, beta_0, symptomatic_init_concentration, Interior, mu_u, omega_h, mu_h, beta_2, beta_1, population, p_symp_rate, gamma_s, gamma_h, gamma_a = paramVec 
+
+	Hospital = 0.0 
+	Symptomatic = population * symptomatic_init_concentration 
+	Cumulative_cases = population * symptomatic_init_concentration 
+	Asymptomatic = asymptomatic_init_concentration * population 
+	Exposed = exposed_init_concentration * population 
+	ICU = 0.0 
+	Recovered = 0.0 
+	Deaths = 0.0 
+	Susceptible = population * ( 1 - asymptomatic_init_concentration - exposed_init_concentration - symptomatic_init_concentration ) 
+
+	 return [Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible]
+end
+
 function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam) 
 
 	Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible= u 
