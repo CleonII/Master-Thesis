@@ -196,7 +196,7 @@ function calcGradCost!(grad::T1,
     noneDynParamEst = paramVecEst[paramIndices.iNonDynParam]
     namesSdParam = paramIndices.namesSdParam
     namesObsParam = paramIndices.namesObsParam
-    namesNonDynParam = paramVecEst[paramIndices.namesNonDynParam]
+    namesNonDynParam = paramIndices.namesNonDynParam
     namesSdObsNonDynPar = paramIndices.namesSdObsNonDynPar
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
@@ -263,7 +263,7 @@ function calcHessianApprox!(hessian::T1,
     noneDynParamEst = paramVecEst[paramIndices.iNonDynParam]
     namesSdParam = paramIndices.namesSdParam
     namesObsParam = paramIndices.namesObsParam
-    namesNonDynParam = paramVecEst[paramIndices.namesNonDynParam]
+    namesNonDynParam = paramIndices.namesNonDynParam
     namesSdObsNonDynPar = paramIndices.namesSdObsNonDynPar
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
@@ -397,9 +397,9 @@ function calcLogLikNotSolveODE(dynamicParamEst::T1,
     logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParamEstUse, nonDynParamEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcGradObsSdParam=calcGradObsSdParam)
     
     if priorInfo.hasPriors == true 
-        logLik += evalPriors(sdParamEstUse, sdParamEst, paramEstIndices.namesSdParam, paramIndices, priorInfo)
-        logLik += evalPriors(obsParamEstUse, obsParamEst, paramEstIndices.namesObsParam, paramIndices, priorInfo)
-        logLik += evalPriors(nonDynParamEstUse, nonDynParamEst, nonDynParamEst, paramIndices, priorInfo)
+        logLik += evalPriors(sdParamEstUse, sdParamEst, paramIndices.namesSdParam, paramIndices, priorInfo)
+        logLik += evalPriors(obsParamEstUse, obsParamEst, paramIndices.namesObsParam, paramIndices, priorInfo)
+        logLik += evalPriors(nonDynParamEstUse, nonDynParamEst, paramIndices.namesNonDynParam, paramIndices, priorInfo)
     end
 
     return logLik
@@ -526,7 +526,7 @@ function calcGradZygote!(grad::T1,
     noneDynParamEst = paramVecEst[paramIndices.iNonDynParam]
     namesSdParam = paramIndices.namesSdParam
     namesObsParam = paramIndices.namesObsParam
-    namesNonDynParam = paramVecEst[paramIndices.namesNonDynParam]
+    namesNonDynParam = paramIndices.namesNonDynParam
     namesSdObsNonDynPar = paramIndices.namesSdObsNonDynPar
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. This seems to considerble help Zygote 

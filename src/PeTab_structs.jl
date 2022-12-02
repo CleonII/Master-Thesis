@@ -23,7 +23,6 @@
 """
 struct PeTabModel{T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}}, 
                   T2<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}},
-                  #T3<:Vector{Sym{Real, Base.ImmutableDict{DataType, Any}}}, 
                   T3<:Vector{<:Any}, 
                   T4<:Vector{<:Any}}
     modelName::String
@@ -243,8 +242,9 @@ struct ParameterIndices{T1<:Array{<:Integer, 1},
 end
 
 
-struct PriorInfo
-    logpdf::Vector{Function}
-    priorOnParamScale::Vector{Bool}
+struct PriorInfo{T1 <: Vector{<:Function}, 
+                 T2 <: Vector{<:Bool}}
+    logpdf::T1
+    priorOnParamScale::T2
     hasPriors::Bool
 end
