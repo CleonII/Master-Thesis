@@ -601,7 +601,7 @@ function calcLogLikZygote(dynamicParamEst,
     end
 
     if priorInfo.hasPriors == true && evalGradDyn == true
-        logLik += evalPriors(dynamicParamEstUse, dynamicParamEst, paramEstIndices.namesDynParam, paramIndices, priorInfo)
+        logLik += evalPriors(dynamicParamEstUse, dynamicParamEst, paramIndices.namesDynParam, paramIndices, priorInfo)
     end
 
     return logLik

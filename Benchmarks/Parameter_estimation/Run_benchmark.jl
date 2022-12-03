@@ -105,9 +105,9 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
     
     # Fides 
     FidesAutoHess = setUpFides(peTabOpt, :autoDiff; verbose=0, 
-                               options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
+                               options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
     FidesAutoHessBlock = setUpFides(peTabOpt, :blockAutoDiff; verbose=0, 
-                                    options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
+                                    options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
 
     # Make sure to activate allocation of required arrays for Ipopt solvers, and to compile 
     # gradient and required hessian functions to avoid bias in run-times for benchmark. 
@@ -174,7 +174,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
 
         if :FidesBlockAutoHess in algList
             runTime = @elapsed res, nIter, converged = FidesAutoHessBlock(p0)
-            writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHess", solverStr, string(tol))
+            writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHessBlock", solverStr, string(tol))
         end
     end
 end
@@ -215,7 +215,7 @@ end
 if ARGS[1] == "Fujita"
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Fujita_SciSignal2010/"
     peTabModel = setUpPeTabModel("model_Fujita_SciSignal2010", dirModel)
-    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :NLoptLBFGS]
+    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :FidesAutoHess, :FidesBlockAutoHess]
     benchmarkParameterEstimation(peTabModel, Rodas5(), "Rodas5", 1e-6, 1000, algList=algsTest)
 end
 
