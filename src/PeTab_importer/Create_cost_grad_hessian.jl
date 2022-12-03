@@ -342,6 +342,7 @@ function calcLogLikSolveODE(dynamicParamEst,
     end
     if success != true
         println("Failed to solve ODE model")
+        return Inf
     end
 
     logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParEstUse, nonDynParamEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, calcHessDynParam=calcHessDynParam, calcGradDynParam=calcGradDynParam)
