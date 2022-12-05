@@ -549,7 +549,7 @@ function calcGradZygote!(grad::T1,
     # This is subtle. By using Zygote-ignore when solving the ODE the ODE solution is stored in simulationInfo.solArray
     # which can be used to compute the gradient for the non-dynamic parameters without having to resolve the ODE system.
     calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, priorInfo, calcGradObsSdParam=false)
-    @views ReverseDiff.gradient!(grad[paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
+    @views ForwardDiff.gradient!(grad[paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
 end
 
 
@@ -620,6 +620,10 @@ function calcLogLikExpCond(odeSol::ODESolution,
                            measurementData::MeasurementData,
                            parameterData::ParamData, 
                            calcGradObsSdParam::Bool)::Real
+
+    if !(odeSol.retcode == :Success || odeSol.retcode == :Terminated)
+        return Inf
+    end
 
     # Compute yMod and sd for all observations having id conditionID 
     logLik = 0.0
