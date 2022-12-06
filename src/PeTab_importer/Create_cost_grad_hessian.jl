@@ -67,8 +67,21 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     # This is subtle. When computing the hessian via autodiff it is important that the ODE-solution arrary with dual 
     # numbers is used, else dual numbers will be present when computing the cost which will crash the code when taking 
     # the gradient of non-dynamic parameters in optim. 
+    # Moreover, sometimes even though the cost can be computed the ODE solver with Dual number can fail (as the error is 
+    # monitored slightly differently). When this happens we error out and the code crash, hence the need of a catch 
+    # statement 
     _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessian=true)
-    evalHess = (hessianMat, paramVec) -> begin hessianMat .= Symmetric(ForwardDiff.hessian(_evalHess, paramVec)) end
+    evalHess = (hessianMat, paramVec) -> begin 
+                                            if all([simulationInfo.solArray[i].retcode == :Success for i in eachindex(simulationInfo.solArray)])
+                                                try 
+                                                    hessianMat .= Symmetric(ForwardDiff.hessian(_evalHess, paramVec))
+                                                catch
+                                                    hessianMat .= 0.0
+                                                end
+                                            else
+                                                hessianMat .= 0.0
+                                            end
+                                         end
     
     # Lower and upper bounds for parameters to estimate 
     namesParamEst = paramEstIndices.namesParamEst
@@ -135,7 +148,6 @@ function calcCost(paramVecEst,
                   solveOdeModelAllCondUse!::Function, 
                   priorInfo::PriorInfo;
                   calcHessian::Bool=false)
-                                                            
 
     # Correctly map paramVecEst to dynmaic, observable and sd param. The new vectors 
     # are all distinct copies.
@@ -205,7 +217,17 @@ function calcGradCost!(grad::T1,
     # worth to look into a parellisation over the chunks (as for larger models each call takes relatively long time). 
     # Also parellisation of the chunks should be faster than paralellisation over experimental condtions.
     calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcGradDynParam=true)
-    grad[paramIndices.iDynParam] .= ForwardDiff.gradient(calcCostDyn, dynamicParamEst)::Vector{Float64}
+    try 
+        grad[paramIndices.iDynParam] .= ForwardDiff.gradient(calcCostDyn, dynamicParamEst)::Vector{Float64}
+    catch
+        grad = 1e8
+        return
+    end
+
+    if !all([simulationInfo.solArrayGrad[i].retcode == :Success for i in eachindex(simulationInfo.solArrayGrad)])
+        grad .= 1e8
+        return 
+    end
 
     # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
     # of both Sd and Obs param is used to account for this. This is not a worry for non-dynamic parameters.
@@ -251,10 +273,14 @@ function calcHessianApprox!(hessian::T1,
                             changeModelParamUse!::Function,
                             solveOdeModelAllCondUse!::Function, 
                             priorInfo::PriorInfo) where {T1<:Array{<:AbstractFloat, 2}, 
-                                                         T2<:Vector{<:Real}}
+                                                         T2<:Vector{<:Real}}                                                         
 
     # Avoid incorrect non-zero values 
     hessian .= 0.0
+
+    if !all([simulationInfo.solArray[i].retcode == :Success for i in eachindex(simulationInfo.solArray)])
+        return 
+    end
 
     # Split input into observeble and dynamic parameters 
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
@@ -268,7 +294,12 @@ function calcHessianApprox!(hessian::T1,
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
     calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessDynParam=true)
-    hessian[paramIndices.iDynParam, paramIndices.iDynParam] .= ForwardDiff.hessian(calcCostDyn, dynamicParamEst)::Matrix{Float64}
+    try 
+        hessian[paramIndices.iDynParam, paramIndices.iDynParam] .= ForwardDiff.hessian(calcCostDyn, dynamicParamEst)::Matrix{Float64}
+    catch
+        hessian .= 0.0
+        return 
+    end
 
     # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
     # of both Sd and Obs param is used to account for this 
@@ -279,7 +310,7 @@ function calcHessianApprox!(hessian::T1,
     
     # Compute hessian for none dynamic parameters 
     calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, priorInfo)
-    @views ReverseDiff.hessian!(hessian[paramIndices.iSdObsNonDynPar, paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
+    @views ForwardDiff.hessian!(hessian[paramIndices.iSdObsNonDynPar, paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
 
 end
 
