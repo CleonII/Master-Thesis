@@ -35,7 +35,7 @@ function solveOdeModelAtFileValues(peTabModel::PeTabModel, solver, tol::Float64;
     changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, parameterData, experimentalConditionsFile, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
-    solArray, status = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, measurementDataFile, simulationInfo, solver, absTol, relTol, nTSave=nTSave, denseSol=denseSol)
+    solArray, status = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, nTSave=nTSave, denseSol=denseSol)
 
     return solArray, simulationInfo
 end
@@ -77,11 +77,11 @@ end
 function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
                                            prob::ODEProblem, 
                                            changeToExperimentalCondUse!::Function, 
-                                           measurementData::DataFrame,
                                            simulationInfo::SimulationInfo,
                                            solver,
                                            absTol::Float64,
                                            relTol::Float64;
+                                           expIDSolve::Array{String, 1}=["all"],
                                            nTSave::Int64=0, 
                                            onlySaveAtTobs::Bool=false,
                                            denseSol::Bool=true)::Bool
@@ -92,6 +92,11 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         k = 1
         @inbounds for i in eachindex(simulationInfo.firstExpIds)
             for j in eachindex(simulationInfo.shiftExpIds[i])
+
+                if expIDSolve[1] != "all" && simulationInfo.conditionIdSol[k] ∉ expIDSolve
+                    k += 1
+                    continue
+                end
 
                 firstExpId = simulationInfo.firstExpIds[i]
                 shiftExpId = simulationInfo.shiftExpIds[i][j]
@@ -132,6 +137,10 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
     elseif simulationInfo.simulateSS == false
 
         @inbounds for i in eachindex(simulationInfo.firstExpIds)
+
+            if expIDSolve[1] != "all" && simulationInfo.conditionIdSol[i] ∉ expIDSolve
+                continue
+            end
             
             firstExpId = simulationInfo.firstExpIds[i]
             # Keep index of which forward solution index i corresponds for calculating cost 
@@ -173,27 +182,27 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                            prob::ODEProblem, 
                                            dynParamEst,
                                            changeToExperimentalCondUsePre!::Function, 
-                                           measurementData::DataFrame,
                                            simulationInfo::SimulationInfo,
                                            solver,
                                            absTol::Float64,
                                            relTol::Float64;
                                            nTSave::Int64=0, 
                                            onlySaveAtTobs::Bool=false,
+                                           expIDSolve::Array{String, 1}=["all"],
                                            denseSol::Bool=true)::Bool
 
     changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeToExperimentalCondUsePre!(pVec, u0Vec, expID, dynParamEst)
     sucess = solveOdeModelAllExperimentalCond!(solArray, 
                                                prob, 
                                                changeToExperimentalCondUse!, 
-                                               measurementData, 
                                                simulationInfo, 
                                                solver, 
                                                absTol, 
                                                relTol,
                                                nTSave=nTSave, 
                                                denseSol=denseSol, 
-                                               onlySaveAtTobs=onlySaveAtTobs)
+                                               onlySaveAtTobs=onlySaveAtTobs, 
+                                               expIDSolve=expIDSolve)
 
     return sucess
 end
@@ -201,7 +210,6 @@ end
 
 function solveOdeModelAllExperimentalCond(prob::ODEProblem, 
                                           changeToExperimentalCondUse!::Function, 
-                                          measurementData::DataFrame,
                                           simulationInfo::SimulationInfo,
                                           solver, 
                                           absTol::Float64,
@@ -223,7 +231,6 @@ function solveOdeModelAllExperimentalCond(prob::ODEProblem,
     success = solveOdeModelAllExperimentalCond!(solArray, 
                                                 prob, 
                                                 changeToExperimentalCondUse!, 
-                                                measurementData, 
                                                 simulationInfo, 
                                                 solver, 
                                                 absTol, 
@@ -233,15 +240,6 @@ function solveOdeModelAllExperimentalCond(prob::ODEProblem,
                                                 onlySaveAtTobs=onlySaveAtTobs)
 
     return solArray, success
-end
-
-
-function MyTerminateSteadyState(abstol, reltol; min_t = nothing)
-
-    test = DiffEqCallbacks.allDerivPass                                
-    condition = (u, t, integrator) -> test(integrator, abstol, reltol, min_t)
-    affect! = (integrator) -> terminate!(integrator)
-    DiscreteCallback(condition, affect!; save_positions = (true, true))
 end
 
 

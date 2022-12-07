@@ -1,7 +1,6 @@
 # Solve the ODE models for all experimental condiditions and return the run-time for all solve-calls.
 function solveOdeModelAllExperimentalCondBench(prob::ODEProblem, 
                                                changeToExperimentalCondUse!::Function, 
-                                               measurementData::DataFrame,
                                                simulationInfo::SimulationInfo,
                                                solver, 
                                                absTol::Float64,
