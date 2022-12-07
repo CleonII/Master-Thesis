@@ -2,6 +2,7 @@ include(joinpath(pwd(), "src", "PeTab_importer", "Common.jl"))
 include(joinpath(pwd(), "src", "PeTab_importer", "Map_parameters.jl"))
 include(joinpath(pwd(), "src", "PeTab_importer", "Create_obs_u0_sd_functions.jl"))
 include(joinpath(pwd(), "src", "PeTab_importer", "Process_PeTab_files.jl"))
+include(joinpath(pwd(), "src", "PeTab_importer", "Distributed.jl"))
 include(joinpath(pwd(), "src", "Common.jl"))
 
 
@@ -23,7 +24,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                            sparseJac::Bool=false, 
                            absTolSS::Float64=1e-8, 
                            relTolSS::Float64=1e-6, 
-                           )::PeTabOpt
+                           nProcs::Integer=1)::PeTabOpt
 
     # Process PeTab files into type-stable Julia structs 
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
@@ -54,32 +55,35 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
     solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementData, simulationInfo, solver, tol, tol, sensealg)
 
-    evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
-    evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
-    
-    evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
-    evalGradFZygote = (grad, paramVecEst) -> calcGradZygote!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
-    
-    evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
-    
-    # This is subtle. When computing the hessian via autodiff it is important that the ODE-solution arrary with dual 
-    # numbers is used, else dual numbers will be present when computing the cost which will crash the code when taking 
-    # the gradient of non-dynamic parameters in optim. 
-    # Moreover, sometimes even though the cost can be computed the ODE solver with Dual number can fail (as the error is 
-    # monitored slightly differently). When this happens we error out and the code crash, hence the need of a catch 
-    # statement 
-    _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessian=true)
-    evalHess = (hessianMat, paramVec) -> begin 
-                                            if all([simulationInfo.solArray[i].retcode == :Success for i in eachindex(simulationInfo.solArray)])
-                                                try 
-                                                    hessianMat .= Symmetric(ForwardDiff.hessian(_evalHess, paramVec))
-                                                catch
+    if nProcs > 1 && nprocs() != nProcs
+        println("Error : PEtab importer was set to build the cost, grad and hessian with $nProcs processes, 
+                 however, Julia is currently running with ", nprocs(), " processes which does not match input 
+                 value. Input argument nProcs must match nprocs()")
+    elseif nProcs == 1
+        evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
+        evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)    
+        evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
+        # Sometimes even though the cost can be computed the ODE solver with Dual number can fail (as the error is 
+        # monitored slightly differently). When this happens we error out and the code crash, hence the need of a catch statement 
+        _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessian=true)
+        evalHess = (hessianMat, paramVec) -> begin 
+                                                if all([simulationInfo.solArray[i].retcode == :Success for i in eachindex(simulationInfo.solArray)])
+                                                    try 
+                                                        hessianMat .= Symmetric(ForwardDiff.hessian(_evalHess, paramVec))
+                                                    catch
+                                                        hessianMat .= 0.0
+                                                    end
+                                                else
                                                     hessianMat .= 0.0
                                                 end
-                                            else
-                                                hessianMat .= 0.0
                                             end
-                                         end
+    elseif nProcs > 1 && nprocs() == nProcs
+        evalF, evalGradF, evalHess, evalHessApprox = setUpPEtabOptDistributed(peTabModel, solver, tol, parameterData, measurementData, 
+                                                                              simulationInfo, paramEstIndices, priorInfo, odeProb)
+    end
+
+    evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
+    evalGradFZygote = (grad, paramVecEst) -> calcGradZygote!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
     
     # Lower and upper bounds for parameters to estimate 
     namesParamEst = paramEstIndices.namesParamEst
