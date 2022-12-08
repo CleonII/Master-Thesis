@@ -207,8 +207,8 @@ end
 if ARGS[1] == "Brannmark"
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Brannmark_JBC2010/"
     peTabModel = setUpPeTabModel("model_Brannmark_JBC2010", dirModel)
-    algsTest = [:IpoptLBFGS, :IpoptBlockAutoDiff, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS]
-    benchmarkParameterEstimation(peTabModel, Rodas5(), "Rodas5", 1e-6, 1000, algList=algsTest)
+    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :FidesAutoHess, :FidesBlockAutoHess]
+    benchmarkParameterEstimation(peTabModel, Rodas5P(), "Rodas5P", 1e-6, 1000, algList=algsTest)
 end
 
 
