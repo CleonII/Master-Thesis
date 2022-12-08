@@ -170,6 +170,7 @@ function testRunBenchmark(peTabModel::PeTabModel, solver, tol::Float64, nProcs::
     return passTest
 end
 
+
 peTabModel = setUpPeTabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/")
 removeAllProcs()
 solver, tol = Rodas5(), 1e-9
@@ -187,5 +188,5 @@ solver, tol = Rodas5(), 1e-9
 addprocs(1, exeflags="--project=.")
 passTest = testRunBenchmark(peTabModel, Rodas5(), 1e-9, 2, computeH=true)
 if passTest == false
-    println("Does not pass parallellisation test for Fiedler model")
+    println("Does not pass parallellisation test for Brännmark model")
 end

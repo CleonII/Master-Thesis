@@ -81,7 +81,7 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                            solver,
                                            absTol::Float64,
                                            relTol::Float64;
-                                           expIDSolve::Array{String, 1}=["all"],
+                                           expIDSolve::Array{String, 1} = ["all"],
                                            nTSave::Int64=0, 
                                            onlySaveAtTobs::Bool=false,
                                            denseSol::Bool=true)::Bool
@@ -89,47 +89,71 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
     local sucess = true
     # In case the model is first simulated to a steady state 
     if simulationInfo.simulateSS == true
-        k = 1
-        @inbounds for i in eachindex(simulationInfo.firstExpIds)
-            for j in eachindex(simulationInfo.shiftExpIds[i])
 
-                if expIDSolve[1] != "all" && simulationInfo.conditionIdSol[k] ∉ expIDSolve
-                    k += 1
-                    continue
-                end
+        # Extract all unique Pre-equlibrium conditions. If the code is run in parallell 
+        # (expIDSolve != [["all]]) the number of preEq cond. might be smaller than the 
+        # total number of preEq cond.
+        if expIDSolve[1] == "all"
+            preEqIds = unique(simulationInfo.firstExpIds)
+        else
+            whichPreEq = findall(x -> x ∈ simulationInfo.conditionIdSol, expIDSolve)
+            preEqIds = unique(simulationInfo.preEqIdSol[whichPreEq])
+        end
+        
+        uAtSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
+        u0PreSimSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
+        for i in eachindex(preEqIds)
+            success = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
+                                             (@view u0PreSimSS[:, i]), 
+                                             prob, 
+                                             changeToExperimentalCondUse!, 
+                                             preEqIds[i], 
+                                             absTol, 
+                                             relTol, 
+                                             solver, 
+                                             simulationInfo.absTolSS, 
+                                             simulationInfo.relTolSS)
+            if success != true
+                return false
+            end
+        end
 
-                firstExpId = simulationInfo.firstExpIds[i]
-                shiftExpId = simulationInfo.shiftExpIds[i][j]
+        @inbounds for i in eachindex(simulationInfo.conditionIdSol)
+            
+            if expIDSolve[1] != "all" && simulationInfo.conditionIdSol[i] ∉ expIDSolve                
+                continue
+            end
 
-                # Whether or not we only want to save solution at observed time-points 
-                if onlySaveAtTobs == true
-                    nTSave = 0
-                    # Extract t-save point for specific condition ID 
-                    tSave = simulationInfo.tVecSave[firstExpId * shiftExpId]
-                else
-                    tSave=Float64[]
-                end
+            whichPreEq = findfirst(x -> x == simulationInfo.preEqIdSol[i], preEqIds)
 
-                t_max_ss = simulationInfo.tMaxForwardSim[k]
-                solArray[k] = solveOdeSS(prob, 
-                                         changeToExperimentalCondUse!, 
-                                         firstExpId, 
-                                         shiftExpId, 
-                                         absTol,
-                                         relTol, 
-                                         t_max_ss, 
-                                         solver, 
-                                         tSave=tSave,
-                                         nTSave=nTSave, 
-                                         denseSol=denseSol, 
-                                         absTolSS=simulationInfo.absTolSS, 
-                                         relTolSS=simulationInfo.relTolSS)
+            # Whether or not we only want to save solution at observed time-points 
+            if onlySaveAtTobs == true
+                nTSave = 0
+                # Extract t-save point for specific condition ID 
+                tSave = simulationInfo.tVecSave[simulationInfo.conditionIdSol[i]]
+            else
+                tSave=Float64[]
+            end
 
-                if solArray[k].retcode != :Success
-                    sucess = false
-                    break 
-                end
-                k += 1
+            t_max_ss = simulationInfo.tMaxForwardSim[i]
+            solArray[i] = solveODEPostEqulibrium(prob, 
+                                                 (@view uAtSS[:, whichPreEq]),
+                                                 (@view u0PreSimSS[:, whichPreEq]), 
+                                                 changeToExperimentalCondUse!,
+                                                 simulationInfo.postEqIdSol[i], 
+                                                 absTol,
+                                                 relTol,
+                                                 t_max_ss,
+                                                 simulationInfo.absTolSS, 
+                                                 simulationInfo.relTolSS,
+                                                 solver,
+                                                 tSave=tSave, 
+                                                 nTSave=nTSave, 
+                                                 denseSol=denseSol)
+
+            if solArray[i].retcode != :Success
+                sucess = false
+                break 
             end
         end
 
@@ -138,15 +162,12 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
 
         @inbounds for i in eachindex(simulationInfo.firstExpIds)
 
-            if expIDSolve[1] != "all" && simulationInfo.conditionIdSol[i] ∉ expIDSolve
+            if expIDSolve[1] != "all" && simulationInfo.conditionIdSol[i] ∉ expIDSolve                
                 continue
             end
-            
-            firstExpId = simulationInfo.firstExpIds[i]
-            # Keep index of which forward solution index i corresponds for calculating cost 
-            simulationInfo.conditionIdSol[i] = firstExpId
 
             # Whether or not we only want to save solution at observed time-points 
+            firstExpId = simulationInfo.firstExpIds[i]
             if onlySaveAtTobs == true
                 nTSave = 0
                 # Extract t-save point for specific condition ID 
@@ -188,7 +209,7 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                            relTol::Float64;
                                            nTSave::Int64=0, 
                                            onlySaveAtTobs::Bool=false,
-                                           expIDSolve::Array{String, 1}=["all"],
+                                           expIDSolve::Array{String, 1} = ["all"],
                                            denseSol::Bool=true)::Bool
 
     changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeToExperimentalCondUsePre!(pVec, u0Vec, expID, dynParamEst)
@@ -353,30 +374,73 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
 end
 
 
-"""
-    solveOdeSS(prob::ODEProblem, 
-               changeToExperimentalCondUse!::Function, 
-               firstExpId::String, 
-               shiftExpId::String,
-               tol::Float64, 
-               t_max_ss::Float64,
-               solver;
-               tSave=Float64[], 
-               nTSave=0, 
-               denseSol=true)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+function solveODEPreEqulibrium!(uAtSSVec::AbstractVector, 
+                                u0PreSimSS::AbstractVector,
+                                prob::ODEProblem, 
+                                changeToExperimentalCondUse!::Function,
+                                firstExpId::String, 
+                                absTol::Float64, 
+                                relTol::Float64, 
+                                solver, 
+                                absTolSS::Float64, 
+                                relTolSS::Float64)::Bool
 
-    For an experimentaCondition specifed by firstExpId (preequilibration ID) and shiftExpId
-    (postequilibration ID) solve a PeTab ODE-problem using any Julia ODE-solver (solver can 
-    also be an alg-hint) using absTol and relTol value given by tol. Returns an ODE-solution.
+    if typeof(solver) <: Vector{Symbol} # Alg-hint case
+        solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=absTol, reltol=relTol, dense=false, 
+                                       callback=TerminateSteadyState(absTolSS, relTolSS))
+    else # Julia solver case
+        solveCallPre = (prob) -> solve(prob, solver, abstol=absTol, reltol=relTol, dense=false, 
+            callback=TerminateSteadyState(absTolSS, relTolSS))
+    end
 
-    Here the model is first simualted to a steady state using the experimental-condition parameters 
-    corresponding to firstExpId in the experimentaCondition peTab-file. Then using the experimental-condition 
-    parameters specifed by shiftExpId the actual simulation that is saved and returned is produced.
-    Optional args are the save as for `solveOdeModelAllExperimentalCond!`, and this function is called 
-    by solveOdeModelAllExperimentalCond!. 
-     
-    See also: [`solveOdeModelAllExperimentalCond!`]
-"""
+    # Change to parameters for the preequilibration simulations 
+    changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
+    prob = remake(prob, tspan = (0.0, 1e8), p = prob.p[:], u0 = prob.u0[:])
+    u0PreSimSS .= prob.u0
+
+    # Terminate if a steady state was not reached in preequilibration simulations 
+    sol_pre = solveCallPre(prob)
+    if sol_pre.retcode != :Terminated
+        return false
+    else
+        uAtSSVec .= sol_pre.u[end]
+        return true
+    end
+end
+
+
+function solveODEPostEqulibrium(prob::ODEProblem, 
+                                uAtSS::AbstractVector,
+                                u0PreSimSS::AbstractVector,
+                                changeToExperimentalCondUse!::Function, 
+                                shiftExpId::String,
+                                absTol::Float64, 
+                                relTol::Float64,
+                                t_max_ss::Float64,
+                                absTolSS::Float64, 
+                                relTolSS::Float64,
+                                solver;
+                                tSave=Float64[], 
+                                nTSave=0, 
+                                denseSol::Bool=true)
+
+    changeToExperimentalCondUse!(prob.p, prob.u0, shiftExpId)
+    # Sometimes the experimentaCondition-file changes the initial values for a state 
+    # whose value was changed in the preequilibration-simulation. The experimentaCondition
+    # value is prioritized by only changing u0 to the steady state value for those states  
+    # that were not affected by change to shiftExpId.
+    has_not_changed = (prob.u0 .== u0PreSimSS)
+    prob.u0[has_not_changed] .= uAtSS[has_not_changed]
+    prob = remake(prob, tspan = (0.0, t_max_ss))           
+    
+    solCall = getSolCallSolveOdeNoSS(absTol,relTol, t_max_ss, solver, tSave, 
+                                     nTSave, denseSol, absTolSS, relTolSS)
+    sol = solCall(prob)
+    
+    return sol                                     
+end
+
+
 function solveOdeSS(prob::ODEProblem, 
                     changeToExperimentalCondUse!::Function, 
                     firstExpId::String, 

@@ -149,7 +149,7 @@ function calcCost(paramVecEst,
                   changeModelParamUse!::Function,
                   solveOdeModelAllCondUse!::Function, 
                   priorInfo::PriorInfo;
-                  expIDSolve::Array{String, 1}=["all"],
+                  expIDSolve::Array{String, 1} = ["all"],
                   calcHessian::Bool=false)
 
     # Correctly map paramVecEst to dynmaic, observable and sd param. The new vectors 
@@ -202,8 +202,8 @@ function calcGradCost!(grad::T1,
                        changeModelParamUse!::Function, 
                        solveOdeModelAllCondUse!::Function, 
                        priorInfo::PriorInfo;
-                       expIDSolve::Array{String, 1}=["all"])    where {T1<:Array{<:AbstractFloat, 1}, 
-                                                                       T2<:Vector{<:Real}}
+                       expIDSolve::Array{String, 1} = ["all"])    where {T1<:Array{<:AbstractFloat, 1}, 
+                                                                                   T2<:Vector{<:Real}}
     
     # Split input into observeble and dynamic parameters 
     dynamicParamEst = paramVecEst[paramIndices.iDynParam]
@@ -229,9 +229,11 @@ function calcGradCost!(grad::T1,
     end
 
     @inbounds for i in eachindex(simulationInfo.solArrayGrad)
-        if (expIDSolve[1] == "all" || simulationInfo.conditionIdSol[i] ∈ expIDSolve) && simulationInfo.solArrayGrad[i].retcode != :Success
-            grad .= 1e8
-            return 
+        if expIDSolve[1] == "all" || simulationInfo.conditionIdSol[i] ∈ expIDSolve
+            if simulationInfo.solArrayGrad[i].retcode != :Success
+                grad .= 1e8
+                return 
+            end
         end
     end
 
@@ -279,7 +281,7 @@ function calcHessianApprox!(hessian::T1,
                             changeModelParamUse!::Function,
                             solveOdeModelAllCondUse!::Function, 
                             priorInfo::PriorInfo; 
-                            expIDSolve::Array{String, 1}=["all"]) where {T1<:Array{<:AbstractFloat, 2}, 
+                            expIDSolve::Array{String, 1} = ["all"]) where {T1<:Array{<:AbstractFloat, 2}, 
                                                                          T2<:Vector{<:Real}}                                                         
 
     # Avoid incorrect non-zero values 
@@ -305,10 +307,11 @@ function calcHessianApprox!(hessian::T1,
     end
 
     @inbounds for i in eachindex(simulationInfo.solArrayGrad)
-        if (expIDSolve[1] == "all" || simulationInfo.conditionIdSol[i] ∈ expIDSolve) && simulationInfo.solArrayGrad[i].retcode != :Success
-            grad .= 1e8
-            hessian .= 0.0
-            return 
+        if expIDSolve[1] == "all" || simulationInfo.conditionIdSol[i] ∈ expIDSolve
+            if simulationInfo.solArrayGrad[i].retcode != :Success
+                grad .= 1e8
+                return 
+            end
         end
     end
 
@@ -367,7 +370,7 @@ function calcLogLikSolveODE(dynamicParamEst,
                             priorInfo::PriorInfo;
                             calcHessDynParam::Bool=false, 
                             calcGradDynParam::Bool=false, 
-                            expIDSolve::Array{String, 1}=["all"])::Real
+                            expIDSolve::Array{String, 1} = ["all"])::Real
 
     dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
     sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
@@ -431,7 +434,7 @@ function calcLogLikNotSolveODE(dynamicParamEst::T1,
                                parameterData::ParamData, 
                                priorInfo::PriorInfo;
                                calcGradObsSdParam::Bool=false, 
-                               expIDSolve::Array{String, 1}=["all"])::Real where T1<:Vector{<:Real}
+                               expIDSolve::Array{String, 1} = ["all"])::Real where T1<:Vector{<:Real}
 
     # To be able to use ReverseDiff sdParamEstUse and obsParamEstUse cannot be overwritten. 
     # Hence new vectors have to be created. Minimal overhead.
@@ -479,7 +482,7 @@ function calcLogLik(dynamicParamEst,
                     paramIndices::ParameterIndices,
                     measurementData::MeasurementData, 
                     parameterData::ParamData,
-                    expIDSolve::Array{String, 1};
+                    expIDSolve::Array{String, 1} = ["all"];
                     calcHessDynParam::Bool=false, 
                     calcGradDynParam::Bool=false, 
                     calcGradObsSdParam::Bool=false)::Real 

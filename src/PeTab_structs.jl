@@ -141,6 +141,8 @@ struct SimulationInfo{T1<:Array{<:String, 1},
                       T6<:Array{<:AbstractFloat, 1}}
     firstExpIds::T1
     shiftExpIds::T2
+    preEqIdSol::T1
+    postEqIdSol::T1
     conditionIdSol::T1
     tMaxForwardSim::T6
     simulateSS::T3

@@ -210,7 +210,7 @@ end
 # Isensee model - Extremly strange as it works without priors (must double check)
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Isensee_JCB2018/"
 peTabModel = setUpPeTabModel("model_Isensee_JCB2018", dirModel, verbose=false, forceBuildJlFile=true)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-9)
+peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-10)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed) + 4.45299970460275
 costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed) + 4.45299970460275
 diff = abs(cost + (-3949.375966548649))
@@ -311,4 +311,6 @@ end
 
 if passTest
     println("Passes ll-test")
+else
+    println("Does not pass ll-test!")
 end

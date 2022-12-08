@@ -39,7 +39,7 @@ function runProcess(jobs, results)
     evalHess = (hessianMat, paramVec) ->    begin 
                                                 computeH = true
                                                 @inbounds for i in eachindex(simulationInfo.solArray)
-                                                    if (expIDs[1] == "all" || simulationInfo.conditionIdSol[i] ∈ expIDs) 
+                                                    if simulationInfo.conditionIdSol[i] ∈ expIDs
                                                         if simulationInfo.solArray[i].retcode != :Success
                                                             computeH = false
                                                         end

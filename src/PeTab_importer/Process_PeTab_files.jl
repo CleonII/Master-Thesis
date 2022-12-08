@@ -361,8 +361,10 @@ function getSimulationInfo(measurementDataFile::DataFrame,
 
     # Array with conition-ID for each foward simulations. As we always solve the ODE in the same order this can 
     # be pre-computed.
-    conditionIdSol = Array{String, 1}(undef, nForwardSol)
-    tMaxForwardSim = Array{Float64, 1}(undef, nForwardSol)
+    conditionIdSol::Array{String, 1} = Array{String, 1}(undef, nForwardSol)
+    preEqIdSol::Array{String, 1} = Array{String, 1}(undef, nForwardSol)
+    postEqIdSol::Array{String, 1} = Array{String, 1}(undef, nForwardSol)
+    tMaxForwardSim::Array{Float64, 1} = Array{Float64, 1}(undef, nForwardSol)
     if simulateSS == true
         k = 1
         for i in eachindex(firstExpIds)
@@ -370,6 +372,8 @@ function getSimulationInfo(measurementDataFile::DataFrame,
                 firstExpId = firstExpIds[i]
                 shiftExpId = shiftExpIds[i][j]
                 conditionIdSol[k] = firstExpId * shiftExpId
+                preEqIdSol[k] = firstExpId
+                postEqIdSol[k] = shiftExpId
                 tMaxForwardSim[k] = getTimeMax(measurementDataFile, shiftExpId)
                 k +=1
             end
@@ -385,6 +389,8 @@ function getSimulationInfo(measurementDataFile::DataFrame,
 
     simulationInfo = SimulationInfo(firstExpIds, 
                                     shiftExpIds, 
+                                    preEqIdSol,
+                                    postEqIdSol,
                                     conditionIdSol, 
                                     tMaxForwardSim,
                                     simulateSS,
