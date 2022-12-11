@@ -96,7 +96,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
                                           options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
                                                                 successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
     optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff, 
-                                        options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
+                                        options=Optim.Options(iterations = 1000, show_trace = true, allow_f_increases=true, 
                                                               successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
     optimProbLBFGS = createOptimProb(peTabOpt, LBFGS())
     
@@ -195,6 +195,16 @@ if ARGS[1] == "Boehm"
     peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel)
     benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000, algList=algsTest) 
 end
+
+
+if ARGS[1] == "Crauste"
+    loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
+    algsTest = [:IpoptAutoHess, :IpoptLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Crauste_CellSystems2017/"
+    peTabModel = setUpPeTabModel("model_Crauste_CellSystems2017", dirModel)
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-8, 1000, algList=algsTest) 
+end
+
 
 if ARGS[1] == "Bachmann"
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
