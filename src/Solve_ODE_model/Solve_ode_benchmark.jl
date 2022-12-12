@@ -20,6 +20,7 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
 
                 firstExpId = simulationInfo.firstExpIds[i]
                 shiftExpId = simulationInfo.shiftExpIds[i][j]
+                t_max_ss = simulationInfo.tMaxForwardSim[k]
 
                 # Whether or not we only want to save solution at observed time-points 
                 if onlySaveAtTobs == true
@@ -40,8 +41,7 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
                 # Terminate if a steady state was not reached in preequilibration simulations 
                 sol_pre = solveCallPre(prob)
                 b = @elapsed sol_pre = solveCallPre(prob)
-                simulationInfo.solArray[i] = sol
-                runTime += minimum(b).time
+                runTime += b
                 
                 if sol_pre.retcode != :Terminated
                     return false, NaN
@@ -59,7 +59,6 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
                 
                 sol = solveCallPost(prob) 
                 b = @elapsed sol = solveCallPost(prob) 
-                simulationInfo.solArray[i] = sol
                 runTime += b
                 simulationInfo.solArray[k] = sol
 
