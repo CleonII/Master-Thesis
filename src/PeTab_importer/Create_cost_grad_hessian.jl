@@ -237,6 +237,12 @@ function calcGradCost!(grad::T1,
         end
     end
 
+    # Happens when at least one forward pass fails 
+    if all(grad[paramIndices.iDynParam] .== 0.0)
+        grad .= 1e8
+        return 
+    end
+
     # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
     # of both Sd and Obs param is used to account for this. This is not a worry for non-dynamic parameters.
     paramNotOdeSys = paramVecEst[paramIndices.iSdObsNonDynPar]
@@ -313,6 +319,11 @@ function calcHessianApprox!(hessian::T1,
                 return 
             end
         end
+    end
+
+    # Happens when at least one forward pass fails 
+    if all(hessian[paramIndices.iDynParam, paramIndices.iDynParam] .== 0.0)
+        return 
     end
 
     # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
