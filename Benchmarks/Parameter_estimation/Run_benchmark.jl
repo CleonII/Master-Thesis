@@ -96,12 +96,15 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
                                           options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
                                                                 successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
     optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff, 
-                                        options=Optim.Options(iterations = 1000, show_trace = true, allow_f_increases=true, 
+                                        options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
                                                               successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
     optimProbLBFGS = createOptimProb(peTabOpt, LBFGS())
     
     # NLopt optimizers 
     NLoptLBFGS = createNLoptProb(peTabOpt, :LD_LBFGS, verbose=false)
+    NLoptLBFGS.ftol_rel = 1e-8
+    NLoptLBFGS.xtol_rel = 0.0
+    NLoptLBFGS.maxeval = 5000
     
     # Fides 
     FidesAutoHess = setUpFides(peTabOpt, :autoDiff; verbose=0, 
@@ -128,7 +131,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
 
         if :IpoptAutoHess in algList
             ipoptProbAutoHess.x = deepcopy(p0)
-            Ipopt.AddIpoptIntOption(ipoptProbAutoHess, "print_level", 0)
+            Ipopt.AddIpoptIntOption(ipoptProbAutoHess, "print_level", 5)
             runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbAutoHess)
             writeFile(pathSave, ipoptProbAutoHess.obj_val, runTime, ipoptProbAutoHess.status, iterArrAutoHess[1], i, "IpoptAutoHess", solverStr, string(tol))
         end
@@ -142,7 +145,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
 
         if :IpoptLBFGS in algList
             ipoptProbBfgs.x = deepcopy(p0)
-            Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 0)
+            Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 5)
             runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
             writeFile(pathSave, ipoptProbBfgs.obj_val, runTime, ipoptProbBfgs.status, iterArrBfgs[1], i, "IpoptLBFGS", solverStr, string(tol))
         end
@@ -188,6 +191,7 @@ if ARGS[1] == "Fiedler"
     benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-9, 1000, algList=algsTest) 
 end
 
+
 if ARGS[1] == "Boehm"
     loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
     algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :FidesAutoHess, :FidesBlockAutoHess]
@@ -202,7 +206,16 @@ if ARGS[1] == "Crauste"
     algsTest = [:IpoptAutoHess, :IpoptLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Crauste_CellSystems2017/"
     peTabModel = setUpPeTabModel("model_Crauste_CellSystems2017", dirModel)
-    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-8, 1000, algList=algsTest) 
+    benchmarkParameterEstimation(peTabModel, KenCarp4(), "KenCarp4", 1e-8, 1000, algList=algsTest) 
+end
+
+
+if ARGS[1] == "Weber"
+    loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
+    algsTest = [:IpoptAutoHess, :IpoptLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Weber_BMC2015/"
+    peTabModel = setUpPeTabModel("model_Weber_BMC2015", dirModel)
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-6, 1000, algList=algsTest) 
 end
 
 
@@ -223,6 +236,7 @@ end
 
 
 if ARGS[1] == "Fujita"
+    loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Fujita_SciSignal2010/"
     peTabModel = setUpPeTabModel("model_Fujita_SciSignal2010", dirModel)
     algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :FidesAutoHess, :FidesBlockAutoHess]
@@ -230,17 +244,11 @@ if ARGS[1] == "Fujita"
 end
 
 
-if ARGS[1] == "Crauste"
-    dirModel = pwd() * "/Intermediate/PeTab_models/model_Crauste_CellSystems2017/"
-    peTabModel = setUpPeTabModel("model_Crauste_CellSystems2017", dirModel)
-    algsTest = [:IpoptAutoHess, :IpoptLBFGS, :OptimIPNewtonAutoHess, :NLoptLBFGS, :OptimLBFGS]
-    benchmarkParameterEstimation(peTabModel, Rodas4P(), "Rodas4P", 1e-8, 1000, algList=algsTest)
-end
-
-
 if ARGS[1] == "Zheng"
+    loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Zheng_PNAS2012/"
     peTabModel = setUpPeTabModel("model_Zheng_PNAS2012", dirModel)
-    algsTest = [:IpoptLBFGS, :IpoptBlockAutoDiff, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS]
+    algsTest = [:IpoptLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess, :NLoptLBFGS]
     benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-6, 1000, algList=algsTest)
 end
+
