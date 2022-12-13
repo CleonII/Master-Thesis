@@ -30,6 +30,10 @@ struct PeTabModel{T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}},
     evalU0!::Function
     evalU0::Function
     evalSd!::Function
+    evalDYmodDu::Function
+    evalDSdDu!::Function
+    evalDYmodDp::Function
+    evalDSdDp!::Function
     odeSystem::ODESystem 
     paramMap::T1
     stateMap::T2
@@ -49,6 +53,7 @@ struct PeTabOpt{T1 <: Integer,
     evalFZygote::Function
     evalGradF::Function
     evalGradFZygote::Function
+    evalGradFAdjoint::Function
     evalHess::Function
     evalHessApprox::Function
     nParamEst::T1
@@ -102,7 +107,8 @@ struct MeasurementData{T1<:Array{<:AbstractFloat, 1},
                        T3<:Array{<:Symbol, 1}, 
                        T4<:Dict, 
                        T5<:Array{<:Integer, 1}, 
-                       T6<:Array{<:Union{<:String, <:AbstractFloat}, 1}}
+                       T6<:Array{<:Union{<:String, <:AbstractFloat}, 1}, 
+                       T7<:Dict{<:String, <:Vector{<:Vector{<:Integer}}}}
                     
     yObsNotTransformed::T1
     yObsTransformed::T1
@@ -117,6 +123,7 @@ struct MeasurementData{T1<:Array{<:AbstractFloat, 1},
     iPerConditionId::T4
     preEqCond::T2
     simCond::T2
+    iGroupedTObs::T7
 end
 
 
