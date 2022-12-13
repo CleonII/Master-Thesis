@@ -31,7 +31,7 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
 
-function benchmarkCostGrad(peTabModel, modelName::String, solversCheck, pathFileSave, tol; nIter=10, checkHess::Bool=false)
+function benchmarkCostGrad(peTabModel, modelName::String, solversCheck, pathFileSave, tol; nIter=10, checkHess::Bool=false, sensealg=ForwardDiffSensitivity())
 
     println("Running model $modelName")
 
@@ -40,7 +40,7 @@ function benchmarkCostGrad(peTabModel, modelName::String, solversCheck, pathFile
         solverUse = solversCheck[i][1]
         solverStr = solversCheck[i][2]
 
-        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sensealg = ForwardDiffSensitivity())
+        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sensealg = sensealg)
 
         # Use nominal parameter vector 
         paramVec = peTabOpt.paramVecTransformed
@@ -109,28 +109,59 @@ function benchmarkCostGrad(peTabModel, modelName::String, solversCheck, pathFile
     end
 end
 
-dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
-pathSave = dirSave * "Cost_grad_hess.csv"
-if !isdir(dirSave)
-    mkpath(dirSave)
+
+if ARGS[1] == "No_pre_eq_models"
+
+    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
+    pathSave = dirSave * "Cost_grad_hess.csv"
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+
+    modelListTry = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011", "model_Beer_MolBioSystems2014", 
+                    "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
+                    "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
+                    "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]
+
+    solversCheck = [[Rodas5(), "Rodas5"], [Rodas5P(), "Rodas5P"], [QNDF(), "QNDF"]]
+
+    for i in eachindex(modelListTry)
+        modelName = modelListTry[i]
+        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
+        peTabModel = setUpPeTabModel(modelName, dirModel)
+        # Where we need higher abs- and reltol to solve the ODE 
+        if modelName ∈ ["model_Boehm_JProteomeRes2014", "model_Beer_MolBioSystems2014", "model_Crauste_CellSystems2017"]
+            tol = 1e-8
+        else
+            tol = 1e-6
+        end
+        benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=false)
+    end
 end
 
-modelListTry = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011", "model_Beer_MolBioSystems2014", 
-                "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
-                "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
-                "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]
 
-solversCheck = [[Rodas5(), "Rodas5"], [Rodas5P(), "Rodas5P"], [QNDF(), "QNDF"]]
+if ARGS[1] == "Large_models"
 
-for i in eachindex(modelListTry)
-    modelName = modelListTry[i]
-    dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
-    peTabModel = setUpPeTabModel(modelName, dirModel)
-    # Where we need higher abs- and reltol to solve the ODE 
-    if modelName ∈ ["model_Boehm_JProteomeRes2014", "model_Beer_MolBioSystems2014", "model_Crauste_CellSystems2017"]
-        tol = 1e-8
-    else
-        tol = 1e-6
+    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
+    pathSave = dirSave * "Cost_grad_hess_large.csv"
+    if !isdir(dirSave)
+        mkpath(dirSave)
     end
-    benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=false)
+
+    modelListTry = ["model_Chen_MSB2009"]
+
+    solversCheck = [[QNDF(), "QNDF"]]
+
+    for i in eachindex(modelListTry)
+        modelName = modelListTry[i]
+        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
+        peTabModel = setUpPeTabModel(modelName, dirModel)
+        # Where we need higher abs- and reltol to solve the ODE 
+        if modelName ∈ ["model_Boehm_JProteomeRes2014", "model_Beer_MolBioSystems2014", "model_Crauste_CellSystems2017"]
+            tol = 1e-8
+        else
+            tol = 1e-6
+        end
+        benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=false, nIter=2, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP()))
+    end
 end
