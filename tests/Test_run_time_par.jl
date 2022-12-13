@@ -173,7 +173,6 @@ end
 
 peTabModel = setUpPeTabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/")
 removeAllProcs()
-solver, tol = Rodas5(), 1e-9
 addprocs(1, exeflags="--project=.")
 passTest = testRunBenchmark(peTabModel, Rodas5(), 1e-9, 2)
 if passTest == false
