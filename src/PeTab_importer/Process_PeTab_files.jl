@@ -345,7 +345,8 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
         uniqueT = unique(tObs[indexObs])
         vecSave = Array{Array{Integer, 1}, 1}(undef, length(uniqueT))
         for j in eachindex(vecSave)
-            vecSave[j] = findall(x -> x == uniqueT[j], tObs[indexObs])
+            saveTmp = findall(x -> x == uniqueT[j], tObs)
+            vecSave[j] = saveTmp[findall(x -> conditionId[x] == key, saveTmp)]
         end
         iGroupedTObs[key] = vecSave
     end

@@ -687,8 +687,8 @@ function calcLogLikZygote(dynamicParamEst,
 end
 
 
-function calcGradCostAdj!(grad::Vector{AbstractFloat}, 
-                          paramVecEst::Vector{AbstractFloat}, 
+function calcGradCostAdj!(grad::Vector{<:AbstractFloat}, 
+                          paramVecEst::Vector{<:AbstractFloat}, 
                           adjSolver, 
                           sensealg,
                           tol::Float64,
@@ -772,6 +772,7 @@ function calcGradAdjDynParam!(gradAdj::AbstractVector,
         return
     end
 
+    gradAdj .= 0.0
     # Compute the gradient by looping through all experimental conditions.
     for conditionID in keys(measurementData.iPerConditionId)
 
@@ -831,6 +832,8 @@ function calcGradAdjExpCond!(grad::AbstractVector,
                                                                    dYmodDp, dSdDp, calcdGdU=false)
                                                                                             end
 
+    gDiscrete = (u, p, t, i) ->  calcdGDiscrete(u, p, t, i, iGroupedTObs, measurementData, parameterData, paramIndices, peTabModel, sdParam, obsParam, nonDynParam)
+                                                                                        
     # Time points for which we have observed data 
     tSaveAt = measurementData.tVecSave[conditionID]
     du, dp = adjoint_sensitivities(sol, 
@@ -845,20 +848,21 @@ function calcGradAdjExpCond!(grad::AbstractVector,
     # constant parameters which are not a part ode the parameter estimation problem. Sometimes 
     # the gradient for these evaluate to NaN (as they where never thought to be estimated) which 
     # results in the entire gradient evaluating to NaN. Hence, we perform this calculation outside 
-    # of the lower level interface.                                                                                        
+    # of the lower level interface. 
     dgDpOut = zeros(Float64, length(sol.prob.p))
     for i in eachindex(tSaveAt)                                                                                        
         calcDgDpDiscrete(dgDpOut, sol(tSaveAt[i]), sol.prob.p, tSaveAt[i], i)
         dp .+= dgDpOut'
     end
+
     # Compute initial sensitives and adjust gradient accordingly  
     sMatAtT0 = ForwardDiff.jacobian(peTabModel.evalU0, sol.prob.p)
-    dp += reshape(du, (1, length(sol.prob.u0))) * sMatAtT0
+    gradTot = dp .+ du'*sMatAtT0
 
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we 
     # want dY/dθ_log. We can adjust via;
     # dY/dθ_log = log(10) * θ * dY/dθ
-    grad .= transformParamVecGrad(dp[paramIndices.mapDynParEst.iDynParamInSys], dynParam, paramIndices.namesDynParam, parameterData)
+    grad .+= transformParamVecGrad(gradTot[paramIndices.mapDynParEst.iDynParamInSys], dynParam, paramIndices.namesDynParam, parameterData)
 end
 
 
@@ -906,8 +910,8 @@ function calcdGd_Discrete(out,
         end
 
         if measurementData.transformData[iMeasurementData] == :log10
-            dYmodD_[dYmodD_ .> 0] *= 1 / (log(10) * exp10(yModTrans))
             yObs = measurementData.yObsTransformed[iMeasurementData]
+            dYmodD_ .*= 1 / (log(10) * exp10(yModTrans))
         elseif measurementData.transformData[iMeasurementData] == :lin
             yObs = measurementData.yObsNotTransformed[iMeasurementData]
         end
@@ -920,6 +924,51 @@ function calcdGd_Discrete(out,
         end
     end
     return
+end
+
+
+function calcdGDiscrete(u::AbstractVector,
+                        p::AbstractVector, # odeProb.p
+                        t::AbstractFloat, 
+                        i::Integer, 
+                        iGroupedTObs::Vector{Vector{Integer}}, 
+                        measurementData::MeasurementData, 
+                        parameterData::ParamData,
+                        paramIndices::ParameterIndices,
+                        peTabModel::PeTabModel, 
+                        sdParam::Vector{Float64}, 
+                        obsParam::Vector{Float64}, 
+                        nonDynParam::Vector{Float64})
+
+    dynParam = p[paramIndices.mapDynParEst.iDynParamInSys]
+    logLik = 0.0
+
+    for iMeasurementData in iGroupedTObs[i]
+        
+        mapObsParam = paramIndices.mapArrayObsParam[paramIndices.indexObsParamMap[iMeasurementData]]
+        yMod = peTabModel.evalYmod(u, t, dynParam, obsParam, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapObsParam)
+        yModTrans = transformObsOrData(yMod, measurementData.transformData[iMeasurementData])
+
+        # Compute associated SD-value or extract said number if it is known 
+        mapSdParam = paramIndices.mapArraySdParam[paramIndices.indexSdParamMap[iMeasurementData]]
+        if typeof(measurementData.sdParams[iMeasurementData]) <: AbstractFloat
+            sdVal = measurementData.sdParams[iMeasurementData]
+        else
+            sdVal = peTabModel.evalSd!(u, t, sdParam, dynParam, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapSdParam)
+        end
+
+        # Update log-likelihood 
+        if measurementData.transformData[iMeasurementData] == :lin
+            logLik += log(sdVal) + 0.5*log(2*pi) + 0.5*((yModTrans - measurementData.yObsNotTransformed[iMeasurementData]) / sdVal)^2
+        elseif measurementData.transformData[iMeasurementData] == :log10
+            logLik += log(sdVal) + 0.5*log(2*pi) + log(log(10)) + log(exp10(measurementData.yObsTransformed[iMeasurementData])) + 0.5*( ( log(exp10(yModTrans)) - log(exp10(measurementData.yObsTransformed[iMeasurementData])) ) / (log(10)*sdVal))^2
+        else
+            println("Transformation ", measurementData.transformData[iMeasurementData], "not yet supported.")
+            return Inf
+        end   
+        
+    end
+    return logLik
 end
 
 
