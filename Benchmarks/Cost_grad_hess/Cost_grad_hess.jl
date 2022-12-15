@@ -113,7 +113,7 @@ end
 if ARGS[1] == "No_pre_eq_models"
 
     dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
-    pathSave = dirSave * "Cost_grad_hess.csv"
+    pathSave = dirSave * "Cost_grad_hess_tol_low.csv"
     if !isdir(dirSave)
         mkpath(dirSave)
     end
@@ -130,12 +130,8 @@ if ARGS[1] == "No_pre_eq_models"
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
         # Where we need higher abs- and reltol to solve the ODE 
-        if modelName ∈ ["model_Boehm_JProteomeRes2014", "model_Beer_MolBioSystems2014", "model_Crauste_CellSystems2017"]
-            tol = 1e-8
-        else
-            tol = 1e-6
-        end
-        benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=false)
+        tol = 1e-8
+        benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=true)
     end
 end
 
@@ -157,11 +153,7 @@ if ARGS[1] == "Large_models"
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
         # Where we need higher abs- and reltol to solve the ODE 
-        if modelName ∈ ["model_Boehm_JProteomeRes2014", "model_Beer_MolBioSystems2014", "model_Crauste_CellSystems2017"]
-            tol = 1e-8
-        else
-            tol = 1e-6
-        end
+        tol = 1e-8
         benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=false, nIter=2, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP()))
     end
 end
