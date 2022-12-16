@@ -131,7 +131,7 @@ if ARGS[1] == "No_pre_eq_models"
         peTabModel = setUpPeTabModel(modelName, dirModel)
         # Where we need higher abs- and reltol to solve the ODE 
         tol = 1e-8
-        benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=true)
+        benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=false)
     end
 end
 

@@ -31,6 +31,8 @@ conda env create -f PeTab.yml -n your_env_name
 
 ## Running ODE solver benchmark
 
+### Small models
+
 To run the benchmark Borghans, Crauste, Fiedler, Sneyd, Bruno, Elowitz, Boehm, Schwen and Lucarelli models in the project root-directory run:
 
 ~~~
@@ -41,7 +43,35 @@ The ODE solvers tested are KenCarp4, FBDF, QNDF, Rosenbrock23, TRBDF2, RadauIIA5
 
 The parameter values used for the ODE benchmark are the same as the nominal values in the PEtab files from [here](https://github.com/Benchmarking-Initiative/Benchmark-Models-PEtab), and the ODE:s are solved for all experimental conditions for which there are measurement data. For each model the benchmark pipeline computes a high accuracy solution of the ODE using BigFloatm abstol=1e-16, and reltol=1e-16 which can take some time.
 
-The result from the parameter estimation is automatically stored in *Intermediate/Benchmarks/ODE_solvers/file_name.csv* in a [Tidy-format](https://www.jstatsoft.org/article/view/v059i10).
+The result from the benchmark estimation is automatically stored in *Intermediate/Benchmarks/ODE_solvers/file_name.csv* in a [Tidy-format](https://www.jstatsoft.org/article/view/v059i10).
+
+### Chen model 
+
+To run the benchmark for the Chen model in the project root-directory run:
+
+~~~
+path_julia_folder/bin/julia --project=. Benchmarks/ODE_solvers/Benchmark_solvers.jl large_models
+~~~
+
+The result from the benchmark estimation is automatically stored in *Intermediate/Benchmarks/ODE_solvers/Large_models.csv* in a [Tidy-format](https://www.jstatsoft.org/article/view/v059i10). Visuals can be produced by running the R-script *Analysis/Large_models.R*. Note, this script must be run from the */Analysis* directory. As long as you have R (version > 4.0) and the packages *tidyverse*, *gt* and *ggthemes* you should be able to run the code.
+
+## Running cost, gradient and hessian benchmark
+
+To run the benchmark for the gradient, cost and hessian in the project root-directory run:
+
+~~~
+path_julia_folder/bin/julia --project=. Benchmarks/Cost_grad_hess/Cost_grad_hess.jl No_pre_eq_models
+~~~
+
+This will run the benchmark for the *Boehm*, *Bachmann*, *Beer*, *Bruno*, *Crauste*, *Elowitz*, *Fiedler_BMC2016*, *Fujita*, *Lucarelli* and *Sneyd* models at the nominal parameter vector. Currently we use abstol=reltol=1e-8 for the ODE solvers. The actual function call to run the benchmark is;
+
+~~~
+benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=false)
+~~~
+
+If you set `checkHess=true` the hessian is also computed (this takes some time however, so use with care).
+
+The result from the benchmark is automatically stored in *Intermediate/Benchmarks/Cost_grad_hess/Process_cost_grad_hess.csv* in a [Tidy-format](https://www.jstatsoft.org/article/view/v059i10). Visuals and a html-table with run-times can be produced by running the R-script *Analysis/Cost_grad_hess.R*. Note, this script must be run from the */Analysis* directory. As long as you have R (version > 4.0) and the packages *tidyverse*, *gt* and *ggthemes* you should be able to run the code. Also if you in the *Intermediate/Benchmarks/Cost_grad_hess/* put the file *computation_times.csv* from running the benchmark on the [AMICI](https://github.com/AMICI-dev/AMICI) develop branch using this [workflow](https://github.com/AMICI-dev/AMICI/actions/runs/3687257251/workflow) a comparison visual against AMICI is produced.
 
 ## Running parameter estimation benchmark
 
