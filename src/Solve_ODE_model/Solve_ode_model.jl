@@ -103,17 +103,18 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         uAtSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
         u0PreSimSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
         for i in eachindex(preEqIds)
-            success = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
-                                             (@view u0PreSimSS[:, i]), 
-                                             prob, 
-                                             changeToExperimentalCondUse!, 
-                                             preEqIds[i], 
-                                             absTol, 
-                                             relTol, 
-                                             solver, 
-                                             simulationInfo.absTolSS, 
-                                             simulationInfo.relTolSS)
-            if success != true
+            whichPreEq = findfirst(x -> x == preEqIds[i], simulationInfo.preEqIdSol)
+            simulationInfo.solArrayPreEq[whichPreEq] = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
+                                                                              (@view u0PreSimSS[:, i]), 
+                                                                               prob, 
+                                                                               changeToExperimentalCondUse!, 
+                                                                               preEqIds[i], 
+                                                                               absTol, 
+                                                                               relTol, 
+                                                                               solver, 
+                                                                               simulationInfo.absTolSS, 
+                                                                               simulationInfo.relTolSS)
+            if simulationInfo.solArrayPreEq[whichPreEq].retcode != :Terminated
                 return false
             end
         end
@@ -383,7 +384,7 @@ function solveODEPreEqulibrium!(uAtSSVec::AbstractVector,
                                 relTol::Float64, 
                                 solver, 
                                 absTolSS::Float64, 
-                                relTolSS::Float64)::Bool
+                                relTolSS::Float64)
 
     if typeof(solver) <: Vector{Symbol} # Alg-hint case
         solveCallPre = (prob) -> solve(prob, alg_hints=solver, abstol=absTol, reltol=relTol, dense=false, 
@@ -400,12 +401,10 @@ function solveODEPreEqulibrium!(uAtSSVec::AbstractVector,
 
     # Terminate if a steady state was not reached in preequilibration simulations 
     sol_pre = solveCallPre(prob)
-    if sol_pre.retcode != :Terminated
-        return false
-    else
+    if sol_pre.retcode == :Terminated
         uAtSSVec .= sol_pre.u[end]
-        return true
     end
+    return sol_pre
 end
 
 
@@ -431,11 +430,15 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     # that were not affected by change to shiftExpId.
     has_not_changed = (prob.u0 .== u0PreSimSS)
     prob.u0[has_not_changed] .= uAtSS[has_not_changed]
-    prob = remake(prob, tspan = (0.0, t_max_ss))           
+
+    # Here it is IMPORTANT that we copy prob.p[:] else different experimental conditions will 
+    # share the same parameter vector p. This will, for example, cause the lower level adjoint 
+    # sensitivity interface to fail.
+    probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])           
     
     solCall = getSolCallSolveOdeNoSS(absTol,relTol, t_max_ss, solver, tSave, 
                                      nTSave, denseSol, absTolSS, relTolSS)
-    sol = solCall(prob)
+    sol = solCall(probUse)
     
     return sol                                     
 end

@@ -397,7 +397,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
         shiftExpIds = Any[]
         for firstExpId in firstExpIds
             iRows = findall(x -> x == firstExpId, measurementData.preEqCond)
-            shiftExpId = unique(measurementData.preEqCond[iRows])
+            shiftExpId = unique(measurementData.simCond[iRows])
             push!(shiftExpIds, shiftExpId)
         end
         shiftExpIds = convert(Vector{Vector{String}}, shiftExpIds)
@@ -421,6 +421,11 @@ function getSimulationInfo(measurementDataFile::DataFrame,
     # used when computing the cost.
     solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
     solArrayGrad = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
+    if simulateSS
+        solArrayPreEq = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, length(unique(firstExpIds)))
+    else
+        solArrayPreEq = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, 0)
+    end
 
     # Array with conition-ID for each foward simulations. As we always solve the ODE in the same order this can 
     # be pre-computed.
@@ -459,6 +464,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
                                     simulateSS,
                                     solArray, 
                                     solArrayGrad, 
+                                    solArrayPreEq,
                                     absTolSS, 
                                     relTolSS, 
                                     deepcopy(measurementData.tVecSave))

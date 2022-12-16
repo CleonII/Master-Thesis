@@ -237,8 +237,7 @@ end
 
 
 peTabModel = setUpPeTabModel("Test_model3", pwd() * "/tests/Test_model3/", forceBuildJlFile=true)
-
-
+a = 1
 passTest = testOdeSol(peTabModel, Rodas4P(), 1e-12, printRes=true)
 if passTest == true
     @printf("Passed test for ODE solution\n")
@@ -252,3 +251,178 @@ if passTest == true
 else
     @printf("Did not pass test for cost, gradient and hessian\n")
 end
+
+peTabOpt = setUpCostGradHess(peTabModel, Rodas5P(), 1e-12, sensealg = ForwardDiffSensitivity(), 
+                             adjSolver=Rodas5P(), adjTol=1e-12, 
+                             adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
+a = 1                             
+gradFor = zeros(length(peTabOpt.paramVecTransformed))
+
+peTabOpt.evalF(peTabOpt.paramVecTransformed)
+@elapsed peTabOpt.evalGradF(gradFor, peTabOpt.paramVecTransformed)
+prob = peTabOpt.evalF.simulationInfo.solArray[1].prob
+probUse = remake(prob, tspan=(0.0, 100))
+pUse = probUse.p
+
+myF = (p) -> Array(solve(probUse, Rodas5(autodiff=false), abstol=1e-8, reltol=1e-8, p=p, dense=false, sensealg=InterpolatingAdjoint(autodiff=false, autojacvec=false)))[:,end]
+y, ybar = Zygote.pullback(myF, pUse)
+@elapsed foo1 = ybar([1.0, 0.0])
+
+ssProb = SteadyStateProblem(prob)
+ySS, ybarSS = Zygote.pullback((p) -> solve(ssProb, DynamicSS(Rodas5()), abstol=1e-8, reltol=1e-8, p=p, sensealg=SteadyStateAdjoint(autojacvec=ReverseDiffVJP(true)))[:], pUse)
+@elapsed foo2 = ybarSS([1.0, 0.0])
+
+
+myF = (p) -> Array(solve(probUse, Rodas5(autodiff=false), abstol=1e-8, reltol=1e-8, p=p, dense=false, callback=TerminateSteadyState(), sensealg=SteadyStateAdjoint()))[:,end]
+y, ybar = Zygote.pullback(myF, pUse)
+
+
+hej = solve(prob, Rodas5(), abstol=1e-8, reltol=1e-8, callback=TerminateSteadyState(), dense=false)
+
+using StaticArrays
+
+u0M = SVector{length(prob.u0), Float64}(prob.u0) 
+pM = SVector{length(prob.p), Float64}(prob.p) 
+
+odeProb = ODEProblem{false}(peTabModel.odeSystem, 
+                            peTabModel.stateMap, 
+                            (0.0, 5e3), 
+                            peTabModel.paramMap, 
+                            jac=true)
+probM = remake(odeProb, p = pM, u0=u0M, tspan=(@SVector [0.0, 1.0]))
+
+b1 = @benchmark solve(prob, Rodas5(), abstol=1e-8, reltol=1e-8)
+b2 = @benchmark solve(probM, Rodas5(), abstol=1e-8, reltol=1e-8)
+
+
+solver = Rodas4P()
+tol = 1e-8
+
+# Process PeTab files into type-stable Julia structs 
+experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
+parameterData = processParameterData(parameterDataFile)
+measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
+simulationInfo = getSimulationInfo(measurementDataFile, measurementData)
+
+# Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
+paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
+    
+# Set up potential prior for the parameters to estimate 
+priorInfo::PriorInfo = getPriorInfo(paramEstIndices, parameterDataFile)
+
+# Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
+setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
+
+# The time-span 5e3 is overwritten when performing actual forward simulations 
+odeProb = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=false)
+odeProb = remake(odeProb, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
+
+# Functions to map experimental conditions and parameters correctly to the ODE model 
+changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
+changeModelParamUse! = (pVec, u0Vec, paramEst) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstIndices, peTabModel)
+
+# Set up function which solves the ODE model for all conditions and stores result 
+solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, denseSol=true, expIDSolve=expIDSolveArg)
+
+paramVecEst = peTabOpt.paramVecTransformed
+paramIndices = paramEstIndices
+dynamicParamEst = paramVecEst[paramIndices.iDynParam]
+obsParEst = paramVecEst[paramIndices.iObsParam]
+sdParamEst = paramVecEst[paramIndices.iSdParam]
+noneDynParamEst = paramVecEst[paramIndices.iNonDynParam]
+
+dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
+sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
+obsParEstUse = transformParamVec(obsParEst, paramIndices.namesObsParam, parameterData)
+nonDynParamEstUse = transformParamVec(noneDynParamEst, paramIndices.namesNonDynParam, parameterData)
+
+odeProbUse = remake(odeProb, p = convert.(eltype(dynamicParamEstUse), odeProb.p), u0 = convert.(eltype(dynamicParamEstUse), odeProb.u0))
+changeModelParamUse!(odeProbUse.p, odeProbUse.u0, dynamicParamEstUse)
+success = solveOdeModelAllCondAdjUse!(simulationInfo.solArrayGrad, odeProbUse, dynamicParamEstUse, ["all"])
+
+preEqSol = simulationInfo.solArrayPreEq[1]
+probSSPullback = remake(preEqSol.prob, tspan=(0.0, preEqSol.t[end]))
+ssVal, yBarSS = Zygote.pullback((p) -> solve(probSSPullback, solver, p=p, abstol=tol, reltol=tol, sensealg=QuadratureAdjoint(autodiff=false, autojacvec=false))[:, end], preEqSol.prob.p)
+
+sensealg = QuadratureAdjoint(autojacvec=false)
+gradAdj = zeros(4)
+
+for j in 1:2
+
+    sol = simulationInfo.solArrayGrad[j]
+    conditionID = simulationInfo.conditionIdSol[j]
+
+    iGroupedTObs = measurementData.iGroupedTObs[conditionID]
+    # Pre allcoate vectors needed for computations 
+    dYmodDu = zeros(Float64, length(sol.prob.u0))
+    dSdDu = zeros(Float64, length(sol.prob.u0))
+    dYmodDp = zeros(Float64, length(sol.prob.p))
+    dSdDp = zeros(Float64, length(sol.prob.p))
+
+    # Functions needed by the lower level interface 
+    calcDgDuDiscrete = (out, u, p, t, i) -> begin calcdGd_Discrete(out, u, p, t, i, iGroupedTObs, 
+                                                                measurementData, parameterData, 
+                                                                paramIndices, peTabModel, 
+                                                                dynamicParamEstUse, sdParamEstUse, obsParEstUse, nonDynParamEstUse, 
+                                                                dYmodDu, dSdDu, calcdGdU=true)
+                                            end
+    calcDgDpDiscrete = (out, u, p, t, i) -> begin calcdGd_Discrete(out, u, p, t, i, iGroupedTObs, 
+                                                                measurementData, parameterData, 
+                                                                paramIndices, peTabModel, 
+                                                                dynamicParamEstUse, sdParamEstUse, obsParEstUse, nonDynParamEstUse, 
+                                                                dYmodDp, dSdDp, calcdGdU=false)
+                                                                                            end
+                                                                                        
+    # Time points for which we have observed data 
+    tSaveAt = measurementData.tVecSave[conditionID]
+    du, dp = adjoint_sensitivities(sol, 
+                                Rodas4P(),
+                                dgdp_discrete=nothing,
+                                dgdu_discrete=calcDgDuDiscrete, 
+                                t=tSaveAt, 
+                                sensealg=sensealg, 
+                                abstol=tol, 
+                                reltol=tol)
+
+    # Technically we can pass calcDgDpDiscrete above to dgdp_discrete. However, odeProb.p often contain 
+    # constant parameters which are not a part ode the parameter estimation problem. Sometimes 
+    # the gradient for these evaluate to NaN (as they where never thought to be estimated) which 
+    # results in the entire gradient evaluating to NaN. Hence, we perform this calculation outside 
+    # of the lower level interface. 
+    dgDpOut = zeros(Float64, length(sol.prob.p))
+    for i in eachindex(tSaveAt)                                                                                        
+        calcDgDpDiscrete(dgDpOut, sol(tSaveAt[i]), sol.prob.p, tSaveAt[i], i)
+        dp .+= dgDpOut'
+    end
+
+    # Compute initial sensitives and adjust gradient accordingly  
+    sMatAtT0 = ForwardDiff.jacobian(peTabModel.evalU0, sol.prob.p)
+    gradTot = dp .+ du'*sMatAtT0
+
+    # Compensate for initial values 
+    gradTot[:] .+= yBarSS(du)[1]
+
+    # Thus far have have computed dY/dθ, but for parameters on the log-scale we 
+    # want dY/dθ_log. We can adjust via;
+    # dY/dθ_log = log(10) * θ * dY/dθ'
+    gradAdj .+= transformParamVecGrad(gradTot[paramIndices.mapDynParEst.iDynParamInSys], dynamicParamEstUse, paramIndices.namesDynParam, parameterData)
+end
+
+gradFor = zeros(4)
+peTabOpt.evalGradF(gradFor, peTabOpt.paramVecTransformed)
+probSSPullback = remake(probSSPullback, tspan=(0.0, 15.0))
+
+condition(u,t,integrator) = t== 15.0
+affect!(integrator) = integrator.p[4] = 2.0
+cb = DiscreteCallback(condition,affect!)
+senseEnd = (ForwardDiff.jacobian((p) -> solve(probSSPullback, solver, p=p, abstol=tol, reltol=tol, callback=cb, tstops=[15.0])[:, end], preEqSol.prob.p))
+
+yBarSS(du)
+du' * senseEnd
+
+senseProb = ODEForwardSensitivityProblem(probSSPullback.f, probSSPullback.u0, (0.0, 15.0), probSSPullback.p)
+sol = solve(senseProb)#,  callback=cb, tstops=[15.0])
+
+tmp = collect(extract_local_sensitivities(sol, 15.0)[2])
+for i in eachindex(tmp)
+senseFirst = zeros(2, 6)

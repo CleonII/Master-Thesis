@@ -107,7 +107,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
 end
 
 
-peTabModel = setUpPeTabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/")
+peTabModel = setUpPeTabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/", forceBuildJlFile=true)
 
 passTest = compareAgainstPyPesto(peTabModel, Rodas5(), 1e-12, printRes=true)
 if passTest == true
