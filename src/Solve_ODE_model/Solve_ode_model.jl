@@ -104,17 +104,18 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         u0PreSimSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
         for i in eachindex(preEqIds)
             try
+                whichPreEq = findfirst(x -> x == preEqIds[i], simulationInfo.preEqIdSol)
                 simulationInfo.solArrayPreEq[whichPreEq] = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
-                                                                                (@view u0PreSimSS[:, i]), 
-                                                                                prob, 
-                                                                                changeToExperimentalCondUse!, 
-                                                                                preEqIds[i], 
-                                                                                absTol, 
-                                                                                relTol, 
-                                                                                solver, 
-                                                                                simulationInfo.absTolSS, 
-                                                                                simulationInfo.relTolSS)
-                if success != true
+                                                                                  (@view u0PreSimSS[:, i]), 
+                                                                                  prob, 
+                                                                                  changeToExperimentalCondUse!, 
+                                                                                  preEqIds[i], 
+                                                                                  absTol, 
+                                                                                  relTol, 
+                                                                                  solver, 
+                                                                                  simulationInfo.absTolSS, 
+                                                                                  simulationInfo.relTolSS)
+                if simulationInfo.solArrayPreEq[whichPreEq].retcode != :Terminated
                     return false
                 end
             catch e
@@ -160,6 +161,7 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                                     tSave=tSave, 
                                                     nTSave=nTSave, 
                                                     denseSol=denseSol)
+
                 if solArray[i].retcode != :Success
                     sucess = false
                 end
@@ -462,7 +464,7 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     
     solCall = getSolCallSolveOdeNoSS(absTol,relTol, t_max_ss, solver, tSave, 
                                      nTSave, denseSol, absTolSS, relTolSS)
-    sol = solCall(prob)
+    sol = solCall(probUse)
     
     return sol                                     
 end

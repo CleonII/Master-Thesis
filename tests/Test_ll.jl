@@ -116,6 +116,7 @@ peTabOpt.evalGradF(gradFor, peTabOpt.paramVecTransformed)
 peTabOpt.evalGradFAdjoint(gradAdj, peTabOpt.paramVecTransformed)
 if sum((gradFor - gradAdj).^2) > 1e-4
     println("Does not pass prior test for adjoint sensitivity")
+    passTest=false
 end
 
 
@@ -277,6 +278,7 @@ peTabOpt.evalGradF(gradFor, peTabOpt.paramVecTransformed)
 peTabOpt.evalGradFAdjoint(gradAdj, peTabOpt.paramVecTransformed)
 if sum((gradFor - gradAdj).^2) > 1e-6
     println("Does not pass prior test for adjoint sensitivity")
+    passTest = false
 end
 
 
