@@ -1,6 +1,7 @@
 include(joinpath(pwd(), "src", "PeTab_importer", "Common.jl"))
 include(joinpath(pwd(), "src", "PeTab_importer", "Map_parameters.jl"))
 include(joinpath(pwd(), "src", "PeTab_importer", "Create_obs_u0_sd_functions.jl"))
+include(joinpath(pwd(), "src", "PeTab_importer", "Create_obs_u0_sd_derivatives.jl"))
 include(joinpath(pwd(), "src", "PeTab_importer", "Process_PeTab_files.jl"))
 include(joinpath(pwd(), "src", "PeTab_importer", "Distributed.jl"))
 include(joinpath(pwd(), "src", "Common.jl"))
@@ -24,7 +25,19 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                            sparseJac::Bool=false, 
                            absTolSS::Float64=1e-8, 
                            relTolSS::Float64=1e-6, 
-                           nProcs::Integer=1)::PeTabOpt
+                           nProcs::Integer=1,
+                           adjSolver=Rodas5P(), 
+                           adjTol=1e-6, 
+                           adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), 
+                           adjSensealgSS=SteadyStateAdjoint())::PeTabOpt
+
+    if !(typeof(adjSensealgSS) <: SteadyStateAdjoint)
+        println("If you are using adjoint sensitivity analysis for a model with PreEq-criteria the most 
+                 the most efficient adjSensealgSS is usually SteadyStateAdjoint. The algorithm you have 
+                 provided, ", adjSensealgSS, "might not work (as there are some bugs here). In case it does 
+                 not work, and SteadyStateAdjoint fails (because a dependancy on time) a good choice might 
+                 be QuadratureAdjoint(autodiff=false, autojacvec=false)")
+    end
 
     # Process PeTab files into type-stable Julia structs 
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
@@ -36,7 +49,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     
     # Set up potential prior for the parameters to estimate 
-    priorInfo = getPriorInfo(paramEstIndices::ParameterIndices, parameterDataFile::DataFrame)::PriorInfo
+    priorInfo::PriorInfo = getPriorInfo(paramEstIndices, parameterDataFile)
 
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
@@ -53,6 +66,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
 
     # Set up function which solves the ODE model for all conditions and stores result 
     solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
+    solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, denseSol=true, expIDSolve=expIDSolveArg)
     solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementData, simulationInfo, solver, tol, tol, sensealg)
 
     if nProcs > 1 && nprocs() != nProcs
@@ -85,6 +99,9 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
     evalGradFZygote = (grad, paramVecEst) -> calcGradZygote!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
     
+    # Gradient computed via adjoint sensitivity analysis (not Zygote interface)
+    evalGradFAdjoint = (grad, paramVecEst) -> calcGradCostAdj!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo) 
+    
     # Lower and upper bounds for parameters to estimate 
     namesParamEst = paramEstIndices.namesParamEst
     lowerBounds = [parameterData.lowerBounds[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)] 
@@ -101,6 +118,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                         evalFZygote,
                         evalGradF, 
                         evalGradFZygote,
+                        evalGradFAdjoint,
                         evalHess,
                         evalHessApprox, 
                         length(namesParamEst), 
@@ -163,7 +181,7 @@ function calcCost(paramVecEst,
 
     if priorInfo.hasPriors == true
         paramVecEstTransformed = transformParamVec(paramVecEst, paramIndices.namesParamEst, parameterData)
-        logLik += evalPriors(paramVecEst, paramVecEstTransformed, paramIndices.namesParamEst, paramIndices, priorInfo)
+        logLik += evalPriors(paramVecEstTransformed, paramVecEst, paramIndices.namesParamEst, paramIndices, priorInfo)
     end
 
     return logLik
@@ -444,6 +462,7 @@ function calcLogLikNotSolveODE(dynamicParamEst::T1,
                                measurementData::MeasurementData,
                                parameterData::ParamData, 
                                priorInfo::PriorInfo;
+                               calcGradObsSdParamAdj::Bool=false,
                                calcGradObsSdParam::Bool=false, 
                                expIDSolve::Array{String, 1} = ["all"])::Real where T1<:Vector{<:Real}
 
@@ -454,7 +473,9 @@ function calcLogLikNotSolveODE(dynamicParamEst::T1,
     obsParamEstUse = transformParamVec(obsParamEst, paramIndices.namesObsParam, parameterData)
     nonDynParamEstUse = transformParamVec(nonDynParamEst, paramIndices.namesNonDynParam, parameterData)
 
-    logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParamEstUse, nonDynParamEstUse, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, expIDSolve, calcGradObsSdParam=calcGradObsSdParam)
+    logLik = calcLogLik(dynamicParamEstUse, sdParamEstUse, obsParamEstUse, nonDynParamEstUse, peTabModel, simulationInfo, paramIndices, 
+                        measurementData, parameterData, expIDSolve, calcGradObsSdParam=calcGradObsSdParam, 
+                        calcGradObsSdParamAdj=calcGradObsSdParamAdj)
     
     if priorInfo.hasPriors == true 
         logLik += evalPriors(sdParamEstUse, sdParamEst, paramIndices.namesSdParam, paramIndices, priorInfo)
@@ -496,9 +517,10 @@ function calcLogLik(dynamicParamEst,
                     expIDSolve::Array{String, 1} = ["all"];
                     calcHessDynParam::Bool=false, 
                     calcGradDynParam::Bool=false, 
+                    calcGradObsSdParamAdj::Bool=false,
                     calcGradObsSdParam::Bool=false)::Real 
 
-    if calcHessDynParam == true || calcGradDynParam == true || calcGradObsSdParam == true
+    if calcHessDynParam == true || calcGradDynParam == true || calcGradObsSdParam == true || calcGradObsSdParamAdj == true
         odeSolArray = simulationInfo.solArrayGrad
     else
         odeSolArray = simulationInfo.solArray
@@ -518,7 +540,8 @@ function calcLogLik(dynamicParamEst,
         odeSol = odeSolArray[whichForwardSol]   
         logLik += calcLogLikExpCond(odeSol, dynamicParamEst, sdParamEst, obsPar, 
                                     nonDynParamEst, peTabModel, conditionID, paramIndices,
-                                    measurementData, parameterData, calcGradObsSdParam)
+                                    measurementData, parameterData, calcGradObsSdParam, 
+                                    calcGradObsSdParamAdj=calcGradObsSdParamAdj)
 
         if isinf(logLik)
             return Inf
@@ -564,7 +587,7 @@ function calcCostZygote(paramVecEst,
 
     if priorInfo.hasPriors == true
         paramVecEstTransformed = transformParamVec(paramVecEst, paramIndices.namesParamEst, parameterData)
-        logLik += evalPriors(paramVecEst, paramVecEstTransformed, paramIndices.namesParamEst, paramIndices, priorInfo)
+        logLik += evalPriors(paramVecEstTransformed, paramVecEst, paramIndices.namesParamEst, paramIndices, priorInfo)
     end                                  
 
     return logLik                          
@@ -673,6 +696,408 @@ function calcLogLikZygote(dynamicParamEst,
 end
 
 
+function calcGradCostAdj!(grad::Vector{<:AbstractFloat}, 
+                          paramVecEst::Vector{<:AbstractFloat}, 
+                          adjSolver, 
+                          sensealg,
+                          sensealgSS,
+                          tol::Float64,
+                          odeProb::ODEProblem,  
+                          peTabModel::PeTabModel,
+                          simulationInfo::SimulationInfo,
+                          paramIndices::ParameterIndices,
+                          measurementData::MeasurementData,
+                          parameterData::ParamData, 
+                          changeModelParamUse!::Function, 
+                          solveOdeModelAllCondUse!::Function, 
+                          priorInfo::PriorInfo;
+                          expIDSolve::Array{String, 1} = ["all"])   
+    
+    # Split input into observeble and dynamic parameters 
+    dynamicParamEst = paramVecEst[paramIndices.iDynParam]
+    obsParEst = paramVecEst[paramIndices.iObsParam]
+    sdParamEst = paramVecEst[paramIndices.iSdParam]
+    noneDynParamEst = paramVecEst[paramIndices.iNonDynParam]
+    namesSdParam = paramIndices.namesSdParam
+    namesObsParam = paramIndices.namesObsParam
+    namesNonDynParam = paramIndices.namesNonDynParam
+    namesSdObsNonDynPar = paramIndices.namesSdObsNonDynPar
+
+    # Calculate gradient seperately for dynamic and non dynamic parameter. 
+
+    calcGradAdjDynParam!((@view grad[paramIndices.iDynParam]), dynamicParamEst, sdParamEst, obsParEst,
+                         noneDynParamEst, odeProb, adjSolver, tol, sensealg, peTabModel, simulationInfo, paramIndices,
+                         measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo;
+                         expIDSolve=expIDSolve, sensealgSS=sensealgSS)
+
+    # Happens when at least one forward pass fails and I set the gradient to 1e8 
+    if all(grad[paramIndices.iDynParam] .== 1e8)
+        return 
+    end
+
+    # Here it is crucial to account for that obs- and sd parameter can be overlapping. Thus, a name-map 
+    # of both Sd and Obs param is used to account for this. This is not a worry for non-dynamic parameters.
+    paramNotOdeSys = paramVecEst[paramIndices.iSdObsNonDynPar]
+    iSdUse = [findfirst(x -> x == namesSdParam[i], namesSdObsNonDynPar) for i in eachindex(namesSdParam)]
+    iObsUse = [findfirst(x -> x == namesObsParam[i],  namesSdObsNonDynPar) for i in eachindex(namesObsParam)]
+    iNonDynUse = [findfirst(x -> x == namesNonDynParam[i],  namesSdObsNonDynPar) for i in eachindex(namesNonDynParam)]
+
+    # TODO : Make choice of gradient availble 
+    calcCostNonDyn = (x) -> calcLogLikNotSolveODE(dynamicParamEst, x[iSdUse], x[iObsUse], x[iNonDynUse], peTabModel, simulationInfo, paramIndices, measurementData, parameterData, priorInfo, calcGradObsSdParamAdj=true, expIDSolve=expIDSolve)
+    @views ReverseDiff.gradient!(grad[paramIndices.iSdObsNonDynPar], calcCostNonDyn, paramNotOdeSys)
+
+    # Account for priors 
+    if priorInfo.hasPriors == true
+        evalLogLikPrior = (pVec) ->     begin
+                                            paramVecEstTransformed = transformParamVec(pVec, paramIndices.namesParamEst, parameterData)
+                                            return evalPriors(paramVecEstTransformed, pVec, paramIndices.namesParamEst, paramIndices, priorInfo)
+                                        end
+        grad .+= ForwardDiff.gradient(evalLogLikPrior, paramVecEst)
+    end
+end
+
+
+function calcYBarSS(simulationInfo::SimulationInfo, 
+                    sensealgSS::SteadyStateAdjoint, 
+                    solver,
+                    tol::Float64,
+                    expIDSolve::Vector{String})::NamedTuple
+
+    # Extract all unique Pre-equlibrium conditions. If the code is run in parallell 
+    # (expIDSolve != [["all]]) the number of preEq cond. might be smaller than the 
+    # total number of preEq cond.
+    if expIDSolve[1] == "all"
+        preEqIds = unique(simulationInfo.firstExpIds)
+    else
+        whichPreEq = findall(x -> x ∈ simulationInfo.conditionIdSol, expIDSolve)
+        preEqIds = unique(simulationInfo.preEqIdSol[whichPreEq])
+    end
+
+    yBarF = Array{Function, 1}(undef, length(preEqIds))
+    for i in eachindex(preEqIds)
+        whichPreEq = findfirst(x -> x == preEqIds[i], simulationInfo.preEqIdSol)
+        probUse = simulationInfo.solArrayPreEq[whichPreEq].prob
+        ssProb = SteadyStateProblem(probUse)
+        ySS, ybarSS = Zygote.pullback((p) ->    (
+                                                solve(ssProb, 
+                                                      DynamicSS(solver, abstol=simulationInfo.absTolSS, reltol=simulationInfo.relTolSS), 
+                                                      abstol=tol, 
+                                                      reltol=tol, 
+                                                      p=p, 
+                                                      sensealg=sensealgSS)[:]), probUse.p)
+                                                
+        yBarF[i] = ybarSS
+    end
+    yBarTuple = Tuple(f for f in yBarF)
+
+    return NamedTuple{Tuple(Symbol(preEqId) for preEqId in preEqIds)}(yBarTuple)
+end
+function calcYBarSS(simulationInfo::SimulationInfo, 
+                    sensealgSS::Union{QuadratureAdjoint, InterpolatingAdjoint}, 
+                    solver,
+                    tol::Float64,
+                    expIDSolve::Vector{String})::NamedTuple
+
+    # Extract all unique Pre-equlibrium conditions. If the code is run in parallell 
+    # (expIDSolve != [["all]]) the number of preEq cond. might be smaller than the 
+    # total number of preEq cond.
+    if expIDSolve[1] == "all"
+        preEqIds = unique(simulationInfo.firstExpIds)
+    else
+        whichPreEq = findall(x -> x ∈ simulationInfo.conditionIdSol, expIDSolve)
+        preEqIds = unique(simulationInfo.preEqIdSol[whichPreEq])
+    end
+
+    yBarF = Array{Function, 1}(undef, length(preEqIds))
+    for i in eachindex(preEqIds)
+        whichPreEq = findfirst(x -> x == preEqIds[i], simulationInfo.preEqIdSol)
+        preEqSol = simulationInfo.solArrayPreEq[whichPreEq]
+        probSSPullback = remake(preEqSol.prob, tspan=(0.0, preEqSol.t[end]))
+        ssVal, ybarSS = Zygote.pullback((p) -> solve(probSSPullback, solver, p=p, abstol=tol, reltol=tol, sensealg=sensealgSS)[:, end], preEqSol.prob.p)
+                                                
+        yBarF[i] = ybarSS
+    end
+    yBarTuple = Tuple(f for f in yBarF)
+
+    return NamedTuple{Tuple(Symbol(preEqId) for preEqId in preEqIds)}(yBarTuple)
+end
+
+
+# Compute the adjoint gradient across all experimental conditions 
+function calcGradAdjDynParam!(gradAdj::AbstractVector,
+                              dynamicParamEst::Vector{Float64},
+                              sdParamEst::Vector{Float64},
+                              obsParEst::Vector{Float64},
+                              nonDynParamEst::Vector{Float64},
+                              odeProb::ODEProblem,
+                              adjSolver, 
+                              tol::Float64,
+                              sensealg,
+                              peTabModel::PeTabModel,
+                              simulationInfo::SimulationInfo,
+                              paramIndices::ParameterIndices,
+                              measurementData ::MeasurementData, 
+                              parameterData::ParamData, 
+                              changeModelParamUse!::Function,
+                              solveOdeModelAllCondUse!::Function, 
+                              priorInfo::PriorInfo;
+                              sensealgSS=SteadyStateAdjoint(),
+                              expIDSolve::Array{String, 1} = ["all"])
+
+    
+    dynamicParamEstUse = transformParamVec(dynamicParamEst, paramIndices.namesDynParam, parameterData)
+    sdParamEstUse = transformParamVec(sdParamEst, paramIndices.namesSdParam, parameterData)
+    obsParEstUse = transformParamVec(obsParEst, paramIndices.namesObsParam, parameterData)
+    nonDynParamEstUse = transformParamVec(nonDynParamEst, paramIndices.namesNonDynParam, parameterData)
+
+    odeProbUse = remake(odeProb, p = convert.(eltype(dynamicParamEstUse), odeProb.p), u0 = convert.(eltype(dynamicParamEstUse), odeProb.u0))
+    changeModelParamUse!(odeProbUse.p, odeProbUse.u0, dynamicParamEstUse)
+    success = solveOdeModelAllCondUse!(simulationInfo.solArrayGrad, odeProbUse, dynamicParamEstUse, expIDSolve)
+    if success != true
+        grad .= 1e8
+        return
+    end
+
+    # In case of PreEq-critera we need to compute the pullback function at tSS to compute the VJP between 
+    # λ_t0 and the sensitivites at t_ss
+    if simulationInfo.simulateSS == true
+        yBarSS = calcYBarSS(simulationInfo, sensealgSS, adjSolver, tol, expIDSolve)
+    else
+        yBarSSUse = identity
+    end
+
+    gradAdj .= 0.0
+    # Compute the gradient by looping through all experimental conditions.
+    for conditionID in keys(measurementData.iPerConditionId)
+
+        if expIDSolve[1] != "all" && conditionID ∉ expIDSolve
+            continue
+        end
+
+        whichForwardSol = findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)
+        if simulationInfo.simulateSS == true
+            yBarSSUse = yBarSS[Symbol(simulationInfo.preEqIdSol[whichForwardSol])]
+        end
+
+        whichForwardSol = findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)
+        sol = simulationInfo.solArrayGrad[whichForwardSol]
+        calcGradAdjExpCond!(gradAdj, sol, sensealg, tol, adjSolver, dynamicParamEstUse,
+                            sdParamEstUse, obsParEstUse, nonDynParamEstUse, conditionID, 
+                            peTabModel, paramIndices, measurementData, parameterData, 
+                            simulationInfo.simulateSS, yBarSSUse)
+    end
+
+end
+
+
+# For a given experimental condition compute the gradient using adjoint sensitivity analysis 
+function calcGradAdjExpCond!(grad::AbstractVector,
+                             sol::ODESolution,
+                             sensealg,
+                             tol::Float64,
+                             adjSolver, 
+                             dynParam::Vector{Float64},
+                             sdParam::Vector{Float64}, 
+                             obsParam::Vector{Float64}, 
+                             nonDynParam::Vector{Float64},
+                             conditionID::String,
+                             peTabModel::PeTabModel,
+                             paramIndices::ParameterIndices,
+                             measurementData::MeasurementData, 
+                             parameterData::ParamData, 
+                             simulateSS::Bool,
+                             yBarSS::Function;
+                             expIDSolve::Array{String, 1} = ["all"])
+                            
+    if expIDSolve[1] != "all" && conditionID ∉ expIDSolve
+        return
+    end
+
+    iGroupedTObs = measurementData.iGroupedTObs[conditionID]
+    # Pre allcoate vectors needed for computations 
+    dYmodDu = zeros(Float64, length(sol.prob.u0))
+    dSdDu = zeros(Float64, length(sol.prob.u0))
+    dYmodDp = zeros(Float64, length(sol.prob.p))
+    dSdDp = zeros(Float64, length(sol.prob.p))
+
+    # Functions needed by the lower level interface 
+    calcDgDuDiscrete = (out, u, p, t, i) -> begin calcdGd_Discrete(out, u, p, t, i, iGroupedTObs, 
+                                                                   measurementData, parameterData, 
+                                                                   paramIndices, peTabModel, 
+                                                                   dynParam, sdParam, obsParam, nonDynParam, 
+                                                                   dYmodDu, dSdDu, calcdGdU=true)
+                                            end
+    calcDgDpDiscrete = (out, u, p, t, i) -> begin calcdGd_Discrete(out, u, p, t, i, iGroupedTObs, 
+                                                                   measurementData, parameterData, 
+                                                                   paramIndices, peTabModel, 
+                                                                   dynParam, sdParam, obsParam, nonDynParam, 
+                                                                   dYmodDp, dSdDp, calcdGdU=false)
+                                                                                            end
+                                                                                        
+    # Time points for which we have observed data. The standard allow cases where we only observe data at t0, that 
+    # is we do not solve the ODE. Here adjoint_sensitivities fails (naturally). In this case we compute the gradient 
+    # via ∇G_p = dp + du*J(u(t_0)) where du is the cost function differentiated with respect to the states at time zero, 
+    # dp is the cost function differentiated with respect to the parameters at time zero and J is sensititvites at time 
+    # zero. Overall, the only workflow that changes below is that we compute du outside of the adjoint interface 
+    # and use sol[:] as we no longer can interpolate from the forward solution.
+    tSaveAt = measurementData.tVecSave[conditionID]
+    onlyObsAtZero::Bool = false
+    if !(length(tSaveAt) == 1 && tSaveAt[1] == 0.0)
+        du, dp = adjoint_sensitivities(sol, 
+                                    adjSolver,
+                                    dgdp_discrete=nothing,
+                                    dgdu_discrete=calcDgDuDiscrete, 
+                                    t=tSaveAt, 
+                                    sensealg=sensealg, 
+                                    abstol=tol, 
+                                    reltol=tol)
+    else
+        du = zeros(Float64, length(sol.prob.u0))
+        calcDgDuDiscrete(du, sol[1], sol.prob.p, 0.0, 1)
+        dp = zeros(Float64, length(sol.prob.p))'
+        onlyObsAtZero = true
+    end
+    # Technically we can pass calcDgDpDiscrete above to dgdp_discrete. However, odeProb.p often contain 
+    # constant parameters which are not a part ode the parameter estimation problem. Sometimes 
+    # the gradient for these evaluate to NaN (as they where never thought to be estimated) which 
+    # results in the entire gradient evaluating to NaN. Hence, we perform this calculation outside 
+    # of the lower level interface. 
+    dgDpOut = zeros(Float64, length(sol.prob.p))
+    for i in eachindex(tSaveAt)     
+        if onlyObsAtZero == false                                                                                   
+            calcDgDpDiscrete(dgDpOut, sol(tSaveAt[i]), sol.prob.p, tSaveAt[i], i)
+        else
+            calcDgDpDiscrete(dgDpOut, sol[1], sol.prob.p, tSaveAt[i], i)
+        end
+        dp .+= dgDpOut'
+    end
+
+    if simulateSS == false
+        # In case we do not simulate the ODE for a steady state first we can compute 
+        # the initial sensitivites easily via automatic differantitatiom
+        sMatAtT0 = ForwardDiff.jacobian(peTabModel.evalU0, sol.prob.p)
+        gradTot = dp .+ du'*sMatAtT0
+
+    else
+        # In case we simulate to a stady state we need to compute a VJP. We use 
+        # Zygote pullback to avoid having to having build the Jacobian, rather 
+        # we create the yBar function required for the vector Jacobian product.
+        gradTot = (dp .+ (yBarSS(du)[1])')[:]
+    end
+
+    # Thus far have have computed dY/dθ, but for parameters on the log-scale we 
+    # want dY/dθ_log. We can adjust via;
+    # dY/dθ_log = log(10) * θ * dY/dθ
+    grad .+= transformParamVecGrad(gradTot[paramIndices.mapDynParEst.iDynParamInSys], dynParam, paramIndices.namesDynParam, parameterData)
+end
+
+
+function calcdGd_Discrete(out,
+                          u::Vector{<:AbstractFloat}, 
+                          p::Vector{<:AbstractFloat}, # odeProb.p
+                          t::AbstractFloat, 
+                          i::Integer, 
+                          iGroupedTObs::Vector{Vector{Integer}}, 
+                          measurementData::MeasurementData, 
+                          parameterData::ParamData,
+                          paramIndices::ParameterIndices,
+                          peTabModel::PeTabModel, 
+                          dynParam::Vector{Float64},
+                          sdParam::Vector{Float64}, 
+                          obsParam::Vector{Float64}, 
+                          nonDynParam::Vector{Float64}, 
+                          dYmodD_::Vector{Float64}, 
+                          dSdD_::Vector{Float64}; 
+                          calcdGdU::Bool=true)
+
+    out .= 0.0
+    for iMeasurementData in iGroupedTObs[i]
+        dYmodD_ .= 0.0
+        dSdD_ .= 0.0
+
+        mapObsParam = paramIndices.mapArrayObsParam[paramIndices.indexObsParamMap[iMeasurementData]]
+        yMod = peTabModel.evalYmod(u, t, dynParam, obsParam, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapObsParam)
+        yModTrans = transformObsOrData(yMod, measurementData.transformData[iMeasurementData])
+
+        # Compute associated SD-value or extract said number if it is known 
+        mapSdParam = paramIndices.mapArraySdParam[paramIndices.indexSdParamMap[iMeasurementData]]
+        if typeof(measurementData.sdParams[iMeasurementData]) <: AbstractFloat
+            sdVal = measurementData.sdParams[iMeasurementData]
+        else
+            sdVal = peTabModel.evalSd!(u, t, sdParam, dynParam, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapSdParam)
+        end
+
+        if calcdGdU == true
+            peTabModel.evalDYmodDu(u, t, p, obsParam, nonDynParam, measurementData.observebleID[iMeasurementData], mapObsParam, dYmodD_)
+            peTabModel.evalDSdDu!(u, t, sdParam, p, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapSdParam, dSdD_)
+        else
+            peTabModel.evalDYmodDp(u, t, p, obsParam, nonDynParam, measurementData.observebleID[iMeasurementData], mapObsParam, dYmodD_)
+            peTabModel.evalDSdDp!(u, t, sdParam, p, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapSdParam, dSdD_)
+        end
+
+        if measurementData.transformData[iMeasurementData] == :log10
+            yObs = measurementData.yObsTransformed[iMeasurementData]
+            dYmodD_ .*= 1 / (log(10) * exp10(yModTrans))
+        elseif measurementData.transformData[iMeasurementData] == :lin
+            yObs = measurementData.yObsNotTransformed[iMeasurementData]
+        end
+
+        dLogLikDyModTrans::Float64 = ( yModTrans - yObs ) / sdVal^2
+        dLogLikDsdVal::Float64 = 1/sdVal - (( yModTrans - yObs )^2 / sdVal^3)
+        to_out = dLogLikDyModTrans*dYmodD_ .+ dLogLikDsdVal*dSdD_
+        @inbounds for i in eachindex(to_out)
+            out[i] += to_out[i]
+        end
+    end
+    return
+end
+
+
+function calcdGDiscrete(u::AbstractVector,
+                        p::AbstractVector, # odeProb.p
+                        t::AbstractFloat, 
+                        i::Integer, 
+                        iGroupedTObs::Vector{Vector{Integer}}, 
+                        measurementData::MeasurementData, 
+                        parameterData::ParamData,
+                        paramIndices::ParameterIndices,
+                        peTabModel::PeTabModel, 
+                        sdParam::Vector{Float64}, 
+                        obsParam::Vector{Float64}, 
+                        nonDynParam::Vector{Float64})
+
+    dynParam = p[paramIndices.mapDynParEst.iDynParamInSys]
+    logLik = 0.0
+
+    for iMeasurementData in iGroupedTObs[i]
+        
+        mapObsParam = paramIndices.mapArrayObsParam[paramIndices.indexObsParamMap[iMeasurementData]]
+        yMod = peTabModel.evalYmod(u, t, dynParam, obsParam, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapObsParam)
+        yModTrans = transformObsOrData(yMod, measurementData.transformData[iMeasurementData])
+
+        # Compute associated SD-value or extract said number if it is known 
+        mapSdParam = paramIndices.mapArraySdParam[paramIndices.indexSdParamMap[iMeasurementData]]
+        if typeof(measurementData.sdParams[iMeasurementData]) <: AbstractFloat
+            sdVal = measurementData.sdParams[iMeasurementData]
+        else
+            sdVal = peTabModel.evalSd!(u, t, sdParam, dynParam, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapSdParam)
+        end
+
+        # Update log-likelihood 
+        if measurementData.transformData[iMeasurementData] == :lin
+            logLik += log(sdVal) + 0.5*log(2*pi) + 0.5*((yModTrans - measurementData.yObsNotTransformed[iMeasurementData]) / sdVal)^2
+        elseif measurementData.transformData[iMeasurementData] == :log10
+            logLik += log(sdVal) + 0.5*log(2*pi) + log(log(10)) + log(exp10(measurementData.yObsTransformed[iMeasurementData])) + 0.5*( ( log(exp10(yModTrans)) - log(exp10(measurementData.yObsTransformed[iMeasurementData])) ) / (log(10)*sdVal))^2
+        else
+            println("Transformation ", measurementData.transformData[iMeasurementData], "not yet supported.")
+            return Inf
+        end   
+        
+    end
+    return logLik
+end
+
+
 function calcLogLikExpCond(odeSol::ODESolution,
                            dynamicParamEst,
                            sdParamEst, 
@@ -683,7 +1108,8 @@ function calcLogLikExpCond(odeSol::ODESolution,
                            paramIndices::ParameterIndices,
                            measurementData::MeasurementData,
                            parameterData::ParamData, 
-                           calcGradObsSdParam::Bool)::Real
+                           calcGradObsSdParam::Bool;
+                           calcGradObsSdParamAdj=false)::Real
 
     if !(odeSol.retcode == :Success || odeSol.retcode == :Terminated)
         return Inf
@@ -696,6 +1122,13 @@ function calcLogLikExpCond(odeSol::ODESolution,
         t = measurementData.tObs[i]
         if calcGradObsSdParam == true
             odeSolAtT = dualVecToFloatVec(odeSol[:, measurementData.iTObs[i]]) #u
+        elseif calcGradObsSdParamAdj == true
+            # In case we only have sol.t = 0.0 (or similar) interpolation does not work
+            if length(odeSol.t) > 1 
+                odeSolAtT = odeSol(t)
+            else
+                odeSolAtT = odeSol[1]
+            end
         else
             odeSolAtT = odeSol[:, measurementData.iTObs[i]]
         end
@@ -752,9 +1185,9 @@ function evalPriors(paramVecTransformed,
     for i in eachindex(paramVecNotTransformed)
         iParam = findfirst(x -> x == namesParamVec[i], paramEstIndices.namesParamEst)
         if priorInfo.priorOnParamScale[iParam] == true
-            pInput = paramVecTransformed[i]
-        else
             pInput = paramVecNotTransformed[i]
+        else
+            pInput = paramVecTransformed[i]
         end
         priorContribution += priorInfo.logpdf[iParam](pInput)
 
@@ -867,6 +1300,19 @@ function transformParamVec(paramVec,
     else
         return log10.(paramVec) .* shouldTransform .+ paramVec .* shouldNotTransform
     end
+end
+
+
+function transformParamVecGrad(gradientVec::AbstractVector, 
+                               dynamicParam::AbstractVector,
+                               namesParam::Array{String, 1}, 
+                               paramData::ParamData)
+    
+    iParam = [findfirst(x -> x == namesParam[i], paramData.parameterID) for i in eachindex(namesParam)]
+    shouldTransform = [paramData.logScale[i] == true ? true : false for i in iParam]
+    shouldNotTransform = .!shouldTransform
+
+    return log(10) .* gradientVec .* dynamicParam .* shouldTransform .+ gradientVec .* shouldNotTransform
 end
 
 

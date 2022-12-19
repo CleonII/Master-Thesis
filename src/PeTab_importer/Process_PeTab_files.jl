@@ -67,6 +67,29 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
 
     # Build functions for observables, sd and u0 if does not exist and include
     pathObsSdU0 = dirModel * modelName * "ObsSdU0.jl"
+    pathDObsSdU0 = dirModel * modelName * "DObsSdU0.jl"
+    if !isfile(pathObsSdU0) || forceBuildJlFile == true
+        if verbose && forceBuildJlFile == false
+            @printf("File for yMod, U0 and Sd does not exist - building it\n")
+        end
+        if verbose && forceBuildJlFile == true
+            @printf("By user option will rebuild Ymod, Sd and u0\n")
+        end
+        if !@isdefined(modelDict)
+            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, writeToFile=false)
+        end
+        createFileYmodSdU0(modelName, dirModel, odeSysUse, stateMap, modelDict)
+        createFileDYmodSdU0(modelName, dirModel, odeSysUse, stateMap, modelDict)
+    else
+        if verbose
+            @printf("File for yMod, U0 and Sd does exist - will not rebuild it\n")
+        end
+    end
+    include(pathObsSdU0)
+    include(pathDObsSdU0)    
+
+    # Build functions for observables, sd and u0 if does not exist and include
+    pathObsSdU0 = dirModel * modelName * "ObsSdU0.jl"
     if !isfile(pathObsSdU0) || forceBuildJlFile == true
         if verbose && forceBuildJlFile == false
             @printf("File for yMod, U0 and Sd does not exist - building it\n")
@@ -90,6 +113,10 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
                             evalU0!,
                             evalU0,
                             evalSd!,
+                            evalDYmodDu,
+                            evalDSdDu!,
+                            evalDYmodDp,
+                            evalDSdDp!,
                             odeSysUse,
                             paramMap,
                             stateMap,
@@ -260,19 +287,40 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
         end
     end
 
-    # Save for each observation its pre-equlibrium and simulation condition id. 
-
-
     # To avoid repeating calculations yObs is stored in a transformed and untransformed format 
     yObsTransformed::Array{Float64, 1} = deepcopy(yObs)
     transformYobsOrYmodArr!(yObsTransformed, transformArr)
 
+    # To make everything easier for adjoint sensitivity analysis we can sort the observations for each experimental 
+    # condition based on the observed time, that is we do not follow the format in the measurementData file. 
+    uniqueConditionID = unique(conditionId)
+    indexVec::Array{Integer, 1} = Array{Integer, 1}(undef, length(tObs))
+    k = 1
+    for i in eachindex(uniqueConditionID)
+        obsWithId = findall(x -> x == uniqueConditionID[i], conditionId)
+        nObsWithId = length(obsWithId)
+        iSort = sortperm(tObs[obsWithId])
+        indexVec[k:(nObsWithId+k-1)] .= obsWithId[iSort]
+        k += nObsWithId
+    end
+    yObs = yObs[indexVec]
+    yObsTransformed = yObsTransformed[indexVec]
+    tObs = tObs[indexVec]
+    conditionId = conditionId[indexVec]
+    sdParams = sdParams[indexVec]
+    transformArr = transformArr[indexVec]
+    obsParam = obsParam[indexVec]
+    simCond = simCond[indexVec]
+    obsID = obsID[indexVec]
+    if !isempty(preEq)
+        preEq = preEq[indexVec]
+    end
+
     # For each experimental condition we want to know the vector of time-points to save the ODE solution at 
     # for each experimental condition. For each t-obs we also want to know which index in t-save vector 
-    # it corresponds to.
+    # it corresponds to. We do not need to sort here as it is done above
     iTimePoint = Array{Int64, 1}(undef, nObs)
     iPerConditionId = Dict() # Index in measurment data corresponding to specific condition id 
-    uniqueConditionID = unique(conditionId)
     tVecSave = Dict()
     for i in eachindex(uniqueConditionID)
         iConditionId = findall(x -> x == uniqueConditionID[i], conditionId)
@@ -285,7 +333,27 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
         end
     end
 
-    return MeasurementData(yObs, yObsTransformed, tObs, obsID, conditionId, sdParams, transformArr, obsParam, tVecSave, iTimePoint, iPerConditionId, preEq, simCond)
+    # When doing adjoint sensitivity analysis via the lower level interface we need at each time 
+    # points (for a specific experimental condition) need to know how many observations we have, 
+    # and which index they have in the measurementData-struct. This computes a dictionary such 
+    # that iGroupedTObs["expId"] returns a vector of vector where iGroupedTObs["expId"][i] returns 
+    # the indices (in measurmentData) for all observations we have for unique(tVecExpId)[i], which 
+    # is then used by the lower level interface for adjoint sensitivity analysis.
+    iGroupedTObs = Dict{String, Vector{Vector{Integer}}}()
+    for key in keys(iPerConditionId)
+        indexObs = iPerConditionId[key]
+        uniqueT = unique(tObs[indexObs])
+        vecSave = Array{Array{Integer, 1}, 1}(undef, length(uniqueT))
+        for j in eachindex(vecSave)
+            saveTmp = findall(x -> x == uniqueT[j], tObs)
+            vecSave[j] = saveTmp[findall(x -> conditionId[x] == key, saveTmp)]
+        end
+        iGroupedTObs[key] = vecSave
+    end
+
+    return MeasurementData(yObs, yObsTransformed, tObs, obsID, conditionId, sdParams, 
+                           transformArr, obsParam, tVecSave, iTimePoint, iPerConditionId, 
+                           preEq, simCond, iGroupedTObs)
 end
 
 
@@ -320,12 +388,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
 
     # If preequilibrationConditionId column is not empty the model should 
     # first be simulated to a stady state 
-    colNames = names(measurementDataFile)
-    if !("preequilibrationConditionId" in colNames)
-        preEqIDs = Array{String, 1}(undef, 0)
-    else
-        preEqIDs = convert(Array{String, 1}, unique(filter(x -> !ismissing(x), measurementDataFile[!, "preequilibrationConditionId"])))
-    end
+    preEqIDs = unique(measurementData.preEqCond)
     simulateSS = length(preEqIDs) > 0
 
     # In case the the model is simulated to steday state get pre and post equlibration experimental conditions 
@@ -333,16 +396,16 @@ function getSimulationInfo(measurementDataFile::DataFrame,
         firstExpIds = preEqIDs
         shiftExpIds = Any[]
         for firstExpId in firstExpIds
-            iRows = findall(x -> x == firstExpId, measurementDataFile[!, "preequilibrationConditionId"])
-            shiftExpId = unique(measurementDataFile[iRows, "simulationConditionId"])
+            iRows = findall(x -> x == firstExpId, measurementData.preEqCond)
+            shiftExpId = unique(measurementData.simCond[iRows])
             push!(shiftExpIds, shiftExpId)
         end
         shiftExpIds = convert(Vector{Vector{String}}, shiftExpIds)
     end
 
-    # In case the the model is mpt simulated to steday state store experimental condition in firstExpIds
+    # In case the the model is not simulated to steday state store experimental condition in firstExpIds
     if simulateSS == false
-        firstExpIds = convert(Array{String, 1}, unique(measurementDataFile[!, "simulationConditionId"]))
+        firstExpIds = unique(measurementData.simCond)
         shiftExpIds = Array{Array{String, 1}, 1}(undef, 0)
     end
 
@@ -358,6 +421,11 @@ function getSimulationInfo(measurementDataFile::DataFrame,
     # used when computing the cost.
     solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
     solArrayGrad = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
+    if simulateSS
+        solArrayPreEq = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, length(unique(firstExpIds)))
+    else
+        solArrayPreEq = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, 0)
+    end
 
     # Array with conition-ID for each foward simulations. As we always solve the ODE in the same order this can 
     # be pre-computed.
@@ -396,6 +464,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
                                     simulateSS,
                                     solArray, 
                                     solArrayGrad, 
+                                    solArrayPreEq,
                                     absTolSS, 
                                     relTolSS, 
                                     deepcopy(measurementData.tVecSave))

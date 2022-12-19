@@ -105,6 +105,18 @@ elseif diffZygote > 1e-3
     println("Does not pass ll-test for Zygote Brännmark model")
     passTest = false
 end
+# Check we get correct gradient for a pre-eq simulation model 
+peTabOpt = setUpCostGradHess(peTabModel, Rodas5(), 1e-9, adjSolver=Rodas5(), adjTol=1e-9, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)),
+                             adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), 
+                             adjSensealgSS=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
+cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)                             
+gradFor = zeros(length(peTabOpt.paramVecTransformed))
+gradAdj = zeros(length(peTabOpt.paramVecTransformed))
+peTabOpt.evalGradF(gradFor, peTabOpt.paramVecTransformed)
+peTabOpt.evalGradFAdjoint(gradAdj, peTabOpt.paramVecTransformed)
+if sum((gradFor - gradAdj).^2) > 1e-4
+    println("Does not pass prior test for adjoint sensitivity")
+end
 
 
 # Bruno model 
@@ -241,7 +253,7 @@ elseif diffZygote > 1e-3
 end
 
 
-# Schwen model - We do not handle Priors yet
+# Schwen model
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Schwen_PONE2014/"
 peTabModel = setUpPeTabModel("model_Schwen_PONE2014", dirModel, verbose=false, forceBuildJlFile=true)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
@@ -255,6 +267,16 @@ if diff > 1e-3
 elseif diffZygote > 1e-3
     println("Does not pass ll-test for Zygote Schwen model")
     passTest = false
+end
+# For Schwen check that lower level adjoint interface handles priors well 
+peTabOpt = setUpCostGradHess(peTabModel, Rodas5(), 1e-9, adjSolver=Rodas5(), adjTol=1e-9, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)),
+                             adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
+gradFor = zeros(length(peTabOpt.paramVecTransformed))
+gradAdj = zeros(length(peTabOpt.paramVecTransformed))
+peTabOpt.evalGradF(gradFor, peTabOpt.paramVecTransformed)
+peTabOpt.evalGradFAdjoint(gradAdj, peTabOpt.paramVecTransformed)
+if sum((gradFor - gradAdj).^2) > 1e-6
+    println("Does not pass prior test for adjoint sensitivity")
 end
 
 

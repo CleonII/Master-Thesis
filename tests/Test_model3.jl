@@ -163,7 +163,11 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
 
     solver = Rodas4P(autodiff=false)
     tol = 1e-12
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, absTolSS=1e-12, relTolSS=1e-10, sensealg=ForwardDiffSensitivity())
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, absTolSS=1e-12, relTolSS=1e-10, sensealg=ForwardDiffSensitivity(), 
+                                 adjTol=1e-12, adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
+    peTabOptAdj = setUpCostGradHess(peTabModel, solver, tol, absTolSS=1e-12, relTolSS=1e-10, sensealg=ForwardDiffSensitivity(), 
+                                    adjTol=1e-12, adjSensealg=adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)),
+                                    adjSensealgSS=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)))                                 
     calcCostAlg = (paramVec) -> calcCostAlgebraic(paramVec, peTabModel, solver, tol)
 
     Random.seed!(123)
@@ -172,6 +176,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
 
     for i in 1:5
 
+        println("i = $i")
         paramVec = cube[i, :]
 
         # Evaluate cost 
@@ -186,7 +191,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
 
         # Evaluate cost for Zygote 
         costZygote = peTabOpt.evalFZygote(paramVec)
-        sqDiffCostZygote = (costPeTab - costAlg)^2
+        sqDiffCostZygote = (costZygote - costAlg)^2
         if sqDiffCostZygote > 1e-4
             @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
             @printf("Does not pass test on cost\n")
@@ -213,6 +218,26 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             return false
         end
 
+        # Evaluate lower level adjoint sensitivity interfance gradient 
+        gradAdj = zeros(4)
+        peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
+        sqDiffGradAdjoint1 = sum((gradAdj - gradAlg).^2)
+        if sqDiffGradAdjoint1 > 1e-4
+            @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
+            @printf("Does not pass test on adjoint gradient gradient\n")
+            return false
+        end
+
+        # Evaluate lower level adjoint sensitivity interfance gradient 
+        gradAdj = zeros(4)
+        peTabOptAdj.evalGradFAdjoint(gradAdj, paramVec)
+        sqDiffGradAdjoint2 = sum((gradAdj - gradAlg).^2)
+        if sqDiffGradAdjoint2 > 1e-4
+            @printf("sqDiffGradAdjointOpt2 = %.3e\n", sqDiffGradAdjoint2)
+            @printf("Does not pass test on adjoint without steady state adjoint approach\n")
+            return false
+        end
+
         # Evaluate hessian 
         hessAlg = ForwardDiff.hessian(calcCostAlg, paramVec)
         hess = zeros(4, 4); peTabOpt.evalHess(hess, paramVec)
@@ -229,6 +254,8 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
             @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
+            @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
+            @printf("sqDiffGradAdjointOpt2 = %.3e\n", sqDiffGradAdjoint2)
         end
     end
 
@@ -237,8 +264,6 @@ end
 
 
 peTabModel = setUpPeTabModel("Test_model3", pwd() * "/tests/Test_model3/", forceBuildJlFile=true)
-
-
 passTest = testOdeSol(peTabModel, Rodas4P(), 1e-12, printRes=true)
 if passTest == true
     @printf("Passed test for ODE solution\n")
