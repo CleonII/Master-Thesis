@@ -183,7 +183,8 @@ end
 """
 function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity())
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity(), 
+                                 adjSolver=solver, adjTol=tol, adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
 
     Random.seed!(123)
     createCube(peTabOpt, 5)
@@ -241,6 +242,17 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("Does not pass test on hessian\n")
             return false
         end
+
+        # Here we normalise the gradients (as the gradients are typically huge here 1e8, so without any form 
+        # of normalisation we do not pass the test)
+        gradAdj = zeros(nParam)
+        peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
+        sqDiffGradAdjoint1 = sum((gradAnalytic ./ norm(gradAnalytic) - gradAdj / norm(gradAdj)).^2)
+        if sqDiffGradAdjoint1 > 1e-4
+            @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
+            @printf("Does not pass test on adjoint gradient gradient\n")
+            return false
+        end
                 
         if printRes == true
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
@@ -248,6 +260,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
             @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
+            @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
         end
     end
 

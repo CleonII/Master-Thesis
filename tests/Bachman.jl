@@ -37,7 +37,8 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 """
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity())
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity(), 
+                                 adjSolver=solver, adjTol=1e-10, adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
 
     # Parameter values to test gradient at 
     paramVals = CSV.read(pwd() * "/tests/Bachman/Params.csv", DataFrame)
@@ -82,6 +83,16 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
+        # Evaluate lower level adjoint sensitivity interface gradient 
+        gradAdj = zeros(length(paramVec))
+        peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
+        sqDiffGradAdjoint = sum((gradAdj - gradPython[iUse]).^2)
+        if sqDiffGradAdjoint > 1e-4
+            @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
+            @printf("Does not pass test on adjoint gradient gradient\n")
+            return false
+        end
+
         # This currently takes considerble time (hence it does not run for all passes)
         if i == 1
             gradZygote = zeros(length(paramVec))
@@ -100,6 +111,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("sqDiffCostZygote = %.3e\n", sqDiffZygote)
+            @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
         end
     end
 
