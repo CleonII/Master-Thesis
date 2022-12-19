@@ -145,7 +145,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
 
         if :IpoptLBFGS in algList
             ipoptProbBfgs.x = deepcopy(p0)
-            Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 5)
+            Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 0)
             runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
             writeFile(pathSave, ipoptProbBfgs.obj_val, runTime, ipoptProbBfgs.status, iterArrBfgs[1], i, "IpoptLBFGS", solverStr, string(tol))
         end
@@ -201,6 +201,15 @@ if ARGS[1] == "Boehm"
 end
 
 
+if ARGS[1] == "Elowitz"
+    loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
+    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :FidesAutoHess, :FidesBlockAutoHess]
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Elowitz_Nature2000/"
+    peTabModel = setUpPeTabModel("model_Elowitz_Nature2000", dirModel, verbose=false)
+    benchmarkParameterEstimation(peTabModel, Rodas5(), "Rodas5", 1e-6, 1000, algList=algsTest) 
+end
+
+
 if ARGS[1] == "Crauste"
     loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
     algsTest = [:IpoptAutoHess, :IpoptLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
@@ -252,3 +261,20 @@ if ARGS[1] == "Zheng"
     benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-6, 1000, algList=algsTest)
 end
 
+
+a = 1.0
+
+
+function myTest(a)
+    try 
+        res = sqrt(a)
+        return res
+    catch e
+        if e isa DomainError
+            println("Domain error when solving ODE. Likelly becuase ODE-system Jacobian is ill-conditioned")
+            return 0.0
+        else
+            rethrow(e)
+        end
+    end
+end

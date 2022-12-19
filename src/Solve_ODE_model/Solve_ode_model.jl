@@ -103,16 +103,27 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         uAtSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
         u0PreSimSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
         for i in eachindex(preEqIds)
-            success = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
-                                             (@view u0PreSimSS[:, i]), 
-                                             prob, 
-                                             changeToExperimentalCondUse!, 
-                                             preEqIds[i], 
-                                             absTol, 
-                                             relTol, 
-                                             solver, 
-                                             simulationInfo.absTolSS, 
-                                             simulationInfo.relTolSS)
+            # Sometimes when the parameter vector is particularly bad the Jacbobian is severly
+            # ill conditioned resulting in a bounds error when trying to solve the linear
+            # system in a stiff-solver. 
+            try 
+                success = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
+                                                (@view u0PreSimSS[:, i]), 
+                                                prob, 
+                                                changeToExperimentalCondUse!, 
+                                                preEqIds[i], 
+                                                absTol, 
+                                                relTol, 
+                                                solver, 
+                                                simulationInfo.absTolSS, 
+                                                simulationInfo.relTolSS)
+            catch e
+                if e isa DomainError
+                    println("Bounds error ODE PreEq solve")
+                    return false
+                end
+            end
+
             if success != true
                 return false
             end
@@ -136,24 +147,33 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
             end
 
             t_max_ss = simulationInfo.tMaxForwardSim[i]
-            solArray[i] = solveODEPostEqulibrium(prob, 
-                                                 (@view uAtSS[:, whichPreEq]),
-                                                 (@view u0PreSimSS[:, whichPreEq]), 
-                                                 changeToExperimentalCondUse!,
-                                                 simulationInfo.postEqIdSol[i], 
-                                                 absTol,
-                                                 relTol,
-                                                 t_max_ss,
-                                                 simulationInfo.absTolSS, 
-                                                 simulationInfo.relTolSS,
-                                                 solver,
-                                                 tSave=tSave, 
-                                                 nTSave=nTSave, 
-                                                 denseSol=denseSol)
-
-            if solArray[i].retcode != :Success
-                sucess = false
-                break 
+            # See comment above on domain error
+            try 
+                solArray[i] = solveODEPostEqulibrium(prob, 
+                                                    (@view uAtSS[:, whichPreEq]),
+                                                    (@view u0PreSimSS[:, whichPreEq]), 
+                                                    changeToExperimentalCondUse!,
+                                                    simulationInfo.postEqIdSol[i], 
+                                                    absTol,
+                                                    relTol,
+                                                    t_max_ss,
+                                                    simulationInfo.absTolSS, 
+                                                    simulationInfo.relTolSS,
+                                                    solver,
+                                                    tSave=tSave, 
+                                                    nTSave=nTSave, 
+                                                    denseSol=denseSol)
+                if solArray[i].retcode != :Success
+                    sucess = false
+                end
+            catch e
+                if e isa BoundsError
+                    println("Bounds error ODE solve")
+                    sucess = false
+                end
+            end
+            if sucess == false
+                return false
             end
         end
 
@@ -177,23 +197,31 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
             end
 
             t_max = simulationInfo.tMaxForwardSim[i]
-            solArray[i] = solveOdeNoSS(prob, 
-                                       changeToExperimentalCondUse!, 
-                                       firstExpId, 
-                                       absTol,
-                                       relTol, 
-                                       solver, 
-                                       t_max, 
-                                       nTSave=nTSave, 
-                                       tSave=tSave,
-                                       denseSol=denseSol, 
-                                       absTolSS=simulationInfo.absTolSS, 
-                                       relTolSS=simulationInfo.relTolSS)
-
-            if !(solArray[i].retcode == :Success || solArray[i].retcode == :Terminated)
-                sucess = false
-                break 
+            try
+                solArray[i] = solveOdeNoSS(prob, 
+                                           changeToExperimentalCondUse!, 
+                                           firstExpId, 
+                                           absTol,
+                                           relTol, 
+                                           solver, 
+                                           t_max, 
+                                           nTSave=nTSave, 
+                                           tSave=tSave,
+                                           denseSol=denseSol, 
+                                           absTolSS=simulationInfo.absTolSS, 
+                                           relTolSS=simulationInfo.relTolSS)
+                if !(solArray[i].retcode == :Success || solArray[i].retcode == :Terminated)
+                    sucess = false
+                end
+            catch e
+                if e isa BoundsError
+                    println("Bounds error ODE solve")
+                    sucess = false
+                end
             end
+            if sucess == false
+                return false
+            end                                       
         end
     end
 
@@ -435,8 +463,12 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     
     solCall = getSolCallSolveOdeNoSS(absTol,relTol, t_max_ss, solver, tSave, 
                                      nTSave, denseSol, absTolSS, relTolSS)
+
+    # For some models with bad parameter vector the Jacobian for the ODE system 
+    # can be badly conditioned such that when trying to solve the linear system 
+    # a domain error is thrown. Given this we return Inf
     sol = solCall(prob)
-    
+
     return sol                                     
 end
 
