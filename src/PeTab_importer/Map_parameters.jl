@@ -21,10 +21,10 @@ function getIndicesParam(paramData::ParamData,
                          odeSystem::ODESystem, 
                          experimentalConditionsFile::DataFrame)::ParameterIndices
 
-    namesObsParam = getIdEst(measurementData.obsParam, paramData)
+    namesObsParam::Vector{String} = getIdEst(measurementData.obsParam, paramData)
     isObsParam = [paramData.parameterID[i] in namesObsParam for i in eachindex(paramData.parameterID)]
 
-    namesSdParam = getIdEst(measurementData.sdParams, paramData)
+    namesSdParam::Vector{String} = getIdEst(measurementData.sdParams, paramData)
     isSdParam = [paramData.parameterID[i] in namesSdParam for i in eachindex(paramData.parameterID)]
 
     # Parameters not entering the ODE system (or initial values), are not noise-parameter or observable 
@@ -32,34 +32,34 @@ function getIndicesParam(paramData::ParamData,
     # want to compute gradients for these given a fixed ODE solution.
     condSpecificDynParam = identityCondSpecificDynParam(odeSystem, paramData, experimentalConditionsFile)
     isNonDynamicParam = (paramData.shouldEst .&& .!isSdParam .&& .!isObsParam)
-    namesNonDynamicParam = paramData.parameterID[isNonDynamicParam]
-    namesNonDynamicParam = namesNonDynamicParam[findall(x -> x ∉ (string.(parameters(odeSystem))), namesNonDynamicParam)]
-    namesNonDynamicParam = namesNonDynamicParam[findall(x -> x ∉ condSpecificDynParam, namesNonDynamicParam)]
+    namesNonDynamicParam_ = paramData.parameterID[isNonDynamicParam]
+    namesNonDynamicParam_ = namesNonDynamicParam_[findall(x -> x ∉ (string.(parameters(odeSystem))), namesNonDynamicParam_)]
+    namesNonDynamicParam::Vector{String} = namesNonDynamicParam_[findall(x -> x ∉ condSpecificDynParam, namesNonDynamicParam_)]
     isNonDynamicParam = [paramData.parameterID[i] in namesNonDynamicParam for i in eachindex(paramData.parameterID)]
 
     isDynamicParam = (paramData.shouldEst .&& .!isNonDynamicParam .&& .!isSdParam .&& .!isObsParam)
-    namesParamDyn = paramData.parameterID[isDynamicParam]
+    namesParamDyn::Vector{String} = paramData.parameterID[isDynamicParam]
 
     # A paramter can be both a SD and observable parameter
     namesSdObsNonDynParam::Array{String, 1} = string.(unique(vcat(namesSdParam, namesObsParam, namesNonDynamicParam)))
     namesParamEst::Array{String, 1} = string.(vcat(string.(namesParamDyn), string.(namesSdObsNonDynParam)))
 
-    # Index vector for the dynamic and sd parameters as UInt32 vectors 
-    iDynPar::Array{UInt32, 1} = [findfirst(x -> x == namesParamDyn[i],  namesParamEst) for i in eachindex(namesParamDyn)]
-    iSdPar::Array{UInt32, 1} = [findfirst(x -> x == namesSdParam[i],  namesParamEst) for i in eachindex(namesSdParam)]
-    iObsPar::Array{UInt32, 1} = [findfirst(x -> x == namesObsParam[i],  namesParamEst) for i in eachindex(namesObsParam)]
-    iNonDynPar::Array{UInt32, 1} = [findfirst(x -> x == namesNonDynamicParam[i],  namesParamEst) for i in eachindex(namesNonDynamicParam)]
-    iSdObsNonDynPar::Array{UInt32, 1} = [findfirst(x -> x == namesSdObsNonDynParam[i],  namesParamEst) for i in eachindex(namesSdObsNonDynParam)]
+    # Index vector for the dynamic and sd parameters as Int64 vectors 
+    iDynPar::Array{Int64, 1} = [findfirst(x -> x == namesParamDyn[i],  namesParamEst) for i in eachindex(namesParamDyn)]
+    iSdPar::Array{Int64, 1} = [findfirst(x -> x == namesSdParam[i],  namesParamEst) for i in eachindex(namesSdParam)]
+    iObsPar::Array{Int64, 1} = [findfirst(x -> x == namesObsParam[i],  namesParamEst) for i in eachindex(namesObsParam)]
+    iNonDynPar::Array{Int64, 1} = [findfirst(x -> x == namesNonDynamicParam[i],  namesParamEst) for i in eachindex(namesNonDynamicParam)]
+    iSdObsNonDynPar::Array{Int64, 1} = [findfirst(x -> x == namesSdObsNonDynParam[i],  namesParamEst) for i in eachindex(namesSdObsNonDynParam)]
     
     # When extracting observable or sd parameter for computing the likelhood a pre-calculcated map-array
     # is used to efficently extract correct parameters. The arrays below define which map to extract to 
     # use in the map array for each specific observation 
     # Observable parameters 
     keysObsMap = unique(measurementData.obsParam)
-    indexObsParamMap = [UInt32(findfirst(x -> x == measurementData.obsParam[i], keysObsMap)) for i in eachindex(measurementData.obsParam)]
+    indexObsParamMap = [Int64(findfirst(x -> x == measurementData.obsParam[i], keysObsMap)) for i in eachindex(measurementData.obsParam)]
     # Noise parameters 
     keysSdMap = unique(measurementData.sdParams)
-    indexSdParamMap = [UInt32(findfirst(x -> x == measurementData.sdParams[i], keysSdMap)) for i in eachindex(measurementData.sdParams)]
+    indexSdParamMap = [Int64(findfirst(x -> x == measurementData.sdParams[i], keysSdMap)) for i in eachindex(measurementData.sdParams)]
 
     # Build maps to efficently map Obs- and SD-parameter when computing the likelhood
     mapArrayObsParam = buildMapParameters(keysObsMap, measurementData, paramData, true)
@@ -69,12 +69,12 @@ function getIndicesParam(paramData::ParamData,
 
     # Set up a map for changing ODEProblem model parameters when doing parameter estimation  
     iDynParamInSys = [findfirst(x -> x == namesParamDyn[i], namesAllString) for i in eachindex(namesParamDyn)]
-    iDynParamInSys = convert(Array{Integer, 1}, iDynParamInSys[.!isnothing.(iDynParamInSys)])
-    iDynParamInVecEst = convert(Array{Integer, 1}, [findfirst(x -> x == namesAllString[iSys], namesParamEst) for iSys in iDynParamInSys])
-    mapDynParEst = MapDynParEst(iDynParamInSys, iDynParamInVecEst)
+    iDynParamInSys = convert(Array{Int64, 1}, iDynParamInSys[.!isnothing.(iDynParamInSys)])
+    iDynParamInVecEst = convert(Array{Int64, 1}, [findfirst(x -> x == namesAllString[iSys], namesParamEst) for iSys in iDynParamInSys])
+    mapDynParEst::MapDynParEst = MapDynParEst(iDynParamInSys, iDynParamInVecEst)
 
     # Set up a map for changing between experimental conditions 
-    mapExpCond, constParamPerCond = getMapExpCond(odeSystem, namesAllString, measurementData, paramData, experimentalConditionsFile, namesParamDyn, namesParamEst)
+    mapExpCond::Vector{MapExpCond}, constParamPerCond::Vector{Vector{Float64}} = getMapExpCond(odeSystem, namesAllString, measurementData, paramData, experimentalConditionsFile, namesParamDyn, namesParamEst)
 
     paramIndicies = ParameterIndices(iDynPar, 
                                      iObsPar, 
@@ -117,17 +117,17 @@ function buildMapParameters(keysMap::T1,
     # index in obsParamVecEst-vector depending on the observable parameters should be estimated or not.
     for i in eachindex(keysMap)
         if isempty(keysMap[i])
-            mapEntries[i] = ParamMap(Array{Bool, 1}(undef, 0), Array{UInt32, 1}(undef, 0), Array{Float64, 1}(undef, 0), UInt32(0))
+            mapEntries[i] = ParamMap(Array{Bool, 1}(undef, 0), Array{Int64, 1}(undef, 0), Array{Float64, 1}(undef, 0), Int64(0))
 
         elseif typeof(keysMap[i]) <: AbstractFloat
-            mapEntries[i] = ParamMap(Array{Bool, 1}(undef, 0), Array{UInt32, 1}(undef, 0), Array{Float64, 1}(undef, 0), UInt32(0))
+            mapEntries[i] = ParamMap(Array{Bool, 1}(undef, 0), Array{Int64, 1}(undef, 0), Array{Float64, 1}(undef, 0), Int64(0))
 
         elseif !isempty(keysMap[i])
 
             paramsRet = split(keysMap[i], ';')
             nParamsRet::Int = length(paramsRet)
             shouldEst::Array{Bool, 1} = Array{Bool, 1}(undef, nParamsRet)
-            indexUse::Array{UInt32, 1} = Array{UInt32, 1}(undef, nParamsRet)
+            indexUse::Array{Int64, 1} = Array{Int64, 1}(undef, nParamsRet)
             valuesConst::Array{Float64, 1} = Array{Float64, 1}(undef, nParamsRet)
 
             for j in eachindex(paramsRet)
@@ -135,7 +135,7 @@ function buildMapParameters(keysMap::T1,
                 # it has in the obsParam parameter vector.
                 if paramsRet[j] in namesParamEst
                     shouldEst[j] = true
-                    indexUse[j] = UInt32(findfirst(x -> x == paramsRet[j], namesParamEst))
+                    indexUse[j] = Int64(findfirst(x -> x == paramsRet[j], namesParamEst))
 
                 # In case observable parameter in paramsRet[j] is constant save its constant value. 
                 # The constant value can be found either directly in the measurementDataFile, or in 
@@ -156,7 +156,7 @@ function buildMapParameters(keysMap::T1,
                 end
             end
 
-            mapEntries[i] = ParamMap(shouldEst, indexUse[shouldEst], valuesConst[.!shouldEst], UInt32(length(paramsRet)))
+            mapEntries[i] = ParamMap(shouldEst, indexUse[shouldEst], valuesConst[.!shouldEst], Int64(length(paramsRet)))
         end
     end
 
@@ -164,7 +164,7 @@ function buildMapParameters(keysMap::T1,
 end
 
 
-function getObsOrSdParam(paramVec, paramMap::ParamMap)
+function getObsOrSdParam(paramVec::AbstractVector, paramMap::ParamMap)
 
     # Helper function to in a non-mutating way map SD-parameters in non-mutating way 
     function mapParamEst(iWal)
@@ -288,7 +288,7 @@ function getMapExpCond(odeSystem::ODESystem,
                        paramData::ParamData, 
                        experimentalConditionsFile::DataFrame, 
                        namesParamDyn::Array{String, 1}, 
-                       namesParamEst::Array{String, 1})
+                       namesParamEst::Array{String, 1})::Tuple{Vector{MapExpCond}, Vector{Vector{Float64}}}
 
 
     lenExpCond = nrow(experimentalConditionsFile)
@@ -297,17 +297,17 @@ function getMapExpCond(odeSystem::ODESystem,
     i_start = "conditionName" in names(experimentalConditionsFile) ? 3 : 2
     paramStateChange = names(experimentalConditionsFile)[i_start:end]
 
-    mapExpCondArr = Array{MapExpCond, 1}(undef, lenExpCond)
+    mapExpCondArr::Array{MapExpCond, 1} = Array{MapExpCond, 1}(undef, lenExpCond)
     condIdName = Array{String, 1}(undef, lenExpCond)
 
     for i in 1:lenExpCond
 
         expCondParamConstVal::Array{Float64, 1} = Array{Float64, 1}(undef, 0)
-        iOdeProbParamConstVal::Array{Int, 1} = Array{Int, 1}(undef, 0)
+        iOdeProbParamConstVal::Array{Int64, 1} = Array{Int64, 1}(undef, 0)
         expCondStateConstVal::Array{Float64, 1} = Array{Float64, 1}(undef, 0)
-        iOdeProbStateConstVal::Array{Int, 1} = Array{Int, 1}(undef, 0)
-        iDynEstVec::Array{Int, 1} = Array{Int, 1}(undef, 0)
-        iOdeProbDynParam::Array{Int, 1} = Array{Int, 1}(undef, 0)
+        iOdeProbStateConstVal::Array{Int64, 1} = Array{Int64, 1}(undef, 0)
+        iDynEstVec::Array{Int64, 1} = Array{Int64, 1}(undef, 0)
+        iOdeProbDynParam::Array{Int64, 1} = Array{Int64, 1}(undef, 0)
 
         rowI = string.(collect(experimentalConditionsFile[i, i_start:end]))
         condID = experimentalConditionsFile[i, 1]
@@ -351,11 +351,11 @@ function getMapExpCond(odeSystem::ODESystem,
 
         mapExpCondArr[i] = MapExpCond(string(condID),
                                       expCondParamConstVal, 
-                                      iOdeProbParamConstVal, 
+                                      convert(Vector{Int64}, iOdeProbParamConstVal),
                                       expCondStateConstVal, 
-                                      iOdeProbStateConstVal, 
-                                      iDynEstVec, 
-                                      iOdeProbDynParam)                                    
+                                      convert(Vector{Int64}, iOdeProbStateConstVal), 
+                                      convert(Vector{Int64}, iDynEstVec), 
+                                      convert(Vector{Int64}, iOdeProbDynParam))                                    
     end
 
     # In order to prevent Zygote from trying to find rules for the struct 

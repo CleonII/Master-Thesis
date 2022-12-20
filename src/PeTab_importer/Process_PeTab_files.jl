@@ -294,7 +294,7 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     # To make everything easier for adjoint sensitivity analysis we can sort the observations for each experimental 
     # condition based on the observed time, that is we do not follow the format in the measurementData file. 
     uniqueConditionID = unique(conditionId)
-    indexVec::Array{Integer, 1} = Array{Integer, 1}(undef, length(tObs))
+    indexVec::Array{Int64, 1} = Array{Int64, 1}(undef, length(tObs))
     k = 1
     for i in eachindex(uniqueConditionID)
         obsWithId = findall(x -> x == uniqueConditionID[i], conditionId)
@@ -320,10 +320,10 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     # for each experimental condition. For each t-obs we also want to know which index in t-save vector 
     # it corresponds to. We do not need to sort here as it is done above
     iTimePoint = Array{Int64, 1}(undef, nObs)
-    iPerConditionId = Dict() # Index in measurment data corresponding to specific condition id 
-    tVecSave = Dict()
+    iPerConditionId = Dict{String, Vector{Int64}}() # Index in measurment data corresponding to specific condition id 
+    tVecSave = Dict{String, Vector{Float64}}()
     for i in eachindex(uniqueConditionID)
-        iConditionId = findall(x -> x == uniqueConditionID[i], conditionId)
+        iConditionId::Vector{Int64} = findall(x -> x == uniqueConditionID[i], conditionId)
         # Sorting is needed so that when extracting time-points when computing the cost 
         # we extract the correct index.
         tVecSave[uniqueConditionID[i]] = sort(unique(tObs[iConditionId]))
@@ -339,11 +339,11 @@ function processMeasurementData(measurementData::DataFrame, observableData::Data
     # that iGroupedTObs["expId"] returns a vector of vector where iGroupedTObs["expId"][i] returns 
     # the indices (in measurmentData) for all observations we have for unique(tVecExpId)[i], which 
     # is then used by the lower level interface for adjoint sensitivity analysis.
-    iGroupedTObs = Dict{String, Vector{Vector{Integer}}}()
+    iGroupedTObs = Dict{String, Vector{Vector{Int64}}}()
     for key in keys(iPerConditionId)
         indexObs = iPerConditionId[key]
         uniqueT = unique(tObs[indexObs])
-        vecSave = Array{Array{Integer, 1}, 1}(undef, length(uniqueT))
+        vecSave = Array{Array{Int64, 1}, 1}(undef, length(uniqueT))
         for j in eachindex(vecSave)
             saveTmp = findall(x -> x == uniqueT[j], tObs)
             vecSave[j] = saveTmp[findall(x -> conditionId[x] == key, saveTmp)]
@@ -419,13 +419,14 @@ function getSimulationInfo(measurementDataFile::DataFrame,
     # of the dynamic parameters, while for the observable/sd parameters the system should not be resolved. 
     # Rather, an ODE solution without dual numbers is required and this solution can be the same which is 
     # used when computing the cost.
-    solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
-    solArrayGrad = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
+    solArray::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1} = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
+    solArrayGrad::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1} = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, nForwardSol)
     if simulateSS
-        solArrayPreEq = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, length(unique(firstExpIds)))
+        lenPreEq = length(unique(firstExpIds))
     else
-        solArrayPreEq = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, 0)
+        lenPreEq = 0
     end
+    solArrayPreEq::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1} = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, lenPreEq)
 
     # Array with conition-ID for each foward simulations. As we always solve the ODE in the same order this can 
     # be pre-computed.
@@ -455,6 +456,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
 
     end
 
+    tVecSave::Dict{String, Vector{Float64}} = deepcopy(measurementData.tVecSave)
     simulationInfo = SimulationInfo(firstExpIds, 
                                     shiftExpIds, 
                                     preEqIdSol,
@@ -467,7 +469,7 @@ function getSimulationInfo(measurementDataFile::DataFrame,
                                     solArrayPreEq,
                                     absTolSS, 
                                     relTolSS, 
-                                    deepcopy(measurementData.tVecSave))
+                                    tVecSave)
     return simulationInfo
 end
 

@@ -21,20 +21,29 @@
 
     See also: [`setUpCostFunc`]
 """
-struct PeTabModel{T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}}, 
-                  T2<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}},
+struct PeTabModel{F1<:Function, 
+                  F2<:Function, 
+                  F3<:Function,
+                  F4<:Function,
+                  F5<:Function,
+                  F6<:Function,
+                  F7<:Function,
+                  F8<:Function,
+                  S<:ODESystem,
+                  T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}}, 
+                  T2<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}}, 
                   T3<:Vector{<:Any}, 
                   T4<:Vector{<:Any}}
     modelName::String
-    evalYmod::Function 
-    evalU0!::Function
-    evalU0::Function
-    evalSd!::Function
-    evalDYmodDu::Function
-    evalDSdDu!::Function
-    evalDYmodDp::Function
-    evalDSdDp!::Function
-    odeSystem::ODESystem 
+    evalYmod::F1
+    evalU0!::F2
+    evalU0::F3
+    evalSd!::F4
+    evalDYmodDu::F5
+    evalDSdDu!::F6
+    evalDYmodDp::F7
+    evalDSdDp!::F8
+    odeSystem::S
     paramMap::T1
     stateMap::T2
     paramNames::T3
@@ -47,21 +56,27 @@ struct PeTabModel{T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}},
 end
 
 
-struct PeTabOpt{T1 <: Integer, 
-                T2 <: Array{<:AbstractFloat, 1}}
-    evalF::Function
-    evalFZygote::Function
-    evalGradF::Function
-    evalGradFZygote::Function
-    evalGradFAdjoint::Function
-    evalHess::Function
-    evalHessApprox::Function
-    nParamEst::T1
+struct PeTabOpt{F1<:Function, 
+                F2<:Function, 
+                F3<:Function,
+                F4<:Function, 
+                F5<:Function, 
+                F6<:Function, 
+                F7<:Function}
+
+    evalF::F1
+    evalFZygote::F2
+    evalGradF::F3
+    evalGradFZygote::F4
+    evalGradFAdjoint::F5
+    evalHess::F6
+    evalHessApprox::F7
+    nParamEst::Int64
     namesParam::Array{String, 1}
-    paramVecNotTransformed::T2
-    paramVecTransformed::T2
-    lowerBounds::T2
-    upperBounds::T2
+    paramVecNotTransformed::Vector{Float64}
+    paramVecTransformed::Vector{Float64}
+    lowerBounds::Vector{Float64}
+    upperBounds::Vector{Float64}
     pathCube::String
     peTabModel::PeTabModel
 end
@@ -102,28 +117,22 @@ end
 
     See also: [`processMeasurementData`]
 """
-struct MeasurementData{T1<:Array{<:AbstractFloat, 1}, 
-                       T2<:Array{<:String, 1}, 
-                       T3<:Array{<:Symbol, 1}, 
-                       T4<:Dict, 
-                       T5<:Array{<:Integer, 1}, 
-                       T6<:Array{<:Union{<:String, <:AbstractFloat}, 1}, 
-                       T7<:Dict{<:String, <:Vector{<:Vector{<:Integer}}}}
+struct MeasurementData{T6<:Array{<:Union{<:String, <:AbstractFloat}, 1}}
                     
-    yObsNotTransformed::T1
-    yObsTransformed::T1
-    tObs::T1
-    observebleID::T2
-    conditionId::T2  # Sum of pre-eq + simulation-cond id 
+    yObsNotTransformed::Vector{Float64}
+    yObsTransformed::Vector{Float64}
+    tObs::Vector{Float64}
+    observebleID::Vector{String}
+    conditionId::Vector{String}  # Sum of pre-eq + simulation-cond id 
     sdParams::T6
-    transformData::T3 # Only done once 
-    obsParam::T2
-    tVecSave::T4
-    iTObs::T5
-    iPerConditionId::T4
-    preEqCond::T2
-    simCond::T2
-    iGroupedTObs::T7
+    transformData::Vector{Symbol} # Only done once 
+    obsParam::Vector{String}
+    tVecSave::Dict{String, Vector{Float64}}
+    iTObs::Vector{Int64}
+    iPerConditionId::Dict{String, Vector{Int64}}
+    preEqCond::Vector{String}
+    simCond::Vector{String}
+    iGroupedTObs::Dict{String, Vector{Vector{Int64}}}
 end
 
 
@@ -140,19 +149,15 @@ end
 
     See also: [`getSimulationInfo`]
 """
-struct SimulationInfo{T1<:Array{<:String, 1}, 
-                      T2<:Vector{<:Vector{String}},
-                      T3<:Bool,
-                      T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}, 
-                      T5<:Dict, 
-                      T6<:Array{<:AbstractFloat, 1}}
-    firstExpIds::T1
-    shiftExpIds::T2
-    preEqIdSol::T1
-    postEqIdSol::T1
-    conditionIdSol::T1
-    tMaxForwardSim::T6
-    simulateSS::T3
+struct SimulationInfo{T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}, 
+                      T5<:Dict{<:String, <:Vector{<:Float64}}}
+    firstExpIds::Vector{String}
+    shiftExpIds::Vector{Vector{String}}
+    preEqIdSol::Vector{String}
+    postEqIdSol::Vector{String}
+    conditionIdSol::Vector{String}
+    tMaxForwardSim::Vector{Float64}
+    simulateSS::Bool
     solArray::T4
     solArrayGrad::T4
     solArrayPreEq::T4
@@ -176,29 +181,28 @@ end
 
     See also: [`getIndicesParam`, `buildMapParameters`]
 """
-struct ParamMap{T1<:Array{<:AbstractFloat, 1}}
+struct ParamMap
     shouldEst::Array{Bool, 1}
-    indexUse::Array{UInt32, 1}
-    valuesConst::T1
-    nParam::UInt32
+    indexUse::Array{Int64, 1}
+    valuesConst::Vector{Float64}
+    nParam::Int64
 end
 
 
-struct MapExpCond{T1 <: Vector{<:AbstractFloat}, 
-                  T2 <: Vector{<:Integer}}
+struct MapExpCond
     condID::String
-    expCondParamConstVal::T1 
-    iOdeProbParamConstVal::T2
-    expCondStateConstVal::T1 
-    iOdeProbStateConstVal::T2
-    iDynEstVec::T2
-    iOdeProbDynParam::T2
+    expCondParamConstVal::Vector{Float64}
+    iOdeProbParamConstVal::Vector{Int64}
+    expCondStateConstVal::Vector{Float64}
+    iOdeProbStateConstVal::Vector{Int64}
+    iDynEstVec::Vector{Int64}
+    iOdeProbDynParam::Vector{Int64}
 end
 
 
-struct MapDynParEst{T1 <: Vector{<:Integer}}
-    iDynParamInSys::T1
-    iDynParamInVecEst::T1
+struct MapDynParEst
+    iDynParamInSys::Vector{Int64}
+    iDynParamInVecEst::Vector{Int64}
 end
 
 
@@ -223,38 +227,33 @@ end
 
     See also: [`getIndicesParam`, `ParamMap`]
 """
-struct ParameterIndices{T1<:Array{<:Integer, 1}, 
-                        T2<:Array{<:String, 1}, 
-                        T3<:Array{<:UInt32, 1}, 
-                        T4<:Array{<:ParamMap, 1}, 
+struct ParameterIndices{T4<:Array{<:ParamMap, 1}, 
                         T5<:MapDynParEst, 
-                        T6<:Array{<:MapExpCond, 1}, 
-                        T7<:Array{<:Array{<:AbstractFloat, 1}, 1}}
+                        T6<:Array{<:MapExpCond, 1}}
 
-    iDynParam::T1
-    iObsParam::T1
-    iSdParam::T1
-    iSdObsNonDynPar::T1
-    iNonDynParam::T1
-    namesDynParam::T2
-    namesObsParam::T2
-    namesSdParam::T2
-    namesSdObsNonDynPar::T2
-    namesNonDynParam::T2
-    namesParamEst::T2
-    indexObsParamMap::T3
-    indexSdParamMap::T3
+    iDynParam::Vector{Int64}
+    iObsParam::Vector{Int64}
+    iSdParam::Vector{Int64}
+    iSdObsNonDynPar::Vector{Int64}
+    iNonDynParam::Vector{Int64}
+    namesDynParam::Vector{String}
+    namesObsParam::Vector{String}
+    namesSdParam::Vector{String}
+    namesSdObsNonDynPar::Vector{String}
+    namesNonDynParam::Vector{String}
+    namesParamEst::Vector{String}
+    indexObsParamMap::Vector{Int64}
+    indexSdParamMap::Vector{Int64}
     mapArrayObsParam::T4
     mapArraySdParam::T4
     mapDynParEst::T5
     mapExpCond::T6
-    constParamPerCond::T7
+    constParamPerCond::Vector{Vector{Float64}}
 end
 
 
-struct PriorInfo{T1 <: Vector{<:Function}, 
-                 T2 <: Vector{<:Bool}}
+struct PriorInfo{T1 <: Vector{<:Function}}
     logpdf::T1
-    priorOnParamScale::T2
+    priorOnParamScale::Vector{Bool}
     hasPriors::Bool
 end
