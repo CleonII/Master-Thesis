@@ -131,7 +131,7 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
 
         if :IpoptAutoHess in algList
             ipoptProbAutoHess.x = deepcopy(p0)
-            Ipopt.AddIpoptIntOption(ipoptProbAutoHess, "print_level", 5)
+            Ipopt.AddIpoptIntOption(ipoptProbAutoHess, "print_level", 0)
             runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbAutoHess)
             writeFile(pathSave, ipoptProbAutoHess.obj_val, runTime, ipoptProbAutoHess.status, iterArrAutoHess[1], i, "IpoptAutoHess", solverStr, string(tol))
         end
@@ -262,19 +262,10 @@ if ARGS[1] == "Zheng"
 end
 
 
-a = 1.0
-
-
-function myTest(a)
-    try 
-        res = sqrt(a)
-        return res
-    catch e
-        if e isa DomainError
-            println("Domain error when solving ODE. Likelly becuase ODE-system Jacobian is ill-conditioned")
-            return 0.0
-        else
-            rethrow(e)
-        end
-    end
+if ARGS[1] == "Schwen"
+    loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Schwen_PONE2014/"
+    peTabModel = setUpPeTabModel("model_Schwen_PONE2014", dirModel, verbose=false)
+    algsTest = [:IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :FidesBlockAutoHess]
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-6, 1000, algList=algsTest)
 end
