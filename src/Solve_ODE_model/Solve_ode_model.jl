@@ -389,11 +389,7 @@ function solveODEPreEqulibrium!(uAtSSVec::AbstractVector,
     u0PreSimSS .= prob.u0
 
     # Terminate if a steady state was not reached in preequilibration simulations 
-    if typeof(solver) <: Symbol
-        sol_pre = getSolPreEqHint(prob, solver, absTol, relTol, absTolSS, relTolSS)
-    else
-        sol_pre = getSolPreEqSolver(prob, solver, absTol, relTol, absTolSS, relTolSS)
-    end
+    sol_pre = getSolPreEq(prob, solver, absTol, relTol, absTolSS, relTolSS)
     if sol_pre.retcode == :Terminated
         uAtSSVec .= sol_pre.u[end]
     end
@@ -488,25 +484,21 @@ function solveOdeNoSS(prob::ODEProblem,
     changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
     probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
     
-    if typeof(solver) <: Symbol
-        sol = getSolSolveOdeNoSSHint(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_use, saveAtVec, dense)
-    else
-        sol = getSolSolveOdeNoSSSolver(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_use, saveAtVec, dense)
-    end
+    sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_use, saveAtVec, dense)
 
     return sol
 end
 
 
-function getSolSolveOdeNoSSHint(prob::ODEProblem, 
-                                solver::Symbol, 
-                                absTol::Float64, 
-                                relTol::Float64,
-                                absTolSS::Float64, 
-                                relTolSS::Float64,
-                                t_max::Float64, 
-                                saveAtVec::Vector{Float64}, 
-                                dense::Bool)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+function getSolSolveOdeNoSS(prob::ODEProblem, 
+                            solver::Symbol, 
+                            absTol::Float64, 
+                            relTol::Float64,
+                            absTolSS::Float64, 
+                            relTolSS::Float64,
+                            t_max::Float64, 
+                            saveAtVec::Vector{Float64}, 
+                            dense::Bool)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
@@ -517,16 +509,15 @@ function getSolSolveOdeNoSSHint(prob::ODEProblem,
     end
     return sol
 end
-
-function getSolSolveOdeNoSSSolver(prob::ODEProblem, 
-                                  solver::SciMLAlgorithm, 
-                                  absTol::Float64, 
-                                  relTol::Float64,
-                                  absTolSS::Float64, 
-                                  relTolSS::Float64,
-                                  t_max::Float64, 
-                                  saveAtVec::Vector{Float64}, 
-                                  dense::Bool)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+function getSolSolveOdeNoSS(prob::ODEProblem, 
+                            solver::SciMLAlgorithm, 
+                            absTol::Float64, 
+                            relTol::Float64,
+                            absTolSS::Float64, 
+                            relTolSS::Float64,
+                            t_max::Float64, 
+                            saveAtVec::Vector{Float64}, 
+                            dense::Bool)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
@@ -539,22 +530,22 @@ function getSolSolveOdeNoSSSolver(prob::ODEProblem,
 end
 
 
-function getSolPreEqHint(prob::ODEProblem,
-                         solver::Symbol,
-                         absTol::Float64, 
-                         relTol::Float64, 
-                         absTolSS::Float64, 
-                        relTolSS::Float64)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+function getSolPreEq(prob::ODEProblem,
+                     solver::Symbol,
+                     absTol::Float64, 
+                     relTol::Float64, 
+                     absTolSS::Float64, 
+                     relTolSS::Float64)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
     sol = solve(prob, alg_hints=solver, abstol=absTol, reltol=relTol, dense=false, callback=TerminateSteadyState(absTolSS, relTolSS))
     return sol
 end
-function getSolPreEqSolver(prob::ODEProblem,
-                           solver::SciMLAlgorithm,
-                           absTol::Float64, 
-                           relTol::Float64, 
-                           absTolSS::Float64, 
-                           relTolSS::Float64)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+function getSolPreEq(prob::ODEProblem,
+                     solver::SciMLAlgorithm,
+                     absTol::Float64, 
+                     relTol::Float64, 
+                     absTolSS::Float64, 
+                     relTolSS::Float64)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
     sol = solve(prob, solver, abstol=absTol, reltol=relTol, dense=false, callback=TerminateSteadyState(absTolSS, relTolSS))
     return sol
