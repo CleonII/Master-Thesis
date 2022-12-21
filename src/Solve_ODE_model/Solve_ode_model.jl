@@ -87,6 +87,8 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
             catch e
                 if e isa BoundsError
                     println("Bounds error on PreEq solution")
+                elseif e isa DomainError
+                    println("Bounds error on PreEq solution")
                 else
                     rethrow(e)
                 end
@@ -135,6 +137,8 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                 if e isa BoundsError
                     println("Bounds error ODE solve")
                     sucess = false
+                elseif e isa DomainError
+                    println("Bounds error on PreEq solution")
                 else
                     rethrow(e)
                 end
@@ -185,6 +189,8 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                 if e isa BoundsError
                     println("Bounds error ODE solve")
                     sucess = false
+                elseif e isa DomainError
+                    println("Bounds error on PreEq solution")
                 else
                     rethrow(e)
                 end
