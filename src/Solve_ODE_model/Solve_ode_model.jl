@@ -422,7 +422,7 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     if length(tSave) != 0 && nTSave != 0
         println("Error : Can only provide tSave (vector to save at) or nTSave as saveat argument to solvers")
     elseif nTSave != 0
-        saveAtVec = collect(LinRange(0.0, t_max, nTSave))
+        saveAtVec = collect(LinRange(0.0, t_max_ss, nTSave))
     else
         saveAtVec = tSave
     end
@@ -446,11 +446,8 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     # share the same parameter vector p. This will, for example, cause the lower level adjoint 
     # sensitivity interface to fail.
     probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])     
-    if typeof(solver) <: Symbol
-        sol = getSolSolveOdeNoSSHint(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_ss, saveAtVec, dense)
-    else
-        sol = getSolSolveOdeNoSSSolver(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_ss, saveAtVec, dense)
-    end      
+    
+    sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_ss, saveAtVec, dense)
     
     return sol                                     
 end
@@ -497,7 +494,7 @@ end
 
 
 function getSolSolveOdeNoSS(prob::ODEProblem, 
-                            solver::Symbol, 
+                            solver::Vector{Symbol}, 
                             absTol::Float64, 
                             relTol::Float64,
                             absTolSS::Float64, 
@@ -537,7 +534,7 @@ end
 
 
 function getSolPreEq(prob::ODEProblem,
-                     solver::Symbol,
+                     solver::Vector{Symbol},
                      absTol::Float64, 
                      relTol::Float64, 
                      absTolSS::Float64, 

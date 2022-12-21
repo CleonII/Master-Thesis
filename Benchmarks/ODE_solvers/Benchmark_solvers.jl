@@ -162,11 +162,11 @@ end
 function runBenchmarkOdeSolvers(peTabModel::PeTabModel, 
                                 pathFileSave::String,
                                 sparseLinSolvers::Bool;
-                                solversCheck="All",
+                                solversCheck="all",
                                 nTimesRepat::UInt=UInt(3), 
                                 tolsCheck=[(1e-6, 1e-6), (1e-9, 1e-9), (1e-12, 1e-12)], 
                                 checkAccuracy::Bool=true)
-    
+  
     println("Working with model ", peTabModel.modelName)
 
     # Process PeTab files into type-stable Julia structs 
@@ -221,10 +221,10 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
         solverLib = solverInfoMat[i, 4]
 
         println("Trying solver = ", solver)
-        # Crashes as problem is to stiff 
+        # Crauste crashes as problem is to stiff 
         if !((peTabModel.modelName == "model_Crauste_CellSystems2017") && solver == AutoTsit5(Rosenbrock23())) 
             for tol in tolsCheck
-
+                
                 absTol, relTol = tol            
                 benchRunTime = Vector{Float64}(undef, nTimesRepat)
 
@@ -233,7 +233,6 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                 # If we do not check accuracy, check that we can solve the model using the provided solver.
                 local sqDiffSolver = Float64
                 if checkAccuracy == true
-                    sqDiffSolver = calcAccuracyOdeSolver(odeProb, solArrayHighAcc, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol)
                     try
                         sqDiffSolver = calcAccuracyOdeSolver(odeProb, solArrayHighAcc, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol)
                     catch 
@@ -248,7 +247,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                     
                 if solverSuccess == true
                     for i in 1:nTimesRepat
-                        status, runTime = solveOdeModelAllExperimentalCondBench(odeProb, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, onlySaveAtTobs=true) 
+                        status, runTime = solveOdeModelAllExperimentalCondBench(odeProb, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, onlySaveAtTobs=true, savePreEqTime=true) 
                         benchRunTime[i] = runTime # nanosecond
                         GC.gc(); GC.gc();GC.gc()
                     end
@@ -304,11 +303,11 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
 end
 
 
-if ARGS[1] == "Test all"
+if ARGS[1] == "Test_all"
 
     dirSave = pwd() * "/Intermediate/Benchmarks/ODE_solvers/"
-    pathFileSaveNotSparse = dirSave * "Sparse_not_linsolvers.csv"
-    pathFileSaveSparse = dirSave * "Sparse_linsolvers.csv"
+    pathFileSaveNotSparse = dirSave * "Sparse_not_linsolvers_new.csv"
+    pathFileSaveSparse = dirSave * "Sparse_linsolvers_new.csv"
     if !isdir(dirSave)
         mkpath(dirSave)
     end
@@ -321,11 +320,15 @@ if ARGS[1] == "Test all"
                     "model_Oliveira_NatCommun2021", "model_Perelson_Science1996", "model_Rahman_MBS2016", 
                     "model_SalazarCavazos_MBoC2020", "model_Sneyd_PNAS2002", "model_Zhao_QuantBiol2020", "model_Zheng_PNAS2012"]
 
+    modelListTry = ["model_Boehm_JProteomeRes2014"]
+    tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
+
     for i in eachindex(modelListTry)
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathFileSaveNotSparse, false, nTimesRepat=UInt(3))
+        a = 1
+        runBenchmarkOdeSolvers(peTabModel, pathFileSaveNotSparse, false, nTimesRepat=UInt(3), tolsCheck=tolsTry)
         GC.gc(); GC.gc();GC.gc()
         runBenchmarkOdeSolvers(peTabModel, pathFileSaveSparse, true, nTimesRepat=UInt(3))
         GC.gc(); GC.gc();GC.gc()

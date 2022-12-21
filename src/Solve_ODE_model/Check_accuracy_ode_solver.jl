@@ -86,26 +86,62 @@ function calcAccuracyOdeSolver(prob::ODEProblem,
     # is done at the time-points in the high accuracy solver. 
     sqErr::Float64 = 0.0
     local couldSolve = true
+
     if simulationInfo.simulateSS == true
-        k = 1
-        for i in eachindex(simulationInfo.firstExpIds)
-            for j in eachindex(simulationInfo.shiftExpIds[i])
 
-                firstExpId = simulationInfo.firstExpIds[i]
-                shiftExpId = simulationInfo.shiftExpIds[i][j]
-                t_max_ss = simulationInfo.tMaxForwardSim[k]
-                
-                solCompare = solveOdeSS(prob, changeToExperimentalCondUse!, firstExpId, shiftExpId, absTol, relTol, t_max_ss, solver, tSave=solArrayHighAccuracy[k].t)
-                
-                # Only compute comparison upon Success retcode, and if solCompare made it to the end-point.
-                if solCompare.retcode != :Success && solCompare.t[end] != solArrayHighAccuracy[k].t[end]
-                    couldSolve = false
-                    break 
-                end
+        preEqIds = unique(simulationInfo.firstExpIds)    
+        # Arrays to store steady state (pre-eq) values 
+        uAtSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
+        u0PreSimSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
 
-                sqErr += calcSqErrVal(solArrayHighAccuracy[k], solCompare, t_max_ss)
-                k += 1
+        for i in eachindex(preEqIds)
+            # Sometimes due to strongly ill-conditioned Jacobian the linear-solve runs 
+            # into a domain error.
+            whichPreEq = findfirst(x -> x == preEqIds[i], simulationInfo.preEqIdSol)
+            simulationInfo.solArrayPreEq[whichPreEq] = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
+                                                                            (@view u0PreSimSS[:, i]), 
+                                                                            prob, 
+                                                                            changeToExperimentalCondUse!, 
+                                                                            preEqIds[i], 
+                                                                            absTol, 
+                                                                            relTol, 
+                                                                            solver, 
+                                                                            simulationInfo.absTolSS, 
+                                                                            simulationInfo.relTolSS)
+            if simulationInfo.solArrayPreEq[whichPreEq].retcode != :Terminated
+                couldSolve == false
+                break
+            end        
+        end
+
+        for i in eachindex(simulationInfo.conditionIdSol)
+
+            if couldSolve == false
+                break
             end
+                
+            whichPreEq = findfirst(x -> x == simulationInfo.preEqIdSol[i], preEqIds)
+            t_max_ss = simulationInfo.tMaxForwardSim[i]
+            # See comment above on domain error
+            solCompare = solveODEPostEqulibrium(prob, 
+                                                (@view uAtSS[:, whichPreEq]),
+                                                (@view u0PreSimSS[:, whichPreEq]), 
+                                                changeToExperimentalCondUse!,
+                                                simulationInfo.postEqIdSol[i], 
+                                                absTol,
+                                                relTol,
+                                                t_max_ss,
+                                                simulationInfo.absTolSS, 
+                                                simulationInfo.relTolSS,
+                                                solver,
+                                                tSave=solArrayHighAccuracy[i].t)
+
+            if solCompare.retcode != :Success
+                couldSolve = false
+                break
+            end
+
+            sqErr += calcSqErrVal(solArrayHighAccuracy[i], solCompare, t_max_ss)
         end
 
     elseif simulationInfo.simulateSS == false

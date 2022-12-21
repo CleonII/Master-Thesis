@@ -7,67 +7,69 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
                                                relTol::Float64;
                                                nTSave::Int64=0, 
                                                onlySaveAtTobs::Bool=false,
-                                               denseSol::Bool=true)
+                                               denseSol::Bool=true, 
+                                               savePreEqTime::Bool=false)
 
+    
     absTolSS, relTolSS = simulationInfo.absTolSS, simulationInfo.relTolSS
-    local sucess = true
-    runTime = 0.0
+
+    bPreEq = 0.0
+    bSim = 0.0
+    local sucess::Bool = true   
     # In case the model is first simulated to a steady state 
     if simulationInfo.simulateSS == true
-        k = 1
-        @inbounds for i in eachindex(simulationInfo.firstExpIds)
-            for j in eachindex(simulationInfo.shiftExpIds[i])
 
-                firstExpId = simulationInfo.firstExpIds[i]
-                shiftExpId = simulationInfo.shiftExpIds[i][j]
-                t_max_ss = simulationInfo.tMaxForwardSim[k]
+        preEqIds = unique(simulationInfo.firstExpIds)
+        # Arrays to store steady state (pre-eq) values 
+        uAtSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
+        u0PreSimSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
 
-                # Whether or not we only want to save solution at observed time-points 
-                if onlySaveAtTobs == true
-                    nTSave = 0
-                    # Extract t-save point for specific condition ID 
-                    tSave = simulationInfo.tVecSave[firstExpId * shiftExpId]
-                else
-                    tSave=Float64[]
-                end
+        for i in eachindex(preEqIds)
+            
+            uAtSSVec = @view uAtSS[:, i]
+            u0PreSimSS = @view u0PreSimSS[:, i]
 
-                solveCallPre, solveCallPost = getSolCallSolveOdeSS(absTol, relTol, t_max_ss, solver, tSave, nTSave, denseSol, absTolSS, relTolSS)
+            changeToExperimentalCondUse!(prob.p, prob.u0, preEqIds[i])
+            prob = remake(prob, tspan = (0.0, 1e8), p = prob.p[:], u0 = prob.u0[:])
+            u0PreSimSS .= prob.u0
 
-                # Change to parameters for the preequilibration simulations 
-                changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
-                u0_pre = deepcopy(prob.u0)
-                prob = remake(prob, tspan = (0.0, 1e8), p = prob.p[:], u0 = prob.u0[:])
+            # Terminate if a steady state was not reached in preequilibration simulations 
+            bPreEq += @elapsed sol_pre = getSolPreEq(prob, solver, absTol, relTol, absTolSS, relTolSS)
+            if sol_pre.retcode == :Terminated
+                uAtSSVec .= sol_pre.u[end]
+            else
+                return false, Inf
+            end
+        end
 
-                # Terminate if a steady state was not reached in preequilibration simulations 
-                sol_pre = solveCallPre(prob)
-                b = @elapsed sol_pre = solveCallPre(prob)
-                runTime += b
-                
-                if sol_pre.retcode != :Terminated
-                    return false, NaN
-                end
+        @inbounds for i in eachindex(simulationInfo.conditionIdSol)
 
-                # Change to parameters for the post steady state parameters 
-                changeToExperimentalCondUse!(prob.p, prob.u0, shiftExpId)
-                # Sometimes the experimentaCondition-file changes the initial values for a state 
-                # whose value was changed in the preequilibration-simulation. The experimentaCondition
-                # value is prioritized by only changing u0 to the steady state value for those states  
-                # that were not affected by change to shiftExpId.
-                has_not_changed = (prob.u0 .== u0_pre)
-                prob.u0[has_not_changed] .= sol_pre.u[end][has_not_changed]
-                prob = remake(prob, tspan = (0.0, t_max_ss))
-                
-                sol = solveCallPost(prob) 
-                b = @elapsed sol = solveCallPost(prob) 
-                runTime += b
-                simulationInfo.solArray[k] = sol
+            whichPreEq = findfirst(x -> x == simulationInfo.preEqIdSol[i], preEqIds)
+            uAtSSVec = @view uAtSS[:, whichPreEq]
+            u0PreSimSSVec = @view u0PreSimSS[:, whichPreEq]
 
-                if simulationInfo.solArray[k].retcode != :Success
-                    sucess = false
-                    runTime = NaN
-                    break 
-                end
-                k += 1
+            t_max_ss = simulationInfo.tMaxForwardSim[i]
+            # Sanity check input. Can only provide either nTsave (points to save solution at) or tSave (number of points to save)
+            if nTSave != 0
+                saveAtVec = collect(LinRange(0.0, t_max, nTSave))
+            else
+                saveAtVec = Float64[]
+            end
+            # Sanity check input. Both tSave and nTsave must be empty or zero in order to be able to output a dense solution.
+            if (isempty(saveAtVec) && nTSave == 0) && denseSol == true
+                dense = true
+            else
+                dense = false
+            end                                
+
+            changeToExperimentalCondUse!(prob.p, prob.u0, simulationInfo.postEqIdSol[i])
+            has_not_changed = (prob.u0 .== u0PreSimSSVec)
+            prob.u0[has_not_changed] .= uAtSSVec[has_not_changed]
+            probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])     
+            bSim += @elapsed sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_ss, saveAtVec, dense)
+
+            if !(sol.retcode == :Success || sol.retcode == :Terminated)
+                sucess = false, Inf
             end
         end
 
@@ -75,11 +77,9 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
     elseif simulationInfo.simulateSS == false
 
         @inbounds for i in eachindex(simulationInfo.firstExpIds)
-            
-            firstExpId = simulationInfo.firstExpIds[i]
-            # Keep index of which forward solution index i corresponds for calculating cost 
-            simulationInfo.conditionIdSol[i] = firstExpId
+
             # Whether or not we only want to save solution at observed time-points 
+            firstExpId = simulationInfo.firstExpIds[i]
             if onlySaveAtTobs == true
                 nTSave = 0
                 # Extract t-save point for specific condition ID 
@@ -87,26 +87,41 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
             else
                 tSave=Float64[]
             end
+
             t_max = simulationInfo.tMaxForwardSim[i]
+            
+            # Sanity check input. Can only provide either nTsave (points to save solution at) or tSave (number of points to save)
+            if length(tSave) != 0 && nTSave != 0
+                println("Error : Can only provide tSave (vector to save at) or nTSave as saveat argument to solvers")
+            elseif nTSave != 0
+                saveAtVec = collect(LinRange(0.0, t_max, nTSave))
+            else
+                saveAtVec = tSave
+            end
 
-            # Account for different solver algorithms, and if end-time is infinity 
-            solveCall = getSolCallSolveOdeNoSS(absTol, relTol, t_max, solver, tSave, nTSave, denseSol, absTolSS, relTolSS)
+            # Sanity check input. Both tSave and nTsave must be empty or zero in order to be able to output a dense solution.
+            if (isempty(tSave) && nTSave == 0) && denseSol == true
+                dense = true
+            else
+                dense = false
+            end                                
 
-            # Change parameters to those for the specific experimental condition 
-            probUse = getOdeProbSolveOdeNoSS(prob, changeToExperimentalCondUse!, firstExpId, t_max)
+            # Change experimental condition 
+            t_max_use = isinf(t_max) ? 1e8 : t_max
+            changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
+            probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
+            
+            bSim += @elapsed sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_use, saveAtVec, dense)
 
-            sol = solveCall(probUse)
-            b = @elapsed sol = solveCall(probUse) 
-            simulationInfo.solArray[i] = sol
-            runTime += b
-
-            if !(simulationInfo.solArray[i].retcode == :Success || simulationInfo.solArray[i].retcode == :Terminated)
-                sucess = false
-                runTime = NaN
-                break 
+            if !(sol.retcode == :Success || sol.retcode == :Terminated)
+                sucess = false, Inf
             end
         end
     end
 
-    return success, runTime
+    if savePreEqTime == true
+        return sucess, bSim + bPreEq
+    else
+        return sucess, bSim 
+    end
 end
