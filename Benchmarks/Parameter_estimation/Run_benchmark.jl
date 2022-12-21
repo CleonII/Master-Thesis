@@ -146,8 +146,12 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
         if :IpoptLBFGS in algList
             ipoptProbBfgs.x = deepcopy(p0)
             Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 0)
-            runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
-            writeFile(pathSave, ipoptProbBfgs.obj_val, runTime, ipoptProbBfgs.status, iterArrBfgs[1], i, "IpoptLBFGS", solverStr, string(tol))
+            try
+                runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
+                writeFile(pathSave, ipoptProbBfgs.obj_val, runTime, ipoptProbBfgs.status, iterArrBfgs[1], i, "IpoptLBFGS", solverStr, string(tol))
+            catch
+                writeFile(pathSave, Inf, Inf, 0, Inf, i, "IpoptLBFGS", solverStr, string(tol))
+            end
         end
 
         if :OptimIPNewtonAutoHess in algList
@@ -171,13 +175,21 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
         end
 
         if :FidesAutoHess in algList
-            runTime = @elapsed res, nIter, converged = FidesAutoHess(p0)
-            writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHess", solverStr, string(tol))
+            try
+                runTime = @elapsed res, nIter, converged = FidesAutoHess(p0)
+                writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHess", solverStr, string(tol))
+            catch
+                writeFile(pathSave, Inf, Inf, 0, Inf, i, "FidesAutoHess", solverStr, string(tol))
+            end
         end
 
         if :FidesBlockAutoHess in algList
-            runTime = @elapsed res, nIter, converged = FidesAutoHessBlock(p0)
-            writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHessBlock", solverStr, string(tol))
+            try
+                runTime = @elapsed res, nIter, converged = FidesAutoHessBlock(p0)
+                writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHessBlock", solverStr, string(tol))
+            catch
+                writeFile(pathSave, Inf, Inf, 0, Inf, i, "FidesAutoHessBlock", solverStr, string(tol))
+            end
         end
     end
 end
@@ -203,10 +215,10 @@ end
 
 if ARGS[1] == "Elowitz"
     loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
-    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :FidesAutoHess, :FidesBlockAutoHess]
+    algsTest = [:OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :NLoptLBFGS, :FidesAutoHess, :FidesBlockAutoHess]
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Elowitz_Nature2000/"
     peTabModel = setUpPeTabModel("model_Elowitz_Nature2000", dirModel, verbose=false)
-    benchmarkParameterEstimation(peTabModel, Rodas5(), "Rodas5", 1e-6, 1000, algList=algsTest) 
+    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-8, 1000, algList=algsTest) 
 end
 
 
