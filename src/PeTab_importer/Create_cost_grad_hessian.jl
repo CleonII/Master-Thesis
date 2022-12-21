@@ -989,7 +989,18 @@ function calcGradAdjExpCond!(grad::Vector{Float64},
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we 
     # want dY/dθ_log. We can adjust via;
     # dY/dθ_log = log(10) * θ * dY/dθ
-    grad .+= transformParamVecGrad(gradTot[paramIndices.mapDynParEst.iDynParamInSys], dynParam, paramIndices.namesDynParam, parameterData)
+    # Account for parameters which are not condition specific 
+    grad[paramIndices.mapDynParEst.iDynParamInVecEst] .+= transformParamVecGrad(gradTot[paramIndices.mapDynParEst.iDynParamInSys], 
+                                                                                dynParam[paramIndices.mapDynParEst.iDynParamInVecEst], 
+                                                                                paramIndices.namesDynParam[paramIndices.mapDynParEst.iDynParamInVecEst], 
+                                                                                parameterData)
+    # For parameters which are specific to an experimental condition 
+    whichExpMap = findfirst(x -> x == conditionID, [paramIndices.mapExpCond[i].condID for i in eachindex(paramIndices.mapExpCond)])
+    expMap = paramIndices.mapExpCond[whichExpMap]                                          
+    grad[expMap.iDynEstVec] .+= transformParamVecGrad(gradTot[expMap.iOdeProbDynParam], 
+                                                      dynParam[expMap.iDynEstVec], 
+                                                      paramIndices.namesDynParam[expMap.iDynEstVec], 
+                                                      parameterData)                                   
 end
 
 
