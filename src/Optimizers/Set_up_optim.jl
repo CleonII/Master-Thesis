@@ -27,7 +27,7 @@ function createOptimProb(peTabOpt::PeTabOpt,
     if typeof(optimAlg) <: IPNewton
         return createOptimInteriorNewton(peTabOpt, hessianUse=hessianUse, options=options)
     elseif typeof(optimAlg) <: LBFGS || typeof(optimAlg) <: BFGS || typeof(optimAlg) <: ConjugateGradient
-        return createOptimFminbox(peTabOpt, optimAlg)
+        return createOptimFminbox(peTabOpt, optimAlg, options)
     else
         println("Error : optimAlg $optimAlg is not supported")
         println("Supported methods are IPNewton, ConjugateGradient, LBFGS and BFGS")
@@ -91,7 +91,8 @@ end
     inner optimizer is either LBFGS or BFGS using lineSearch. 
 """
 function createOptimFminbox(peTabOpt::PeTabOpt, 
-                            optimAlg)
+                            optimAlg, 
+                            options)
 
     lowerBounds = peTabOpt.lowerBounds
     upperBounds = peTabOpt.upperBounds
@@ -102,9 +103,6 @@ function createOptimFminbox(peTabOpt::PeTabOpt,
                                                         upperBounds, 
                                                         p0, 
                                                         Fminbox(optimAlg), 
-                                                        Optim.Options(iterations = 250, 
-                                                                      show_trace = showTrace, 
-                                                                      allow_f_increases=true, 
-                                                                      outer_iterations = 2))
+                                                        options)
     return evalOptim
 end

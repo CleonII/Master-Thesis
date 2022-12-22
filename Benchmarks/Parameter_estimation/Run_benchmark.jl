@@ -98,7 +98,11 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
     optimProbAutoHess = createOptimProb(peTabOpt, IPNewton(), hessianUse=:autoDiff, 
                                         options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
                                                               successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
-    optimProbLBFGS = createOptimProb(peTabOpt, LBFGS())
+    optimProbLBFGS = createOptimProb(peTabOpt, LBFGS(), 
+                                     options=Optim.Options(iterations = 250, 
+                                                           show_trace = showTrace, 
+                                                           allow_f_increases=true, 
+                                                           outer_iterations = 4))
     
     # NLopt optimizers 
     NLoptLBFGS = createNLoptProb(peTabOpt, :LD_LBFGS, verbose=false)

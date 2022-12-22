@@ -331,7 +331,7 @@ function calcHessianApprox!(hessian::Matrix{Float64},
     @inbounds for i in eachindex(simulationInfo.solArrayGrad)
         if expIDSolve[1] == "all" || simulationInfo.conditionIdSol[i] ∈ expIDSolve
             if simulationInfo.solArrayGrad[i].retcode != :Success
-                grad .= 1e8
+                hessian .= 0.0
                 return 
             end
         end

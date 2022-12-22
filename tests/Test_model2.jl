@@ -250,9 +250,6 @@ end
 """
 function testOptimizer(peTabModel::PeTabModel, solver, tol)
 
-    solver = Rodas4P()
-    tol = 1e-9
-
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
 
     Random.seed!(123)
@@ -277,11 +274,21 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
                                         options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
                                                               successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
     optimProbBFGS = createOptimProb(peTabOpt, BFGS())
-    optimProbLBFGS = createOptimProb(peTabOpt, LBFGS())
+    optimProbLBFGS = createOptimProb(peTabOpt, LBFGS(), 
+                                     options=Optim.Options(iterations = 250, 
+                                                           show_trace = false, 
+                                                           allow_f_increases=true, 
+                                                           outer_iterations = 4))
 
     # NLopt optimizers 
     NLoptLBFGS = createNLoptProb(peTabOpt, :LD_LBFGS, verbose=false)
+    NLoptLBFGS.ftol_rel = 1e-8
+    NLoptLBFGS.xtol_rel = 0.0
+    NLoptLBFGS.maxeval = 5000
     NLoptTNewton = createNLoptProb(peTabOpt, :LD_TNEWTON_PRECOND_RESTART, verbose=false)
+    NLoptTNewton.ftol_rel = 1e-8
+    NLoptTNewton.xtol_rel = 0.0
+    NLoptTNewton.maxeval = 5000
 
     p0 = cube[1, :]
     # Ipopt Hessian approximation
@@ -448,7 +455,7 @@ end
 
 # Will have to change parameters 
 loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
-passTest = testOptimizer(peTabModel, Vern9(), 1e-12)
+passTest = testOptimizer(peTabModel, Rodas4P(), 1e-9)
 if passTest == true
     @printf("Passed test for checking optimizers\n")
 else
