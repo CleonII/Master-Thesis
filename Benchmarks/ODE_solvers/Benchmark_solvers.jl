@@ -191,10 +191,10 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
     # tolerance.
     if checkAccuracy == true
         println("Computing high accuracy model")
-        if peTabModel.modelName != "model_Isensee_JCB2018"
+        if !(peTabModel.modelName == "model_Isensee_JCB2018" || peTabModel.modelName == "model_Weber_BMC2015s")
             solArrayHighAcc, statusHighAcc = calcHighAccOdeSolution(odeProbHighAcc, changeToExperimentalCondUse!, simulationInfo, absTol=1e-15, relTol=1e-15)
         else
-            solArrayHighAcc, tmp = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, simulationInfo, KenCarp58(), 1e-14, 1e-14, nTSave=100)
+            solArrayHighAcc, tmp = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, simulationInfo, KenCarp58(), 1e-15, 1e-15, nTSave=100)
             statusHighAcc = true
         end
         println("Done with statusHighAcc = $statusHighAcc")
@@ -205,7 +205,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
     if checkAccuracy == true && statusHighAcc != true
         # Log failure to disk 
         println("High accuracy solver failed for ", peTabModel.modelName)
-        open(joinpath(pwd(), "Benchmark", "ODE_solvers", "Log.txt"), "a") do io
+        open(joinpath(pwd(), "Benchmark", "ODE_solvers", "Log.txt"), "a+") do io
             println(io, "Failed with high accuracy solution for $modelFile")
         end
         return 
@@ -320,7 +320,6 @@ if ARGS[1] == "Test_all"
                     "model_Oliveira_NatCommun2021", "model_Perelson_Science1996", "model_Rahman_MBS2016", 
                     "model_SalazarCavazos_MBoC2020", "model_Sneyd_PNAS2002", "model_Zhao_QuantBiol2020", "model_Zheng_PNAS2012"]
 
-    modelListTry = ["model_Boehm_JProteomeRes2014"]
     tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
 
     for i in eachindex(modelListTry)

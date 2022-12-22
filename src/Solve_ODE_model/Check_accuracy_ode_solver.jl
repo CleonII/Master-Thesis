@@ -25,6 +25,7 @@ function calcHighAccOdeSolution(prob::ODEProblem,
 
     solverNonStiff = AutoVern9(Rodas4P())
     solverStiff = Rodas4P()
+    solverStiff = KenCarp58()
     
     local solArrayHighAcc
     local sucessSolver
