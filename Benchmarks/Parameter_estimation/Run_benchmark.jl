@@ -100,9 +100,10 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
                                                               successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
     optimProbLBFGS = createOptimProb(peTabOpt, LBFGS(), 
                                      options=Optim.Options(iterations = 250, 
-                                                           show_trace = showTrace, 
+                                                           show_trace = false, 
                                                            allow_f_increases=true, 
-                                                           outer_iterations = 4))
+                                                           outer_iterations = 4, 
+                                                           successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
     
     # NLopt optimizers 
     NLoptLBFGS = createNLoptProb(peTabOpt, :LD_LBFGS, verbose=false)
@@ -169,8 +170,13 @@ function benchmarkParameterEstimation(peTabModel::PeTabModel,
         end
 
         if :OptimLBFGS in algList
-            res = optimProbLBFGS(p0, showTrace=false)
-            writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimLBFGS", solverStr, string(tol))
+            try
+                res = optimProbLBFGS(p0, showTrace=false)
+                println("Final cost value = ", peTabOpt.evalF(res.minimizer))
+                writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimLBFGS", solverStr, string(tol))
+            catch
+                writeFile(pathSave, Inf, Inf, 0, Inf, i, "optimLBFGS", solverStr, string(tol))
+            end
         end
 
         if :NLoptLBFGS in algList
@@ -247,8 +253,9 @@ end
 if ARGS[1] == "Bachmann"
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
     peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel)
-    algsTest = [:IpoptLBFGS, :NLoptLBFGS]
-    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-6, 1000, algList=algsTest)
+    algsTest = [:IpoptLBFGS, :OptimLBFGS, :NLoptLBFGS]
+    algsTest = [:OptimLBFGS]
+    benchmarkParameterEstimation(peTabModel, Rodas4P(), "QNDF", 1e-8, 1000, algList=algsTest)
 end
 
 

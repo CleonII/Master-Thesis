@@ -120,7 +120,6 @@ end
 
 
 peTabModel = setUpPeTabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/", forceBuildJlFile=true)
-
 passTest = compareAgainstPyPesto(peTabModel, Rodas5(), 1e-12, printRes=true)
 if passTest == true
     @printf("Passed test Bachaman against PyPesto\n")

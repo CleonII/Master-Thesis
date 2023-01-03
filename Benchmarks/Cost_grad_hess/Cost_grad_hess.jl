@@ -113,7 +113,7 @@ end
 if ARGS[1] == "No_pre_eq_models"
 
     dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
-    pathSave = dirSave * "Cost_grad_hess_tol_low.csv"
+    pathSave = dirSave * "Cost_grad_hess_tol_low_composite.csv"
     if !isdir(dirSave)
         mkpath(dirSave)
     end
@@ -123,7 +123,11 @@ if ARGS[1] == "No_pre_eq_models"
                     "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
                     "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]
 
-    solversCheck = [[Rodas5(), "Rodas5"], [Rodas5P(), "Rodas5P"], [QNDF(), "QNDF"]]
+    solversCheck = [[Rodas5(), "Rodas5"], 
+                    [Rodas5P(), "Rodas5P"], 
+                    [QNDF(), "QNDF"], 
+                    [AutoTsit5(Rodas5()), "Tsti5_Rodas5"], 
+                    [AutoVern7(Rodas5()), "Vern7_Rodas5"]]
 
     for i in eachindex(modelListTry)
         modelName = modelListTry[i]
@@ -131,7 +135,7 @@ if ARGS[1] == "No_pre_eq_models"
         peTabModel = setUpPeTabModel(modelName, dirModel)
         # Where we need higher abs- and reltol to solve the ODE 
         tol = 1e-8
-        benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=false)
+        benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=true)
     end
 end
 

@@ -135,11 +135,13 @@ elseif diffZygote > 1e-3
     println("Does not pass ll-test for Zygote Bruno model")
     passTest = false
 end
-
+peTabOpt = setUpCostGradHess(peTabModel, Rodas5(), 1e-12, adjSolver=Rodas5(), adjTol=1e-12, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)),
+                             adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
 # Check that we can compute gradients for Bruno model 
 gradBrunoForward = ForwardDiff.gradient(peTabOpt.evalF, peTabOpt.paramVecTransformed) 
 gradBrunoCalc = Calculus.gradient(peTabOpt.evalF, peTabOpt.paramVecTransformed) 
 gradImporter = zeros(length(peTabOpt.paramVecTransformed))
+gradAdj = zeros(length(peTabOpt.paramVecTransformed))
 peTabOpt.evalGradF(gradImporter, peTabOpt.paramVecTransformed)
 gradZygote = Zygote.gradient(peTabOpt.evalFZygote, peTabOpt.paramVecTransformed)[1]
 if sum((gradImporter - gradBrunoCalc).^2) > 1e-6
@@ -148,6 +150,10 @@ if sum((gradImporter - gradBrunoCalc).^2) > 1e-6
 end
 if sum((gradZygote - gradBrunoCalc).^2) > 1e-6
     println("Does not pass gradient Zygote test for Bruno model")
+    passTest = false
+end
+if sum((gradImporter[1:(end-1)] - gradAdj[1:(end-1)]).^2) > 1e-6
+    println("Does not pass gradient Adjoint test for Bruno model")
     passTest = false
 end
 
@@ -329,7 +335,8 @@ if diff > 1e-3
     passTest = false
 elseif diffZygote > 1e-3
     println("Does not pass ll-test for Zygote Lucarelli model")
-    passTest = false
+    passTest = falsegradZygote = Zygote.gradient(evalZygote, probUse.p)
+    grad_new = gradZygote[1][[1, 2, 3, 4, 6]] .* log(10) .* exp10.(p)
 end
 
 
