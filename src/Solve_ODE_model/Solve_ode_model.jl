@@ -1,8 +1,3 @@
-# Functions for solving a PeTab ODE-system for all experimental conditions. Can handle models with and without 
-# a preequilibration-criteria (where the model must be simulated to a steady state).
-# TODO: Pre-compute better with indices and when extracting the t-max value.
-
-
 """
     solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
                                       prob::ODEProblem, 
@@ -20,7 +15,7 @@
     
     All inputs are automatically computed by the PeTab importer. Each experimental condition is simulated to the 
     maximum time for that condition found in the the measurementData PeTab-file. In case a pre-equlibration condition 
-    exists the model is first simulated to a steady-state. Then starting from the steady state the solution stored in 
+    exists the model is first simulated to a steady-state. Then starting from the steadychangeModelParamUse! state the solution stored in 
     solArray is calculcated.
 
     # Args

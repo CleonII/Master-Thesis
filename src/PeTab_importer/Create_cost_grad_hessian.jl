@@ -1065,52 +1065,7 @@ function calcdGd_Discrete(out,
 end
 
 
-function calcdGDiscrete(u::AbstractVector,
-                        p::AbstractVector, # odeProb.p
-                        t::AbstractFloat, 
-                        i::Integer, 
-                        iGroupedTObs::Vector{Vector{Int64}}, 
-                        measurementData::MeasurementData, 
-                        parameterData::ParamData,
-                        paramIndices::ParameterIndices,
-                        peTabModel::PeTabModel, 
-                        sdParam::Vector{Float64}, 
-                        obsParam::Vector{Float64}, 
-                        nonDynParam::Vector{Float64})
-
-    dynParam = p[paramIndices.mapDynParEst.iDynParamInSys]
-    logLik = 0.0
-
-    for iMeasurementData in iGroupedTObs[i]
-        
-        mapObsParam = paramIndices.mapArrayObsParam[paramIndices.indexObsParamMap[iMeasurementData]]
-        yMod = peTabModel.evalYmod(u, t, dynParam, obsParam, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapObsParam)
-        yModTrans = transformObsOrData(yMod, measurementData.transformData[iMeasurementData])
-
-        # Compute associated SD-value or extract said number if it is known 
-        mapSdParam = paramIndices.mapArraySdParam[paramIndices.indexSdParamMap[iMeasurementData]]
-        if typeof(measurementData.sdParams[iMeasurementData]) <: AbstractFloat
-            sdVal = measurementData.sdParams[iMeasurementData]
-        else
-            sdVal = peTabModel.evalSd!(u, t, sdParam, dynParam, nonDynParam, parameterData, measurementData.observebleID[iMeasurementData], mapSdParam)
-        end
-
-        # Update log-likelihood 
-        if measurementData.transformData[iMeasurementData] == :lin
-            logLik += log(sdVal) + 0.5*log(2*pi) + 0.5*((yModTrans - measurementData.yObsNotTransformed[iMeasurementData]) / sdVal)^2
-        elseif measurementData.transformData[iMeasurementData] == :log10
-            logLik += log(sdVal) + 0.5*log(2*pi) + log(log(10)) + log(exp10(measurementData.yObsTransformed[iMeasurementData])) + 0.5*( ( log(exp10(yModTrans)) - log(exp10(measurementData.yObsTransformed[iMeasurementData])) ) / (log(10)*sdVal))^2
-        else
-            println("Transformation ", measurementData.transformData[iMeasurementData], "not yet supported.")
-            return Inf
-        end   
-        
-    end
-    return logLik
-end
-
-
-function calcLogLikExpCond(odeSol::ODESolution,
+function calcLogLikExpCond(odeSol::Union{ODESolution, OrdinaryDiffEq.ODECompositeSolution},
                            dynamicParamEst::AbstractVector,
                            sdParamEst::AbstractVector, 
                            obsPar::AbstractVector, 
