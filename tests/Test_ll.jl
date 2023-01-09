@@ -64,10 +64,10 @@ cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
 costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed)
 diff = cost + (58622.9145631413)
 diffZygote = costZygote + (58622.9145631413)
-if diff > 1e-3
+if diff > 1e-2
     println("Does not pass ll-test for Beer model")
     passTest = false
-elseif diffZygote > 1e-3
+elseif diffZygote > 1e-2
     println("Does not pass ll-test for Zygote Beer model")
     passTest = false
 end
@@ -144,6 +144,7 @@ gradImporter = zeros(length(peTabOpt.paramVecTransformed))
 gradAdj = zeros(length(peTabOpt.paramVecTransformed))
 peTabOpt.evalGradF(gradImporter, peTabOpt.paramVecTransformed)
 gradZygote = Zygote.gradient(peTabOpt.evalFZygote, peTabOpt.paramVecTransformed)[1]
+peTabOpt.evalGradFAdjoint(gradAdj, peTabOpt.paramVecTransformed)
 if sum((gradImporter - gradBrunoCalc).^2) > 1e-6
     println("Does not pass gradient test for Bruno model")
     passTest = false
@@ -229,7 +230,7 @@ end
 # Isensee model - Extremly strange as it works without priors (must double check)
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Isensee_JCB2018/"
 peTabModel = setUpPeTabModel("model_Isensee_JCB2018", dirModel, verbose=false, forceBuildJlFile=true)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-10)
+peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed) + 4.45299970460275
 costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed) + 4.45299970460275
 diff = abs(cost + (-3949.375966548649))

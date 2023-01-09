@@ -65,7 +65,7 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
     
     # Extract experimental conditions for simulations 
-    simulationInfo = getSimulationInfo(measurementDataFile, measurementData)
+    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
 
     # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
     u0 = [8.0, 4.0]
@@ -86,7 +86,7 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, paramData, experimentalConditionsFile, peTabModel)
         
         # Solve ODE system 
-        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol)
+        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
         solNumeric = solArray[1]
         
         # Compare against analytical solution 

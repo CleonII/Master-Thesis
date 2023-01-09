@@ -1,8 +1,10 @@
-# Check the accruacy of the PeTab importer for a simple linear ODE;
-#   x' = Ax; x(0) = u0 and A = [alpha beta ; gamma delta].
-# This ODE is solved analytically, and using the analytical solution the accuracy of 
-# the ODE solver, cost function, gradient and hessian of the PeTab importer is checked.
-# The measurment data is avaible in tests/Test_model1/
+#=
+    Check the accruacy of the PeTab importer for a simple linear ODE;
+        x' = Ax; x(0) = u0 and A = [α β ; γ δ].
+    This ODE is solved analytically, and using the analytical solution the accuracy of 
+    the ODE solver, cost function, gradient and hessian of the PeTab importer is checked.
+    The measurment data is avaible in tests/Test_model1/
+=#
 
 
 using ModelingToolkit 
@@ -37,22 +39,22 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
 
 """
-    solveOde2x2Lin(t, u0, alpha, beta, gamma, delta)
+    solveOde2x2Lin(t, u0, α, β, γ, δ)
 
-    Solve ODE system x' = Ax with A = [alpha beta ; gamma delta] a time point 
+    Solve ODE system x' = Ax with A = [α β ; γ δ] a time point 
     t given initial values x(0)=u0. 
 """
-function solveOde2x2Lin(t, u0, alpha, beta, gamma, delta)
+function solveOde2x2Lin(t, u0, α, β, γ, δ)
 
     # Calculate eigenvectors of A (PQ-formula)
-    m = (alpha + delta) / 2
-    p = (alpha*delta) - (beta*gamma)
+    m = (α + δ) / 2
+    p = (α*δ) - (β*γ)
     eVal1 = m + sqrt(m^2 - p)
     eVal2 = m - sqrt(m^2 - p)
 
     # Eigenvectors of A in matrix 
-    e1, e3 = [ beta, -(alpha-eVal1)]
-    e2, e4 = [ beta, -(alpha-eVal2)]
+    e1, e3 = [ β, -(α-eVal1)]
+    e2, e4 = [ β, -(α-eVal2)]
     eVecMat = [e1 e2; e3 e4]
 
     # Solve for constants c1 and c2 
@@ -79,9 +81,9 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
     
     # Extract experimental conditions for simulations 
-    simulationInfo = getSimulationInfo(measurementDataFile, measurementData)
+    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
 
-    # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
+    # Parameter values where to teast accuracy. Each column is a α, β, γ and δ
     u0 = [8.0, 4.0]
     paramMat = reshape([2.0, 3.0, 3.0, 5.0, 
                         1.0, 2.0, 3.0, 3.0,
@@ -91,25 +93,25 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
 
     for i in 1:5
 
-        alpha, beta, gamma, delta = paramMat[:, i]
+        α, β, γ, δ = paramMat[:, i]
         
         # Set parameter values for ODE
-        peTabModel.paramMap[2] = Pair(peTabModel.paramMap[2].first, alpha)
-        peTabModel.paramMap[4] = Pair(peTabModel.paramMap[4].first, gamma)
-        peTabModel.paramMap[5] = Pair(peTabModel.paramMap[5].first, delta)
-        peTabModel.paramMap[6] = Pair(peTabModel.paramMap[6].first, beta)
+        peTabModel.paramMap[2] = Pair(peTabModel.paramMap[2].first, α)
+        peTabModel.paramMap[4] = Pair(peTabModel.paramMap[4].first, γ)
+        peTabModel.paramMap[5] = Pair(peTabModel.paramMap[5].first, δ)
+        peTabModel.paramMap[6] = Pair(peTabModel.paramMap[6].first, β)
         prob = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true)
         prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
         changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, paramData, experimentalConditionsFile, peTabModel)
         
         # Solve ODE system 
-        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol)
+        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
         solNumeric = solArray[1]
         
         # Compare against analytical solution 
         sqDiff = 0.0
         for t in solNumeric.t
-            solAnalytic = solveOde2x2Lin(t, u0, alpha*0.5, beta, gamma, delta)
+            solAnalytic = solveOde2x2Lin(t, u0, α*0.5, β, γ, δ)
             sqDiff += sum((solNumeric(t)[1:2] - solAnalytic).^2)
         end
 
@@ -131,7 +133,7 @@ end
 function calcCostAnalytic(paramVec)
 
     u0 = [8.0, 4.0]
-    alpha, beta, gamma, delta = paramVec[1:4]
+    α, β, γ, δ = paramVec[1:4]
     measurementData = CSV.read(pwd() * "/tests/Test_model1/measurementData_Test_model1.tsv", DataFrame)
 
     # Extract correct parameter for observation i and compute logLik
@@ -154,12 +156,12 @@ function calcCostAnalytic(paramVec)
 
         # Consider experimental conditions 
         if expId == "model1_data1"
-            alpha_use = alpha * 0.5
+            α_use = α * 0.5
         else
-            alpha_use = alpha * 1.0
+            α_use = α * 1.0
         end
 
-        sol = solveOde2x2Lin(t, u0, alpha_use, beta, gamma, delta)
+        sol = solveOde2x2Lin(t, u0, α_use, β, γ, δ)
         if obsID == "sebastian_measurement"
             yMod = sol[1]
         elseif obsID == "damiano_measurement"

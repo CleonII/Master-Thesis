@@ -108,7 +108,7 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
     
     # Extract experimental conditions for simulations 
-    simulationInfo = getSimulationInfo(measurementDataFile, measurementData, absTolSS=1e-12, relTolSS=1e-10)
+    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData, absTolSS=1e-12, relTolSS=1e-10)
 
     # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
     # a, b, c, d
@@ -131,7 +131,7 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, paramData, experimentalConditionsFile, peTabModel)
         
         # Solve ODE system with steady state simulation 
-        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol)
+        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
 
         # Solve ODE system with algebraic intial values 
         solArrayAlg = getSolAlgebraicSS(peTabModel, solver, tol, a, b, c, d)

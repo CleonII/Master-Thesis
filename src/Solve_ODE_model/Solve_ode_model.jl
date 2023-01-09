@@ -481,7 +481,7 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     # Here it is IMPORTANT that we copy prob.p[:] else different experimental conditions will 
     # share the same parameter vector p. This will, for example, cause the lower level adjoint 
     # sensitivity interface to fail.
-    t_max_ss = isinf(t_max) ? 1e8 : t_max
+    t_max_ss = isinf(t_max_ss) ? 1e8 : t_max_ss
     probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])     
     # If case of adjoint sensitivity analysis we need to track the callback to get correct gradients 
     callBackSet = getCallbackSet(probUse, simulationInfo, whichForwardSol, trackCallback)
