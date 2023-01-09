@@ -43,9 +43,7 @@ function rewritePiecewiseToIfElse(ruleFormula, variable, modelDict, baseFunction
             valActive = rewriteDerivatives(vals[cIndex], modelDict, baseFunctions)
         end      
         if occursin("piecewise(", vals[end])
-            println("vals = ", vals[end])
             valInactive = rewritePiecewiseToIfElse(vals[end], "foo", modelDict, baseFunctions, retFormula=true)#[7:end]
-            println("valInActive = ", valInactive)
             valInactive = rewriteDerivatives(valInactive, modelDict, baseFunctions)
         else
             valInactive = rewriteDerivatives(vals[end], modelDict, baseFunctions)
@@ -145,8 +143,6 @@ function simplePiecewiseToIfElse(condition, variable, valActive, valInactive, di
     parts = splitBetween(strippedCondition, ',')
     # Trigger of event 
     expression = "ifelse(" * parts[1] * inEqUse * parts[2] * ", " * valActive * ", " * valInactive * ")"
-
-    println("Expression = $expression")
 
     return expression 
 end
@@ -385,7 +381,6 @@ function findSignTerm(str::String)
             if str[j] == '('
                 j += (findIParanthesis(str[j:end]) - 1)
                 iEnd = j
-                println("iEnd after paranthesis = ", iEnd)
                 if length(str) > j+1 && str[j+1] ∈ ['*', '/']
                     i = j+2
                 else
@@ -414,7 +409,6 @@ function findSignTerm(str::String)
             signTerms[i] = 1
         end
     end
-    println("For me using $str signTerms = ", signTerms)
     return prod(signTerms)
 end
 

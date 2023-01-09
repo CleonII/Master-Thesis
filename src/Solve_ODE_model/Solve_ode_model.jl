@@ -288,7 +288,8 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
                                                solver::Union{SciMLAlgorithm, Symbol}, 
                                                absTol::Float64, 
                                                relTol::Float64, 
-                                               sensealg)
+                                               sensealg, 
+                                               calcTStops::Function)
 
     changeToExperimentalCondUse = (pVec, u0Vec, expID) -> changeToExperimentalCondUsePre(pVec, u0Vec, expID, dynParamEst)                                               
 
@@ -302,15 +303,6 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
         firstExpId = measurementData.preEqCond[measurementData.iPerConditionId[conditionId][1]]
         shiftExpId = measurementData.simCond[measurementData.iPerConditionId[conditionId][1]]
         tSave = simulationInfo.tVecSave[conditionId]            
-        
-        # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
-        # The preequilibration simulations are terminated upon a steady state using the TerminateSteadyState callback.
-        solveCallPost = (prob) -> solve(prob, 
-                                        solver, 
-                                        abstol=absTol, 
-                                        reltol=relTol, 
-                                        saveat=tSave,
-                                        sensealg=sensealg)
     
         u0Pre = prob.u0[:]                                        
         pUsePre, u0UsePre = changeToExperimentalCondUse(prob.p, prob.u0, firstExpId)
@@ -333,6 +325,20 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
         hasNotChanged = (u0UsePostTmp .== u0Pre)
         u0UsePost = [hasNotChanged[i] == true ? solSS[i] : u0UsePostTmp[i] for i in eachindex(u0UsePostTmp)]
         probUsePost = remake(prob, tspan=(0.0, t_max), u0 = convert.(eltype(dynParamEst), u0UsePost), p = convert.(eltype(dynParamEst), pUsePost))
+        
+        # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
+        # The preequilibration simulations are terminated upon a steady state using the TerminateSteadyState callback.
+        tStops = calcTStops(probUsePost.u0, probUsePost.p)
+        solveCallPost = (prob) -> solve(prob, 
+                                        solver, 
+                                        abstol=absTol, 
+                                        reltol=relTol, 
+                                        saveat=tSave,
+                                        sensealg=sensealg, 
+                                        callback=simulationInfo.callbacks[whichCondID], 
+                                        tstops=tStops)
+        
+        
         sol = solveCallPost(probUsePost)
 
         if sol.retcode != :Success
@@ -351,6 +357,7 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
 
         # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
         # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
+        tStops = calcTStops(probUse.u0, probUse.p)
         if !(typeof(solver) <: Vector{Symbol}) && isinf(t_max)
             solveCall = (probArg) -> solve(probArg, 
                                            solver, 
@@ -369,7 +376,9 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
                                            abstol=absTol, 
                                            reltol=relTol, 
                                            saveat=tSave, 
-                                           sensealg=sensealg)
+                                           sensealg=sensealg, 
+                                           callback=simulationInfo.callbacks[whichCondID], 
+                                           tstops=tStops)
         else
             println("Error : Solver option does not exist")        
         end
@@ -474,7 +483,6 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     # sensitivity interface to fail.
     probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])     
     # If case of adjoint sensitivity analysis we need to track the callback to get correct gradients 
-    println("ShiftExpId = ", shiftExpId)
     callBackSet = getCallbackSet(probUse, simulationInfo, whichForwardSol, trackCallback)
     
     sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, simulationInfo.absTolSS, simulationInfo.relTolSS, 
@@ -667,6 +675,11 @@ function changeExperimentalCondEst(paramVec::AbstractVector,
     # To fix if above works.
     if !isempty(expMap.expCondStateConstVal)
         stateVec[iOdeProbStateConstVal] .= expCondStateConstVal
+    end
+
+    # Account for any potential events 
+    for f! in peTabModel.checkCallbackActive
+        f!(stateVecRet, paramVecRetRet)
     end
 
     return paramVecRetRet, stateVecRet

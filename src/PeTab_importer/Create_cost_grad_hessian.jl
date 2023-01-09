@@ -32,11 +32,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                            adjSensealgSS::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm=SteadyStateAdjoint())::PeTabOpt
 
     if !(typeof(adjSensealgSS) <: SteadyStateAdjoint)
-        println("If you are using adjoint sensitivity analysis for a model with PreEq-criteria the most 
-                 the most efficient adjSensealgSS is usually SteadyStateAdjoint. The algorithm you have 
-                 provided, ", adjSensealgSS, "might not work (as there are some bugs here). In case it does 
-                 not work, and SteadyStateAdjoint fails (because a dependancy on time) a good choice might 
-                 be QuadratureAdjoint(autodiff=false, autojacvec=false)")
+        println("If you are using adjoint sensitivity analysis for a model with PreEq-criteria the most the most efficient adjSensealgSS is usually SteadyStateAdjoint. The algorithm you have provided, ", adjSensealgSS, "might not work (as there are some bugs here). In case it does not work, and SteadyStateAdjoint fails (because a dependancy on time) a good choice might be QuadratureAdjoint(autodiff=false, autojacvec=false)")
     end
 
     # Process PeTab files into type-stable Julia structs 
@@ -67,7 +63,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     # Set up function which solves the ODE model for all conditions and stores result 
     solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
     solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, denseSol=true, expIDSolve=expIDSolveArg, trackCallback=true)
-    solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementData, simulationInfo, solver, tol, tol, sensealg)
+    solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementData, simulationInfo, solver, tol, tol, sensealg, peTabModel.getTStops)
 
     if nProcs > 1 && nprocs() != nProcs
         println("Error : PEtab importer was set to build the cost, grad and hessian with $nProcs processes, 
@@ -1000,14 +996,12 @@ function calcGradAdjExpCond!(grad::Vector{Float64},
                                                                                 paramIndices.namesDynParam[paramIndices.mapDynParEst.iDynParamInVecEst], 
                                                                                 parameterData)
     # For parameters which are specific to an experimental condition 
-    #=
     whichExpMap = findfirst(x -> x == postEqId, [paramIndices.mapExpCond[i].condID for i in eachindex(paramIndices.mapExpCond)])
     expMap = paramIndices.mapExpCond[whichExpMap]                                          
     grad[expMap.iDynEstVec] .+= transformParamVecGrad(gradTot[expMap.iOdeProbDynParam], 
                                                       dynParam[expMap.iDynEstVec], 
                                                       paramIndices.namesDynParam[expMap.iDynEstVec], 
                                                       parameterData)                                   
-    =#
 end
 
 
