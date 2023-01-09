@@ -15,10 +15,10 @@ function getODEModel_model_Raimundez_PCB2020()
     ModelingToolkit.@variables CET(t) METinh(t) EGF(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters d_ksyn_EGFR__fm_2_hm xi_kexp_pMMET_2_i d_ka_RAS__pEGFR_EGF_2__MKN1_2_HS746T d_ka_MAPK__MKN1_2_HS746T ki_RAS__MKN1 d_ka_AKT__MKN1_2_HS746T KD_EGFR_CET xi_ka_PI3K_pMMET_2 d_MAPKtotal__fm_2_hm d_ksyn_MMET__fm_2_hm ka_PI3K__basal d_kimp_pEGFR_EGF_2__MKN1_2_HS746T d_AKTtotal__fm_2_hm KD_METinh xi_ki_MPI3K d_kexp_pEGFR_EGF_2_i__MKN1_2_HS746T d_ksyn_EGFR__MKN1_2_HS746T d_MPI3Ktotal__fm_2_hm d_kdeg_membran__MKN1_2_HS746T MPI3Ktotal__MKN1_fm KD_EGFR_EGF kexp_pEGFR_EGF_2_i__MKN1 CET_level kbin_EGFR_EGF ksyn_EGFR__MKN1_fm xi_kdeg_pMMET_pEGFR_i d_ki_PI3K__MKN1_2_HS746T xi_kpho_MMET_EGFR MAPKtotal__MKN1_fm xi_kexp_pMMET_pEGFR_i d_RAStotal__MKN1_2_HS746T kpho_EGFR_EGF ka_MAPK__MKN1 kpho_MMET_EGFR full_medium xi_ka_RAS_pMMET_2 xi_kimp_pMMET_pEGFR xi_kdeg_pMMET_2_i ka_RAS__basal__MKN1 d_RAStotal__fm_2_hm kdim_MMET MKN1 ksyn_MMET__HS746T_fm kdim_MMET_EGFR ka_PI3K__pEGFR_EGF_2 kdeg_membran__MKN1 HS746T d_ki_RAS__MKN1_2_HS746T EGF_level kdim_EGFR_EGF kbin_EGFR_CET ka_AKT__MKN1 d_ki_AKT__MKN1_2_HS746T PI3Ktotal__HS746T_fm ki_PI3K__MKN1 kpho_MMET AKTtotal__MKN1_fm xi_kimp_pMMET_2 relative_ksyn_EGFR ka_RAS__pEGFR_EGF_2__MKN1 ki_MAPK cyt kimp_pEGFR_EGF_2__MKN1 d_AKTtotal__MKN1_2_HS746T ki_AKT__MKN1 RAStotal__MKN1_fm d_PI3Ktotal__fm_2_hm xi_ka_PI3K_pMMET_pEGFR xi_kdim_MMET_EGFR xi_kpho_MMET METinh_level kdim_MMETinh d_MAPKtotal__MKN1_2_HS746T xi_ka_RAS_pMMET_pEGFR kdeg_pEGFR_EGF_2_i__MKN1 xi_kdim_MMET d_kdeg_pEGFR_EGF_2_i__MKN1_2_HS746T d_ka_RAS__basal__MKN1_2_HS746T hunger_medium
+    ModelingToolkit.@parameters d_ksyn_EGFR__fm_2_hm xi_kexp_pMMET_2_i d_ka_RAS__pEGFR_EGF_2__MKN1_2_HS746T CET_bool1 EGF_bool1 d_ka_MAPK__MKN1_2_HS746T ki_RAS__MKN1 d_ka_AKT__MKN1_2_HS746T KD_EGFR_CET xi_ka_PI3K_pMMET_2 d_MAPKtotal__fm_2_hm d_ksyn_MMET__fm_2_hm ka_PI3K__basal d_kimp_pEGFR_EGF_2__MKN1_2_HS746T d_AKTtotal__fm_2_hm KD_METinh xi_ki_MPI3K d_kexp_pEGFR_EGF_2_i__MKN1_2_HS746T d_ksyn_EGFR__MKN1_2_HS746T d_MPI3Ktotal__fm_2_hm d_kdeg_membran__MKN1_2_HS746T MPI3Ktotal__MKN1_fm KD_EGFR_EGF METinh_bool1 kexp_pEGFR_EGF_2_i__MKN1 CET_level kbin_EGFR_EGF ksyn_EGFR__MKN1_fm xi_kdeg_pMMET_pEGFR_i d_ki_PI3K__MKN1_2_HS746T xi_kpho_MMET_EGFR MAPKtotal__MKN1_fm xi_kexp_pMMET_pEGFR_i d_RAStotal__MKN1_2_HS746T kpho_EGFR_EGF ka_MAPK__MKN1 kpho_MMET_EGFR full_medium xi_ka_RAS_pMMET_2 xi_kimp_pMMET_pEGFR xi_kdeg_pMMET_2_i ka_RAS__basal__MKN1 d_RAStotal__fm_2_hm kdim_MMET MKN1 ksyn_MMET__HS746T_fm kdim_MMET_EGFR ka_PI3K__pEGFR_EGF_2 kdeg_membran__MKN1 HS746T d_ki_RAS__MKN1_2_HS746T EGF_level kdim_EGFR_EGF kbin_EGFR_CET ka_AKT__MKN1 d_ki_AKT__MKN1_2_HS746T PI3Ktotal__HS746T_fm ki_PI3K__MKN1 kpho_MMET AKTtotal__MKN1_fm xi_kimp_pMMET_2 relative_ksyn_EGFR ka_RAS__pEGFR_EGF_2__MKN1 ki_MAPK cyt kimp_pEGFR_EGF_2__MKN1 d_AKTtotal__MKN1_2_HS746T ki_AKT__MKN1 RAStotal__MKN1_fm d_PI3Ktotal__fm_2_hm xi_ka_PI3K_pMMET_pEGFR xi_kdim_MMET_EGFR xi_kpho_MMET METinh_level kdim_MMETinh d_MAPKtotal__MKN1_2_HS746T xi_ka_RAS_pMMET_pEGFR kdeg_pEGFR_EGF_2_i__MKN1 xi_kdim_MMET d_kdeg_pEGFR_EGF_2_i__MKN1_2_HS746T d_ka_RAS__basal__MKN1_2_HS746T hunger_medium
 
     ### Store parameters in array for ODESystem command
-    parameterArray = [d_ksyn_EGFR__fm_2_hm, xi_kexp_pMMET_2_i, d_ka_RAS__pEGFR_EGF_2__MKN1_2_HS746T, d_ka_MAPK__MKN1_2_HS746T, ki_RAS__MKN1, d_ka_AKT__MKN1_2_HS746T, KD_EGFR_CET, xi_ka_PI3K_pMMET_2, d_MAPKtotal__fm_2_hm, d_ksyn_MMET__fm_2_hm, ka_PI3K__basal, d_kimp_pEGFR_EGF_2__MKN1_2_HS746T, d_AKTtotal__fm_2_hm, KD_METinh, xi_ki_MPI3K, d_kexp_pEGFR_EGF_2_i__MKN1_2_HS746T, d_ksyn_EGFR__MKN1_2_HS746T, d_MPI3Ktotal__fm_2_hm, d_kdeg_membran__MKN1_2_HS746T, MPI3Ktotal__MKN1_fm, KD_EGFR_EGF, kexp_pEGFR_EGF_2_i__MKN1, CET_level, kbin_EGFR_EGF, ksyn_EGFR__MKN1_fm, xi_kdeg_pMMET_pEGFR_i, d_ki_PI3K__MKN1_2_HS746T, xi_kpho_MMET_EGFR, MAPKtotal__MKN1_fm, xi_kexp_pMMET_pEGFR_i, d_RAStotal__MKN1_2_HS746T, kpho_EGFR_EGF, ka_MAPK__MKN1, kpho_MMET_EGFR, full_medium, xi_ka_RAS_pMMET_2, xi_kimp_pMMET_pEGFR, xi_kdeg_pMMET_2_i, ka_RAS__basal__MKN1, d_RAStotal__fm_2_hm, kdim_MMET, MKN1, ksyn_MMET__HS746T_fm, kdim_MMET_EGFR, ka_PI3K__pEGFR_EGF_2, kdeg_membran__MKN1, HS746T, d_ki_RAS__MKN1_2_HS746T, EGF_level, kdim_EGFR_EGF, kbin_EGFR_CET, ka_AKT__MKN1, d_ki_AKT__MKN1_2_HS746T, PI3Ktotal__HS746T_fm, ki_PI3K__MKN1, kpho_MMET, AKTtotal__MKN1_fm, xi_kimp_pMMET_2, relative_ksyn_EGFR, ka_RAS__pEGFR_EGF_2__MKN1, ki_MAPK, cyt, kimp_pEGFR_EGF_2__MKN1, d_AKTtotal__MKN1_2_HS746T, ki_AKT__MKN1, RAStotal__MKN1_fm, d_PI3Ktotal__fm_2_hm, xi_ka_PI3K_pMMET_pEGFR, xi_kdim_MMET_EGFR, xi_kpho_MMET, METinh_level, kdim_MMETinh, d_MAPKtotal__MKN1_2_HS746T, xi_ka_RAS_pMMET_pEGFR, kdeg_pEGFR_EGF_2_i__MKN1, xi_kdim_MMET, d_kdeg_pEGFR_EGF_2_i__MKN1_2_HS746T, d_ka_RAS__basal__MKN1_2_HS746T, hunger_medium]
+    parameterArray = [d_ksyn_EGFR__fm_2_hm, xi_kexp_pMMET_2_i, d_ka_RAS__pEGFR_EGF_2__MKN1_2_HS746T, CET_bool1, EGF_bool1, d_ka_MAPK__MKN1_2_HS746T, ki_RAS__MKN1, d_ka_AKT__MKN1_2_HS746T, KD_EGFR_CET, xi_ka_PI3K_pMMET_2, d_MAPKtotal__fm_2_hm, d_ksyn_MMET__fm_2_hm, ka_PI3K__basal, d_kimp_pEGFR_EGF_2__MKN1_2_HS746T, d_AKTtotal__fm_2_hm, KD_METinh, xi_ki_MPI3K, d_kexp_pEGFR_EGF_2_i__MKN1_2_HS746T, d_ksyn_EGFR__MKN1_2_HS746T, d_MPI3Ktotal__fm_2_hm, d_kdeg_membran__MKN1_2_HS746T, MPI3Ktotal__MKN1_fm, KD_EGFR_EGF, METinh_bool1, kexp_pEGFR_EGF_2_i__MKN1, CET_level, kbin_EGFR_EGF, ksyn_EGFR__MKN1_fm, xi_kdeg_pMMET_pEGFR_i, d_ki_PI3K__MKN1_2_HS746T, xi_kpho_MMET_EGFR, MAPKtotal__MKN1_fm, xi_kexp_pMMET_pEGFR_i, d_RAStotal__MKN1_2_HS746T, kpho_EGFR_EGF, ka_MAPK__MKN1, kpho_MMET_EGFR, full_medium, xi_ka_RAS_pMMET_2, xi_kimp_pMMET_pEGFR, xi_kdeg_pMMET_2_i, ka_RAS__basal__MKN1, d_RAStotal__fm_2_hm, kdim_MMET, MKN1, ksyn_MMET__HS746T_fm, kdim_MMET_EGFR, ka_PI3K__pEGFR_EGF_2, kdeg_membran__MKN1, HS746T, d_ki_RAS__MKN1_2_HS746T, EGF_level, kdim_EGFR_EGF, kbin_EGFR_CET, ka_AKT__MKN1, d_ki_AKT__MKN1_2_HS746T, PI3Ktotal__HS746T_fm, ki_PI3K__MKN1, kpho_MMET, AKTtotal__MKN1_fm, xi_kimp_pMMET_2, relative_ksyn_EGFR, ka_RAS__pEGFR_EGF_2__MKN1, ki_MAPK, cyt, kimp_pEGFR_EGF_2__MKN1, d_AKTtotal__MKN1_2_HS746T, ki_AKT__MKN1, RAStotal__MKN1_fm, d_PI3Ktotal__fm_2_hm, xi_ka_PI3K_pMMET_pEGFR, xi_kdim_MMET_EGFR, xi_kpho_MMET, METinh_level, kdim_MMETinh, d_MAPKtotal__MKN1_2_HS746T, xi_ka_RAS_pMMET_pEGFR, kdeg_pEGFR_EGF_2_i__MKN1, xi_kdim_MMET, d_kdeg_pEGFR_EGF_2_i__MKN1_2_HS746T, d_ka_RAS__basal__MKN1_2_HS746T, hunger_medium]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -51,9 +51,9 @@ function getODEModel_model_Raimundez_PCB2020()
     D(EGFR_CET) ~ +1.0 * ( 1 /cyt ) * (cyt * CET * EGFR * kbin_EGFR_CET)-1.0 * ( 1 /cyt ) * (cyt * EGFR_CET * KD_EGFR_CET * kbin_EGFR_CET)-1.0 * ( 1 /cyt ) * (cyt * EGFR_CET * (kdeg_membran__MKN1 * exp(HS746T * d_kdeg_membran__MKN1_2_HS746T))),
     D(pMMET_pEGFR) ~ +1.0 * ( 1 /cyt ) * (cyt * MMET_EGFR * kpho_MMET_EGFR * xi_kpho_MMET_EGFR)-1.0 * ( 1 /cyt ) * (cyt * (kimp_pEGFR_EGF_2__MKN1 * exp(HS746T * d_kimp_pEGFR_EGF_2__MKN1_2_HS746T)) * pMMET_pEGFR * xi_kimp_pMMET_pEGFR),
     D(EGFR_MMET_METinh) ~ +1.0 * ( 1 /cyt ) * (cyt * EGFR * MMET_METinh * kdim_MMET_EGFR * xi_kdim_MMET_EGFR),
-    CET ~ 6.86 * CET_level * ifelse(t < 0, 0, 1),
-    METinh ~ METinh_level * ifelse(t < 0, 0, 1),
-    EGF ~ 0.161 * EGF_level * ifelse(t < 0, 0, 1)
+    CET ~ 6.86 * CET_level * ((1 - CET_bool1)*( 0) + CET_bool1*( 1)),
+    METinh ~ METinh_level * ((1 - METinh_bool1)*( 0) + METinh_bool1*( 1)),
+    EGF ~ 0.161 * EGF_level * ((1 - EGF_bool1)*( 0) + EGF_bool1*( 1))
     ]
 
     @named sys = ODESystem(eqs, t, stateArray, parameterArray)
@@ -89,6 +89,8 @@ function getODEModel_model_Raimundez_PCB2020()
     d_ksyn_EGFR__fm_2_hm => -0.087595179128819,
     xi_kexp_pMMET_2_i => 1.24320885340702,
     d_ka_RAS__pEGFR_EGF_2__MKN1_2_HS746T => 0.0,
+    CET_bool1 => 0.0,
+    EGF_bool1 => 0.0,
     d_ka_MAPK__MKN1_2_HS746T => 0.0,
     ki_RAS__MKN1 => 0.326956568863966,
     d_ka_AKT__MKN1_2_HS746T => 0.0,
@@ -107,6 +109,7 @@ function getODEModel_model_Raimundez_PCB2020()
     d_kdeg_membran__MKN1_2_HS746T => -0.599975506316473,
     MPI3Ktotal__MKN1_fm => 1.0,
     KD_EGFR_EGF => 0.320759905034371,
+    METinh_bool1 => 0.0,
     kexp_pEGFR_EGF_2_i__MKN1 => 0.75168312329534,
     CET_level => 1.0,
     kbin_EGFR_EGF => 8.88174858370342,

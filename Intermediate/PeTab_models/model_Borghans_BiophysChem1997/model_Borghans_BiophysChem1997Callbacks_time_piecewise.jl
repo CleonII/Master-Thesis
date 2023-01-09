@@ -1,4 +1,4 @@
-function getCallbacks_model_Elowitz_Nature2000()
+function getCallbacks_model_Borghans_BiophysChem1997()
 	return CallbackSet(), []
 end
 

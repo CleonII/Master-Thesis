@@ -22,7 +22,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	k1c, k21, k1g, insulin_dose_2, k1a, insulin_dose_1, k1aBasic, k1d, insulin_time_1, insulin_time_2, cyt, k22, default, k1r, k1f, k1b, k3, km2, k1e, k_IRSiP_DosR, km3 = paramVec 
+	k1c, k21, insulin_bool1, k1g, insulin_dose_2, k1a, insulin_dose_1, k1aBasic, k1d, insulin_time_1, insulin_time_2, cyt, k22, insulin_bool2, default, k1r, k1f, k1b, k3, km2, k1e, k_IRSiP_DosR, km3 = paramVec 
 
 	IRp = 1.7629010620181e-9 
 	IR = 9.94957642787569 
@@ -39,7 +39,7 @@ end
 
 function evalU0(paramVec) 
 
-	k1c, k21, k1g, insulin_dose_2, k1a, insulin_dose_1, k1aBasic, k1d, insulin_time_1, insulin_time_2, cyt, k22, default, k1r, k1f, k1b, k3, km2, k1e, k_IRSiP_DosR, km3 = paramVec 
+	k1c, k21, insulin_bool1, k1g, insulin_dose_2, k1a, insulin_dose_1, k1aBasic, k1d, insulin_time_1, insulin_time_2, cyt, k22, insulin_bool2, default, k1r, k1f, k1b, k3, km2, k1e, k_IRSiP_DosR, km3 = paramVec 
 
 	IRp = 1.7629010620181e-9 
 	IR = 9.94957642787569 

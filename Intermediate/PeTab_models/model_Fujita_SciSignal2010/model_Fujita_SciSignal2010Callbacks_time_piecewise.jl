@@ -1,12 +1,12 @@
 function getCallbacks_model_Fujita_SciSignal2010()
-	cb_EGF_bool1 = ContinuousCallback(condition_EGF_bool1, affect_EGF_bool1!, save_positions=(false, false))
+	cb_EGF_bool1 = DiscreteCallback(condition_EGF_bool1, affect_EGF_bool1!, save_positions=(false, false))
 
 	return CallbackSet(cb_EGF_bool1), [activeAtTime0_EGF_bool1!]
 end
 
 
 function condition_EGF_bool1(u, t, integrator)
-	t - integrator.p[1]
+	t == integrator.p[1]
 end
 function affect_EGF_bool1!(integrator)
 	integrator.p[6] = 1.0

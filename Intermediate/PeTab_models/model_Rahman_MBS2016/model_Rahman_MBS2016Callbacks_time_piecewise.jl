@@ -1,4 +1,4 @@
-function getCallbacks_model_Elowitz_Nature2000()
+function getCallbacks_model_Rahman_MBS2016()
 	return CallbackSet(), []
 end
 

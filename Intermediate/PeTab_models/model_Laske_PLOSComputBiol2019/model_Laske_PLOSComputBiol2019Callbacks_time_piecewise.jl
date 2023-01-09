@@ -1,4 +1,4 @@
-function getCallbacks_model_Elowitz_Nature2000()
+function getCallbacks_model_Laske_PLOSComputBiol2019()
 	return CallbackSet(), []
 end
 

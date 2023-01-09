@@ -1,4 +1,4 @@
-function getCallbacks_model_Elowitz_Nature2000()
+function getCallbacks_model_Zheng_PNAS2012()
 	return CallbackSet(), []
 end
 

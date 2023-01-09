@@ -15,10 +15,10 @@ function getODEModel_model_Oliveira_NatCommun2021()
     ModelingToolkit.@variables beta(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters asymptomatic_init_concentration beta_2_multiplier t_2 gamma_u exposed_init_concentration omega_u kappa h_hosp_rate xi delta_ t_1 beta_0 symptomatic_init_concentration Interior mu_u omega_h mu_h beta_2 beta_1 population p_symp_rate gamma_s gamma_h gamma_a
+    ModelingToolkit.@parameters asymptomatic_init_concentration beta_2_multiplier t_2 gamma_u exposed_init_concentration omega_u kappa h_hosp_rate xi delta_ t_1 beta_0 symptomatic_init_concentration Interior mu_u omega_h beta_bool1 mu_h beta_2 beta_1 beta_bool2 population p_symp_rate gamma_s gamma_h gamma_a
 
     ### Store parameters in array for ODESystem command
-    parameterArray = [asymptomatic_init_concentration, beta_2_multiplier, t_2, gamma_u, exposed_init_concentration, omega_u, kappa, h_hosp_rate, xi, delta_, t_1, beta_0, symptomatic_init_concentration, Interior, mu_u, omega_h, mu_h, beta_2, beta_1, population, p_symp_rate, gamma_s, gamma_h, gamma_a]
+    parameterArray = [asymptomatic_init_concentration, beta_2_multiplier, t_2, gamma_u, exposed_init_concentration, omega_u, kappa, h_hosp_rate, xi, delta_, t_1, beta_0, symptomatic_init_concentration, Interior, mu_u, omega_h, beta_bool1, mu_h, beta_2, beta_1, beta_bool2, population, p_symp_rate, gamma_s, gamma_h, gamma_a]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -38,7 +38,7 @@ function getODEModel_model_Oliveira_NatCommun2021()
     D(Recovered) ~ +1.0 * ( 1 /Interior ) * (Interior * gamma_a * Asymptomatic)+1.0 * ( 1 /Interior ) * (Interior * ((1 - h_hosp_rate) * gamma_s) * Symptomatic)+1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * (1 - mu_h) * gamma_h) * Hospital),
     D(Deaths) ~ +1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_h) * mu_h * gamma_h) * Hospital)+1.0 * ( 1 /Interior ) * (Interior * ((1 - omega_u) * mu_u * gamma_u) * ICU),
     D(Susceptible) ~ -1.0 * ( 1 /Interior ) * (Interior * (beta * Susceptible * (Symptomatic + delta_ * Asymptomatic) / population)),
-    beta ~ ifelse(t < t_1, beta_0, ifelse(t < t_2, beta_1, beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))
+    beta ~ ((1 - beta_bool2)*( beta_0) + beta_bool2*( ((1 - beta_bool1)*( beta_1) + beta_bool1*( beta_2 * beta_2_multiplier + beta_1 * (1 - beta_2_multiplier)))))
     ]
 
     @named sys = ODESystem(eqs, t, stateArray, parameterArray)
@@ -74,9 +74,11 @@ function getODEModel_model_Oliveira_NatCommun2021()
     Interior => 1.0,
     mu_u => 0.4,
     omega_h => 0.14,
+    beta_bool1 => 0.0,
     mu_h => 0.15,
     beta_2 => 0.66,
     beta_1 => 0.560641488770886,
+    beta_bool2 => 0.0,
     population => 1.2098867e7,
     p_symp_rate => 0.2,
     gamma_s => 0.25,

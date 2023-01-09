@@ -27,7 +27,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	asymptomatic_init_concentration, beta_2_multiplier, t_2, gamma_u, exposed_init_concentration, omega_u, kappa, h_hosp_rate, xi, delta_, t_1, beta_0, symptomatic_init_concentration, Interior, mu_u, omega_h, mu_h, beta_2, beta_1, population, p_symp_rate, gamma_s, gamma_h, gamma_a = paramVec 
+	asymptomatic_init_concentration, beta_2_multiplier, t_2, gamma_u, exposed_init_concentration, omega_u, kappa, h_hosp_rate, xi, delta_, t_1, beta_0, symptomatic_init_concentration, Interior, mu_u, omega_h, beta_bool1, mu_h, beta_2, beta_1, beta_bool2, population, p_symp_rate, gamma_s, gamma_h, gamma_a = paramVec 
 
 	Hospital = 0.0 
 	Symptomatic = population * symptomatic_init_concentration 
@@ -44,7 +44,7 @@ end
 
 function evalU0(paramVec) 
 
-	asymptomatic_init_concentration, beta_2_multiplier, t_2, gamma_u, exposed_init_concentration, omega_u, kappa, h_hosp_rate, xi, delta_, t_1, beta_0, symptomatic_init_concentration, Interior, mu_u, omega_h, mu_h, beta_2, beta_1, population, p_symp_rate, gamma_s, gamma_h, gamma_a = paramVec 
+	asymptomatic_init_concentration, beta_2_multiplier, t_2, gamma_u, exposed_init_concentration, omega_u, kappa, h_hosp_rate, xi, delta_, t_1, beta_0, symptomatic_init_concentration, Interior, mu_u, omega_h, beta_bool1, mu_h, beta_2, beta_1, beta_bool2, population, p_symp_rate, gamma_s, gamma_h, gamma_a = paramVec 
 
 	Hospital = 0.0 
 	Symptomatic = population * symptomatic_init_concentration 

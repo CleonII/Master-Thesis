@@ -24,7 +24,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	Lockdown_NY_end, Pop_CA, Io_CA, Pop_NY, Io_NY, Trigger_NY, USA___CA__NY, Lockdown_CA_start, gamma_NY, Trigger_Lockdown, Ro_NY, Lockdown_CA_end, gamma_CA, Ro_CA, Lockdown_NY_start = paramVec 
+	Lockdown_NY_end, Pop_CA, Ro_bool1, Ro_bool2, Io_CA, Ro_bool4, Pop_NY, Io_NY, Trigger_NY, USA___CA__NY, Lockdown_CA_start, gamma_NY, Trigger_Lockdown, Ro_NY, Lockdown_CA_end, Ro_bool5, gamma_CA, Ro_CA, Lockdown_NY_start = paramVec 
 
 	Infected = ( Io_CA * ( 1 - Trigger_NY ) + Io_NY * Trigger_NY ) / ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) ) 
 	Recovered = 0.0 
@@ -35,7 +35,7 @@ end
 
 function evalU0(paramVec) 
 
-	Lockdown_NY_end, Pop_CA, Io_CA, Pop_NY, Io_NY, Trigger_NY, USA___CA__NY, Lockdown_CA_start, gamma_NY, Trigger_Lockdown, Ro_NY, Lockdown_CA_end, gamma_CA, Ro_CA, Lockdown_NY_start = paramVec 
+	Lockdown_NY_end, Pop_CA, Ro_bool1, Ro_bool2, Io_CA, Ro_bool4, Pop_NY, Io_NY, Trigger_NY, USA___CA__NY, Lockdown_CA_start, gamma_NY, Trigger_Lockdown, Ro_NY, Lockdown_CA_end, Ro_bool5, gamma_CA, Ro_CA, Lockdown_NY_start = paramVec 
 
 	Infected = ( Io_CA * ( 1 - Trigger_NY ) + Io_NY * Trigger_NY ) / ( Pop_NY * Trigger_NY + Pop_CA * ( 1 - Trigger_NY ) ) 
 	Recovered = 0.0 

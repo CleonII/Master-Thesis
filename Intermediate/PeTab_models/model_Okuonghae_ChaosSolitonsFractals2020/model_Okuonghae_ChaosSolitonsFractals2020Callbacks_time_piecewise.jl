@@ -1,4 +1,4 @@
-function getCallbacks_model_Elowitz_Nature2000()
+function getCallbacks_model_Okuonghae_ChaosSolitonsFractals2020()
 	return CallbackSet(), []
 end
 

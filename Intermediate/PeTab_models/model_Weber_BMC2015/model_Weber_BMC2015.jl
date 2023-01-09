@@ -15,10 +15,10 @@ function getODEModel_model_Weber_BMC2015()
     ModelingToolkit.@variables u6(t) u4(t) u3(t) u5(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters a21 m33 kb_NB142_70_dose a22 kb_NB142_70_time p12 p33 s31 PdBu_dose a12 p22 a33 p13 cyt pu5 pu2 p31 pu4 PdBu_time s12 m11 m31 u2 Ect_Expr_PI4K3beta_flag a11 p32 p21 pu6 s21 pu3 m22 p11 Ect_Expr_CERT_flag a31 a32
+    ModelingToolkit.@parameters a21 m33 u4_bool1 u5_bool1 kb_NB142_70_dose a22 kb_NB142_70_time p12 p33 s31 PdBu_dose a12 p22 a33 p13 cyt pu5 u6_bool1 pu2 p31 pu4 PdBu_time s12 m11 m31 u2 Ect_Expr_PI4K3beta_flag a11 p32 p21 pu6 s21 pu3 m22 p11 Ect_Expr_CERT_flag a31 u3_bool1 a32
 
     ### Store parameters in array for ODESystem command
-    parameterArray = [a21, m33, kb_NB142_70_dose, a22, kb_NB142_70_time, p12, p33, s31, PdBu_dose, a12, p22, a33, p13, cyt, pu5, pu2, p31, pu4, PdBu_time, s12, m11, m31, u2, Ect_Expr_PI4K3beta_flag, a11, p32, p21, pu6, s21, pu3, m22, p11, Ect_Expr_CERT_flag, a31, a32]
+    parameterArray = [a21, m33, u4_bool1, u5_bool1, kb_NB142_70_dose, a22, kb_NB142_70_time, p12, p33, s31, PdBu_dose, a12, p22, a33, p13, cyt, pu5, u6_bool1, pu2, p31, pu4, PdBu_time, s12, m11, m31, u2, Ect_Expr_PI4K3beta_flag, a11, p32, p21, pu6, s21, pu3, m22, p11, Ect_Expr_CERT_flag, a31, u3_bool1, a32]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -36,10 +36,10 @@ function getODEModel_model_Weber_BMC2015()
     D(PKDDAGa) ~ +1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))+1.0 * ( 1 /cyt ) * (cyt * PKD * p12 * (pu5 * u5 + 1))-1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * p13 * (pu6 * u6 + 1))-1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * a12),
     D(PKD) ~ -1.0 * ( 1 /cyt ) * (cyt * (CERTERa * PI4K3Ba * PKD * p11 * p31 / ((PI4K3Ba + m31) * (m11 + CERTERa * PI4K3Ba * p31 / (PI4K3Ba + m31)))))-1.0 * ( 1 /cyt ) * (cyt * PKD * p12 * (pu5 * u5 + 1))+1.0 * ( 1 /cyt ) * (cyt * PKDDAGa * p13 * (pu6 * u6 + 1))+1.0 * ( 1 /cyt ) * (cyt * s12)+1.0 * ( 1 /cyt ) * (cyt * pu2 * u2)-1.0 * ( 1 /cyt ) * (cyt * PKD * a11),
     D(PI4K3Ba) ~ -1.0 * ( 1 /cyt ) * (cyt * PI4K3Ba * p21)+1.0 * ( 1 /cyt ) * (cyt * (PI4K3B * PKDDAGa * p22 / (PKDDAGa + m22)))-1.0 * ( 1 /cyt ) * (cyt * PI4K3Ba * a22),
-    u6 ~ kb_NB142_70_dose * ifelse(t - kb_NB142_70_time < 0, 0, 1),
-    u4 ~ ifelse(t < 0, 0, Ect_Expr_CERT_flag),
-    u3 ~ ifelse(t < 0, 0, Ect_Expr_PI4K3beta_flag),
-    u5 ~ ifelse(t - PdBu_time < 0, 0, PdBu_dose)
+    u6 ~ kb_NB142_70_dose * ((1 - u6_bool1)*( 0) + u6_bool1*( 1)),
+    u4 ~ ((1 - u4_bool1)*( 0) + u4_bool1*( Ect_Expr_CERT_flag)),
+    u3 ~ ((1 - u3_bool1)*( 0) + u3_bool1*( Ect_Expr_PI4K3beta_flag)),
+    u5 ~ ((1 - u5_bool1)*( 0) + u5_bool1*( PdBu_dose))
     ]
 
     @named sys = ODESystem(eqs, t, stateArray, parameterArray)
@@ -59,6 +59,8 @@ function getODEModel_model_Weber_BMC2015()
     trueParameterValues = [
     a21 => 1.86921330588484,
     m33 => 7.56019670948633e7,
+    u4_bool1 => 0.0,
+    u5_bool1 => 0.0,
     kb_NB142_70_dose => 0.0,
     a22 => 0.00010000000000001,
     kb_NB142_70_time => 0.0,
@@ -72,6 +74,7 @@ function getODEModel_model_Weber_BMC2015()
     p13 => 0.00183182922741504,
     cyt => 1.0,
     pu5 => 33.7869036338953,
+    u6_bool1 => 0.0,
     pu2 => 1.0,
     p31 => 2428.01870197136,
     pu4 => 3.57637576834332e7,
@@ -91,6 +94,7 @@ function getODEModel_model_Weber_BMC2015()
     p11 => 4.23578569731751,
     Ect_Expr_CERT_flag => 0.0,
     a31 => 0.140427319109888,
+    u3_bool1 => 0.0,
     a32 => 0.00010000000000001
     ]
 

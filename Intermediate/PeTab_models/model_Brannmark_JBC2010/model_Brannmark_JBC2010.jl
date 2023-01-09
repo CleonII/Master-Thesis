@@ -15,10 +15,10 @@ function getODEModel_model_Brannmark_JBC2010()
     ModelingToolkit.@variables insulin(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters k1c k21 k1g insulin_dose_2 k1a insulin_dose_1 k1aBasic k1d insulin_time_1 insulin_time_2 cyt k22 default k1r k1f k1b k3 km2 k1e k_IRSiP_DosR km3
+    ModelingToolkit.@parameters k1c k21 insulin_bool1 k1g insulin_dose_2 k1a insulin_dose_1 k1aBasic k1d insulin_time_1 insulin_time_2 cyt k22 insulin_bool2 default k1r k1f k1b k3 km2 k1e k_IRSiP_DosR km3
 
     ### Store parameters in array for ODESystem command
-    parameterArray = [k1c, k21, k1g, insulin_dose_2, k1a, insulin_dose_1, k1aBasic, k1d, insulin_time_1, insulin_time_2, cyt, k22, default, k1r, k1f, k1b, k3, km2, k1e, k_IRSiP_DosR, km3]
+    parameterArray = [k1c, k21, insulin_bool1, k1g, insulin_dose_2, k1a, insulin_dose_1, k1aBasic, k1d, insulin_time_1, insulin_time_2, cyt, k22, insulin_bool2, default, k1r, k1f, k1b, k3, km2, k1e, k_IRSiP_DosR, km3]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -38,7 +38,7 @@ function getODEModel_model_Brannmark_JBC2010()
     D(IRi) ~ +1.0 * ( 1 /cyt ) * (cyt * IRiP * (k1e + Xp * k1f / (Xp + 1)))-1.0 * ( 1 /cyt ) * (cyt * IRi * k1r),
     D(IRSiP) ~ +1.0 * ( 1 /cyt ) * (cyt * IRS * k21 * (IRp + IRiP * k22))-1.0 * ( 1 /cyt ) * (cyt * IRSiP * km2),
     D(Xp) ~ +1.0 * ( 1 /cyt ) * (cyt * IRSiP * X * k3)-1.0 * ( 1 /cyt ) * (cyt * Xp * km3),
-    insulin ~ insulin_dose_1 * ifelse(t - insulin_time_1 < 0, 0, 1) + insulin_dose_2 * ifelse(t - insulin_time_2 < 0, 0, 1)
+    insulin ~ insulin_dose_1 * ((1 - insulin_bool1)*( 0) + insulin_bool1*( 1)) + insulin_dose_2 * ((1 - insulin_bool2)*( 0) + insulin_bool2*( 1))
     ]
 
     @named sys = ODESystem(eqs, t, stateArray, parameterArray)
@@ -60,6 +60,7 @@ function getODEModel_model_Brannmark_JBC2010()
     trueParameterValues = [
     k1c => 0.050861851404055,
     k21 => 2.13019897196189,
+    insulin_bool1 => 0.0,
     k1g => 1931.1338834437,
     insulin_dose_2 => 0.0,
     k1a => 0.177252330941141,
@@ -70,6 +71,7 @@ function getODEModel_model_Brannmark_JBC2010()
     insulin_time_2 => 1000.0,
     cyt => 1.0,
     k22 => 658.762927786248,
+    insulin_bool2 => 0.0,
     default => 1.0,
     k1r => 0.0266983879216281,
     k1f => 499999.990737798,
