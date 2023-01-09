@@ -481,6 +481,7 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     # Here it is IMPORTANT that we copy prob.p[:] else different experimental conditions will 
     # share the same parameter vector p. This will, for example, cause the lower level adjoint 
     # sensitivity interface to fail.
+    t_max_ss = isinf(t_max) ? 1e8 : t_max
     probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])     
     # If case of adjoint sensitivity analysis we need to track the callback to get correct gradients 
     callBackSet = getCallbackSet(probUse, simulationInfo, whichForwardSol, trackCallback)
@@ -553,7 +554,7 @@ function getSolSolveOdeNoSS(prob::ODEProblem,
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
-    if isinf(t_max)
+    if isinf(t_max) || t_max == 1e8
         sol = solve(prob, alg_hints=solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=dense, callback=TerminateSteadyState(absTolSS, relTolSS))
     else 
         sol = solve(prob, alg_hints=solver, abstol=absTol, reltol=relTol, saveat=saveAtVec, dense=dense, tstops=tStops, callback=callBackSet)   
@@ -574,7 +575,7 @@ function getSolSolveOdeNoSS(prob::ODEProblem,
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
-    if isinf(t_max)
+    if isinf(t_max) || t_max == 1e8
         sol = solve(prob, solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=dense, callback=TerminateSteadyState(absTolSS, relTolSS))
     else
         sol = solve(prob, solver, abstol=absTol, reltol=relTol, saveat=saveAtVec, dense=dense, tstops=tStops, callback=callBackSet)
