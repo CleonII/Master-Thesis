@@ -29,11 +29,14 @@ struct PeTabModel{F1<:Function,
                   F6<:Function,
                   F7<:Function,
                   F8<:Function,
+                  F9<:Function,
                   S<:ODESystem,
                   T1<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}}, 
                   T2<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}}, 
                   T3<:Vector{<:Any}, 
-                  T4<:Vector{<:Any}}
+                  T4<:Vector{<:Any}, 
+                  C <: SciMLBase.DECallback,
+                  FA<:Vector{<:Function}}
     modelName::String
     evalYmod::F1
     evalU0!::F2
@@ -43,6 +46,7 @@ struct PeTabModel{F1<:Function,
     evalDSdDu!::F6
     evalDYmodDp::F7
     evalDSdDp!::F8
+    getTStops::F9
     odeSystem::S
     paramMap::T1
     stateMap::T2
@@ -53,6 +57,8 @@ struct PeTabModel{F1<:Function,
     pathExperimentalConditions::String
     pathObservables::String
     pathParameters::String
+    callbackSet::C
+    checkCallbackActive::FA
 end
 
 

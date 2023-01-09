@@ -65,8 +65,8 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     changeModelParamUse = (pVec, paramEst) -> changeModelParam(pVec, paramEst, paramEstIndices, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
-    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
-    solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, denseSol=true, expIDSolve=expIDSolveArg)
+    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.callbackSet, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
+    solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, callBackSet, peTabModel.getTStops, denseSol=true, expIDSolve=expIDSolveArg)
     solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementData, simulationInfo, solver, tol, tol, sensealg)
 
     if nProcs > 1 && nprocs() != nProcs

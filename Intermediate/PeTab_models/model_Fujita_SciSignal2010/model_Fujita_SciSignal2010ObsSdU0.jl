@@ -22,7 +22,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	EGF_end, reaction_5_k1, reaction_2_k2, init_AKT, init_EGFR, EGF_rate, EGFR_turnover, reaction_1_k1, reaction_1_k2, reaction_8_k1, reaction_4_k1, reaction_6_k1, reaction_2_k1, init_S6, reaction_7_k1, reaction_9_k1, reaction_3_k1, reaction_5_k2, Cell, EGF_0 = paramVec 
+	EGF_end, reaction_5_k1, reaction_2_k2, init_AKT, init_EGFR, EGF_bool1, EGF_rate, EGFR_turnover, reaction_1_k1, reaction_1_k2, reaction_8_k1, reaction_4_k1, reaction_6_k1, reaction_2_k1, init_S6, reaction_7_k1, reaction_9_k1, reaction_3_k1, reaction_5_k2, Cell, EGF_0 = paramVec 
 
 	pAkt_S6 = 0.0 
 	pAkt = 0.0 
@@ -39,7 +39,7 @@ end
 
 function evalU0(paramVec) 
 
-	EGF_end, reaction_5_k1, reaction_2_k2, init_AKT, init_EGFR, EGF_rate, EGFR_turnover, reaction_1_k1, reaction_1_k2, reaction_8_k1, reaction_4_k1, reaction_6_k1, reaction_2_k1, init_S6, reaction_7_k1, reaction_9_k1, reaction_3_k1, reaction_5_k2, Cell, EGF_0 = paramVec 
+	EGF_end, reaction_5_k1, reaction_2_k2, init_AKT, init_EGFR, EGF_bool1, EGF_rate, EGFR_turnover, reaction_1_k1, reaction_1_k2, reaction_8_k1, reaction_4_k1, reaction_6_k1, reaction_2_k1, init_S6, reaction_7_k1, reaction_9_k1, reaction_3_k1, reaction_5_k2, Cell, EGF_0 = paramVec 
 
 	pAkt_S6 = 0.0 
 	pAkt = 0.0 

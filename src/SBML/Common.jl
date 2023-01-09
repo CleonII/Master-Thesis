@@ -28,7 +28,7 @@ function rewritePiecewiseToIfElse(ruleFormula, variable, modelDict, baseFunction
         end
         
         if length(conds) > 1
-            println("Warning : Breaking example with multile conds")
+            println("Warning : Potentially breaking example with multiple conditions")
         end
 
         # Process the piecewise into ifelse statements 
@@ -208,5 +208,275 @@ function splitBetween(stringToSplit, delimiter)
     numParts += 1
     parts[numParts] = stringToSplit[startPart:end]
     parts[numParts] = strip(parts[numParts])
-    parts = parts[1:numParts]
+    parts = parts[1:numParts]   
 end
+
+
+# Check if time is present in a string (used for rewriting piecewise to event)
+function checkForTime(str::String)
+    strNoWhitespace = replace(str, " " => "")
+
+    # In case we find time t 
+    iT = 0
+    findT = false
+    for i in eachindex(strNoWhitespace)
+        if strNoWhitespace[i] == 't'
+            if (i > 1 && i < length(strNoWhitespace)) && !isletter(strNoWhitespace[i-1]) && !isletter(strNoWhitespace[i+1])
+                findT = true
+                iT = i
+                break
+            elseif i == 1 && i < length(strNoWhitespace) && !isletter(strNoWhitespace[i+1])
+                findT = true
+                iT = i
+                break
+            elseif i == 1 && i == length(strNoWhitespace)
+                findT = true
+                iT = i
+                break
+            elseif 1 == length(strNoWhitespace) 
+                findT = true
+                iT = i
+                break
+            elseif i == length(strNoWhitespace) && length(strNoWhitespace) > 1 && !isletter(strNoWhitespace[i-1])
+                findT = true
+                iT = i
+                break
+            end    
+        end
+    end
+
+    return findT
+end
+
+
+# If we identity time in an ifelse expression identify the sign of time to know whether or not the ifelse statement will 
+# or will not be triggered with time.
+function checkSignTime(str::String)
+
+    # Easy special case with single term 
+    strNoWhitespace = replace(str, " " => "")
+    if strNoWhitespace == "t"
+        return 1
+    end
+
+    terms = findTerms(strNoWhitespace)
+    iTime = 0
+    for i in eachindex(terms)
+        iStart, iEnd = terms[i]
+        if checkForTime(strNoWhitespace[iStart:iEnd]) == true
+            iTime = i
+            break
+        end
+    end
+    iStart, iEnd = terms[iTime]
+    strTime = strNoWhitespace[iStart:iEnd]
+    signTime = findSignTerm(strTime)
+    if iStart == 1
+        signBefore = 1
+    elseif strNoWhitespace[iStart-1] == '-'
+        signBefore = -1
+    else
+        signBefore = 1
+    end
+
+    return signTime * signBefore
+end
+
+
+# Returns the end index for a paranthesis for a string, assuming that the string starts 
+# with a paranthesis
+function findIParanthesis(str::String)
+    numberNested = 0
+    iEnd = 1
+    for i in eachindex(str)
+        if str[i] == '('
+            numberNested += 1
+        end
+        if str[i] == ')' 
+            numberNested -= 1
+        end
+        if numberNested == 0
+            iEnd = i
+            break
+        end        
+    end
+    return iEnd
+end
+
+
+# For a mathemathical expression finds the terms
+function findTerms(str::String)
+    iTerm = Array{Tuple, 1}(undef, 0)
+    i = 1
+    while i < length(str)
+        if str[i] == '-' || str[i] == '+' || isletter(str[i]) || isnumeric(str[i]) || str[i] == '('
+            iEnd = 0
+            iStart = str[i] ∈ ['-', '+'] ? i+1 : i
+            j = iStart
+            while j ≤ length(str)
+                if str[j] == '+'
+                    iEnd = j-1
+                    i = j
+                    break
+                end
+                if str[j] == '-'
+                    if length(str) ≥ j+1 && (isnumeric(str[j+1]) || isletter(str[j+1]))
+                        if j == iStart
+                            j += 1
+                            continue
+                        elseif str[j-1] ∈ ['*', '/']
+                            j += 1
+                            continue
+                        else
+                            iEnd = j-1
+                            i = j
+                            break
+                        end
+                    else
+                        iEnd = j-1
+                        i = j
+                        break
+                    end
+                end        
+                if str[j] == '('
+                    j += (findIParanthesis(str[j:end]) - 1)
+                    if j == length(str)
+                        iEnd = j
+                        i = j
+                        break
+                    end
+                end
+                j += 1
+                if j ≥ length(str)
+                    j = length(str)
+                    iEnd = j
+                    i = j
+                    break
+                end
+            end
+            iTerm = push!(iTerm, tuple(iStart, iEnd))
+        end
+    end
+    return iTerm
+end
+
+
+# For a string like a*b/(c+d) identify sign of the product assuming all variables, 
+# e.g a, b, c, d... are positive.
+function findSignTerm(str::String)
+    # Identify each factor
+    iFactor = Array{Tuple, 1}(undef, 0)
+    i = 1
+    while i ≤ length(str)
+        iStart = i
+        j = iStart
+        iEnd = 0
+        while j ≤ length(str)
+            if str[j] ∈ ['*', '/']
+                iEnd = j - 1
+                i = j+1
+                break
+            end
+            if length(str) == j
+                iEnd = j
+                i = j + 1
+                break
+            end
+            if str[j] == '('
+                j += (findIParanthesis(str[j:end]) - 1)
+                iEnd = j
+                println("iEnd after paranthesis = ", iEnd)
+                if length(str) > j+1 && str[j+1] ∈ ['*', '/']
+                    i = j+2
+                else
+                    i = j+1
+                end
+                break
+            end
+            j += 1
+        end
+        iFactor = push!(iFactor, tuple(iStart, iEnd))
+        if iEnd == length(str)
+            break
+        end
+    end
+
+    signTerms = ones(length(iFactor))
+    for i in eachindex(iFactor)
+        
+        iStart, iEnd = iFactor[i]
+
+        if str[iStart] == '('
+            signTerms[i] = getSignExpression(str[(iStart+1):(iEnd-1)])
+        elseif '-' ∈ str[iStart:iEnd]
+            signTerms[i] = -1
+        else
+            signTerms[i] = 1
+        end
+    end
+    println("For me using $str signTerms = ", signTerms)
+    return prod(signTerms)
+end
+
+
+# Get the sign of a factor like "(a + b * (c + d)*-1) assuming all variables are 
+# positive. In case we cannot infer the sign Inf is returned. Employs recursion to 
+# handle paranthesis 
+function getSignExpression(str::String)
+
+    iTerms = findTerms(str)
+    signTerms = ones(Float64, length(iTerms)) * 100
+    for i in eachindex(signTerms)
+
+        # Get the sign before the term 
+        iStart, iEnd = iTerms[i]
+        if iStart == 1
+            signBeforeTerm = 1
+        elseif str[iStart-1] == '-'
+            signBeforeTerm = -1
+        elseif str[iStart-1] == '+'
+            signBeforeTerm = 1
+        else
+            println("Cannot infer sign before term")
+        end
+
+        valRet = findSignTerm(str[iStart:iEnd]) 
+        signTerms[i] = signBeforeTerm * valRet
+        
+    end
+
+    if all(i -> i == 1, signTerms)
+        return 1
+    elseif all(i -> i == -1, signTerms)
+        return -1
+    # In case all terms do not have the same sign and we thus cannot solve 
+    # without doubt the sign.
+    else
+        return Inf
+    end
+end
+
+
+#=
+getSignExpression("-1")
+getSignExpression("1*2*3")
+getSignExpression("1*2*-a")
+getSignExpression("1*-2*a")
+getSignExpression("a*b*c-c*-d*e")
+getSignExpression("a*b*c-e")
+getSignExpression("a*b*c-(e*d*e)")
+getSignExpression("a*b*c-(e*-d*e)")
+getSignExpression(replace("a*b*c - (e*d*e - 1)", " " => ""))
+getSignExpression(replace("a*b*c - (e*d*e + 1)", " " => ""))
+getSignExpression(replace("a*b*c + (e*d*e + 1)", " " => ""))
+getSignExpression(replace("-a*b*c - (e*d*e + 1)", " " => ""))
+getSignExpression(replace("-a*b*c - (e*d*e + 1)*-1", " " => ""))
+
+checkForTime("-a*b*c - (e*d*e + 1)")
+checkForTime("-a*b*c - (e*d*e + 1 + t)")
+checkSignTime("-a*b*c - (e*d*e + 1 + t)*-1")
+checkSignTime("-a*b*c - (e*d*e + 1 + t)")
+checkSignTime("-a*b*c - (e*d*e + 1 + t)")
+checkSignTime("-a*b*c*(e*d*e + 1 + t)")
+checkSignTime("1*b*c*(e*d*e + 1 + t)")
+=#

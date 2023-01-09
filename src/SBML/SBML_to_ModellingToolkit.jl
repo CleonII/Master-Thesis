@@ -18,14 +18,14 @@ include(pwd() * "/src/SBML/Process_rules.jl")
     The SBML importer goes via libsbml in Python and currently likelly only 
     works with SBML level 3. 
 """
-function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::String; writeToFile=true::Bool)
+function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::String; writeToFile::Bool=true, ifElseToEvent::Bool=true)
 
     libsbml = pyimport("libsbml")
     reader = libsbml.SBMLReader()
 
     document = reader[:readSBML](pathXml)
     model = document[:getModel]() # Get the model
-    modelDict = buildODEModelDictionary(libsbml, model)
+    modelDict = buildODEModelDictionary(libsbml, model, ifElseToEvent)
 
     if writeToFile
         writeODEModelToFile(modelDict, modelName, dirModel)
@@ -145,7 +145,7 @@ function processInitialAssignment(libsbml, model, modelDict::Dict, baseFunctions
 end
 
 
-function buildODEModelDictionary(libsbml, model)
+function buildODEModelDictionary(libsbml, model, ifElseToEvent::Bool)
 
     # Nested dictionaries to store relevant model data:
     # i) Model parameters (constant during for a simulation)
@@ -169,6 +169,7 @@ function buildODEModelDictionary(libsbml, model)
     modelDict["discreteEventString"] = Dict()
     modelDict["numOfParameters"] = Dict()
     modelDict["numOfSpecies"] = Dict()
+    modelDict["boolVariables"] = Dict()
     # Mathemathical base functions (can be expanded if needed)
     baseFunctions = ["exp", "log", "log2", "log10", "sin", "cos", "tan", "pi"]
     stringOfEvents = ""
@@ -307,6 +308,12 @@ function buildODEModelDictionary(libsbml, model)
                 isInODESys[i] = true
             end
         end
+    end
+
+    # Rewrite any time-dependent ifelse to boolean statements such that we can express these as events. 
+    # This is recomended, as it often increases the stabillity when solving the ODE, and decreases run-time
+    if ifElseToEvent == true
+        timeDependentIfElseToBool!(modelDict)
     end
 
     modelDict["stringOfEvents"] = stringOfEvents

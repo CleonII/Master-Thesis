@@ -15,7 +15,7 @@ end
 
 function evalU0!(u0Vec, paramVec) 
 
-	kdegi, medium, Bacmax, ksyn, kdim, tau, init_Bac, beta = paramVec 
+	lag_bool1, kdegi, medium, Bacmax, ksyn, kdim, tau, init_Bac, beta = paramVec 
 
 	Glu = 10.0 
 	cGlu = 0.0 
@@ -27,7 +27,7 @@ end
 
 function evalU0(paramVec) 
 
-	kdegi, medium, Bacmax, ksyn, kdim, tau, init_Bac, beta = paramVec 
+	lag_bool1, kdegi, medium, Bacmax, ksyn, kdim, tau, init_Bac, beta = paramVec 
 
 	Glu = 10.0 
 	cGlu = 0.0 

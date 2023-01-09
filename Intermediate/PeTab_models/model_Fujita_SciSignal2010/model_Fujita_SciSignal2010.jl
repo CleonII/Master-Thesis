@@ -15,10 +15,10 @@ function getODEModel_model_Fujita_SciSignal2010()
     ModelingToolkit.@variables EGF(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters EGF_end reaction_5_k1 reaction_2_k2 init_AKT init_EGFR EGF_rate EGFR_turnover reaction_1_k1 reaction_1_k2 reaction_8_k1 reaction_4_k1 reaction_6_k1 reaction_2_k1 init_S6 reaction_7_k1 reaction_9_k1 reaction_3_k1 reaction_5_k2 Cell EGF_0
+    ModelingToolkit.@parameters EGF_end reaction_5_k1 reaction_2_k2 init_AKT init_EGFR EGF_bool1 EGF_rate EGFR_turnover reaction_1_k1 reaction_1_k2 reaction_8_k1 reaction_4_k1 reaction_6_k1 reaction_2_k1 init_S6 reaction_7_k1 reaction_9_k1 reaction_3_k1 reaction_5_k2 Cell EGF_0
 
     ### Store parameters in array for ODESystem command
-    parameterArray = [EGF_end, reaction_5_k1, reaction_2_k2, init_AKT, init_EGFR, EGF_rate, EGFR_turnover, reaction_1_k1, reaction_1_k2, reaction_8_k1, reaction_4_k1, reaction_6_k1, reaction_2_k1, init_S6, reaction_7_k1, reaction_9_k1, reaction_3_k1, reaction_5_k2, Cell, EGF_0]
+    parameterArray = [EGF_end, reaction_5_k1, reaction_2_k2, init_AKT, init_EGFR, EGF_bool1, EGF_rate, EGFR_turnover, reaction_1_k1, reaction_1_k2, reaction_8_k1, reaction_4_k1, reaction_6_k1, reaction_2_k1, init_S6, reaction_7_k1, reaction_9_k1, reaction_3_k1, reaction_5_k2, Cell, EGF_0]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -38,7 +38,7 @@ function getODEModel_model_Fujita_SciSignal2010()
     D(Akt) ~ -1.0 * ( 1 /Cell ) * (Cell * (Akt * pEGFR * reaction_2_k1 - pEGFR_Akt * reaction_2_k2))+1.0 * ( 1 /Cell ) * (Cell * pAkt * reaction_7_k1),
     D(S6) ~ -1.0 * ( 1 /Cell ) * (Cell * (S6 * pAkt * reaction_5_k1 - pAkt_S6 * reaction_5_k2))+1.0 * ( 1 /Cell ) * (Cell * pS6 * reaction_8_k1),
     D(EGF_EGFR) ~ +1.0 * ( 1 /Cell ) * (Cell * (EGF * EGFR * reaction_1_k1 - EGF_EGFR * reaction_1_k2))-1.0 * ( 1 /Cell ) * (Cell * EGF_EGFR * reaction_9_k1),
-    EGF ~ ifelse(t <= EGF_end, EGF_rate * t + EGF_0, 0)
+    EGF ~ ((1 - EGF_bool1)*( EGF_rate * t + EGF_0) + EGF_bool1*( 0))
     ]
 
     @named sys = ODESystem(eqs, t, stateArray, parameterArray)
@@ -63,6 +63,7 @@ function getODEModel_model_Fujita_SciSignal2010()
     reaction_2_k2 => 41469.6914053245,
     init_AKT => 0.00332683237159935,
     init_EGFR => 2.26508055977911e7,
+    EGF_bool1 => 0.0,
     EGF_rate => 0.0,
     EGFR_turnover => 0.001449799125736,
     reaction_1_k1 => 0.00372345533395159,
