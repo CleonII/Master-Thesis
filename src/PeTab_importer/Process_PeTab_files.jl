@@ -381,10 +381,12 @@ end
 
     TODO: Compute t-vec save at from measurementDataFile (instead of providing another struct)
 """
-function getSimulationInfo(measurementDataFile::DataFrame,
+function getSimulationInfo(peTabModel::PeTabModel,
+                           measurementDataFile::DataFrame,
                            measurementData::MeasurementData;
                            absTolSS::Float64=1e-8,
-                           relTolSS::Float64=1e-6)::SimulationInfo
+                           relTolSS::Float64=1e-6,
+                           sensealg::Union{SciMLSensitivity.AbstractForwardSensitivityAlgorithm, SciMLSensitivity.AbstractAdjointSensitivityAlgorithm}=InterpolatingAdjoint())::SimulationInfo 
 
     # If preequilibrationConditionId column is not empty the model should 
     # first be simulated to a stady state 
@@ -453,8 +455,12 @@ function getSimulationInfo(measurementDataFile::DataFrame,
             conditionIdSol[i] = firstExpId
             tMaxForwardSim[i] = getTimeMax(measurementDataFile, firstExpId)
         end
-
     end
+
+    # Some models, e.g those with time dependent piecewise statements, have callbacks encoded. To accurately 
+    # solve these we have callbacks. When doing adjoint sensitivity analysis we need to track these callbacks 
+    # for the forward and reverse solution, hence we store within an arrary. 
+    modelCallbacks::Vector{SciMLBase.DECallback} = [deepcopy(peTabModel.callbackSet) for i in 1:nForwardSol]
 
     tVecSave::Dict{String, Vector{Float64}} = deepcopy(measurementData.tVecSave)
     simulationInfo = SimulationInfo(firstExpIds, 
@@ -469,7 +475,9 @@ function getSimulationInfo(measurementDataFile::DataFrame,
                                     solArrayPreEq,
                                     absTolSS, 
                                     relTolSS, 
-                                    tVecSave)
+                                    tVecSave, 
+                                    modelCallbacks, 
+                                    sensealg)
     return simulationInfo
 end
 
@@ -556,10 +564,10 @@ end
 function getCallbacksForTimeDepedentPiecewise(odeSys::ODESystem, modelDict::Dict, modelName::String, dirModel::String)
 
     # ParamEstIndices is needed to see if event-triggers contain parameters we want to estimate 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(dirModel, readObs=true)
     parameterData = processParameterData(parameterDataFile)
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
+    paramEstIndices = getIndicesParam(parameterData, measurementData, odeSys, experimentalConditionsFile)
 
     parameterNames = parameters(odeSys)
     stateNames = string.(states(odeSys))

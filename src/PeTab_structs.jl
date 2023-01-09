@@ -156,7 +156,9 @@ end
     See also: [`getSimulationInfo`]
 """
 struct SimulationInfo{T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}, 
-                      T5<:Dict{<:String, <:Vector{<:Float64}}}
+                      T5<:Dict{<:String, <:Vector{<:Float64}}, 
+                      T6<:Vector{<:SciMLBase.DECallback}, 
+                      T7<:Union{<:SciMLSensitivity.AbstractForwardSensitivityAlgorithm, <:SciMLSensitivity.AbstractAdjointSensitivityAlgorithm}}
     firstExpIds::Vector{String}
     shiftExpIds::Vector{Vector{String}}
     preEqIdSol::Vector{String}
@@ -170,6 +172,8 @@ struct SimulationInfo{T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESo
     absTolSS::Float64
     relTolSS::Float64
     tVecSave::T5
+    callbacks::T6
+    sensealg::T7
 end
 
 

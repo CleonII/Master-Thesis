@@ -43,7 +43,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
     parameterData = processParameterData(parameterDataFile)
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    simulationInfo = getSimulationInfo(measurementDataFile, measurementData, absTolSS=absTolSS, relTolSS=relTolSS)
+    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData, sensealg=sensealg, absTolSS=absTolSS, relTolSS=relTolSS)
 
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
     paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
@@ -65,8 +65,8 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     changeModelParamUse = (pVec, paramEst) -> changeModelParam(pVec, paramEst, paramEstIndices, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
-    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.callbackSet, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
-    solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, callBackSet, peTabModel.getTStops, denseSol=true, expIDSolve=expIDSolveArg)
+    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
+    solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, denseSol=true, expIDSolve=expIDSolveArg, trackCallback=true)
     solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementData, simulationInfo, solver, tol, tol, sensealg)
 
     if nProcs > 1 && nprocs() != nProcs
@@ -881,10 +881,12 @@ function calcGradAdjDynParam!(gradAdj::Vector{Float64},
 
         whichForwardSol = findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)
         sol = simulationInfo.solArrayGrad[whichForwardSol]
+        postEqId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardSol] : conditionID
+        # If we have a callback it needs to be properly handled 
         calcGradAdjExpCond!(gradAdj, sol, sensealg, tol, adjSolver, dynamicParamEstUse,
-                            sdParamEstUse, obsParEstUse, nonDynParamEstUse, conditionID, 
+                            sdParamEstUse, obsParEstUse, nonDynParamEstUse, conditionID, postEqId,
                             peTabModel, paramIndices, measurementData, parameterData, 
-                            simulationInfo.simulateSS, yBarSSUse)
+                            simulationInfo.simulateSS, yBarSSUse, simulationInfo.callbacks[whichForwardSol])
     end
 
 end
@@ -901,12 +903,14 @@ function calcGradAdjExpCond!(grad::Vector{Float64},
                              obsParam::Vector{Float64}, 
                              nonDynParam::Vector{Float64},
                              conditionID::String,
+                             postEqId::String,
                              peTabModel::PeTabModel,
                              paramIndices::ParameterIndices,
                              measurementData::MeasurementData, 
                              parameterData::ParamData, 
                              simulateSS::Bool,
-                             yBarSS::Function;
+                             yBarSS::Function, 
+                             callbackRev::SciMLBase.DECallback;
                              expIDSolve::Array{String, 1} = ["all"])
                             
     if expIDSolve[1] != "all" && conditionID ∉ expIDSolve
@@ -944,13 +948,14 @@ function calcGradAdjExpCond!(grad::Vector{Float64},
     onlyObsAtZero::Bool = false
     if !(length(tSaveAt) == 1 && tSaveAt[1] == 0.0)
         du, dp = adjoint_sensitivities(sol, 
-                                    adjSolver,
-                                    dgdp_discrete=nothing,
-                                    dgdu_discrete=calcDgDuDiscrete, 
-                                    t=tSaveAt, 
-                                    sensealg=sensealg, 
-                                    abstol=tol, 
-                                    reltol=tol)
+                                       adjSolver,
+                                       dgdp_discrete=nothing,
+                                       dgdu_discrete=calcDgDuDiscrete, 
+                                       callback=callbackRev,
+                                       t=tSaveAt, 
+                                       sensealg=sensealg, 
+                                       abstol=tol, 
+                                       reltol=tol)
     else
         du = zeros(Float64, length(sol.prob.u0))
         calcDgDuDiscrete(du, sol[1], sol.prob.p, 0.0, 1)
@@ -995,12 +1000,14 @@ function calcGradAdjExpCond!(grad::Vector{Float64},
                                                                                 paramIndices.namesDynParam[paramIndices.mapDynParEst.iDynParamInVecEst], 
                                                                                 parameterData)
     # For parameters which are specific to an experimental condition 
-    whichExpMap = findfirst(x -> x == conditionID, [paramIndices.mapExpCond[i].condID for i in eachindex(paramIndices.mapExpCond)])
+    #=
+    whichExpMap = findfirst(x -> x == postEqId, [paramIndices.mapExpCond[i].condID for i in eachindex(paramIndices.mapExpCond)])
     expMap = paramIndices.mapExpCond[whichExpMap]                                          
     grad[expMap.iDynEstVec] .+= transformParamVecGrad(gradTot[expMap.iOdeProbDynParam], 
                                                       dynParam[expMap.iDynEstVec], 
                                                       paramIndices.namesDynParam[expMap.iDynEstVec], 
                                                       parameterData)                                   
+    =#
 end
 
 
