@@ -52,13 +52,13 @@ end
 
 
 """
-    createTopOfFun(modelName::String, 
-                       dirModel::String, 
-                       stateNames, 
-                       paramData::ParamData, 
-                       namesParamODEProb::Array{String, 1}, 
-                       observablesData::DataFrame,
-                       modelDict::Dict)
+    createTopOfFun(stateNames, 
+        paramData::ParamData, 
+        namesParamODEProb::Array{String, 1}, 
+        namesNonDynParam::Array{String, 1},
+        observablesData::DataFrame,
+        modelDict::Dict,
+        obsFun::Bool)
     Extracts all variables needed for the functions. 
     Also adds them as variables for Symbolics.jl
 """
@@ -67,7 +67,8 @@ function createTopOfFun(stateNames,
                         namesParamODEProb::Array{String, 1}, 
                         namesNonDynParam::Array{String, 1},
                         observablesData::DataFrame,
-                        modelDict::Dict)
+                        modelDict::Dict,
+                        obsFun::Bool)
     # Extract names of model states 
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
     stateStr = "\n\t"
@@ -115,19 +116,22 @@ function createTopOfFun(stateNames,
        
     # Extracts the explicit rules that have keys among the observables.
     explicitRules = ""
-    strObserveble = ""
+    tmpFormulaConCat = ""
     
     observableIDs = String.(observablesData[!, "observableId"])
     for i in eachindex(observableIDs)
-        tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
-        strObserveble *= tmpFormula * "\n"
-
-        tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
-        strObserveble *= tmpFormula * "\n"
+        # Concatenates all formulae and afterwards checks if any explicit rule variable is used there.
+        if obsFun == true
+            tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
+            tmpFormulaConCat *= tmpFormula * "\n"
+        else
+            tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
+            tmpFormulaConCat *= tmpFormula * "\n"
+        end
     end
 
     for (key,value) in modelDict["modelRuleFunctions"]
-        if occursin(Regex("\\b" * key * "\\b"), strObserveble)
+        if occursin(Regex("\\b" * key * "\\b"), tmpFormulaConCat)
             explicitRules *= "\t" * key * " = " * value[2] * "\n"
         end
     end
@@ -166,7 +170,7 @@ function createYmodFunction(modelName::String,
                             modelDict::Dict)
 
     io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "w")
-    stateStr, paramDynStr, paramNonDynStr, paramConstStr, explicitRules, namesExplicitRules = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, modelDict)
+    stateStr, paramDynStr, paramNonDynStr, paramConstStr, explicitRules, namesExplicitRules = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, modelDict, true)
 
     # Write the formula of each observable to file
     observableIDs = String.(observablesData[!, "observableId"])
@@ -302,7 +306,7 @@ function createSdFunction(modelName::String,
 
 
     io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "a")
-    stateStr, paramDynStr, paramNonDynStr, paramConstStr, explicitRules, namesExplicitRules = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, Dict("modelRuleFunctions" => Dict()))
+    stateStr, paramDynStr, paramNonDynStr, paramConstStr, explicitRules, namesExplicitRules = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, modelDict, false)
 
     # Write the formula for standard deviations to file
     observableIDs = String.(observablesData[!, "observableId"])
