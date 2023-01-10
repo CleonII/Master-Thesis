@@ -13,6 +13,7 @@ using SciMLSensitivity
 using BenchmarkTools
 using SparseDiffTools
 using LinearAlgebra
+using Sundials
 
 
 # Relevant PeTab structs for computations 
@@ -31,70 +32,84 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
 
-function benchmarkCostGrad(peTabModel, modelName::String, solversCheck, pathFileSave, tol; nIter=10, checkHess::Bool=false, sensealg=ForwardDiffSensitivity())
+function getPEtabOpt(gradMethod, sensealg, solverUse, tol)
+
+    if gradMethod == :ForwardSenseEq
+        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sensealgForward = sensealg, solverForward=solverUse)
+        evalGradF = peTabOpt.evalGradFForwardEq
+        return peTabOpt, evalGradF
+    elseif gradMethod == :Zygote
+        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sensealg = sensealg)
+        evalGradF = peTabOpt.evalGradFZygote
+        return peTabOpt, evalGradF
+    elseif gradMethod == :Adjoint
+        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, adjSolver=solverUse, adjSensealg=sensealg, adjTol=tol)
+        evalGradF = peTabOpt.evalGradFAdjoint
+        return peTabOpt, evalGradF
+    elseif gradMethod == :ForwardDiff
+        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol)
+        evalGradF = peTabOpt.evalGradF
+        return peTabOpt, evalGradF
+    end
+end
+
+
+function benchmarkCostGrad(peTabModel, modelName::String, gradInfo, solversCheck, pathFileSave, tol; nIter=10, checkHess::Bool=false, checkCost::Bool=false, checkGrad::Bool=false)
 
     println("Running model $modelName")
-
+    
     for i in eachindex(solversCheck)
 
         solverUse = solversCheck[i][1]
         solverStr = solversCheck[i][2]
+        runTime = Array{Float64, 1}(undef, nIter)
 
-        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sensealg = sensealg)
+        if checkGrad == true
+            what_calc = "Gradient"
+            gradMethod, sensealg, methodInfo = gradInfo
+            peTabOpt, evalGradF = getPEtabOpt(gradMethod, sensealg, solverUse, tol)
 
-        # Use nominal parameter vector 
-        paramVec = peTabOpt.paramVecTransformed
-
-        runTimeGrad = Array{Float64, 1}(undef, nIter)
-        runTimeGradZygote = Array{Float64, 1}(undef, nIter)
-        runTimeCost = Array{Float64, 1}(undef, nIter)
-        runTimeHess = Array{Float64, 1}(undef, nIter)
-
-        # Run everything a first time to get pre-compilation out of the way 
-        println("Precompiling the code")
-        grad = zeros(length(paramVec))
-        hess = zeros(length(paramVec), length(paramVec))
-        peTabOpt.evalF(paramVec)
-        peTabOpt.evalGradF(grad, paramVec)
-        # Zygote have problems with SensitivityAdjoint from time-to-time
-        if modelName ∉ ["model_Isensee_JCB2018", "model_Brannmark_JBC2010", "model_Weber_BMC2015"]
-            peTabOpt.evalGradFZygote(grad, paramVec)
-        end
-        # For these models the Hessian approximation takes too long time (qudratic complexity)
-        if checkHess == true
-            peTabOpt.evalHessApprox(hess, paramVec)
-        end
-        println("Done")
-
-        for j in 1:nIter
-            bCost = @elapsed cost = peTabOpt.evalF(paramVec) 
-            runTimeCost[j] = bCost
-        end
-
-        for j in 1:nIter
-            bGrad = @elapsed peTabOpt.evalGradF(grad, paramVec) 
-            runTimeGrad[j] = bGrad
-        end
-
-        for j in 1:nIter
-            bGrad = @elapsed peTabOpt.evalGradFZygote(grad, paramVec) 
-            runTimeGradZygote[j] = bGrad
-        end
-
-        for j in 1:nIter
-            # For these models the Hessian approximation takes too long time (qudratic complexity)
-            if checkHess == true
-                bHess = @elapsed peTabOpt.evalHessApprox(hess, paramVec)
-            else
-                bHess = Inf
+            # Use nominal parameter vector 
+            println("Precompiling the code")
+            paramVec = peTabOpt.paramVecTransformed
+            grad = zeros(length(paramVec))
+            # Zygote have problems with SensitivityAdjoint from time-to-time
+            if modelName ∈ ["model_Isensee_JCB2018", "model_Brannmark_JBC2010", "model_Weber_BMC2015"] && gradMethod == :Zyogte
+                return
             end
-            runTimeHess[j] = bHess
+            evalGradF(grad, peTabOpt.paramVecTransformed)
+            for j in 1:nIter
+                bGrad = @elapsed evalGradF(grad, paramVec)
+                runTime[j] = bGrad
+            end
+
+        elseif checkCost == true
+            what_calc = "Cost"
+            methodInfo = "Standard"
+            peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol)
+            paramVec = peTabOpt.paramVecTransformed
+            println("Precompiling the code")
+            peTabOpt.evalF(paramVec)
+            for j in 1:nIter
+                bCost = @elapsed cost = peTabOpt.evalF(paramVec) 
+                runTime[j] = bCost
+            end
+
+        elseif checkHess == true
+            what_calc = "Hessian"
+            methodInfo = "ForwardDiff"
+            peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sensealg = sensealg)
+            paramVec = peTabOpt.paramVecTransformed
+            hess = zeros(length(paramVec), length(paramVec))
+            for j in 1:nIter
+                bHess = @elapsed peTabOpt.evalHessApprox(hess, paramVec)
+                runTime[j] = bHess
+            end
         end
 
-        dataSave = DataFrame(T_cost = runTimeCost, 
-                             T_grad = runTimeGrad, 
-                             T_grad_zygote = runTimeGradZygote, 
-                             T_hess = runTimeHess, 
+        dataSave = DataFrame(Time = runTime, 
+                             What_calc=what_calc,
+                             Method_info=methodInfo,
                              model = modelName, 
                              tol = tol, 
                              solver = solverStr)
@@ -113,7 +128,7 @@ end
 if ARGS[1] == "No_pre_eq_models"
 
     dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
-    pathSave = dirSave * "Cost_grad_hess_tol_low_composite.csv"
+    pathSave = dirSave * "Cost_grad.csv"
     if !isdir(dirSave)
         mkpath(dirSave)
     end
@@ -125,17 +140,42 @@ if ARGS[1] == "No_pre_eq_models"
 
     solversCheck = [[Rodas5(), "Rodas5"], 
                     [Rodas5P(), "Rodas5P"], 
-                    [QNDF(), "QNDF"], 
-                    [AutoTsit5(Rodas5()), "Tsti5_Rodas5"], 
-                    [AutoVern7(Rodas5()), "Vern7_Rodas5"]]
+                    [QNDF(), "QNDF"]]
+    sensealgInfoTot = [[:ForwardDiff, nothing, "ForwardDiff"], 
+                       [:Zygote, ForwardDiffSensitivity(), "Zygote_ForwardDiffSensitivity"], 
+                       [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
+                       [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"], 
+                       [:Adjoint, QuadratureAdjoint(autodiff=false, autojacvec=false), "Adj_QuadratureAdjoint(autodiff=false, autojacvec=false)"]]
 
+    solverCheckForEq = [[Rodas5(autodiff=false), "Rodas5"], 
+                        [Rodas5P(autodiff=false), "Rodas5P"], 
+                        [QNDF(autodiff=false), "QNDF"]]
+    sensealgInfoForEq = [[:Adjoint, InterpolatingAdjoint(autodiff=false, autojacvec=false), "Adj_InterpolatingAdjoint(autodiff=false, autojacvec=false)"],
+                         [:ForwardSenseEq, ForwardDiffSensitivity(), "ForEq_ForwardDiffSensitivity"], 
+                         [:ForwardSenseEq, ForwardSensitivity(), "ForEq_ForwardSensitivity"]]
+                    
     for i in eachindex(modelListTry)
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
-        # Where we need higher abs- and reltol to solve the ODE 
         tol = 1e-8
-        benchmarkCostGrad(peTabModel, modelName, solversCheck, pathSave, tol, checkHess=true)
+
+        # Check cost 
+        benchmarkCostGrad(peTabModel, modelName, nothing, solversCheck, pathSave, tol, checkCost=true)
+
+        # Check Gradient 
+        for sensealgInfo in sensealgInfoTot
+            benchmarkCostGrad(peTabModel, modelName, sensealgInfo, solversCheck, pathSave, tol, checkGrad=true)
+        end
+
+        # Check gradient for sensitivity equations 
+        for sensealgInfo in sensealgInfoForEq
+            benchmarkCostGrad(peTabModel, modelName, sensealgInfo, solverCheckForEq, pathSave, tol, checkGrad=true)
+        end
+
+        # For fun Check CVODE_BDF
+        benchmarkCostGrad(peTabModel, modelName, [:ForwardSenseEq, ForwardSensitivity(), "ForEq_ForwardSensitivity"], 
+                          [[CVODE_BDF(), "CVODE_BDF"]], pathSave, tol, checkGrad=true)
     end
 end
 
