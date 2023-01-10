@@ -4,11 +4,12 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
                                                simulationInfo::SimulationInfo,
                                                solver, 
                                                absTol::Float64,
-                                               relTol::Float64;
+                                               relTol::Float64, 
+                                               calcTStops::Function;
                                                nTSave::Int64=0, 
                                                onlySaveAtTobs::Bool=false,
                                                denseSol::Bool=true, 
-                                               savePreEqTime::Bool=false)
+                                               savePreEqTime::Bool=true)
 
     
     absTolSS, relTolSS = simulationInfo.absTolSS, simulationInfo.relTolSS
@@ -66,7 +67,9 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
             has_not_changed = (prob.u0 .== u0PreSimSSVec)
             prob.u0[has_not_changed] .= uAtSSVec[has_not_changed]
             probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])     
-            bSim += @elapsed sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_ss, saveAtVec, dense)
+            tStops = calcTStops(probUse.u0, probUse.p)
+            callBackSet = getCallbackSet(probUse, simulationInfo, i, false)
+            bSim += @elapsed sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_ss, saveAtVec, dense, callBackSet, tStops)
 
             if !(sol.retcode == :Success || sol.retcode == :Terminated)
                 sucess = false, Inf
@@ -110,8 +113,9 @@ function solveOdeModelAllExperimentalCondBench(prob::ODEProblem,
             t_max_use = isinf(t_max) ? 1e8 : t_max
             changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
             probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
-            
-            bSim += @elapsed sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_use, saveAtVec, dense)
+            tStops = calcTStops(probUse.u0, probUse.p)
+            callBackSet = getCallbackSet(probUse, simulationInfo, i, false)
+            bSim += @elapsed sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_use, saveAtVec, dense, callBackSet, tStops)
 
             if !(sol.retcode == :Success || sol.retcode == :Terminated)
                 sucess = false, Inf

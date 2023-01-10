@@ -16,7 +16,8 @@
 """
 function calcHighAccOdeSolution(prob::ODEProblem, 
                                 changeToExperimentalCondUse!::Function, 
-                                simulationInfo::SimulationInfo;
+                                simulationInfo::SimulationInfo, 
+                                calcTStops::Function;
                                 absTol::Float64=1e-15, 
                                 relTol::Float64=1e-15,
                                 nTSave=100) 
@@ -25,14 +26,12 @@ function calcHighAccOdeSolution(prob::ODEProblem,
 
     solverNonStiff = AutoVern9(Rodas4P())
     solverStiff = Rodas4P()
-    solverStiff = KenCarp58()
-    
     local solArrayHighAcc
     local sucessSolver
     try 
-        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, simulationInfo, solverNonStiff, absTol, relTol; nTSave=nTSave)                                      
+        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, simulationInfo, solverNonStiff, absTol, relTol, calcTStops; nTSave=nTSave)                                      
     catch 
-        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, simulationInfo, solverStiff, absTol, relTol; nTSave=nTSave)                                      
+        solArrayHighAcc, sucessSolver = solveOdeModelAllExperimentalCond(bigFloatOdeProb, changeToExperimentalCondUse!, simulationInfo, solverStiff, absTol, relTol, calcTStops; nTSave=nTSave)                                      
     end
     GC.gc()
 
@@ -73,11 +72,12 @@ function calcAccuracyOdeSolver(prob::ODEProblem,
                                simulationInfo::SimulationInfo,
                                solver,
                                absTol::Float64, 
-                               relTol::Float64)::Float64
+                               relTol::Float64, 
+                               calcTStops::Function)::Float64
                    
     # Check if model can be solved (without using forced stops for integrator 
     # as this can make the solver converge).
-    solArrayTmp, sucess = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, nTSave=100)
+    solArrayTmp, sucess = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, calcTStops, nTSave=100)
     solArrayTmp = 0
     if sucess == false
         return Inf 
@@ -100,15 +100,15 @@ function calcAccuracyOdeSolver(prob::ODEProblem,
             # into a domain error.
             whichPreEq = findfirst(x -> x == preEqIds[i], simulationInfo.preEqIdSol)
             simulationInfo.solArrayPreEq[whichPreEq] = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
-                                                                            (@view u0PreSimSS[:, i]), 
-                                                                            prob, 
-                                                                            changeToExperimentalCondUse!, 
-                                                                            preEqIds[i], 
-                                                                            absTol, 
-                                                                            relTol, 
-                                                                            solver, 
-                                                                            simulationInfo.absTolSS, 
-                                                                            simulationInfo.relTolSS)
+                                                                              (@view u0PreSimSS[:, i]), 
+                                                                               prob, 
+                                                                               changeToExperimentalCondUse!, 
+                                                                               preEqIds[i], 
+                                                                               absTol, 
+                                                                               relTol, 
+                                                                               solver, 
+                                                                               simulationInfo.absTolSS, 
+                                                                               simulationInfo.relTolSS)
             if simulationInfo.solArrayPreEq[whichPreEq].retcode != :Terminated
                 couldSolve == false
                 break
@@ -125,17 +125,18 @@ function calcAccuracyOdeSolver(prob::ODEProblem,
             t_max_ss = simulationInfo.tMaxForwardSim[i]
             # See comment above on domain error
             solCompare = solveODEPostEqulibrium(prob, 
-                                                (@view uAtSS[:, whichPreEq]),
-                                                (@view u0PreSimSS[:, whichPreEq]), 
-                                                changeToExperimentalCondUse!,
-                                                simulationInfo.postEqIdSol[i], 
-                                                absTol,
-                                                relTol,
-                                                t_max_ss,
-                                                simulationInfo.absTolSS, 
-                                                simulationInfo.relTolSS,
-                                                solver,
-                                                tSave=solArrayHighAccuracy[i].t)
+                                                    (@view uAtSS[:, whichPreEq]),
+                                                    (@view u0PreSimSS[:, whichPreEq]), 
+                                                    i,
+                                                    changeToExperimentalCondUse!,
+                                                    simulationInfo, 
+                                                    simulationInfo.postEqIdSol[i],
+                                                    absTol,
+                                                    relTol,
+                                                    t_max_ss,
+                                                    solver,
+                                                    calcTStops,
+                                                    tSave=solArrayHighAccuracy[i].t)
 
             if solCompare.retcode != :Success
                 couldSolve = false
@@ -151,7 +152,7 @@ function calcAccuracyOdeSolver(prob::ODEProblem,
             
             firstExpId = simulationInfo.firstExpIds[i]
             t_max = simulationInfo.tMaxForwardSim[i]
-            solCompare = solveOdeNoSS(prob, changeToExperimentalCondUse!, firstExpId, absTol, relTol, solver, t_max, tSave=solArrayHighAccuracy[i].t)
+            solCompare = solveOdeNoSS(prob, changeToExperimentalCondUse!, i, simulationInfo, firstExpId, absTol, relTol, solver, t_max, calcTStops, tSave=solArrayHighAccuracy[i].t)
 
             # In case t_max = Inf only calculate sqErr if the model could reach a steady state 
             if isinf(t_max) && solCompare.retcode != :Terminated

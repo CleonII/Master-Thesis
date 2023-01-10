@@ -35,7 +35,7 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                            prob::ODEProblem, 
                                            changeToExperimentalCondUse!::Function, 
                                            simulationInfo::SimulationInfo,
-                                           solver::Union{SciMLAlgorithm, Symbol},
+                                           solver::Union{SciMLAlgorithm, Vector{Symbol}},
                                            absTol::Float64,
                                            relTol::Float64, 
                                            calcTStops::Function;
@@ -209,7 +209,7 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                            dynParamEst::AbstractVector,
                                            changeToExperimentalCondUsePre!::Function, 
                                            simulationInfo::SimulationInfo,
-                                           solver::Union{SciMLAlgorithm, Symbol},
+                                           solver::Union{SciMLAlgorithm, Vector{Symbol}},
                                            absTol::Float64,
                                            relTol::Float64, 
                                            calcTStops::Function;
@@ -241,7 +241,7 @@ end
 function solveOdeModelAllExperimentalCond(prob::ODEProblem, 
                                           changeToExperimentalCondUse!::Function, 
                                           simulationInfo::SimulationInfo,
-                                          solver::Union{SciMLAlgorithm, Symbol}, 
+                                          solver::Union{SciMLAlgorithm, Vector{Symbol}},
                                           absTol::Float64,
                                           relTol::Float64,
                                           calcTStops::Function;
@@ -285,7 +285,7 @@ function solveOdeModelAtExperimentalCondZygote(prob::ODEProblem,
                                                changeToExperimentalCondUsePre::Function, 
                                                measurementData::MeasurementData,
                                                simulationInfo::SimulationInfo,
-                                               solver::Union{SciMLAlgorithm, Symbol}, 
+                                               solver::Union{SciMLAlgorithm, Vector{Symbol}}, 
                                                absTol::Float64, 
                                                relTol::Float64, 
                                                sensealg, 
@@ -403,7 +403,7 @@ function solveODEPreEqulibrium!(uAtSSVec::AbstractVector,
                                 firstExpId::String, 
                                 absTol::Float64, 
                                 relTol::Float64, 
-                                solver::Union{SciMLAlgorithm, Symbol}, 
+                                solver::Union{SciMLAlgorithm, Vector{Symbol}},
                                 absTolSS::Float64, 
                                 relTolSS::Float64)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
@@ -445,7 +445,7 @@ function solveODEPostEqulibrium(prob::ODEProblem,
                                 absTol::Float64, 
                                 relTol::Float64,
                                 t_max_ss::Float64,
-                                solver::Union{SciMLAlgorithm, Symbol}, 
+                                solver::Union{SciMLAlgorithm, Vector{Symbol}},
                                 calcTStops::Function;
                                 tSave=Float64[], 
                                 nTSave=0, 
@@ -476,14 +476,13 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     has_not_changed = (prob.u0 .== u0PreSimSS)
     prob.u0[has_not_changed] .= uAtSS[has_not_changed]
 
-    tStops = calcTStops(prob.u0, prob.p)
-
     # Here it is IMPORTANT that we copy prob.p[:] else different experimental conditions will 
     # share the same parameter vector p. This will, for example, cause the lower level adjoint 
     # sensitivity interface to fail.
     t_max_ss = isinf(t_max_ss) ? 1e8 : t_max_ss
     probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])     
     # If case of adjoint sensitivity analysis we need to track the callback to get correct gradients 
+    tStops = calcTStops(probUse.u0, probUse.p)
     callBackSet = getCallbackSet(probUse, simulationInfo, whichForwardSol, trackCallback)
     
     sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, simulationInfo.absTolSS, simulationInfo.relTolSS, 
@@ -500,7 +499,7 @@ function solveOdeNoSS(prob::ODEProblem,
                       firstExpId::String, 
                       absTol::Float64, 
                       relTol::Float64,
-                      solver::Union{SciMLAlgorithm, Symbol}, 
+                      solver::Union{SciMLAlgorithm, Vector{Symbol}},
                       t_max::Float64, 
                       calcTStops::Function; 
                       tSave=Float64[], 
@@ -527,12 +526,12 @@ function solveOdeNoSS(prob::ODEProblem,
     # Change experimental condition 
     t_max_use = isinf(t_max) ? 1e8 : t_max
     changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
-    tStops = calcTStops(prob.u0, prob.p)
     probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
     
     # If case of adjoint sensitivity analysis we need to track the callback 
     callBackSet = getCallbackSet(probUse, simulationInfo, whichForwardSol, trackCallback)
-    
+    tStops = calcTStops(probUse.u0, probUse.p)
+
     sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, simulationInfo.absTolSS, simulationInfo.relTolSS, 
                              t_max_use, saveAtVec, dense, callBackSet, tStops)
 
@@ -550,7 +549,7 @@ function getSolSolveOdeNoSS(prob::ODEProblem,
                             saveAtVec::Vector{Float64}, 
                             dense::Bool, 
                             callBackSet::SciMLBase.DECallback, 
-                            tStops::Vector{Float64})::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                            tStops::Vector{<:AbstractFloat})::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
@@ -571,7 +570,7 @@ function getSolSolveOdeNoSS(prob::ODEProblem,
                             saveAtVec::Vector{Float64}, 
                             dense::Bool, 
                             callBackSet::SciMLBase.DECallback, 
-                            tStops::Vector{Float64})::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                            tStops::Vector{<:AbstractFloat})::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.

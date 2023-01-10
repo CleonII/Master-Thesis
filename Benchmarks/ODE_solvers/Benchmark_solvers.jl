@@ -47,6 +47,8 @@ function getSolverInfo(sparseList::Bool, solversCheck)
                   Vern8(), "Vern8", "nonStiff", "OrdinaryDiffEq", 
                   Vern9(), "Vern9", "nonStiff", "OrdinaryDiffEq", 
                   Tsit5(), "Tsit5", "nonstiff", "OrdinaryDiffEq", 
+                  BS3(), "BS3", "nonstiff", "OrdinaryDiffEq", 
+                  BS5(), "BS5", "nonstiff", "OrdinaryDiffEq", 
                   DP5(), "DP5", "nonStiff", "OrdinaryDiffEq", 
                   DP8(), "DP8", "nonStiff", "OrdinaryDiffEq", 
                   Feagin14(), "Feagin14", "nonStiff", "OrdinaryDiffEq", 
@@ -173,7 +175,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
     parameterData = processParameterData(parameterDataFile)
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    simulationInfo = getSimulationInfo(measurementDataFile, measurementData)
+    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
      
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
@@ -191,10 +193,10 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
     # tolerance.
     if checkAccuracy == true
         println("Computing high accuracy model")
-        if !(peTabModel.modelName == "model_Isensee_JCB2018" || peTabModel.modelName == "model_Weber_BMC2015s")
-            solArrayHighAcc, statusHighAcc = calcHighAccOdeSolution(odeProbHighAcc, changeToExperimentalCondUse!, simulationInfo, absTol=1e-15, relTol=1e-15)
+        if true == true
+            solArrayHighAcc, statusHighAcc = calcHighAccOdeSolution(odeProbHighAcc, changeToExperimentalCondUse!, simulationInfo, peTabModel.getTStops, absTol=1e-15, relTol=1e-15, )
         else
-            solArrayHighAcc, tmp = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, simulationInfo, KenCarp58(), 1e-15, 1e-15, nTSave=100)
+            solArrayHighAcc, tmp = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, simulationInfo, KenCarp58(), 1e-15, 1e-15, peTabModel.getTStops, nTSave=100)
             statusHighAcc = true
         end
         println("Done with statusHighAcc = $statusHighAcc")
@@ -231,23 +233,24 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                 # Check the accuracy of the ODE solver by comparing with high accuracy solution. In case the squared sum 
                 # error cannot be computed the solver crashed and run time is not profiled.
                 # If we do not check accuracy, check that we can solve the model using the provided solver.
+                sqDiffSolver = calcAccuracyOdeSolver(odeProb, solArrayHighAcc, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, peTabModel.getTStops)
                 local sqDiffSolver = Float64
                 if checkAccuracy == true
                     try
-                        sqDiffSolver = calcAccuracyOdeSolver(odeProb, solArrayHighAcc, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol)
+                        sqDiffSolver = calcAccuracyOdeSolver(odeProb, solArrayHighAcc, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, peTabModel.getTStops)
                     catch 
                         sqDiffSolver = Inf
                     end
                     println("sqDiffSolver = ", sqDiffSolver)
                     solverSuccess = isinf(sqDiffSolver) ? false : true
                 else
-                    tmp, solverSuccess = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, nTSave=100)
+                    tmp, solverSuccess = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, peTabModel.getTStops, nTSave=100)
                     sqDiffSolver = 0.0
                 end
                     
                 if solverSuccess == true
                     for i in 1:nTimesRepat
-                        status, runTime = solveOdeModelAllExperimentalCondBench(odeProb, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, onlySaveAtTobs=true, savePreEqTime=true) 
+                        status, runTime = solveOdeModelAllExperimentalCondBench(odeProb, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, peTabModel.getTStops, onlySaveAtTobs=true, savePreEqTime=true) 
                         benchRunTime[i] = runTime # nanosecond
                         GC.gc(); GC.gc();GC.gc()
                     end
@@ -312,8 +315,8 @@ if ARGS[1] == "Test_all"
         mkpath(dirSave)
     end
 
-    modelListTry = ["model_Beer_MolBioSystems2014", "model_Weber_BMC2015", "model_Schwen_PONE2014", "model_Alkan_SciSignal2018", 
-                    "model_Bachmann_MSB2011", "model_Bertozzi_PNAS2020", "model_Blasi_CellSystems2016", "model_Boehm_JProteomeRes2014", 
+    modelListTry = ["model_Beer_MolBioSystems2014", "model_Blasi_CellSystems2016", "model_Weber_BMC2015", "model_Schwen_PONE2014", "model_Alkan_SciSignal2018", 
+                    "model_Bachmann_MSB2011", "model_Bertozzi_PNAS2020", "model_Boehm_JProteomeRes2014", 
                     "model_Borghans_BiophysChem1997", "model_Brannmark_JBC2010", "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
                     "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", "model_Giordano_Nature2020", 
                     "model_Isensee_JCB2018", "model_Laske_PLOSComputBiol2019", "model_Lucarelli_CellSystems2018", "model_Okuonghae_ChaosSolitonsFractals2020", 
@@ -323,10 +326,12 @@ if ARGS[1] == "Test_all"
     tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
 
     for i in eachindex(modelListTry)
+        i = 1
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
         a = 1
+        solversCheck = ["Rodas4P", "CVODE_BDF_default", "Rodas5"]
         runBenchmarkOdeSolvers(peTabModel, pathFileSaveNotSparse, false, nTimesRepat=UInt(3), tolsCheck=tolsTry)
         GC.gc(); GC.gc();GC.gc()
         runBenchmarkOdeSolvers(peTabModel, pathFileSaveSparse, true, nTimesRepat=UInt(3))
@@ -395,3 +400,6 @@ if ARGS[1] == "large_models"
         runBenchmarkOdeSolvers(peTabModel, pathSave, true, nTimesRepat=UInt(3), solversCheck=solversCheckSparse, tolsCheck=tolsTry, checkAccuracy=false)    
     end
 end
+
+solver = AutoVern9(Rodas4P())
+typeof(solver) <: SciMLAlgorithm
