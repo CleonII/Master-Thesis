@@ -426,7 +426,8 @@ function getWord(str::String, iStart::Int, charListTerm::Array{Char, 1})
         end
         iEnd += 1
     end
-
+    # Remove all spaces from the word
+    wordStr = replace(wordStr, " " => "")
     return wordStr, iEnd
 end
 

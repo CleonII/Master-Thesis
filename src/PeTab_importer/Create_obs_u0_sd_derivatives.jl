@@ -35,7 +35,7 @@ function createFileDYmodSdU0(modelName::String,
     println("Done with DYmod function")
     println("")
     
-    createDSdFunction(modelName, dirModel, paramData, stateNames, string.(parameterNames), paramIndices.namesNonDynParam, observablesDataFile)
+    createDSdFunction(modelName, dirModel, paramData, stateNames, string.(parameterNames), paramIndices.namesNonDynParam, observablesDataFile, modelDict)
     println("Done with Dsd function")
     println("")
 
@@ -176,6 +176,11 @@ function createDYmodFunction(modelName::String,
         strObservebleX *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
         tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
 
+
+        # Replace the explicit rule variable with the explicit rule
+        for (key,value) in modelDict["modelRuleFunctions"]            
+            tmpFormula = replace(tmpFormula, key => "(" * value[2] * ")")
+        end
         # Translate the formula for the observable to Julia syntax 
         juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, namesExplicitRules)
         
@@ -189,7 +194,7 @@ function createDYmodFunction(modelName::String,
                     strObservebleU *= "\t\t" * obsParam * " = getObsOrSdParam(obsPar, mapObsParam)\n" 
                     printInd = 1
                 end 
-        
+                
                 juliaFormulaSym =  eval(Meta.parse(juliaFormula))
                 tmpVar = eval(Meta.parse(statesArray[stateInd]))
                 dYdu = Symbolics.derivative(juliaFormulaSym, tmpVar; simplify=true)
@@ -249,7 +254,8 @@ end
                           paramData::ParamData, 
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
-                          observablesData::DataFrame)
+                          observablesData::DataFrame,
+                          modelDict)
     For modelName create a function for computing the standard deviation by translating the observablesData
     PeTab-file into Julia syntax. 
     To correctly create the function the state-names, names of dynamic parameters to estiamte 
@@ -261,7 +267,8 @@ function createDSdFunction(modelName::String,
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
                           namesNonDynParam::Array{String, 1},
-                          observablesData::DataFrame)
+                          observablesData::DataFrame,
+                          modelDict)
 
     io = open(dirModel * "/" * modelName * "DObsSdU0.jl", "a")
 
@@ -279,6 +286,11 @@ function createDSdFunction(modelName::String,
         strObservebleX *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
         tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
 
+        # Replace the explicit rule variable with the explicit rule
+        for (key,value) in modelDict["modelRuleFunctions"]            
+            tmpFormula = replace(tmpFormula, key => "(" * value[2] * ")")
+        end
+        
         juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
 
         printInd = 0
