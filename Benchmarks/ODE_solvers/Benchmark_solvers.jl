@@ -233,7 +233,6 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                 # Check the accuracy of the ODE solver by comparing with high accuracy solution. In case the squared sum 
                 # error cannot be computed the solver crashed and run time is not profiled.
                 # If we do not check accuracy, check that we can solve the model using the provided solver.
-                sqDiffSolver = calcAccuracyOdeSolver(odeProb, solArrayHighAcc, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, peTabModel.getTStops)
                 local sqDiffSolver = Float64
                 if checkAccuracy == true
                     try
@@ -326,11 +325,9 @@ if ARGS[1] == "Test_all"
     tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
 
     for i in eachindex(modelListTry)
-        i = 1
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
-        a = 1
         solversCheck = ["Rodas4P", "CVODE_BDF_default", "Rodas5"]
         runBenchmarkOdeSolvers(peTabModel, pathFileSaveNotSparse, false, nTimesRepat=UInt(3), tolsCheck=tolsTry)
         GC.gc(); GC.gc();GC.gc()
@@ -400,6 +397,3 @@ if ARGS[1] == "large_models"
         runBenchmarkOdeSolvers(peTabModel, pathSave, true, nTimesRepat=UInt(3), solversCheck=solversCheckSparse, tolsCheck=tolsTry, checkAccuracy=false)    
     end
 end
-
-solver = AutoVern9(Rodas4P())
-typeof(solver) <: SciMLAlgorithm
