@@ -12,6 +12,7 @@ using Printf
 using SciMLSensitivity
 using BenchmarkTools
 using Zygote
+using Sundials
 
 
 # Relevant PeTab structs for compuations 
@@ -38,6 +39,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity(), 
+                                 sensealgForward = ForwardSensitivity(), solverForward=CVODE_BDF(),
                                  adjSolver=solver, adjTol=1e-10, adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
 
     # Parameter values to test gradient at 
@@ -93,6 +95,17 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
+        # Evaluate forward sensitivity equations 
+        gradForwardEq = zeros(length(paramVec))
+        peTabOpt.evalGradFForwardEq(gradForwardEq, paramVec)
+        gradPython = collect(gradPythonMat[i, :])
+        sqDiffGradForwardEq = sum((gradForwardEq - gradPython[iUse]).^2)
+        if sqDiffGradForwardEq > 1e-5
+            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
+            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
+            return false
+        end
+
         # This currently takes considerble time (hence it does not run for all passes)
         if i == 1
             gradZygote = zeros(length(paramVec))
@@ -112,6 +125,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("sqDiffCostZygote = %.3e\n", sqDiffZygote)
             @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
+            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
         end
     end
 

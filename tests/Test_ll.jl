@@ -107,15 +107,22 @@ elseif diffZygote > 1e-3
 end
 # Check we get correct gradient for a pre-eq simulation model 
 peTabOpt = setUpCostGradHess(peTabModel, Rodas5(), 1e-9, adjSolver=Rodas5(), adjTol=1e-9, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)),
+                             sensealgForward = ForwardSensitivity(), solverForward=CVODE_BDF(),
                              adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), 
                              adjSensealgSS=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
 cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)                             
 gradFor = zeros(length(peTabOpt.paramVecTransformed))
 gradAdj = zeros(length(peTabOpt.paramVecTransformed))
+gradForEq = zeros(length(peTabOpt.paramVecTransformed))
 peTabOpt.evalGradF(gradFor, peTabOpt.paramVecTransformed)
 peTabOpt.evalGradFAdjoint(gradAdj, peTabOpt.paramVecTransformed)
+peTabOpt.evalGradFForwardEq(gradForEq, peTabOpt.paramVecTransformed)
 if sum((gradFor - gradAdj).^2) > 1e-4
     println("Does not pass prior test for adjoint sensitivity")
+    passTest=false
+end
+if sum((gradFor - gradForEq).^2) > 1e-4
+    println("Does not pass prior test for forward sensitiviity equations")
     passTest=false
 end
 
@@ -136,15 +143,18 @@ elseif diffZygote > 1e-3
     passTest = false
 end
 peTabOpt = setUpCostGradHess(peTabModel, Rodas5(), 1e-12, adjSolver=Rodas5(), adjTol=1e-12, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)),
+                             sensealgForward = ForwardDiffSensitivity(), solverForward=Rodas4P(autodiff=false),
                              adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
 # Check that we can compute gradients for Bruno model 
 gradBrunoForward = ForwardDiff.gradient(peTabOpt.evalF, peTabOpt.paramVecTransformed) 
 gradBrunoCalc = Calculus.gradient(peTabOpt.evalF, peTabOpt.paramVecTransformed) 
 gradImporter = zeros(length(peTabOpt.paramVecTransformed))
 gradAdj = zeros(length(peTabOpt.paramVecTransformed))
+gradForEq = zeros(length(peTabOpt.paramVecTransformed))
 peTabOpt.evalGradF(gradImporter, peTabOpt.paramVecTransformed)
 gradZygote = Zygote.gradient(peTabOpt.evalFZygote, peTabOpt.paramVecTransformed)[1]
 peTabOpt.evalGradFAdjoint(gradAdj, peTabOpt.paramVecTransformed)
+peTabOpt.evalGradFForwardEq(gradForEq, peTabOpt.paramVecTransformed)
 if sum((gradImporter - gradBrunoCalc).^2) > 1e-6
     println("Does not pass gradient test for Bruno model")
     passTest = false
@@ -155,6 +165,10 @@ if sum((gradZygote - gradBrunoCalc).^2) > 1e-6
 end
 if sum((gradImporter[1:(end-1)] - gradAdj[1:(end-1)]).^2) > 1e-6
     println("Does not pass gradient Adjoint test for Bruno model")
+    passTest = false
+end
+if sum((gradImporter[1:(end-1)] - gradForEq[1:(end-1)]).^2) > 1e-6
+    println("Does not pass gradient ForwardSenseEq test for Bruno model")
     passTest = false
 end
 
@@ -278,12 +292,19 @@ elseif diffZygote > 1e-3
 end
 # For Schwen check that lower level adjoint interface handles priors well 
 peTabOpt = setUpCostGradHess(peTabModel, Rodas5(), 1e-9, adjSolver=Rodas5(), adjTol=1e-9, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)),
+                             sensealgForward = ForwardDiffSensitivity(), solverForward=Rodas4P(autodiff=false),
                              adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
 gradFor = zeros(length(peTabOpt.paramVecTransformed))
 gradAdj = zeros(length(peTabOpt.paramVecTransformed))
+gradForEq = zeros(length(peTabOpt.paramVecTransformed))
 peTabOpt.evalGradF(gradFor, peTabOpt.paramVecTransformed)
 peTabOpt.evalGradFAdjoint(gradAdj, peTabOpt.paramVecTransformed)
+peTabOpt.evalGradFForwardEq(gradForEq, peTabOpt.paramVecTransformed)
 if sum((gradFor - gradAdj).^2) > 1e-6
+    println("Does not pass prior test for adjoint sensitivity")
+    passTest = false
+end
+if sum((gradFor - gradForEq).^2) > 1e-6
     println("Does not pass prior test for adjoint sensitivity")
     passTest = false
 end

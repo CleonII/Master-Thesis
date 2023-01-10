@@ -31,6 +31,7 @@ using Ipopt
 using Optim
 using SciMLSensitivity
 using Zygote
+using Sundials
 
 
 # Relevant PeTab structs for compuations 
@@ -164,6 +165,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
     solver = Rodas4P(autodiff=false)
     tol = 1e-12
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol, absTolSS=1e-12, relTolSS=1e-10, sensealg=ForwardDiffSensitivity(), 
+                                 sensealgForward = ForwardSensitivity(), solverForward=CVODE_BDF(),
                                  adjTol=1e-12, adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
     peTabOptAdj = setUpCostGradHess(peTabModel, solver, tol, absTolSS=1e-12, relTolSS=1e-10, sensealg=ForwardDiffSensitivity(), 
                                     adjTol=1e-12, adjSensealg=adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)),
@@ -218,6 +220,16 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             return false
         end
 
+        # Forward sensitivity equations gradient
+        gradForwardEq = zeros(nParam)
+        peTabOpt.evalGradFForwardEq(gradForwardEq, paramVec)
+        sqDiffGradForwardEq = sum((gradForwardEq - gradAlg).^2)
+        if sqDiffGradForwardEq > 1e-5
+            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
+            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
+            return false
+        end
+
         # Evaluate lower level adjoint sensitivity interfance gradient 
         gradAdj = zeros(4)
         peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
@@ -256,6 +268,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
             @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
             @printf("sqDiffGradAdjointOpt2 = %.3e\n", sqDiffGradAdjoint2)
+            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
         end
     end
 
