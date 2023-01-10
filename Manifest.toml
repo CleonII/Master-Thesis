@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.8.3"
+julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "f6f1afd9aeb11500759d4ddcd18dfb94df1965d8"
+project_hash = "14262c12e4eac64eea81f086f89f5ae765d70b27"
 
 [[deps.ASL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -343,7 +343,7 @@ version = "3.46.0"
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "0.5.2+0"
+version = "1.0.1+0"
 
 [[deps.CompositeTypes]]
 git-tree-sha1 = "d5b014b216dc891e81fea299638e4c10c657b582"
@@ -1059,6 +1059,11 @@ deps = ["ArrayInterfaceCore", "ArrayInterfaceStaticArrays", "ChainRulesCore", "F
 git-tree-sha1 = "3926535a04c12fb986028a4a86bf5a0a3cf88b91"
 uuid = "2ee39098-c373-598a-b85f-a56591580800"
 version = "1.12.0"
+
+[[deps.LambertW]]
+git-tree-sha1 = "2d9f4009c486ef676646bca06419ac02061c088e"
+uuid = "984bce1d-4616-540c-a9ee-88d1112d94c9"
+version = "0.4.5"
 
 [[deps.Latexify]]
 deps = ["Formatting", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "OrderedCollections", "Printf", "Requires"]
@@ -2015,10 +2020,10 @@ uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
 version = "0.19.11"
 
 [[deps.Symbolics]]
-deps = ["ArrayInterfaceCore", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "Groebner", "IfElse", "Latexify", "Libdl", "LinearAlgebra", "MacroTools", "Markdown", "Metatheory", "NaNMath", "RecipesBase", "Reexport", "Requires", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicUtils", "TermInterface", "TreeViews"]
-git-tree-sha1 = "873596ee5c98f913bcb2cbb2dc779d815c5aeb86"
+deps = ["ArrayInterfaceCore", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "Groebner", "IfElse", "LaTeXStrings", "LambertW", "Latexify", "Libdl", "LinearAlgebra", "MacroTools", "Markdown", "Metatheory", "NaNMath", "RecipesBase", "Reexport", "Requires", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicUtils", "TermInterface", "TreeViews"]
+git-tree-sha1 = "111fbf43883d95989577133aeeb889f2040d0aea"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "4.10.4"
+version = "4.14.0"
 
 [[deps.TOML]]
 deps = ["Dates"]

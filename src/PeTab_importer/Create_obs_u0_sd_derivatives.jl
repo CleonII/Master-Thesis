@@ -1,12 +1,10 @@
-using Symbolics
-
 
 """
     createFileDYmodSdU0(modelName::String, 
                        dirModel::String, 
                        odeSys::ODESystem, 
                        stateMap,
-                       modelDict)
+                       modelDict::Dict)
     For a PeTab model with name modelName with all PeTab-files in dirModel and associated 
     ModellingToolkit ODESystem (with its stateMap) build a file containing a functions for 
     i) computing the observable model value (yMod) ii) compute the initial value u0 (by using the 
@@ -42,17 +40,17 @@ function createFileDYmodSdU0(modelName::String,
 end
 
 """
-    createTopOfFun(modelName::String, 
+    createTopOfDFun(modelName::String, 
                        dirModel::String, 
                        stateNames, 
                        paramData::ParamData, 
                        namesParamODEProb::Array{String, 1}, 
                        observablesData::DataFrame,
-                       modelDict)
+                       modelDict::Dict)
     Extracts all variables needed for the functions. 
     Also adds them as variables for Symbolics.jl
 """
-function createTopOfFun(stateNames, 
+function createTopOfDFun(stateNames, 
                         paramData::ParamData, 
                         namesParamODEProb::Array{String, 1}, 
                         namesNonDynParam::Array{String, 1},
@@ -151,7 +149,7 @@ createDYmodFunction(modelName::String,
                        paramData::ParamData, 
                        namesParamDyn::Array{String, 1}, 
                        observablesData::DataFrame,
-                       modelDict)
+                       modelDict::Dict)
 For modelName create a function for computing DyMod/Du and DyMod/Dp
 """
 function createDYmodFunction(modelName::String, 
@@ -161,10 +159,10 @@ function createDYmodFunction(modelName::String,
                             namesParamDyn::Array{String, 1}, 
                             namesNonDynParam::Array{String, 1},
                             observablesData::DataFrame,
-                            modelDict)
+                            modelDict::Dict)
 
     io = open(dirModel * "/" * modelName * "DObsSdU0.jl", "w")
-    stateStr, paramDynStr, paramNonDynStr, explicitRules, namesExplicitRules, statesArray, parameterArray = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, modelDict)
+    stateStr, paramDynStr, paramNonDynStr, explicitRules, namesExplicitRules, statesArray, parameterArray = createTopOfDFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, modelDict)
   
     # Store the formula of each observable in string
     observableIDs = String.(observablesData[!, "observableId"])
@@ -255,7 +253,7 @@ end
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
                           observablesData::DataFrame,
-                          modelDict)
+                          modelDict::Dict)
     For modelName create a function for computing the standard deviation by translating the observablesData
     PeTab-file into Julia syntax. 
     To correctly create the function the state-names, names of dynamic parameters to estiamte 
@@ -268,13 +266,11 @@ function createDSdFunction(modelName::String,
                           namesParamDyn::Array{String, 1}, 
                           namesNonDynParam::Array{String, 1},
                           observablesData::DataFrame,
-                          modelDict)
+                          modelDict::Dict)
 
     io = open(dirModel * "/" * modelName * "DObsSdU0.jl", "a")
-
-    emptyDict = Dict()
-    emptyDict["modelRuleFunctions"] = Dict()
-    stateStr, paramDynStr, paramNonDynStr, explicitRules, namesExplicitRules, statesArray, parameterArray = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, emptyDict)
+    
+    stateStr, paramDynStr, paramNonDynStr, explicitRules, namesExplicitRules, statesArray, parameterArray = createTopOfDFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, Dict("modelRuleFunctions" => Dict()))
     
     # Store the formula for standard deviations in string
     observableIDs = String.(observablesData[!, "observableId"])
@@ -291,7 +287,7 @@ function createDSdFunction(modelName::String,
             tmpFormula = replace(tmpFormula, key => "(" * value[2] * ")")
         end
         
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, namesExplicitRules)
 
         printInd = 0
 

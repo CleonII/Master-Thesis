@@ -18,6 +18,7 @@ using Printf
 using Calculus
 using SciMLSensitivity
 using Zygote
+using Symbolics
 
 
 # Relevant PeTab structs for compuations 

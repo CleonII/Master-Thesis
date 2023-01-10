@@ -12,10 +12,22 @@ function evalDYmodDu(u, t, p, obsPar, nonDynParam, observableId, mapObsParam, ou
 	end
 
 	if observableId == "RVSegTot" 
+		observableParameter1_RVSegTot = getObsOrSdParam(obsPar, mapObsParam)
+		out[2] = 1//8
+		out[3] = 1//8
+		out[8] = 1
+		out[11] = 1//8
+		out[14] = 1//8
+		out[16] = 1
+		out[17] = 1
+		out[30] = 1//8
 		return nothing
 	end
 
 	if observableId == "RCSegTot" 
+		out[5] = 1//8
+		out[13] = 1//8
+		out[15] = 1//8
 		return nothing
 	end
 
@@ -29,34 +41,82 @@ function evalDYmodDu(u, t, p, obsPar, nonDynParam, observableId, mapObsParam, ou
 	end
 
 	if observableId == "FracNucInt_1" 
+		observableParameter1_FracNucInt_1 = getObsOrSdParam(obsPar, mapObsParam)
+		out[2] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[3] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[8] = (-800Vp_nuc - 800Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[11] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[14] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
 		return nothing
 	end
 
 	if observableId == "FracNucInt_2" 
+		observableParameter1_FracNucInt_2 = getObsOrSdParam(obsPar, mapObsParam)
+		out[2] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[3] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[8] = (-800Vp_nuc - 800Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[11] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[14] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
 		return nothing
 	end
 
 	if observableId == "FracNucInt_3" 
+		observableParameter1_FracNucInt_3 = getObsOrSdParam(obsPar, mapObsParam)
+		out[2] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[3] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[8] = (-800Vp_nuc - 800Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[11] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[14] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
 		return nothing
 	end
 
 	if observableId == "FracNucInt_4" 
+		observableParameter1_FracNucInt_4 = getObsOrSdParam(obsPar, mapObsParam)
+		out[2] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[3] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[8] = (-800Vp_nuc - 800Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[11] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[14] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
 		return nothing
 	end
 
 	if observableId == "FracNucInt_5" 
+		observableParameter1_FracNucInt_5 = getObsOrSdParam(obsPar, mapObsParam)
+		out[2] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[3] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[8] = (-800Vp_nuc - 800Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[11] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[14] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
 		return nothing
 	end
 
 	if observableId == "FracNucInt_6" 
+		observableParameter1_FracNucInt_6 = getObsOrSdParam(obsPar, mapObsParam)
+		out[2] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[3] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[8] = (-800Vp_nuc - 800Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[11] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[14] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
 		return nothing
 	end
 
 	if observableId == "FracNucInt_7" 
+		observableParameter1_FracNucInt_7 = getObsOrSdParam(obsPar, mapObsParam)
+		out[2] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[3] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[8] = (-800Vp_nuc - 800Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[11] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[14] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
 		return nothing
 	end
 
 	if observableId == "FracNucInt_8" 
+		observableParameter1_FracNucInt_8 = getObsOrSdParam(obsPar, mapObsParam)
+		out[2] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[3] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[8] = (-800Vp_nuc - 800Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[11] = (-100Vp_nuc - 100Vp_nuc_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
+		out[14] = (800.0V_end + 100.0Vp_cyt + 100.0Vp_cyt_M1) / ((Vp_cyt + Vp_cyt_M1 + Vp_nuc + Vp_nuc_M1 + 8V_end)^2)
 		return nothing
 	end
 
