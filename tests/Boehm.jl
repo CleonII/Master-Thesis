@@ -12,6 +12,7 @@ using Printf
 using SciMLSensitivity
 using Zygote
 using BenchmarkTools
+using Sundials
 
 
 # Relevant PeTab structs for compuations 
@@ -39,7 +40,9 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity(), 
-                                 adjSolver=solver, adjTol=tol, adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
+                                 sensealgForward = ForwardSensitivity(), solverForward=CVODE_BDF(),
+                                 adjSolver=solver, adjTol=tol, 
+                                 adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
 
     paramVals = CSV.read(pwd() * "/tests/Boehm/Params.csv", DataFrame)
     paramMat = paramVals[!, Not([:Id, :ratio, :specC17])]
@@ -96,12 +99,24 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
+        # Forward sensitivity equations gradient 
+        gradForwardEq = zeros(nParam)
+        peTabOpt.evalGradFForwardEq(gradForwardEq, paramVec)
+        gradPython = collect(gradPythonMat[i, :])
+        sqDiffGradForwardEq = sum((gradForwardEq - gradPython).^2)
+        if sqDiffGradForwardEq > 1e-5
+            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
+            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
+            return false
+        end
+
         if printRes == true
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("sqDiffCostZygote = %.3e\n", sqDiffZygote)
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
             @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
+            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
         end
     end
 

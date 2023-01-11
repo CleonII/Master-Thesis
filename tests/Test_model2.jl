@@ -24,6 +24,7 @@ using NLopt
 using LineSearches
 using SciMLSensitivity
 using Zygote
+using Sundials
 
 
 # Relevant PeTab structs for compuations 
@@ -158,6 +159,7 @@ end
 function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
     
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity(), 
+                                 sensealgForward = ForwardSensitivity(), solverForward=solver,
                                  adjSolver=solver, adjTol=tol, adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
 
     Random.seed!(123)
@@ -207,6 +209,16 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             return false
         end
 
+        # Forward sensitivity equations gradient
+        gradForwardEq = zeros(nParam)
+        peTabOpt.evalGradFForwardEq(gradForwardEq, paramVec)
+        sqDiffGradForwardEq = sum((gradForwardEq - gradAnalytic).^2)
+        if sqDiffGradForwardEq > 1e-5
+            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
+            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
+            return false
+        end
+
         # Evaluate lower level adjoint sensitivity interfance gradient 
         gradAdj = zeros(nParam)
         peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
@@ -233,6 +245,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("sqDiffHess = %.3e\n", sqDiffHess)
             @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
+            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
             @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
         end
     end

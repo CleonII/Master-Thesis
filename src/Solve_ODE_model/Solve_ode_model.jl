@@ -59,13 +59,14 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
             preEqIds = unique(simulationInfo.preEqIdSol[whichPreEq])
         end
         
-        # Arrays to store steady state (pre-eq) values 
+        # Arrays to store steady state (pre-eq) values. When computing the sensitivity equations we are solving an 
+        # expanded ODE system where along the original ode we solve on of dimension length(u0)*length(p)
         uAtSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
         u0PreSimSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
 
         for i in eachindex(preEqIds)
             # Sometimes due to strongly ill-conditioned Jacobian the linear-solve runs 
-            # into a domain error.
+            # into a domain error. This is treated as integration error.
             try
                 whichPreEq = findfirst(x -> x == preEqIds[i], simulationInfo.preEqIdSol)
                 simulationInfo.solArrayPreEq[whichPreEq] = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
@@ -481,13 +482,14 @@ function solveODEPostEqulibrium(prob::ODEProblem,
     # sensitivity interface to fail.
     t_max_ss = isinf(t_max_ss) ? 1e8 : t_max_ss
     probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])     
+    probUse.u0 .= prob.u0[:] # This is needed due to remake for ODE-sensitivity problem does not correctly map u0
+
     # If case of adjoint sensitivity analysis we need to track the callback to get correct gradients 
     tStops = calcTStops(probUse.u0, probUse.p)
     callBackSet = getCallbackSet(probUse, simulationInfo, whichForwardSol, trackCallback)
-    
     sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, simulationInfo.absTolSS, simulationInfo.relTolSS, 
                              t_max_ss, saveAtVec, dense, callBackSet, tStops)
-    
+
     return sol                                     
 end
 
@@ -527,6 +529,7 @@ function solveOdeNoSS(prob::ODEProblem,
     t_max_use = isinf(t_max) ? 1e8 : t_max
     changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
     probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
+    probUse.u0 .= prob.u0[:] # Required as due to a bub in remake it does not handle Senstivity-problems well 
     
     # If case of adjoint sensitivity analysis we need to track the callback 
     callBackSet = getCallbackSet(probUse, simulationInfo, whichForwardSol, trackCallback)
@@ -635,6 +638,46 @@ function changeExperimentalCondEst!(paramVec::AbstractVector,
     if !isempty(expMap.expCondStateConstVal)
         stateVec[iOdeProbStateConstVal] .= expCondStateConstVal
     end
+
+    return nothing
+end                                 
+
+
+# Change experimental conditions when solving the expanded sensitity equations ODE system 
+function changeExperimentalCondEstSenseEq!(paramVec::AbstractVector, 
+                                           stateVec::AbstractVector, 
+                                           expID::String, 
+                                           dynParamEst,
+                                           peTabModel::PeTabModel, 
+                                           paramEstIndices::ParameterIndices)
+
+    whichExpMap = findfirst(x -> x == expID, [paramEstIndices.mapExpCond[i].condID for i in eachindex(paramEstIndices.mapExpCond)])
+    expMap = paramEstIndices.mapExpCond[whichExpMap] 
+
+    # Constant parameters 
+    paramVec[expMap.iOdeProbParamConstVal] .= expMap.expCondParamConstVal
+
+    # Parameters to estimate 
+    paramVec[expMap.iOdeProbDynParam] .= dynParamEst[expMap.iDynEstVec]
+
+    # When computing the gradient the paramMap must be able to handle dual 
+    nStates = length(peTabModel.stateNames)
+    peTabModel.evalU0!((@view stateVec[1:nStates]), paramVec) 
+
+    # Account for any potential events active at time zero
+    for f! in peTabModel.checkCallbackActive
+        f!(stateVec, paramVec)
+    end
+
+    # In case an experimental condition maps directly to the initial value of a state. 
+    if !isempty(expMap.expCondStateConstVal)
+        stateVec[iOdeProbStateConstVal] .= expCondStateConstVal
+    end
+
+    # For initial values in the expanded ODE system the sensitivites at time zero are required 
+    sMatAtT0::Matrix{Float64} = Matrix{Float64}(undef, (nStates, length(paramVec)))
+    ForwardDiff.jacobian!(sMatAtT0, peTabModel.evalU0, paramVec)
+    stateVec[(nStates+1):end] .= vec(sMatAtT0)
 
     return nothing
 end                                 
