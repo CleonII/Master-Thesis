@@ -741,6 +741,7 @@ function calcGradCostAdj!(grad::Vector{Float64},
 
     # Happens when at least one forward pass fails and I set the gradient to 1e8 
     if all(grad[paramIndices.iDynParam] .== 1e8)
+        grad .= 1e8
         return 
     end
 
@@ -798,6 +799,7 @@ function calcGradForwardEq!(grad::Vector{Float64},
 
     # Happens when at least one forward pass fails and I set the gradient to 1e8 
     if all(grad[paramIndices.iDynParam] .== 1e8)
+        grad .= 1e8
         return 
     end
 
@@ -949,10 +951,14 @@ function calcGradAdjDynParam!(gradAdj::Vector{Float64},
         sol = simulationInfo.solArrayGrad[whichForwardSol]
         postEqId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardSol] : conditionID
         # If we have a callback it needs to be properly handled 
-        calcGradAdjExpCond!(gradAdj, sol, sensealg, tol, adjSolver, dynamicParamEstUse,
-                            sdParamEstUse, obsParEstUse, nonDynParamEstUse, conditionID, postEqId,
-                            peTabModel, paramIndices, measurementData, parameterData, 
-                            simulationInfo.simulateSS, yBarSSUse, simulationInfo.callbacks[whichForwardSol])
+        success = calcGradAdjExpCond!(gradAdj, sol, sensealg, tol, adjSolver, dynamicParamEstUse,
+                                      sdParamEstUse, obsParEstUse, nonDynParamEstUse, conditionID, postEqId,
+                                      peTabModel, paramIndices, measurementData, parameterData, 
+                                      simulationInfo.simulateSS, yBarSSUse, simulationInfo.callbacks[whichForwardSol])
+        if success == false
+            gradAdj .= 1e8
+            return
+        end
     end
     return 
 end
@@ -977,7 +983,7 @@ function calcGradAdjExpCond!(grad::Vector{Float64},
                              simulateSS::Bool,
                              yBarSS::Function, 
                              callbackRev::SciMLBase.DECallback;
-                             expIDSolve::Array{String, 1} = ["all"])
+                             expIDSolve::Array{String, 1} = ["all"])::Bool
                             
     if expIDSolve[1] != "all" && conditionID ∉ expIDSolve
         return
@@ -1013,15 +1019,28 @@ function calcGradAdjExpCond!(grad::Vector{Float64},
     tSaveAt = measurementData.tVecSave[conditionID]
     onlyObsAtZero::Bool = false
     if !(length(tSaveAt) == 1 && tSaveAt[1] == 0.0)
-        du, dp = adjoint_sensitivities(sol, 
-                                       adjSolver,
-                                       dgdp_discrete=nothing,
-                                       dgdu_discrete=calcDgDuDiscrete, 
-                                       callback=callbackRev,
-                                       t=tSaveAt, 
-                                       sensealg=sensealg, 
-                                       abstol=tol, 
-                                       reltol=tol)
+
+        # adjoint_sensitivities does not return a retcode. Hence upon integration error only a warning is thrown. To capture 
+        # this stderr is redirected to a readyonly stream. Thus upon warning an error is triggered, upon which we return 
+        # false to signify that we could not compute the gradient.
+        stderrOld = stderr
+        redirect_stderr(open(touch(tempname()), "r"))
+        local du, dp
+            try
+            du, dp = adjoint_sensitivities(sol, 
+                                        adjSolver,
+                                        dgdp_discrete=nothing,
+                                        dgdu_discrete=calcDgDuDiscrete, 
+                                        callback=callbackRev,
+                                        t=tSaveAt, 
+                                        sensealg=sensealg, 
+                                        abstol=tol, 
+                                        reltol=tol)
+            catch
+                println("Warning triggered :o")
+                return false
+            end
+        redirect_stderr(stderrOld)
     else
         du = zeros(Float64, length(sol.prob.u0))
         calcDgDuDiscrete(du, sol[1], sol.prob.p, 0.0, 1)
@@ -1071,7 +1090,8 @@ function calcGradAdjExpCond!(grad::Vector{Float64},
     grad[expMap.iDynEstVec] .+= transformParamVecGrad(gradTot[expMap.iOdeProbDynParam], 
                                                       dynParam[expMap.iDynEstVec], 
                                                       paramIndices.namesDynParam[expMap.iDynEstVec], 
-                                                      parameterData)                                   
+                                                      parameterData)                         
+    return true                                                                                            
 end
 
 
