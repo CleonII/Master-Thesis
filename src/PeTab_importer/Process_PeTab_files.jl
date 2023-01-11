@@ -463,6 +463,9 @@ function getSimulationInfo(peTabModel::PeTabModel,
     modelCallbacks::Vector{SciMLBase.DECallback} = [deepcopy(peTabModel.callbackSet) for i in 1:nForwardSol]
 
     tVecSave::Dict{String, Vector{Float64}} = deepcopy(measurementData.tVecSave)
+    # Set up map to identify for each experimental condition in which order (when solving all experimental condition) a time 
+    # point occurs at. 
+    posInSolArray = getPosInSolArray(conditionIdSol, tVecSave)
     simulationInfo = SimulationInfo(firstExpIds, 
                                     shiftExpIds, 
                                     preEqIdSol,
@@ -476,6 +479,7 @@ function getSimulationInfo(peTabModel::PeTabModel,
                                     absTolSS, 
                                     relTolSS, 
                                     tVecSave, 
+                                    posInSolArray,
                                     modelCallbacks, 
                                     sensealg)
     return simulationInfo

@@ -366,3 +366,19 @@ function getMapExpCond(odeSystem::ODESystem,
 
     return mapExpCondArr, constParamPerCond
 end
+
+
+# For each time-point in solArray get corresponding index of the observation vector. Required when computing the 
+# sensitivites via forward mode automatic differentiation because here we get a huge sensitivity matrix where 
+# each S[i:(i+nStates)] row corresponds to the sensitivites at a specific time-point. To practically use this 
+# we need to build an index for each row 
+function getPosInSolArray(conditionIdSol::Vector{String}, tVecSave::Dict{String, Vector{Float64}})::Dict{String, UnitRange{Int64}}
+    indexInSolArray = Dict{String, UnitRange{Int64}}()
+    iStart = 1
+    for i in eachindex(conditionIdSol)
+        saveAt = tVecSave[conditionIdSol[i]]
+        indexInSolArray[conditionIdSol[i]] = iStart:(iStart-1+length(saveAt))
+        iStart = indexInSolArray[conditionIdSol[i]][end] + 1
+    end
+    return indexInSolArray
+end
