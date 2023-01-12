@@ -1,12 +1,10 @@
-using Symbolics
-
 
 """
     createFileDYmodSdU0(modelName::String, 
                        dirModel::String, 
                        odeSys::ODESystem, 
                        stateMap,
-                       modelDict)
+                       modelDict::Dict)
     For a PeTab model with name modelName with all PeTab-files in dirModel and associated 
     ModellingToolkit ODESystem (with its stateMap) build a file containing a functions for 
     i) computing the observable model value (yMod) ii) compute the initial value u0 (by using the 
@@ -35,29 +33,25 @@ function createFileDYmodSdU0(modelName::String,
     println("Done with DYmod function")
     println("")
     
-    createDSdFunction(modelName, dirModel, paramData, stateNames, string.(parameterNames), paramIndices.namesNonDynParam, observablesDataFile)
+    createDSdFunction(modelName, dirModel, paramData, stateNames, string.(parameterNames), paramIndices.namesNonDynParam, observablesDataFile, modelDict)
     println("Done with Dsd function")
     println("")
 
 end
 
 """
-    createTopOfFun(modelName::String, 
-                       dirModel::String, 
-                       stateNames, 
-                       paramData::ParamData, 
-                       namesParamODEProb::Array{String, 1}, 
-                       observablesData::DataFrame,
-                       modelDict)
+    createTopOfDFun(stateNames, 
+        namesParamODEProb::Array{String, 1}, 
+        namesNonDynParam::Array{String, 1},
+        observablesData::DataFrame,
+        modelDict::Dict)
     Extracts all variables needed for the functions. 
     Also adds them as variables for Symbolics.jl
 """
-function createTopOfFun(stateNames, 
-                        paramData::ParamData, 
+function createTopOfDFun(stateNames, 
                         namesParamODEProb::Array{String, 1}, 
                         namesNonDynParam::Array{String, 1},
-                        observablesData::DataFrame,
-                        modelDict::Dict)
+                        observablesData::DataFrame)
 
     variablesStr = "@variables "
     parameterArray = namesParamODEProb
@@ -94,32 +88,20 @@ function createTopOfFun(stateNames,
         paramNonDynStr = paramNonDynStr[1:end-2]
         paramNonDynStr *= " = nonDynParam \n"
     end
-    
-    # Create namesExplicitRules, if length(modelDict["modelRuleFunctions"]) = 0 this becomes a String[].
-    namesExplicitRules = Array{String, 1}(undef,length(modelDict["modelRuleFunctions"]))
-    # Extract the keys from the modelRuleFunctions
-    for (index, key) in enumerate(keys(modelDict["modelRuleFunctions"]))
-        namesExplicitRules[index] = key
-        variablesStr *= key * ", "
-    end
-       
-    # Extracts the explicit rules that have keys among the observables.
-    # also extracts all observable- and noise-parameters
-    explicitRules = ""
-    strObserveble = ""
-    
+
+    # Extracts all observable- and noise-parameters    
     observableIDs = String.(observablesData[!, "observableId"])
     for i in eachindex(observableIDs)
-        tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
-        strObserveble *= tmpFormula * "\n"
+
         # Extract observable parameters 
+        tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
         obsParam = getObsParamStr(tmpFormula)
         if !isempty(obsParam)
             variablesStr *= obsParam * ", "   
         end 
 
+        # Extract noise parameters 
         tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
-        strObserveble *= tmpFormula * "\n"
         noiseParam = getNoiseParamStr(tmpFormula)
         if !isempty(noiseParam)
             variablesStr *= noiseParam * ", "   
@@ -130,17 +112,8 @@ function createTopOfFun(stateNames,
     # Remove last "," and Run @variables ... string
     variablesStr = variablesStr[1:end-2]
     eval(Meta.parse(variablesStr))
-    for (key,value) in modelDict["modelRuleFunctions"]
-        if occursin(Regex("\\b" * key * "\\b"), strObserveble)
-            explicitRules *= "\t" * key * " = " * value[2] * "\n"
-        end
-    end
 
-    if length(explicitRules)>0
-        explicitRules *= "\n"
-    end
-
-    return stateStr, paramDynStr, paramNonDynStr, explicitRules, namesExplicitRules, statesArray, parameterArray
+    return stateStr, paramDynStr, paramNonDynStr, statesArray, parameterArray
 end
 
 
@@ -151,7 +124,7 @@ createDYmodFunction(modelName::String,
                        paramData::ParamData, 
                        namesParamDyn::Array{String, 1}, 
                        observablesData::DataFrame,
-                       modelDict)
+                       modelDict::Dict)
 For modelName create a function for computing DyMod/Du and DyMod/Dp
 """
 function createDYmodFunction(modelName::String, 
@@ -161,10 +134,10 @@ function createDYmodFunction(modelName::String,
                             namesParamDyn::Array{String, 1}, 
                             namesNonDynParam::Array{String, 1},
                             observablesData::DataFrame,
-                            modelDict)
+                            modelDict::Dict)
 
     io = open(dirModel * "/" * modelName * "DObsSdU0.jl", "w")
-    stateStr, paramDynStr, paramNonDynStr, explicitRules, namesExplicitRules, statesArray, parameterArray = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, modelDict)
+    stateStr, paramDynStr, paramNonDynStr, statesArray, parameterArray = createTopOfDFun(stateNames, namesParamDyn, namesNonDynParam, observablesData)
   
     # Store the formula of each observable in string
     observableIDs = String.(observablesData[!, "observableId"])
@@ -176,8 +149,13 @@ function createDYmodFunction(modelName::String,
         strObservebleX *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
         tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
 
+
+        # Replace the explicit rule variable with the explicit rule
+        for (key,value) in modelDict["modelRuleFunctions"]            
+            tmpFormula = replace(tmpFormula, key => "(" * value[2] * ")")
+        end
         # Translate the formula for the observable to Julia syntax 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, namesExplicitRules)
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
         
         printInd = 0
 
@@ -189,7 +167,7 @@ function createDYmodFunction(modelName::String,
                     strObservebleU *= "\t\t" * obsParam * " = getObsOrSdParam(obsPar, mapObsParam)\n" 
                     printInd = 1
                 end 
-        
+                
                 juliaFormulaSym =  eval(Meta.parse(juliaFormula))
                 tmpVar = eval(Meta.parse(statesArray[stateInd]))
                 dYdu = Symbolics.derivative(juliaFormulaSym, tmpVar; simplify=true)
@@ -225,7 +203,6 @@ function createDYmodFunction(modelName::String,
     write(io, stateStr)
     write(io, paramDynStr)
     write(io, paramNonDynStr)
-    write(io, explicitRules)
     write(io, strObservebleU)
     strClose = "end\n\n"
     write(io, strClose)
@@ -234,7 +211,6 @@ function createDYmodFunction(modelName::String,
     write(io, stateStr)
     write(io, paramDynStr)
     write(io, paramNonDynStr)
-    write(io, explicitRules)
     write(io, strObservebleX)
     strClose = "end\n\n"
     write(io, strClose)
@@ -249,7 +225,8 @@ end
                           paramData::ParamData, 
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
-                          observablesData::DataFrame)
+                          observablesData::DataFrame,
+                          modelDict::Dict)
     For modelName create a function for computing the standard deviation by translating the observablesData
     PeTab-file into Julia syntax. 
     To correctly create the function the state-names, names of dynamic parameters to estiamte 
@@ -261,13 +238,12 @@ function createDSdFunction(modelName::String,
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
                           namesNonDynParam::Array{String, 1},
-                          observablesData::DataFrame)
+                          observablesData::DataFrame,
+                          modelDict::Dict)
 
     io = open(dirModel * "/" * modelName * "DObsSdU0.jl", "a")
-
-    emptyDict = Dict()
-    emptyDict["modelRuleFunctions"] = Dict()
-    stateStr, paramDynStr, paramNonDynStr, explicitRules, namesExplicitRules, statesArray, parameterArray = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, emptyDict)
+    
+    stateStr, paramDynStr, paramNonDynStr, statesArray, parameterArray = createTopOfDFun(stateNames, namesParamDyn, namesNonDynParam, observablesData)
     
     # Store the formula for standard deviations in string
     observableIDs = String.(observablesData[!, "observableId"])
@@ -279,6 +255,11 @@ function createDSdFunction(modelName::String,
         strObservebleX *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
         tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
 
+        # Replace the explicit rule variable with the explicit rule
+        for (key,value) in modelDict["modelRuleFunctions"]            
+            tmpFormula = replace(tmpFormula, key => "(" * value[2] * ")")
+        end
+        # Translate the formula for the noise to Julia syntax 
         juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
 
         printInd = 0
@@ -326,7 +307,6 @@ function createDSdFunction(modelName::String,
     write(io, stateStr)
     write(io, paramDynStr)
     write(io, paramNonDynStr)
-    write(io, explicitRules)
     write(io, strObservebleU)
     strClose = "end\n\n"
     write(io, strClose)
@@ -335,7 +315,6 @@ function createDSdFunction(modelName::String,
     write(io, stateStr)
     write(io, paramDynStr)
     write(io, paramNonDynStr)
-    write(io, explicitRules)
     write(io, strObservebleX)
     strClose = "end\n\n"
     write(io, strClose)
