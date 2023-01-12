@@ -1,36 +1,3 @@
-"""
-    solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
-                                      prob::ODEProblem, 
-                                      changeToExperimentalCondUse!::Function, 
-                                      measurementData::DataFrame,
-                                      simulationInfo::SimulationInfo,
-                                      solver,
-                                      tol::Float64;
-                                      nTSave::Int64=0, 
-                                      denseSol::Bool=true)::Bool
-
-    Solve a PeTab ODE model for all experimental conditions specified in the PeTab experimentaCondition-file 
-    and store each ODE-soluation into solArray. Returns true if model could be solved succesfully for all 
-    conditions, else returns false.
-    
-    All inputs are automatically computed by the PeTab importer. Each experimental condition is simulated to the 
-    maximum time for that condition found in the the measurementData PeTab-file. In case a pre-equlibration condition 
-    exists the model is first simulated to a steady-state. Then starting from the steadychangeModelParamUse! state the solution stored in 
-    solArray is calculcated.
-
-    # Args
-    `solArray`: array storing ODE-solution for each experimental condition. Is pre-allocated by PeTab importer.
-    `prob`: ODEProblem struct for the model to be simulated.
-    `changeToExperimentalCondUse!`: function that changes the parameters for the ODE-problem to those for a specific experimental condition 
-    `measurementData`: the PeTab measurementData file 
-    `simulationInfo`: struct storing simulation info like experimental conditions, whether or not to simulate to a steady state.
-    `solver`: ode-solver for solving the ode-problem. Any Julia solver or alg-hint works.
-    `tol`: rel- and abs-tol for the ODE solver 
-    `nTSave`: number of equidistant data-points to save for each ODE-solution. If 0 the ODE-solver outputs a dense solution.
-    `denseSol`: whether to have a dense (true) or none-dense (false) ODE-solution for each experimental condition.
-    
-    See also: [`setUpCostFunc`, `SimulationInfo`, `changeToExperimentalCond!`]
-"""
 function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
                                            prob::ODEProblem, 
                                            changeToExperimentalCondUse!::Function, 
@@ -235,6 +202,77 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                                expIDSolve=expIDSolve, 
                                                trackCallback=trackCallback)
 
+    return sucess
+end
+function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
+                                           SMat::Matrix{Float64},
+                                           prob::ODEProblem, 
+                                           dynParamEst::AbstractVector,
+                                           changeToExperimentalCondUsePre!::Function, 
+                                           changeToModelParamUse!::Function,
+                                           simulationInfo::SimulationInfo,
+                                           solver::Union{SciMLAlgorithm, Vector{Symbol}},
+                                           absTol::Float64,
+                                           relTol::Float64, 
+                                           calcTStops::Function;
+                                           nTSave::Int64=0, 
+                                           onlySaveAtTobs::Bool=false,
+                                           expIDSolve::Array{String, 1} = ["all"],
+                                           denseSol::Bool=true, 
+                                           trackCallback::Bool=false)::Bool
+
+    function getSenseMat(paramEst::AbstractVector)
+
+        odeProbUse = remake(prob, p = convert.(eltype(paramEst), prob.p), u0 = convert.(eltype(paramEst), prob.u0))
+        changeToModelParamUse!(odeProbUse.p, odeProbUse.u0, paramEst)
+        changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeToExperimentalCondUsePre!(pVec, u0Vec, expID, paramEst)
+
+        sucess = solveOdeModelAllExperimentalCond!(solArray, 
+                                                   odeProbUse, 
+                                                   changeToExperimentalCondUse!, 
+                                                   simulationInfo, 
+                                                   solver, 
+                                                   absTol, 
+                                                   relTol,
+                                                   calcTStops,
+                                                   nTSave=nTSave, 
+                                                   denseSol=denseSol, 
+                                                   onlySaveAtTobs=onlySaveAtTobs, 
+                                                   expIDSolve=expIDSolve, 
+                                                   trackCallback=trackCallback)
+
+        nStates = length(prob.u0)                                                                                                      
+        if sucess != true
+            nObs = sum(length(simulationInfo.tVecSave[simulationInfo.conditionIdSol[i]]) for i in eachindex(simulationInfo.conditionIdSol))
+            return zeros(nStates, nObs)
+        end
+        
+        arrRet = Array{eltype(prob.u0), 2}(undef, (nStates, 0))
+        for i in eachindex(simulationInfo.conditionIdSol) 
+            if expIDSolve[1] != "all" && simulationInfo.conditionIdSol[i] ∉ expIDSolve        
+                tSave = simulationInfo.tVecSave[simulationInfo.conditionIdSol[i]]        
+                arrAdd = zeros(eltype(prob.u0), (nStates, length(tSave)))
+            else
+                arrAdd = Array(solArray[i])
+            end
+            arrRet = hcat(arrRet, arrAdd)
+        end
+        return arrRet
+    end
+    # Compute sensitivity matrix via forward mode automatic differentation 
+    ForwardDiff.jacobian!(SMat, getSenseMat, dynParamEst)
+
+    # Check retcode 
+    sucess = true
+    for i in eachindex(simulationInfo.conditionIdSol) 
+        if expIDSolve[1] != "all" && simulationInfo.conditionIdSol[i] ∉ expIDSolve        
+            continue
+        end
+        if !(solArray[i].retcode == :Success || solArray[i].retcode == :Terminated)
+            sucess = false
+        end
+    end
+    
     return sucess
 end
 

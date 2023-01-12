@@ -169,7 +169,9 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
                                  adjTol=1e-12, adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
     peTabOptAdj = setUpCostGradHess(peTabModel, solver, tol, absTolSS=1e-12, relTolSS=1e-10, sensealg=ForwardDiffSensitivity(), 
                                     adjTol=1e-12, adjSensealg=adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)),
-                                    adjSensealgSS=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)))                                 
+                                    adjSensealgSS=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)))   
+    peTabOptAlt = setUpCostGradHess(peTabModel, solver, tol, 
+                                    sensealgForward = :AutoDiffForward, solverForward=solver)                                                                                                   
     calcCostAlg = (paramVec) -> calcCostAlgebraic(paramVec, peTabModel, solver, tol)
 
     Random.seed!(123)
@@ -221,11 +223,21 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
         end
 
         # Forward sensitivity equations gradient
-        gradForwardEq = zeros(nParam)
+        gradForwardEq = zeros(4)
         peTabOpt.evalGradFForwardEq(gradForwardEq, paramVec)
         sqDiffGradForwardEq = sum((gradForwardEq - gradAlg).^2)
         if sqDiffGradForwardEq > 1e-5
             @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
+            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
+            return false
+        end
+
+        # Forward sensitivity equations using autodiff 
+        gradForwardEqAuto = zeros(4)
+        peTabOptAlt.evalGradFForwardEq(gradForwardEqAuto, paramVec)
+        sqDiffGradForwardEqAuto = sum((gradForwardEq - gradAlg).^2)
+        if sqDiffGradForwardEqAuto > 1e-5
+            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
             @printf("Does not pass test on gradient from Forward sensitivity equations\n")
             return false
         end
@@ -269,6 +281,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
             @printf("sqDiffGradAdjointOpt2 = %.3e\n", sqDiffGradAdjoint2)
             @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
+            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
         end
     end
 

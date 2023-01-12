@@ -43,6 +43,8 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
                                  sensealgForward = ForwardSensitivity(), solverForward=CVODE_BDF(),
                                  adjSolver=solver, adjTol=tol, 
                                  adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
+    peTabOptAlt = setUpCostGradHess(peTabModel, solver, tol, 
+                                    sensealgForward = :AutoDiffForward, solverForward=solver)                                 
 
     paramVals = CSV.read(pwd() * "/tests/Boehm/Params.csv", DataFrame)
     paramMat = paramVals[!, Not([:Id, :ratio, :specC17])]
@@ -110,6 +112,16 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
+        # Forward sensitivity equations using autodiff 
+        gradForwardEqAuto = zeros(nParam)
+        peTabOptAlt.evalGradFForwardEq(gradForwardEqAuto, paramVec)
+        sqDiffGradForwardEqAuto = sum((gradForwardEq - gradPython).^2)
+        if sqDiffGradForwardEqAuto > 1e-5
+            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
+            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
+            return false
+        end
+
         if printRes == true
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
@@ -117,6 +129,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
             @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
             @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
+            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
         end
     end
 

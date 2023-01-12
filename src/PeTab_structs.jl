@@ -174,6 +174,7 @@ struct SimulationInfo{T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESo
     absTolSS::Float64
     relTolSS::Float64
     tVecSave::T5
+    posInSolArray::Dict{String, UnitRange{Int64}}
     callbacks::T6
     sensealg::T7
 end
