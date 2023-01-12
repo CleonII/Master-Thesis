@@ -1382,7 +1382,11 @@ function calcGradForwardSenseEqExpCond!(grad::Vector{Float64},
     dgDpOut = zeros(Float64, length(p))    
     dgDpTot = zeros(Float64, length(p))                                        
     dgDuOut = zeros(Float64, length(peTabModel.stateNames))
-    gradTot = zeros(Float64, length(paramIndices.mapDynParEst.iDynParamInSys)) # Length of number of dynamic parameters 
+    gradTot = zeros(Float64, length(paramIndices.iDynParam)) # Length of number of dynamic parameters
+    # Extract relevant parameters for the experimental conditions 
+    whichExpMap = findfirst(x -> x == postEqId, [paramIndices.mapExpCond[i].condID for i in eachindex(paramIndices.mapExpCond)])
+    expMap = paramIndices.mapExpCond[whichExpMap]             
+    iCol = vcat(paramIndices.mapDynParEst.iDynParamInVecEst, expMap.iDynEstVec)                             
     for i in eachindex(tSaveAt)     
         u = dualToFloat.(sol[:, i])
         p = dualToFloat.(sol.prob.p)
@@ -1390,20 +1394,18 @@ function calcGradForwardSenseEqExpCond!(grad::Vector{Float64},
         calcDgDpDiscrete(dgDpOut, u, p, tSaveAt[i], i)
         iStart = (posInSolArray[i]-1)*nStates+1
         iEnd = iStart + nStates - 1
-        SMat = @view SMatBig[iStart:iEnd, :]
-        gradTot .+= SMat'*dgDuOut 
+        SMat = @view SMatBig[iStart:iEnd, iCol]
+        @views gradTot[iCol] .+= SMat'*dgDuOut 
         dgDpTot .+= dgDpOut
     end
 
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we want dY/dθ_log. We can adjust via;
     # dY/dθ_log = log(10) * θ * dY/dθ
-    grad[paramIndices.mapDynParEst.iDynParamInVecEst] .+= transformParamVecGrad(gradTot .+ dgDpTot[paramIndices.mapDynParEst.iDynParamInSys], 
+    grad[paramIndices.mapDynParEst.iDynParamInVecEst] .+= transformParamVecGrad(gradTot[paramIndices.mapDynParEst.iDynParamInVecEst] .+ dgDpTot[paramIndices.mapDynParEst.iDynParamInSys], 
                                                                                 dynParam[paramIndices.mapDynParEst.iDynParamInVecEst], 
                                                                                 paramIndices.namesDynParam[paramIndices.mapDynParEst.iDynParamInVecEst], 
                                                                                 parameterData)
     # For parameters which are specific to an experimental condition 
-    whichExpMap = findfirst(x -> x == postEqId, [paramIndices.mapExpCond[i].condID for i in eachindex(paramIndices.mapExpCond)])
-    expMap = paramIndices.mapExpCond[whichExpMap]                                          
     grad[expMap.iDynEstVec] .+= transformParamVecGrad(gradTot[expMap.iDynEstVec] .+ dgDpTot[expMap.iOdeProbDynParam], 
                                                       dynParam[expMap.iDynEstVec], 
                                                       paramIndices.namesDynParam[expMap.iDynEstVec], 

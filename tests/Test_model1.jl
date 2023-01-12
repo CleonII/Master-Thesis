@@ -189,7 +189,9 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
     peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity(), 
                                  sensealgForward = ForwardDiffSensitivity(), solverForward=Vern9(),
                                  adjSolver=solver, adjTol=tol, adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
-
+    peTabOptAlt = setUpCostGradHess(peTabModel, solver, tol, 
+                                    sensealgForward = :AutoDiffForward, solverForward=Vern9())
+                     
     Random.seed!(123)
     createCube(peTabOpt, 5)
     cube = Matrix(CSV.read(peTabOpt.pathCube, DataFrame))
@@ -247,6 +249,16 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             return false
         end
 
+        # Forward sensitivity equations using autodiff 
+        gradForwardEqAuto = zeros(nParam)
+        peTabOptAlt.evalGradFForwardEq(gradForwardEqAuto, paramVec)
+        sqDiffGradForwardEqAuto = sum((gradForwardEq - gradAnalytic).^2)
+        if sqDiffGradForwardEqAuto > 1e-5
+            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
+            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
+            return false
+        end
+        
         # Evaluate hessian 
         hessAnalytic = ForwardDiff.hessian(calcCostAnalytic, paramVec)
         hessNumeric = zeros(nParam, nParam); peTabOpt.evalHess(hessNumeric, paramVec)
@@ -275,6 +287,7 @@ function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=fa
             @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
             @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
+            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
             @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
         end
     end
