@@ -15,10 +15,10 @@ function getODEModel_model_Chen_MSB2009()
     ModelingToolkit.@variables Step5(t) StepLate(t) Step1(t) StepMini(t) Step33(t) Step10Mio(t)
 
     ### Define parameters
-    ModelingToolkit.@parameters k71 kd25 kd120 c515 k120 kd47 kd94 k73 kd36 kd123h kd119 kd49 kd4 k45 kd106b kd10 kd71 k105 kd101 kd17 k106b kd111 k2 kd109 k111 kd23 k8 kd75 kd60b kd63 kd69 k94b kd42 kd68b k114 kd40 k74 kd114 k67 k69 k44 k94 kd33 kd5 kd7 kd105 kd18 k5 k96 k76 k40 k102 kd35 k61 k117 kd56 kd104 kd115 k5b kd50 k113 k20 c1 k112 kd5b k35 k104 k75 k19 c514 kd97 k22 kd29 k65 kd2b kd37 k50 kd76 k48 k25 kd8 k29 kd32 kd110 kd52 kd22 k107 k56 k60 k33 kd15 kd67 k72 k58 kd108 k118 kd99 kd58 k101 k60b k7 k34 k18 kd24 kd34 kd112 k95 kd2 k53 kd103 kd117 k42 kd43 k70 k57 kd21 k6 kd95 kd41 kd66 kd72 kd48 Step0 k52 kd98 kd57 k49 k6b k108 k41 kd60 kd64 k47 kd6b k2b kd55 kd107 k4 cyt k115 k68 k109 kd61 k10b k36 kd70 kd44 kd45 k16 k43 k66 k28 kd116 kd74 kd28 k64 kd73 k123 kd106 kd65 k120b c285 k103 kd118 kd97c k62b kd100 k37 kd68 k110 k32 k17 k21 k4b kd102 kd113 k15 k1d k123h kd53 kd22b kd20 k23 k60c k106 kd8b kd123 kd19 k8b kd96 k55
+    ModelingToolkit.@parameters k71 kd25 kd120 c515 k120 kd47 kd94 k73 kd36 kd123h kd119 kd49 kd4 k45 kd106b kd10 kd71 k105 kd101 kd17 k106b kd111 StepMini_bool3 k2 kd109 k111 kd23 k8 Step33_bool3 kd75 Step10Mio_bool2 kd60b kd63 kd69 k94b kd42 Step33_bool1 kd68b k114 kd40 k74 kd114 k67 k69 k44 k94 kd33 kd5 Step10Mio_bool3 kd7 kd105 kd18 k5 k96 k76 k40 k102 kd35 k61 Step1_bool1 k117 kd56 Step5_bool1 kd104 kd115 k5b kd50 k113 k20 c1 k112 kd5b k35 k104 k75 k19 c514 kd97 k22 kd29 k65 kd2b kd37 Step5_bool2 k50 kd76 k48 k25 kd8 k29 kd32 kd110 kd52 kd22 k107 k56 k60 k33 kd15 StepMini_bool1 kd67 Step1_bool3 k72 k58 kd108 k118 kd99 kd58 k101 k60b k7 k34 k18 kd24 StepLate_bool1 kd34 kd112 k95 kd2 k53 kd103 kd117 k42 kd43 k70 k57 kd21 k6 Step10Mio_bool1 kd95 kd41 kd66 kd72 kd48 StepMini_bool2 Step0 k52 kd98 kd57 k49 k6b k108 k41 kd60 kd64 k47 kd6b k2b kd55 kd107 k4 cyt k115 k68 k109 kd61 k10b k36 kd70 kd44 kd45 k16 k43 k66 k28 kd116 kd74 kd28 k64 Step33_bool2 kd73 k123 kd106 kd65 StepLate_bool2 k120b c285 k103 kd118 kd97c k62b kd100 k37 kd68 StepLate_bool3 k110 k32 Step5_bool3 k17 k21 k4b kd102 kd113 Step1_bool2 k15 k1d k123h kd53 kd22b kd20 k23 k60c k106 kd8b kd123 kd19 k8b kd96 k55
 
     ### Store parameters in array for ODESystem command
-    parameterArray = [k71, kd25, kd120, c515, k120, kd47, kd94, k73, kd36, kd123h, kd119, kd49, kd4, k45, kd106b, kd10, kd71, k105, kd101, kd17, k106b, kd111, k2, kd109, k111, kd23, k8, kd75, kd60b, kd63, kd69, k94b, kd42, kd68b, k114, kd40, k74, kd114, k67, k69, k44, k94, kd33, kd5, kd7, kd105, kd18, k5, k96, k76, k40, k102, kd35, k61, k117, kd56, kd104, kd115, k5b, kd50, k113, k20, c1, k112, kd5b, k35, k104, k75, k19, c514, kd97, k22, kd29, k65, kd2b, kd37, k50, kd76, k48, k25, kd8, k29, kd32, kd110, kd52, kd22, k107, k56, k60, k33, kd15, kd67, k72, k58, kd108, k118, kd99, kd58, k101, k60b, k7, k34, k18, kd24, kd34, kd112, k95, kd2, k53, kd103, kd117, k42, kd43, k70, k57, kd21, k6, kd95, kd41, kd66, kd72, kd48, Step0, k52, kd98, kd57, k49, k6b, k108, k41, kd60, kd64, k47, kd6b, k2b, kd55, kd107, k4, cyt, k115, k68, k109, kd61, k10b, k36, kd70, kd44, kd45, k16, k43, k66, k28, kd116, kd74, kd28, k64, kd73, k123, kd106, kd65, k120b, c285, k103, kd118, kd97c, k62b, kd100, k37, kd68, k110, k32, k17, k21, k4b, kd102, kd113, k15, k1d, k123h, kd53, kd22b, kd20, k23, k60c, k106, kd8b, kd123, kd19, k8b, kd96, k55]
+    parameterArray = [k71, kd25, kd120, c515, k120, kd47, kd94, k73, kd36, kd123h, kd119, kd49, kd4, k45, kd106b, kd10, kd71, k105, kd101, kd17, k106b, kd111, StepMini_bool3, k2, kd109, k111, kd23, k8, Step33_bool3, kd75, Step10Mio_bool2, kd60b, kd63, kd69, k94b, kd42, Step33_bool1, kd68b, k114, kd40, k74, kd114, k67, k69, k44, k94, kd33, kd5, Step10Mio_bool3, kd7, kd105, kd18, k5, k96, k76, k40, k102, kd35, k61, Step1_bool1, k117, kd56, Step5_bool1, kd104, kd115, k5b, kd50, k113, k20, c1, k112, kd5b, k35, k104, k75, k19, c514, kd97, k22, kd29, k65, kd2b, kd37, Step5_bool2, k50, kd76, k48, k25, kd8, k29, kd32, kd110, kd52, kd22, k107, k56, k60, k33, kd15, StepMini_bool1, kd67, Step1_bool3, k72, k58, kd108, k118, kd99, kd58, k101, k60b, k7, k34, k18, kd24, StepLate_bool1, kd34, kd112, k95, kd2, k53, kd103, kd117, k42, kd43, k70, k57, kd21, k6, Step10Mio_bool1, kd95, kd41, kd66, kd72, kd48, StepMini_bool2, Step0, k52, kd98, kd57, k49, k6b, k108, k41, kd60, kd64, k47, kd6b, k2b, kd55, kd107, k4, cyt, k115, k68, k109, kd61, k10b, k36, kd70, kd44, kd45, k16, k43, k66, k28, kd116, kd74, kd28, k64, Step33_bool2, kd73, k123, kd106, kd65, StepLate_bool2, k120b, c285, k103, kd118, kd97c, k62b, kd100, k37, kd68, StepLate_bool3, k110, k32, Step5_bool3, k17, k21, k4b, kd102, kd113, Step1_bool2, k15, k1d, k123h, kd53, kd22b, kd20, k23, k60c, k106, kd8b, kd123, kd19, k8b, kd96, k55]
 
     ### Define an operator for the differentiation w.r.t. time
     D = Differential(t)
@@ -529,12 +529,12 @@ function getODEModel_model_Chen_MSB2009()
     D(c29) ~ -1.0 * ( 1 /cyt ) * (cyt * (c12 * c29 * k4 - c90 * kd4))-1.0 * ( 1 /cyt ) * (cyt * (c29 * k6 - Step5 * c21))+1.0 * ( 1 /cyt ) * (cyt * (c25 * c43 * k20 - c29 * kd20))+1.0 * ( 1 /cyt ) * (cyt * (c25 * c26 * k21 - c29 * kd21)),
     D(c110) ~ +1.0 * ( 1 /cyt ) * (cyt * (c108 * c109 * k70 - c110 * kd70))+1.0 * ( 1 /cyt ) * (cyt * (c111 * c112 * k71 - c110 * kd71)),
     D(c433) ~ +1.0 * ( 1 /cyt ) * (cyt * (c59 * c445 * k110 - c433 * kd110))+1.0 * ( 1 /cyt ) * (cyt * (c59 * c430 * k111 - c433 * kd111)),
-    Step5 ~ 5e-5 * ifelse(t - 1800 < 0, 0, 1) + sin(50 * pi * (t - 1799.99)) * (5e-5 * ifelse(t - 1799.99 < 0, 0, 1) - 5e-5 * ifelse(t - 1800 < 0, 0, 1)),
-    StepLate ~ 0.0150356 * ifelse(t - 2660 < 0, 0, 1) + sin(50 * pi * (t - 2659.99)) * (0.0150356 * ifelse(t - 2659.99 < 0, 0, 1) - 0.0150356 * ifelse(t - 2660 < 0, 0, 1)),
-    Step1 ~ ifelse(t - 1800 < 0, 0, 1) + sin(50 * pi * (t - 1799.99)) * (ifelse(t - 1799.99 < 0, 0, 1) - ifelse(t - 1800 < 0, 0, 1)),
-    StepMini ~ 1.8704e-8 * ifelse(t - 1800 < 0, 0, 1) + sin(50 * pi * (t - 1799.99)) * (1.8704e-8 * ifelse(t - 1799.99 < 0, 0, 1) - 1.8704e-8 * ifelse(t - 1800 < 0, 0, 1)),
-    Step33 ~ 0.0033 * ifelse(t - 1800 < 0, 0, 1) + sin(50 * pi * (t - 1799.99)) * (0.0033 * ifelse(t - 1799.99 < 0, 0, 1) - 0.0033 * ifelse(t - 1800 < 0, 0, 1)),
-    Step10Mio ~ 10000000 * ifelse(t - 1800 < 0, 0, 1) + sin(50 * pi * (t - 1799.99)) * (10000000 * ifelse(t - 1799.99 < 0, 0, 1) - 10000000 * ifelse(t - 1800 < 0, 0, 1))
+    Step5 ~ 5e-5 * ((1 - Step5_bool1)*( 0) + Step5_bool1*( 1)) + sin(50 * pi * (t - 1799.99)) * (5e-5 * ((1 - Step5_bool2)*( 0) + Step5_bool2*( 1)) - 5e-5 * ((1 - Step5_bool1)*( 0) + Step5_bool1*( 1))),
+    StepLate ~ 0.0150356 * ((1 - StepLate_bool1)*( 0) + StepLate_bool1*( 1)) + sin(50 * pi * (t - 2659.99)) * (0.0150356 * ((1 - StepLate_bool2)*( 0) + StepLate_bool2*( 1)) - 0.0150356 * ((1 - StepLate_bool1)*( 0) + StepLate_bool1*( 1))),
+    Step1 ~ ((1 - Step1_bool1)*( 0) + Step1_bool1*( 1)) + sin(50 * pi * (t - 1799.99)) * (((1 - Step1_bool2)*( 0) + Step1_bool2*( 1)) - ((1 - Step1_bool1)*( 0) + Step1_bool1*( 1))),
+    StepMini ~ 1.8704e-8 * ((1 - StepMini_bool1)*( 0) + StepMini_bool1*( 1)) + sin(50 * pi * (t - 1799.99)) * (1.8704e-8 * ((1 - StepMini_bool2)*( 0) + StepMini_bool2*( 1)) - 1.8704e-8 * ((1 - StepMini_bool1)*( 0) + StepMini_bool1*( 1))),
+    Step33 ~ 0.0033 * ((1 - Step33_bool1)*( 0) + Step33_bool1*( 1)) + sin(50 * pi * (t - 1799.99)) * (0.0033 * ((1 - Step33_bool2)*( 0) + Step33_bool2*( 1)) - 0.0033 * ((1 - Step33_bool1)*( 0) + Step33_bool1*( 1))),
+    Step10Mio ~ 10000000 * ((1 - Step10Mio_bool1)*( 0) + Step10Mio_bool1*( 1)) + sin(50 * pi * (t - 1799.99)) * (10000000 * ((1 - Step10Mio_bool2)*( 0) + Step10Mio_bool2*( 1)) - 10000000 * ((1 - Step10Mio_bool1)*( 0) + Step10Mio_bool1*( 1)))
     ]
 
     @named sys = ODESystem(eqs, t, stateArray, parameterArray)
@@ -1067,17 +1067,21 @@ function getODEModel_model_Chen_MSB2009()
     kd17 => 0.06,
     k106b => 2.63418e-8,
     kd111 => 6.57,
+    StepMini_bool3 => 0.0,
     k2 => 7.44622e-6,
     kd109 => 0.1,
     k111 => 0.0,
     kd23 => 0.06,
     k8 => 5.91474e-7,
+    Step33_bool3 => 0.0,
     kd75 => 0.00633957,
+    Step10Mio_bool2 => 0.0,
     kd60b => 0.0,
     kd63 => 0.275,
     kd69 => 0.1,
     k94b => 5.0e-5,
     kd42 => 0.0141589,
+    Step33_bool1 => 0.0,
     kd68b => 20.5,
     k114 => 4.98816e-6,
     kd40 => 0.064,
@@ -1089,6 +1093,7 @@ function getODEModel_model_Chen_MSB2009()
     k94 => 5.0e-5,
     kd33 => 0.2,
     kd5 => 0.80833,
+    Step10Mio_bool3 => 0.0,
     kd7 => 0.000138,
     kd105 => 0.1,
     kd18 => 1.3,
@@ -1099,8 +1104,10 @@ function getODEModel_model_Chen_MSB2009()
     k102 => 5.0e-7,
     kd35 => 0.0015,
     k61 => 0.00057,
+    Step1_bool1 => 0.0,
     k117 => 8.33000000000001e-8,
     kd56 => 5.0,
+    Step5_bool1 => 0.0,
     kd104 => 0.2,
     kd115 => 1.0,
     k5b => 0.0,
@@ -1121,6 +1128,7 @@ function getODEModel_model_Chen_MSB2009()
     k65 => 0.0,
     kd2b => 0.016,
     kd37 => 0.3,
+    Step5_bool2 => 0.0,
     k50 => 4.74801e-8,
     kd76 => 142.262,
     k48 => 2.37e-5,
@@ -1136,7 +1144,9 @@ function getODEModel_model_Chen_MSB2009()
     k60 => 0.00266742,
     k33 => 3.5e-5,
     kd15 => 0.0,
+    StepMini_bool1 => 0.0,
     kd67 => 0.02,
+    Step1_bool3 => 0.0,
     k72 => 0.0,
     k58 => 8.33000000000001e-7,
     kd108 => 5.0,
@@ -1149,6 +1159,7 @@ function getODEModel_model_Chen_MSB2009()
     k34 => 7.5e-6,
     k18 => 2.5e-5,
     kd24 => 0.55,
+    StepLate_bool1 => 0.0,
     kd34 => 0.03,
     kd112 => 0.1,
     k95 => 0.0,
@@ -1162,11 +1173,13 @@ function getODEModel_model_Chen_MSB2009()
     k57 => 0.0,
     kd21 => 0.23,
     k6 => 0.013,
+    Step10Mio_bool1 => 0.0,
     kd95 => 33.0,
     kd41 => 0.0429,
     kd66 => 0.2,
     kd72 => 5.01187,
     kd48 => 0.79,
+    StepMini_bool2 => 0.0,
     Step0 => 0.0,
     k52 => 8.85125e-6,
     kd98 => 0.001,
@@ -1201,10 +1214,12 @@ function getODEModel_model_Chen_MSB2009()
     kd74 => 0.355656,
     kd28 => 0.0053,
     k64 => 1.67e-5,
+    Step33_bool2 => 0.0,
     kd73 => 0.5,
     k123 => 0.0,
     kd106 => 0.1,
     kd65 => 0.2,
+    StepLate_bool2 => 0.0,
     k120b => 5.92538000000001e-11,
     c285 => 0.0,
     k103 => 8.36983000000001e-9,
@@ -1214,13 +1229,16 @@ function getODEModel_model_Chen_MSB2009()
     kd100 => 0.001,
     k37 => 1.5e-6,
     kd68 => 0.2,
+    StepLate_bool3 => 0.0,
     k110 => 0.000333,
     k32 => 4.0e-7,
+    Step5_bool3 => 0.0,
     k17 => 1.67e-5,
     k21 => 3.67e-7,
     k4b => 0.0,
     kd102 => 5.61009,
     kd113 => 177.828,
+    Step1_bool2 => 0.0,
     k15 => 1.667e-8,
     k1d => 518.0,
     k123h => 0.0,
