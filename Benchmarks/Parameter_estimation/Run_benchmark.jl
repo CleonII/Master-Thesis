@@ -243,10 +243,10 @@ end
 
 if ARGS[1] == "Weber"
     loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
-    algsTest = [:IpoptAutoHess, :IpoptLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
+    algsTest = [:IpoptLBFGS, :OptimLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Weber_BMC2015/"
     peTabModel = setUpPeTabModel("model_Weber_BMC2015", dirModel)
-    benchmarkParameterEstimation(peTabModel, QNDF(), "QNDF", 1e-6, 1000, algList=algsTest) 
+    benchmarkParameterEstimation(peTabModel, Rodas5(), "Rodas5", 1e-6, 1000, algList=algsTest) 
 end
 
 
