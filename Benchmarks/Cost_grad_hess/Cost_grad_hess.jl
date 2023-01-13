@@ -211,18 +211,16 @@ if ARGS[1] == "Chen_model"
                          [CVODE_BDF(linear_solver=:KLU), "CVODE_BDF_KLU"]]                        
 
     solversCheckGrad = [[QNDF(), "QNDF"], 
-                        [Rodas5(), "Rodas5"], 
                         [KenCarp4(), "KenCarp4"]]
     solversCheckGradS = [[QNDF(), "QNDFS"], 
-                         [Rodas5(), "Rodas5S"], 
                          [KenCarp4(), "KenCarp4S"]]                                                 
 
-    senseAlgInfo = [[:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
-                    [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"],
-                    [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP(true)), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true))"],
-                    [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP(true))"]]                          
+    senseAlgInfoGrad = [[:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
+                        [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"],
+                        [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP(true)), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true))"],
+                        [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP(true))"]]                          
 
-    for i in eachindex(modelListTry)
+    #for i in eachindex(modelListTry)
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
@@ -233,9 +231,11 @@ if ARGS[1] == "Chen_model"
         benchmarkCostGrad(peTabModel, modelName, nothing,
                           solversCheckCostS, pathSave, tol, checkCost=true, nIter=5, sparseJac=true)                          
 
-        benchmarkCostGrad(peTabModel, modelName, senseAlgInfo,
-                          solversCheckGrad, pathSave, tol, checkGrad=true, nIter=2)
-        benchmarkCostGrad(peTabModel, modelName, senseAlgInfo,
-                          solversCheckGradS, pathSave, tol, checkGrad=true, nIter=2, sparseJac=true)                          
+        for sensealgInfo in senseAlgInfoGrad                          
+            benchmarkCostGrad(peTabModel, modelName, senseAlgInfo,
+                            solversCheckGrad, pathSave, tol, checkGrad=true, nIter=2)
+            benchmarkCostGrad(peTabModel, modelName, senseAlgInfo,
+                            solversCheckGradS, pathSave, tol, checkGrad=true, nIter=2, sparseJac=true)                          
+        end
     end
 end
