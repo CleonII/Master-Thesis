@@ -88,6 +88,8 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     elseif nProcs == 1
         evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
         evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)    
+        evalGradFAdjoint = (grad, paramVecEst) -> calcGradCostAdj!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo) 
+        evalGradFForwardEq = (grad, paramVecEst) -> calcGradForwardEq!(grad, paramVecEst, peTabModel, odeProbSenseEq, sensealgForward, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondForwardEq!, priorInfo) 
         evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
         # Sometimes even though the cost can be computed the ODE solver with Dual number can fail (as the error is 
         # monitored slightly differently). When this happens we error out and the code crash, hence the need of a catch statement 
@@ -104,18 +106,18 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                                                 end
                                             end
     elseif nProcs > 1 && nprocs() == nProcs
-        evalF, evalGradF, evalHess, evalHessApprox = setUpPEtabOptDistributed(peTabModel, solver, tol, parameterData, measurementData, 
-                                                                              simulationInfo, paramEstIndices, priorInfo, odeProb)
+        evalF, evalGradF, evalGradFForwardEq, evalGradFAdjoint, evalHess, evalHessApprox = setUpPEtabOptDistributed(peTabModel, solver, tol, 
+                                                                                                                    adjSolver, adjSensealg, adjSensealgSS, adjTol,
+                                                                                                                    solverForward, sensealgForward, 
+                                                                                                                    parameterData, measurementData, 
+                                                                                                                    simulationInfo, paramEstIndices, priorInfo, odeProb)
     end
 
     evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
     evalGradFZygote = (grad, paramVecEst) -> calcGradZygote!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
-    
-    # Gradient computed via adjoint sensitivity analysis (not Zygote interface)
-    evalGradFAdjoint = (grad, paramVecEst) -> calcGradCostAdj!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo) 
-    
+        
     # Gradient computed via direct interface to forward sensitivity equations 
-    evalGradFForwardEq = (grad, paramVecEst) -> calcGradForwardEq!(grad, paramVecEst, peTabModel, odeProbSenseEq, sensealgForward, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondForwardEq!, priorInfo) 
+    
 
     # Lower and upper bounds for parameters to estimate 
     namesParamEst = paramEstIndices.namesParamEst
@@ -818,7 +820,7 @@ function calcGradForwardEq!(grad::Vector{Float64},
     gradDynParam::Vector{Float64} = zeros(Float64, length(dynamicParamEst))
     calcGradForwardEqDynParam!(gradDynParam, dynamicParamEst, sdParamEst, obsParEst, noneDynParamEst, SMat,
                                peTabModel, sensealg, senseEqOdeProb, simulationInfo, paramIndices, measurementData, 
-                               parameterData, changeModelParamUse!, solveOdeModelAllCondUse!)                            
+                               parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, expIDSolve=expIDSolve)                            
     grad[paramIndices.iDynParam] .= gradDynParam
 
     # Happens when at least one forward pass fails and I set the gradient to 1e8 
@@ -1006,13 +1008,8 @@ function calcGradAdjExpCond!(grad::Vector{Float64},
                              parameterData::ParamData, 
                              simulateSS::Bool,
                              yBarSS::Function, 
-                             callbackRev::SciMLBase.DECallback;
-                             expIDSolve::Array{String, 1} = ["all"])::Bool
+                             callbackRev::SciMLBase.DECallback)::Bool
                             
-    if expIDSolve[1] != "all" && conditionID ∉ expIDSolve
-        return
-    end
-
     iGroupedTObs = measurementData.iGroupedTObs[conditionID]
     # Pre allcoate vectors needed for computations 
     dYmodDu = zeros(Float64, length(sol.prob.u0))
@@ -1276,12 +1273,7 @@ function calcGradForwardSenseEqExpCond!(grad::Vector{Float64},
                                         peTabModel::PeTabModel,
                                         paramIndices::ParameterIndices,
                                         measurementData::MeasurementData, 
-                                        parameterData::ParamData;
-                                        expIDSolve::Array{String, 1} = ["all"])
-
-    if expIDSolve[1] != "all" && conditionID ∉ expIDSolve
-        return
-    end
+                                        parameterData::ParamData)
 
     iGroupedTObs = measurementData.iGroupedTObs[conditionID]
     # Pre allcoate vectors needed for computations 
@@ -1348,12 +1340,7 @@ function calcGradForwardSenseEqExpCond!(grad::Vector{Float64},
                                         peTabModel::PeTabModel,
                                         paramIndices::ParameterIndices,
                                         measurementData::MeasurementData, 
-                                        parameterData::ParamData;
-                                        expIDSolve::Array{String, 1} = ["all"])
-
-    if expIDSolve[1] != "all" && conditionID ∉ expIDSolve
-        return
-    end
+                                        parameterData::ParamData)
 
     iGroupedTObs = measurementData.iGroupedTObs[conditionID]
     # Pre allcoate vectors needed for computations 

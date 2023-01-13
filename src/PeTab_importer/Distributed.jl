@@ -2,8 +2,14 @@ using Distributed
 
 
 function setUpPEtabOptDistributed(peTabModel::PeTabModel,
-                                  solver, 
+                                  solver::SciMLAlgorithm, 
                                   tol::Float64,
+                                  adjSolver::SciMLAlgorithm,
+                                  adjSensealg::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
+                                  adjSensealgSS::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
+                                  adjTol::Float64,
+                                  forwardSolver::SciMLAlgorithm, 
+                                  sensealgForward::Union{Symbol, SciMLSensitivity.AbstractForwardSensitivityAlgorithm},
                                   parameterData::ParamData,
                                   measurementData::MeasurementData, 
                                   simulationInfo::SimulationInfo, 
@@ -55,7 +61,25 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
         @async put!(jobs[i], tuple(solver, tol)) 
         status = take!(results[i])[1]
         if status != :Done
-            println("Error : Could not send ExpIds problem to proces ", procs()[i])
+            println("Error : Could not send solver and tolerance problem to proces ", procs()[i])
+        end
+    end
+
+    # Send adjoint solver, adjont tolerance and adjoint solver tolerance
+    for i in 1:nProcs
+        @async put!(jobs[i], tuple(adjSolver, adjTol, adjSensealg, adjSensealgSS)) 
+        status = take!(results[i])[1]
+        if status != :Done
+            println("Error : Could not send adjSolver, adjTolerance and adjSensealg to proces ", procs()[i])
+        end
+    end
+
+    # Send forward sensitivity equations solver and associated 
+    for i in 1:nProcs
+        @async put!(jobs[i], tuple(forwardSolver, sensealgForward)) 
+        status = take!(results[i])[1]
+        if status != :Done
+            println("Error : Could not send adjSolver, adjTolerance and adjSensealg to proces ", procs()[i])
         end
     end
 
@@ -97,6 +121,34 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
                                     end
                                 end
 
+    evalGradFAdjoint = (grad, pVec) -> begin
+                                    grad .= 0.0
+                                    @inbounds for i in nProcs:-1:1
+                                        @async put!(jobs[i], tuple(pVec, :AdjGradient)) 
+                                    end
+                                    @inbounds for i in nProcs:-1:1
+                                        status::Symbol, gradPart::Vector{Float64} = take!(results[i])
+                                        if status != :Done
+                                            println("Error : Could not send ODE problem to proces ", procs()[i])
+                                        end
+                                        grad .+= gradPart
+                                    end
+                                end       
+                                
+    evalGradFForwardEq = (grad, pVec) -> begin
+                                    grad .= 0.0
+                                    @inbounds for i in nProcs:-1:1
+                                        @async put!(jobs[i], tuple(pVec, :ForwardSenseEqGradient)) 
+                                    end
+                                    @inbounds for i in nProcs:-1:1
+                                        status::Symbol, gradPart::Vector{Float64} = take!(results[i])
+                                        if status != :Done
+                                            println("Error : Could not send ODE problem to proces ", procs()[i])
+                                        end
+                                        grad .+= gradPart
+                                    end
+                                end                                           
+
     evalHessA = (hess, pVec) -> begin
                                     hess .= 0.0
                                     @inbounds for i in nProcs:-1:1
@@ -125,7 +177,7 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
                                     end
                                 end
 
-    return tuple(evalF, evalGradF, evalHess, evalHessA)
+    return tuple(evalF, evalGradF, evalGradFForwardEq, evalGradFAdjoint, evalHess, evalHessA)
 end
 
 
@@ -166,6 +218,7 @@ function loadPackages()
                                 using ReverseDiff
                                 using Zygote
                                 using Printf
+                                using SciMLSensitivity
                             end
                         end
                     end
@@ -198,7 +251,11 @@ end
 function loadYmodSdU0(peTabModel::PeTabModel)
     println("Loading yMod, SD and u0 functions")
     pathObsSdU0 = peTabModel.dirModel * peTabModel.modelName * "ObsSdU0.jl"
+    pathDObsSdU0 = peTabModel.dirModel * peTabModel.modelName * "DObsSdU0.jl"
+    pathCallbacks = peTabModel.dirModel * peTabModel.modelName * "Callbacks_time_piecewise.jl"
     @eval @everywhere include($pathObsSdU0)
+    @eval @everywhere include($pathDObsSdU0)
+    @eval @everywhere include($pathCallbacks)
     println("Done")
 end
 

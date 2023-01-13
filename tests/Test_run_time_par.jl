@@ -45,18 +45,18 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
 function testRunBenchmark(peTabModel::PeTabModel, solver, tol::Float64, nProcs::Integer; verbose=true, computeH::Bool=false)::Bool
 
-    peTabOptSeq = setUpCostGradHess(peTabModel, solver, tol)
-    peTabOptPar = setUpCostGradHess(peTabModel, solver, tol, nProcs=nProcs)
+    peTabOptSeq = setUpCostGradHess(peTabModel, solver, tol, 
+                                    adjSolver=solver, adjSensealg=QuadratureAdjoint(autojacvec=false, autodiff=false), adjTol=tol,
+                                    solverForward=solver, sensealgForward=:AutoDiffForward)
+    peTabOptPar = setUpCostGradHess(peTabModel, solver, tol, nProcs=nProcs, 
+                                    adjSolver=solver, adjSensealg=QuadratureAdjoint(autojacvec=false, autodiff=false), adjTol=tol,
+                                    solverForward=solver, sensealgForward=:AutoDiffForward)
 
     passTest = true
 
     # Compute everything first for the sake of pre-compilation to get fair benchmark
-    grad1, grad2 = zeros(length(peTabOptSeq.paramVecTransformed)), zeros(length(peTabOptSeq.paramVecTransformed))
     costSeq = peTabOptSeq.evalF(peTabOptSeq.paramVecTransformed)
     costPar = peTabOptPar.evalF(peTabOptSeq.paramVecTransformed)
-    peTabOptSeq.evalGradF(grad1, peTabOptSeq.paramVecTransformed)
-    peTabOptPar.evalGradF(grad2, peTabOptSeq.paramVecTransformed)
-
     # Check accuracy of parallell computation before moving on
     if abs(costSeq - costPar) > 1e-5
         println("Does not pass test on accurately computing cost.")
@@ -66,13 +66,38 @@ function testRunBenchmark(peTabModel::PeTabModel, solver, tol::Float64, nProcs::
     elseif verbose
         @printf("abs-diff cost = %.e3\n",  abs(costSeq - costPar))
     end
+
+    grad1, grad2, = zeros(length(peTabOptSeq.paramVecTransformed)), zeros(length(peTabOptSeq.paramVecTransformed))
+    peTabOptSeq.evalGradF(grad1, peTabOptSeq.paramVecTransformed)
+    peTabOptPar.evalGradF(grad2, peTabOptSeq.paramVecTransformed)
     if sum((grad1 - grad2).^2) > 1e-5
-        println("Does not pass test on accurately computing gradient")
+        println("Does not pass test on accurately computing gradient using forward mode AD")
         @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
         return false
     elseif verbose
         @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
     end
+
+    peTabOptSeq.evalGradFAdjoint(grad1, peTabOptSeq.paramVecTransformed)
+    peTabOptPar.evalGradFAdjoint(grad2, peTabOptSeq.paramVecTransformed)
+    if sum((grad1 - grad2).^2) > 1e-5
+        println("Does not pass test on accurately computing gradient using adjoint")
+        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
+        return false
+    elseif verbose
+        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
+    end
+
+    peTabOptSeq.evalGradFForwardEq(grad1, peTabOptSeq.paramVecTransformed)
+    peTabOptPar.evalGradFForwardEq(grad2, peTabOptSeq.paramVecTransformed)
+    if sum((grad1 - grad2).^2) > 1e-5
+        println("Does not pass test on accurately computing gradient using forward sensitivity equations")
+        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
+        return false
+    elseif verbose
+        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
+    end
+
     if computeH == true
         dimP = length(peTabOptSeq.paramVecTransformed)
         hess1, hess2 = zeros(dimP, dimP), zeros(dimP, dimP)
@@ -100,7 +125,7 @@ function testRunBenchmark(peTabModel::PeTabModel, solver, tol::Float64, nProcs::
     end
 
     b1, b2 = 0.0, 0.0
-    for i in 1:10
+    for i in 1:5
         b1Tmp = @elapsed peTabOptSeq.evalF(peTabOptSeq.paramVecTransformed)
         sleep(0.1)
         b2Tmp = @elapsed peTabOptPar.evalF(peTabOptSeq.paramVecTransformed)
@@ -111,18 +136,18 @@ function testRunBenchmark(peTabModel::PeTabModel, solver, tol::Float64, nProcs::
     if b1 < b2
         println("Does not pass test. On cost for model ", peTabModel.modelName, " the run time 
                  using $nProcs processes is slower than using a single process")
-        @printf("Run time single proces = %.2e s", b1 / 10)
-        @printf("Run time %d processes = %.2e s", nProcs, b2 / 10)
+        @printf("Run time single proces = %.2e s", b1 / 5)
+        @printf("Run time %d processes = %.2e s", nProcs, b2 / 5)
         return false
     elseif verbose
         @printf("For cost\n")
-        @printf("Run time single proces = %.2e s\n", b1 / 10)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 10)
+        @printf("Run time single proces = %.2e s\n", b1 / 5)
+        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
         @printf("Ratio = %.2f\n\n", b2 / b1)
     end
     
     b1, b2 = 0.0, 0.0
-    for i in 1:10
+    for i in 1:5
         b1Tmp = @elapsed peTabOptSeq.evalGradF(grad1, peTabOptSeq.paramVecTransformed)
         sleep(0.1)
         b2Tmp = @elapsed peTabOptPar.evalGradF(grad2, peTabOptSeq.paramVecTransformed)
@@ -131,15 +156,59 @@ function testRunBenchmark(peTabModel::PeTabModel, solver, tol::Float64, nProcs::
         sleep(0.1)
     end
     if b1 < b2
-        println("Does not pass test. On gradient for model ", peTabModel.modelName, " the run time 
+        println("Does not pass test. On gradient for model forward autodiff ", peTabModel.modelName, " the run time 
                  using $nProcs processes is slower than using a single process")
-        @printf("Run time single proces = %.2e s\n", b1 / 10)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 10)
+        @printf("Run time single proces = %.2e s\n", b1 / 5)
+        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
         return false
     elseif verbose
-        @printf("For gradient\n")
-        @printf("Run time single proces = %.2e s\n", b1 / 10)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 10)
+        @printf("For gradient forward autodiff\n")
+        @printf("Run time single proces = %.2e s\n", b1 / 5)
+        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
+        @printf("Ratio = %.2f\n\n", b2 / b1)
+    end
+
+    b1, b2 = 0.0, 0.0
+    for i in 1:5
+        b1Tmp = @elapsed peTabOptSeq.evalGradFAdjoint(grad1, peTabOptSeq.paramVecTransformed)
+        sleep(0.1)
+        b2Tmp = @elapsed peTabOptPar.evalGradFAdjoint(grad2, peTabOptSeq.paramVecTransformed)
+        b1 += b1Tmp
+        b2 += b2Tmp
+        sleep(0.1)
+    end
+    if b1 < b2
+        println("Does not pass test. On gradient for model adjoint gradient ", peTabModel.modelName, " the run time 
+                 using $nProcs processes is slower than using a single process")
+        @printf("Run time single proces = %.2e s\n", b1 / 5)
+        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
+        return false
+    elseif verbose
+        @printf("For gradient adjoint\n")
+        @printf("Run time single proces = %.2e s\n", b1 / 5)
+        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
+        @printf("Ratio = %.2f\n\n", b2 / b1)
+    end
+
+    b1, b2 = 0.0, 0.0
+    for i in 1:5
+        b1Tmp = @elapsed peTabOptSeq.evalGradFForwardEq(grad1, peTabOptSeq.paramVecTransformed)
+        sleep(0.1)
+        b2Tmp = @elapsed peTabOptPar.evalGradFForwardEq(grad2, peTabOptSeq.paramVecTransformed)
+        b1 += b1Tmp
+        b2 += b2Tmp
+        sleep(0.1)
+    end
+    if b1 < b2
+        println("Does not pass test. On gradient for model forward sense-eq gradient ", peTabModel.modelName, " the run time 
+                 using $nProcs processes is slower than using a single process")
+        @printf("Run time single proces = %.2e s\n", b1 / 5)
+        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
+        return false
+    elseif verbose
+        @printf("For gradient forward sense-eq\n")
+        @printf("Run time single proces = %.2e s\n", b1 / 5)
+        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
         @printf("Ratio = %.2f\n\n", b2 / b1)
     end
     
@@ -156,13 +225,13 @@ function testRunBenchmark(peTabModel::PeTabModel, solver, tol::Float64, nProcs::
         if b1 < b2
             println("Does not pass test. On hessian for model ", peTabModel.modelName, " the run time 
                     using $nProcs processes is slower than using a single process")
-            @printf("Run time single proces = %.2e s\n", b1 / 10)
-            @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 10)
+            @printf("Run time single proces = %.2e s\n", b1 / 5)
+            @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
             return false
         elseif verbose
             @printf("For hessian block approximation\n")
-            @printf("Run time single proces = %.2e s\n", b1 / 10)
-            @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 10)
+            @printf("Run time single proces = %.2e s\n", b1 / 5)
+            @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
             @printf("Ratio = %.2f\n\n", b2 / b1)
         end
     end
