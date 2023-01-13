@@ -80,7 +80,6 @@ function setUpCostGradHess(peTabModel::PeTabModel,
         solveOdeModelAllCondForwardEq! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondSenseEqUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
     end
 
-
     if nProcs > 1 && nprocs() != nProcs
         println("Error : PEtab importer was set to build the cost, grad and hessian with $nProcs processes, 
                  however, Julia is currently running with ", nprocs(), " processes which does not match input 
@@ -116,9 +115,6 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
     evalGradFZygote = (grad, paramVecEst) -> calcGradZygote!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
         
-    # Gradient computed via direct interface to forward sensitivity equations 
-    
-
     # Lower and upper bounds for parameters to estimate 
     namesParamEst = paramEstIndices.namesParamEst
     lowerBounds = [parameterData.lowerBounds[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)] 
