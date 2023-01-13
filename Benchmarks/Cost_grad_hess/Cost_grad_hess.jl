@@ -210,6 +210,13 @@ if ARGS[1] == "Chen_model"
                          [KenCarp4(), "KenCarp4S"], 
                          [CVODE_BDF(linear_solver=:KLU), "CVODE_BDF_KLU"]]                        
 
+    solversCheckGrad = [[QNDF(), "QNDF"], 
+                        [Rodas5(), "Rodas5"], 
+                        [KenCarp4(), "KenCarp4"]]
+    solversCheckGradS = [[QNDF(), "QNDFS"], 
+                         [Rodas5(), "Rodas5S"], 
+                         [KenCarp4(), "KenCarp4S"]]                                                 
+
     senseAlgInfo = [[:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
                     [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"],
                     [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP(true)), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true))"],
@@ -227,9 +234,8 @@ if ARGS[1] == "Chen_model"
                           solversCheckCostS, pathSave, tol, checkCost=true, nIter=5, sparseJac=true)                          
 
         benchmarkCostGrad(peTabModel, modelName, senseAlgInfo,
-                          solversCheckCost, pathSave, tol, checkGrad=true, nIter=2)
+                          solversCheckGrad, pathSave, tol, checkGrad=true, nIter=2)
         benchmarkCostGrad(peTabModel, modelName, senseAlgInfo,
-                          solversCheckCostS, pathSave, tol, checkGrad=true, nIter=2, sparseJac=true)                          
-
+                          solversCheckGradS, pathSave, tol, checkGrad=true, nIter=2, sparseJac=true)                          
     end
 end
