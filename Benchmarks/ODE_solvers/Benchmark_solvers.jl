@@ -39,7 +39,7 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 function getRandomODEParameters(peTabModel::PeTabModel, 
                                 solver::SciMLAlgorithm, 
                                 iCube;
-                                nParamCube=10,
+                                nParamCube=20,
                                 tol::Float64=1e-8)
   
     # Generate Cube if lacking and choose one parameter vector 
@@ -56,13 +56,22 @@ function getRandomODEParameters(peTabModel::PeTabModel,
     paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     transformParamVec!(paramEst, paramEstIndices.namesParamEst, parameterData)
 
-    odeProb = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=false)
-    odeProb = remake(odeProb, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
+    return paramEst[paramEstIndices.iDynParam]
+end
 
-    pVec, u0Vec = zeros(length(odeProb.p)), zeros(length(odeProb.u0))
-    changeModelParam!(pVec, u0Vec, paramEst, paramEstIndices, peTabModel)
 
-    return u0Vec, pVec
+function getFileODEvalues(peTabModel::PeTabModel)
+  
+    # Change model parameters 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
+    parameterData = processParameterData(parameterDataFile)
+    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
+    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
+
+    namesParamEst = paramEstIndices.namesParamEst
+    paramVecNominal = [parameterData.paramVal[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)]
+
+    return paramVecNominal[paramEstIndices.iDynParam]
 end
 
 
@@ -197,8 +206,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
                                 solversCheck="all",
                                 nTimesRepat::UInt=UInt(3), 
                                 tolsCheck=[(1e-6, 1e-6), (1e-9, 1e-9), (1e-12, 1e-12)], 
-                                u0Vec=nothing,
-                                pVec=nothing,
+                                paramVec=nothing,
                                 checkAccuracy::Bool=true)
   
     println("Working with model ", peTabModel.modelName)
@@ -208,6 +216,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
     parameterData = processParameterData(parameterDataFile)
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
     simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
+    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
      
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
@@ -216,18 +225,22 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
     odeProb = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=sparseLinSolvers)
     odeProb = remake(odeProb, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
     # In case we have provided a random start-guess
-    if !isnothing(u0Vec) && !isnothing(pVec)
-        odeProb.p .= pVec
-        odeProb.u0 .= u0Vec
+    if isnothing(paramVec)
+        pDynParam = getFileODEvalues(peTabModel)
+    else
+        pDynParam = paramVec
     end
+    # Change to parameters specified by paramVec
+    changeModelParam!(odeProb.p, odeProb.u0, pDynParam, paramEstIndices, peTabModel)
+    println("odeProb.p = ", odeProb.p)
 
     # High accuracy ODE problem for check solver quality
     odeProbHighAcc = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=false)
     odeProbHighAcc = remake(odeProbHighAcc, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
 
     # Functions to map experimental conditions and parameters correctly to the ODE model 
-    changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, parameterData, experimentalConditionsFile, peTabModel)
-
+    changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCondEst!(pVec, u0Vec, expID, pDynParam, peTabModel, paramEstIndices)
+    
     # High accruacy ODE solution. The Isensee model crashes any BigFloat solution, henc KenCarp58 is used with very low 
     # tolerance.
     if checkAccuracy == true
@@ -347,8 +360,8 @@ end
 if ARGS[1] == "Test_all"
 
     dirSave = pwd() * "/Intermediate/Benchmarks/ODE_solvers/"
-    pathFileSaveNotSparse = dirSave * "Sparse_not_linsolvers_new.csv"
-    pathFileSaveSparse = dirSave * "Sparse_linsolvers_new.csv"
+    pathFileSaveNotSparse = dirSave * "Sparse_not_linsolvers_test.csv"
+    pathFileSaveSparse = dirSave * "Sparse_linsolvers_test.csv"
     if !isdir(dirSave)
         mkpath(dirSave)
     end
@@ -362,12 +375,10 @@ if ARGS[1] == "Test_all"
                     "model_SalazarCavazos_MBoC2020", "model_Sneyd_PNAS2002", "model_Zhao_QuantBiol2020", "model_Zheng_PNAS2012"]
 
     tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
-
     for i in eachindex(modelListTry)
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
-        solversCheck = ["Rodas4P", "CVODE_BDF_default", "Rodas5"]
         runBenchmarkOdeSolvers(peTabModel, pathFileSaveNotSparse, false, nTimesRepat=UInt(3), tolsCheck=tolsTry)
         GC.gc(); GC.gc();GC.gc()
         runBenchmarkOdeSolvers(peTabModel, pathFileSaveSparse, true, nTimesRepat=UInt(3))
@@ -450,18 +461,17 @@ if ARGS[1] == "Test_random_parameter"
     modelListTry = ["model_Weber_BMC2015", "model_Schwen_PONE2014", "model_Sneyd_PNAS2002", "model_Zhao_QuantBiol2020", "model_Zheng_PNAS2012"]
     solversCheck = ["Rodas5", "QNDF", "Rodas4P", "CVODE_BDF_default", "Vern7", "Tsit5", "Vern6", "Vern7Rodas4P"]
     tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
-    tolsTry = [(1e-8, 1e-8)]            
     for i in eachindex(modelListTry)
         modelName = modelListTry[i]
         dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
         peTabModel = setUpPeTabModel(modelName, dirModel)
         
         # 10 random vector 
-        for j in 1:10
-            u0Vec, pVec = getRandomODEParameters(peTabModel, Rodas4P(), j)
-            runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(3), 
+        for j in 1:20
+            paramVec = getRandomODEParameters(peTabModel, Rodas4P(), j)
+            runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(1), 
                                    solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false, 
-                                   u0Vec=u0Vec, pVec=pVec)    
+                                   paramVec=paramVec)    
         end
     end
 end
