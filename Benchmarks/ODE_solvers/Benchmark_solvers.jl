@@ -458,7 +458,8 @@ if ARGS[1] == "Test_random_parameter"
         mkpath(dirSave)
     end
 
-    modelListTry = ["model_Weber_BMC2015", "model_Schwen_PONE2014", "model_Sneyd_PNAS2002", "model_Zhao_QuantBiol2020", "model_Zheng_PNAS2012"]
+    modelListTry = ["model_Perelson_Science1996", "model_Zhao_QuantBiol2020", "model_Crauste_CellSystems2017", "model_Fiedler_BMC2016", 
+                    "model_Bruno_JExpBot2016", "model_Okuonghae_ChaosSolitonsFractals2020", "model_Schwen_PONE2014"]
     solversCheck = ["Rodas5", "QNDF", "Rodas4P", "CVODE_BDF_default", "Vern7", "Tsit5", "Vern6", "Vern7Rodas4P"]
     tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
     for i in eachindex(modelListTry)
