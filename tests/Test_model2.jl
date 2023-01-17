@@ -42,6 +42,9 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
+# For testing residuals
+include(joinpath(pwd(), "tests", "Test_residuals.jl"))
+
 # Optimizers 
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_Ipopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_optim.jl"))
@@ -486,4 +489,11 @@ if passTest == true
     @printf("Passed test for checking optimizers\n")
 else
     @printf("Did not pass test for checking optimizers\n")
+end
+
+passTest = checkGradientResiduals(peTabModel, Rodas5(), 1e-9)
+if passTest == true
+    @printf("Passed test for gradient for residuals\n")
+else
+    @printf("Did not pass test for gradient for residuals\n")
 end

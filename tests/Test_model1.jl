@@ -38,6 +38,9 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
+# For testing residuals
+include(joinpath(pwd(), "tests", "Test_residuals.jl"))
+
 
 """
     solveOde2x2Lin(t, u0, α, β, γ, δ)
@@ -396,4 +399,11 @@ if passTest == true
     @printf("Passed test for different adjoints\n")
 else
     @printf("Did not pass test for different adjoints\n")
+end
+
+passTest = checkGradientResiduals(peTabModel, Rodas5(), 1e-9)
+if passTest == true
+    @printf("Passed test for gradient for residuals\n")
+else
+    @printf("Did not pass test for gradient for residuals\n")
 end

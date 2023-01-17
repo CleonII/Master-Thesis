@@ -69,7 +69,8 @@ struct PeTabOpt{F1<:Function,
                 F5<:Function, 
                 F6<:Function, 
                 F7<:Function, 
-                F8<:Function}
+                F8<:Function, 
+                F9<:Function}
 
     evalF::F1
     evalFZygote::F2
@@ -79,6 +80,7 @@ struct PeTabOpt{F1<:Function,
     evalGradFForwardEq::F6
     evalHess::F7
     evalHessApprox::F8
+    evalHessGaussNewton::F9
     nParamEst::Int64
     namesParam::Array{String, 1}
     paramVecNotTransformed::Vector{Float64}

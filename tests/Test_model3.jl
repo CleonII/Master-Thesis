@@ -49,10 +49,8 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
-# Optimizers 
-include(joinpath(pwd(), "src", "Optimizers", "Set_up_Ipopt.jl"))
-include(joinpath(pwd(), "src", "Optimizers", "Set_up_optim.jl"))
-
+# For testing residuals
+include(joinpath(pwd(), "tests", "Test_residuals.jl"))
 
 function getSolAlgebraicSS(peTabModel::PeTabModel, solver, tol::Float64, a::T1, b::T1, c::T1, d::T1) where T1<:Real
 
@@ -302,4 +300,11 @@ if passTest == true
     @printf("Passed test for cost, gradient and hessian\n")
 else
     @printf("Did not pass test for cost, gradient and hessian\n")
+end
+
+passTest = checkGradientResiduals(peTabModel, Rodas5(), 1e-9)
+if passTest == true
+    @printf("Passed test for gradient for residuals\n")
+else
+    @printf("Did not pass test for gradient for residuals\n")
 end
