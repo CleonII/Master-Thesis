@@ -159,7 +159,7 @@ end
 
 
 """
-    processParameterData(parameterData::DataFrame)::ParamData
+    processParameterData(parameterData::DataFrame)::ParameterInfo
 
     Process the PeTab parameterData file into a type-stable Julia struct.
 """

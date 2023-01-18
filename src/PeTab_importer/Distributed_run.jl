@@ -7,7 +7,7 @@ function runProcess(jobs, results)
     # Import structs needed to compute the cost, gradient, and hessian
     peTabModel::PeTabModel = take!(jobs)[1]
     put!(results, tuple(:Done))
-    parameterData::ParamData = take!(jobs)[1]
+    parameterData::ParameterInfo = take!(jobs)[1]
     put!(results, tuple(:Done))
     measurementData::MeasurementData = take!(jobs)[1]
     put!(results, tuple(:Done))

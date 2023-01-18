@@ -4,7 +4,7 @@
 
 
 """
-    getIndicesParam(paramData::ParamData, measurementData::MeasurementData)::ParameterIndices
+    getIndicesParam(paramData::ParameterInfo, measurementData::MeasurementData)::ParameterIndices
 
     For a PeTab-model creates index vectors for extracting the dynamic-, observable- and sd-parameters from 
     the  optimizsing parameter vector, and indices and maps to effectively for an observation, when computing 
@@ -16,7 +16,7 @@
 
     See also: [`ParameterIndices`, `ParamMap`]
 """
-function getIndicesParam(paramData::ParamData, 
+function getIndicesParam(paramData::ParameterInfo, 
                          measurementData::MeasurementData, 
                          odeSystem::ODESystem, 
                          experimentalConditionsFile::DataFrame)::ParameterIndices
@@ -101,7 +101,7 @@ end
 
 function buildMapParameters(keysMap::T1,
                             measurementData::MeasurementData,
-                            parameterData::ParamData,
+                            parameterData::ParameterInfo,
                             buildObsParam::Bool)::Array{ParamMap, 1} where T1<:Array{<:Union{<:String, <:AbstractFloat}, 1}
 
     
@@ -212,7 +212,7 @@ end
 
 
 # Helper function for extracting Observable parameter when computing the cost. Will be heavily altered as slow.
-function getIdEst(idsInStr::T1, paramData::ParamData) where T1<:Array{<:Union{<:String, <:AbstractFloat}, 1}
+function getIdEst(idsInStr::T1, paramData::ParameterInfo) where T1<:Array{<:Union{<:String, <:AbstractFloat}, 1}
     idVec = String[]
 
     for i in eachindex(idsInStr)
@@ -248,7 +248,7 @@ end
 # Identifaying dynamic parameters to estimate, where the dynamic parameters are only used for some specific 
 # experimental conditions.
 function identityCondSpecificDynParam(odeSystem::ODESystem,
-                                      parameterData::ParamData, 
+                                      parameterData::ParameterInfo, 
                                       experimentalConditionsFile::DataFrame)::Array{String, 1}
 
     allOdeParamNames = string.(parameters(odeSystem))
@@ -285,7 +285,7 @@ end
 function getMapExpCond(odeSystem::ODESystem,
                        namesAllString::Array{String, 1}, 
                        measurementData::MeasurementData, 
-                       paramData::ParamData, 
+                       paramData::ParameterInfo, 
                        experimentalConditionsFile::DataFrame, 
                        namesParamDyn::Array{String, 1}, 
                        namesParamEst::Array{String, 1})::Tuple{Vector{MapExpCond}, Vector{Vector{Float64}}}

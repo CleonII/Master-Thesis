@@ -93,7 +93,7 @@ end
 
 
 """
-    ParamData
+    ParameterInfo
 
     Struct storing the data in the PeTab parameter-file in type-stable manner.
 
@@ -102,19 +102,16 @@ end
 
     See also: [`processParameterData`]
 """
-struct ParamData{T1<:Array{<:AbstractFloat}, 
-                 T2<:Array{<:String, 1}, 
-                 T3<:Array{Bool, 1}, 
-                 T4<:Signed}
+struct ParameterInfo{T1<:Array{<:AbstractFloat}}
 
     # TODO: logScale make symbol to support more transformations 
     paramVal::T1
     lowerBounds::T1
     upperBounds::T1
-    parameterID::T2
-    logScale::T3
-    shouldEst::T3
-    nParamEst::T4
+    parameterID::Vector{String}
+    logScale::Vector{Bool}
+    shouldEst::Vector{Bool}
+    nParamEst::Int64
 end
 
 

@@ -1,13 +1,13 @@
 
 """
-    peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1}, namesExplicitRules::Array{String, 1})::String
+    peTabFormulaToJulia(formula::String, stateNames, paramData::ParameterInfo, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1}, namesExplicitRules::Array{String, 1})::String
     Translate a peTab formula (e.g for observable or for sd-parameter) into Julia syntax and output the result 
     as a string.
 
     State-names, namesParamDyn and paramData are all required to correctly identify states and parameters in the formula.
     namesExplicitRules is optional and is only set if there are any explicit rules in the SBML-file.
 """
-function peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1}, namesExplicitRules::Array{String, 1})::String
+function peTabFormulaToJulia(formula::String, stateNames, paramData::ParameterInfo, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1}, namesExplicitRules::Array{String, 1})::String
 
     # Characters directly translate to Julia and characters that also are assumed to terminate a word (e.g state and parameter)
     charDirectTranslate = ['(', ')', '+', '-', '/', '*', '^'] 
@@ -95,7 +95,7 @@ end
 """"
     wordToJuliaSyntax(wordTranslate::String, 
                            stateNames,
-                           paramData::ParamData, 
+                           paramData::ParameterInfo, 
                            namesParamDyn::Array{String, 1},
                            namesExplicitRules::Array{String, 1})::String
 
@@ -106,7 +106,7 @@ end
 """
 function wordToJuliaSyntax(wordTranslate::String, 
                            stateNames,
-                           paramData::ParamData, 
+                           paramData::ParameterInfo, 
                            namesParamDyn::Array{String, 1}, 
                            namesNonDynParam::Array{String, 1},
                            namesExplicitRules::Array{String, 1})::String

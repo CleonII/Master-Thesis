@@ -53,7 +53,7 @@ end
 
 """
     createTopOfFun(stateNames, 
-        paramData::ParamData, 
+        paramData::ParameterInfo, 
         namesParamODEProb::Array{String, 1}, 
         namesNonDynParam::Array{String, 1},
         observablesData::DataFrame,
@@ -63,7 +63,7 @@ end
     Also adds them as variables for Symbolics.jl
 """
 function createTopOfFun(stateNames, 
-                        paramData::ParamData, 
+                        paramData::ParameterInfo, 
                         namesParamODEProb::Array{String, 1}, 
                         namesNonDynParam::Array{String, 1},
                         observablesData::DataFrame,
@@ -147,7 +147,7 @@ end
     createYmodFunction(modelName::String, 
                        dirModel::String, 
                        stateNames, 
-                       paramData::ParamData, 
+                       paramData::ParameterInfo, 
                        namesParamDyn::Array{String, 1}, 
                        observablesData::DataFrame,
                        modelDict::Dict)
@@ -163,7 +163,7 @@ end
 function createYmodFunction(modelName::String, 
                             dirModel::String, 
                             stateNames, 
-                            paramData::ParamData, 
+                            paramData::ParameterInfo, 
                             namesParamDyn::Array{String, 1}, 
                             namesNonDynParam::Array{String, 1},
                             observablesData::DataFrame,
@@ -208,7 +208,7 @@ end
 """
     createU0Function(modelName::String, 
                          dirModel::String, 
-                         paramData::ParamData, 
+                         paramData::ParameterInfo, 
                          namesParameter::Array{String, 1}, 
                          stateMap)
 
@@ -220,7 +220,7 @@ end
 """
 function createU0Function(modelName::String, 
                           dirModel::String, 
-                          paramData::ParamData, 
+                          paramData::ParameterInfo, 
                           namesParameter::Array{String, 1}, 
                           stateMap;
                           inPlace::Bool=true)
@@ -283,7 +283,7 @@ end
 """
     createSdFunction(modelName::String, 
                           dirModel::String, 
-                          paramData::ParamData, 
+                          paramData::ParameterInfo, 
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
                           observablesData::DataFrame,
@@ -297,7 +297,7 @@ end
 """
 function createSdFunction(modelName::String, 
                           dirModel::String, 
-                          paramData::ParamData, 
+                          paramData::ParameterInfo, 
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
                           namesNonDynParam::Array{String, 1},

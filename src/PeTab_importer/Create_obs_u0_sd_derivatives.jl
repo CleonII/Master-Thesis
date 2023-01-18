@@ -121,7 +121,7 @@ end
 createDYmodFunction(modelName::String, 
                        dirModel::String, 
                        stateNames, 
-                       paramData::ParamData, 
+                       paramData::ParameterInfo, 
                        namesParamDyn::Array{String, 1}, 
                        observablesData::DataFrame,
                        modelDict::Dict)
@@ -130,7 +130,7 @@ For modelName create a function for computing DyMod/Du and DyMod/Dp
 function createDYmodFunction(modelName::String, 
                             dirModel::String, 
                             stateNames, 
-                            paramData::ParamData, 
+                            paramData::ParameterInfo, 
                             namesParamDyn::Array{String, 1}, 
                             namesNonDynParam::Array{String, 1},
                             observablesData::DataFrame,
@@ -222,7 +222,7 @@ end
 """
     createDSdFunction(modelName::String, 
                           dirModel::String, 
-                          paramData::ParamData, 
+                          paramData::ParameterInfo, 
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
                           observablesData::DataFrame,
@@ -234,7 +234,7 @@ end
 """
 function createDSdFunction(modelName::String, 
                           dirModel::String, 
-                          paramData::ParamData, 
+                          paramData::ParameterInfo, 
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
                           namesNonDynParam::Array{String, 1},
