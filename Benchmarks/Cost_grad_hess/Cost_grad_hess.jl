@@ -285,9 +285,9 @@ if ARGS[1] == "Bachman_fix_param"
                 benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
                                   pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix)
             end
-            if isdir(peTabModel.dirModel * "Fewer_param/")
-                rm(peTabModel.dirModel * "Fewer_param/", recursive=true)
-            end                              
+        end
+        if isdir(peTabModel.dirModel * "Fewer_param/")
+            rm(peTabModel.dirModel * "Fewer_param/", recursive=true)
         end
     end
 end

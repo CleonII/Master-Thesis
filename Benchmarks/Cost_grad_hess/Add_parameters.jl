@@ -32,7 +32,7 @@ function getPEtabModelNparamFixed(peTabModel::PeTabModel, nParamFixate::Integer)
     paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
 
     paramFixate = sample(paramEstIndices.namesDynParam, nParamFixate)
-    for i in ncol(parameterDataFile)
+    for i in 1:nrow(parameterDataFile)
         if parameterDataFile[i, :parameterId] ∈ paramFixate
             parameterDataFile[i, :estimate] = 0
         end
