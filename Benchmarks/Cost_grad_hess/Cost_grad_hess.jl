@@ -16,6 +16,9 @@ using LinearAlgebra
 using Sundials
 
 
+# Avoid having BLAS threads mess up timings 
+BLAS.set_num_threads(1)
+
 # Relevant PeTab structs for computations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
@@ -282,10 +285,10 @@ if ARGS[1] == "Bachman_fix_param"
                 benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
                                   pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix)
             end
+            if isdir(peTabModel.dirModel * "Fewer_param/")
+                rm(peTabModel.dirModel * "Fewer_param/", recursive=true)
+            end                              
         end
-    end
-    if isdir(peTabModel.dirModel * "Fewer_param/")
-        rm(peTabModel.dirModel * "Fewer_param/", recursive=true)
     end
 end
 
