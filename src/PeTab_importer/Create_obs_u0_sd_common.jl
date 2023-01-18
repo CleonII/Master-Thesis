@@ -211,3 +211,63 @@ function getNoiseParamStr(sdFormula::String)::String
 
     return sdWordStr
 end
+
+
+"""
+    replaceVariablesWithArrayIndex(formula,stateNames,parameterNames,namesNonDynParam,paramData)::String
+
+    Replaces any state or parameter from formula with their corresponding index in the ODE system 
+    Symbolics can return strings without multiplication sign, e.g. 100.0STAT5 instead of 100.0*STAT5 
+    so replaceWholeWord cannot be used here
+"""
+function replaceVariablesWithArrayIndex(formula,stateNames,parameterNames,namesNonDynParam,paramData)::String
+    stateNamesStr = replace.(string.(stateNames), "(t)" => "")
+    
+    for i in eachindex(stateNamesStr)
+        formula=replaceWholeWordWithNumberPrefix(formula, stateNamesStr[i], "u["*string(i)*"]")
+    end
+    for i in eachindex(parameterNames)
+        formula=replaceWholeWordWithNumberPrefix(formula, parameterNames[i], "dynPar["*string(i)*"]")
+    end
+    for i in eachindex(namesNonDynParam)
+        formula=replaceWholeWordWithNumberPrefix(formula, namesNonDynParam[i], "nonDynParam["*string(i)*"]")
+    end
+    for i in eachindex(paramData.parameterID)
+        if paramData.shouldEst[i] == false
+            formula=replaceWholeWordWithNumberPrefix(formula, paramData.parameterID[i]*"_C", "paramData.paramVal[" * string(i) *"]")
+        end
+    end
+    return formula
+end
+
+
+
+"""
+    replaceExplicitVariableWithRule(formula,stateNames,parameterNames,namesNonDynParam,paramData)::String
+
+    Replace the explicit rule variable with the explicit rule
+"""
+function replaceExplicitVariableWithRule(formula, modelDict)::String
+    for (key,value) in modelDict["modelRuleFunctions"]            
+        formula = replaceWholeWord(formula, key, "(" * value[2] * ")")
+    end
+    return formula
+end
+
+
+"""
+replaceWholeWordWithNumberPrefix(formula,from,to)::String
+    Replaces variables that can be prefixed with numbers.
+    e.g., replaceWholeWordWithNumberPrefix("4STAT5 + 100.0STAT5 + RE*STAT5 + STAT5","STAT5","u[1]") gives
+    4u[1] + 100.0u[1] + RE*u[1] + u[1]   
+"""
+function replaceWholeWordWithNumberPrefix(oldString, replaceFrom, replaceTo)
+    replaceFromRegex = Regex("\\b(\\d+\\.?\\d*)*(" * replaceFrom * ")\\b")
+    replaceToRegex = SubstitutionString("\\1" * replaceTo )
+    newString = replace(oldString, replaceFromRegex => replaceToRegex)
+    return newString
+
+end
+
+
+
