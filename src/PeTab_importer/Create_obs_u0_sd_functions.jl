@@ -221,7 +221,7 @@ function createU0Function(modelName::String,
         stateExp = replace(string(stateMap[i].second), " " => "")
         stateFormula = peTabFormulaToJulia(stateExp, stateNames, paramData, namesParameter, String[], String[])
         for i in eachindex(namesParameter)
-            stateFormula=replaceWholeWordWithNumberPrefix(stateFormula, namesParameter[i], "paramVec["*string(i)*"]")
+            stateFormula=replaceWholeWord(stateFormula, namesParameter[i], "paramVec["*string(i)*"]")
         end
         stateExpWrite *= "\t" * stateName * " = " * stateFormula * "\n"
     end
