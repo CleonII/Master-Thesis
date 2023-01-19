@@ -214,7 +214,8 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
                                            solver::Union{SciMLAlgorithm, Vector{Symbol}},
                                            absTol::Float64,
                                            relTol::Float64, 
-                                           calcTStops::Function;
+                                           calcTStops::Function,
+                                           chunkSize::Union{Int64, Nothing};
                                            nTSave::Int64=0, 
                                            onlySaveAtTobs::Bool=false,
                                            expIDSolve::Array{String, 1} = ["all"],
@@ -261,7 +262,8 @@ function solveOdeModelAllExperimentalCond!(solArray::Array{Union{OrdinaryDiffEq.
         return arrRet
     end
     # Compute sensitivity matrix via forward mode automatic differentation 
-    ForwardDiff.jacobian!(SMat, getSenseMat, dynParamEst)
+    cfg = isnothing(chunkSize) ? ForwardDiff.JacobianConfig(getSenseMat, dynParamEst, ForwardDiff.Chunk(dynParamEst)) : ForwardDiff.JacobianConfig(getSenseMat, dynParamEst, ForwardDiff.Chunk{chunkSize}()) 
+    ForwardDiff.jacobian!(SMat, getSenseMat, dynParamEst, cfg)
 
     # Check retcode 
     sucess = true

@@ -31,6 +31,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                            adjSolver=Rodas5P(), 
                            solverForward=Rodas5P(autodiff=false),
                            adjTol::Float64=1e-6, 
+                           chunkSize::Union{Int64, Nothing}=nothing,
                            adjSensealg::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), 
                            adjSensealgSS::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm=SteadyStateAdjoint())::PeTabOpt
 
@@ -75,7 +76,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, denseSol=true, expIDSolve=expIDSolveArg, trackCallback=true)
     solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementData, simulationInfo, solver, tol, tol, sensealg, peTabModel.getTStops)
     if sensealgForward == :AutoDiffForward
-        solveOdeModelAllCondForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)                                           
+        solveOdeModelAllCondForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, chunkSize, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)                                           
     else
         solveOdeModelAllCondForwardEq! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondSenseEqUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
     end
@@ -87,7 +88,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                  value. Input argument nProcs must match nprocs()")
     elseif nProcs == 1
         evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
-        evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)    
+        evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, chunkSize)    
         evalGradFAdjoint = (grad, paramVecEst) -> calcGradCostAdj!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo) 
         evalGradFForwardEq = (grad, paramVecEst) -> calcGradForwardEq!(grad, paramVecEst, peTabModel, odeProbSenseEq, sensealgForward, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondForwardEq!, priorInfo) 
         evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
@@ -216,7 +217,8 @@ end
                   measurementData::MeasurementData,
                   parameterData::ParamData, 
                   changeModelParamUse!::Function, 
-                  solveOdeModelAllCondUse!::Function) where T1<:Array{<:AbstractFloat, 1}
+                  solveOdeModelAllCondUse!::Functionm 
+                  chunkSize::Union{Int64, Nothing}=nothing) where T1<:Array{<:AbstractFloat, 1}
 
     For a PeTab model compute inplace the gradient  of the cost (likelhood) for 
     a parameter vector paramVecEst. 
@@ -237,7 +239,8 @@ function calcGradCost!(grad::Vector{Float64},
                        parameterData::ParamData, 
                        changeModelParamUse!::Function, 
                        solveOdeModelAllCondUse!::Function, 
-                       priorInfo::PriorInfo;
+                       priorInfo::PriorInfo, 
+                       chunkSize::Union{Int64, Nothing};
                        expIDSolve::Array{String, 1} = ["all"])     
 
     # Split input into observeble and dynamic parameters 
@@ -256,8 +259,10 @@ function calcGradCost!(grad::Vector{Float64},
     # worth to look into a parellisation over the chunks (as for larger models each call takes relatively long time). 
     # Also parellisation of the chunks should be faster than paralellisation over experimental condtions.
     calcCostDyn = (x) -> calcLogLikSolveODE(x, sdParamEst, obsParEst, noneDynParamEst, odeProb, peTabModel, simulationInfo, paramIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcGradDynParam=true, expIDSolve=expIDSolve)
+    # Set chunking for ForwardAutoDiff 
+    cfg = isnothing(chunkSize) ? ForwardDiff.GradientConfig(calcCostDyn, dynamicParamEst, ForwardDiff.Chunk(dynamicParamEst)) : ForwardDiff.GradientConfig(calcCostDyn, dynamicParamEst, ForwardDiff.Chunk{chunkSize}()) 
     try 
-        grad[paramIndices.iDynParam] .= ForwardDiff.gradient(calcCostDyn, dynamicParamEst)::Vector{Float64}
+        grad[paramIndices.iDynParam] .= ForwardDiff.gradient(calcCostDyn, dynamicParamEst, cfg)::Vector{Float64}
     catch
         grad = 1e8
         return
