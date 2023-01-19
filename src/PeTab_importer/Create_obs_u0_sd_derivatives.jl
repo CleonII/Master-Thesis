@@ -149,7 +149,7 @@ function createDYmodFunction(modelName::String,
         tmpFormula = replaceExplicitVariableWithRule(tmpFormula, modelDict)
 
         # Translate the formula for the observable to Julia syntax 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
         
         printInd = 0
 
@@ -255,7 +255,7 @@ function createDSdFunction(modelName::String,
         tmpFormula = replaceExplicitVariableWithRule(tmpFormula, modelDict)
 
         # Translate the formula for the noise to Julia syntax 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
 
         printInd = 0
 

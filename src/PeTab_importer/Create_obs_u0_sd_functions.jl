@@ -55,20 +55,14 @@ end
     createTopOfFun(stateNames, 
         paramData::ParamData, 
         namesParamODEProb::Array{String, 1}, 
-        namesNonDynParam::Array{String, 1},
-        observablesData::DataFrame,
-        modelDict::Dict,
-        obsFun::Bool)
+        namesNonDynParam::Array{String, 1})
     Extracts all variables needed for the functions. 
     Also adds them as variables for Symbolics.jl
 """
 function createTopOfFun(stateNames, 
                         paramData::ParamData, 
                         namesParamODEProb::Array{String, 1}, 
-                        namesNonDynParam::Array{String, 1},
-                        observablesData::DataFrame,
-                        modelDict::Dict,
-                        obsFun::Bool)
+                        namesNonDynParam::Array{String, 1})
                    
     # Extract names of model states 
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
@@ -138,7 +132,7 @@ function createYmodFunction(modelName::String,
                             modelDict::Dict)
 
     io = open(dirModel * "/" * modelName * "ObsSdU0.jl", "w")
-    stateStr, paramDynStr, paramNonDynStr, paramConstStr = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, modelDict, true)
+    stateStr, paramDynStr, paramNonDynStr, paramConstStr = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam)
 
     # Write the formula of each observable to file
     observableIDs = String.(observablesData[!, "observableId"])
@@ -157,7 +151,7 @@ function createYmodFunction(modelName::String,
         tmpFormula = replaceExplicitVariableWithRule(tmpFormula, modelDict)
 
         # Translate the formula for the observable to Julia syntax 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
         juliaFormula = replaceVariablesWithArrayIndex(juliaFormula, stateNames, namesParamDyn, namesNonDynParam, paramData)
         strObserveble *= "\t\t" * "return " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
@@ -219,7 +213,7 @@ function createU0Function(modelName::String,
     for i in eachindex(stateMap)
         stateName = stateNames[i]
         stateExp = replace(string(stateMap[i].second), " " => "")
-        stateFormula = peTabFormulaToJulia(stateExp, stateNames, paramData, namesParameter, String[], String[])
+        stateFormula = peTabFormulaToJulia(stateExp, stateNames, paramData, namesParameter, String[])
         for i in eachindex(namesParameter)
             stateFormula=replaceWholeWord(stateFormula, namesParameter[i], "paramVec["*string(i)*"]")
         end
@@ -298,7 +292,7 @@ function createSdFunction(modelName::String,
         tmpFormula = replaceExplicitVariableWithRule(tmpFormula, modelDict)
 
         # Translate the formula for the observable to Julia syntax 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
         juliaFormula = replaceVariablesWithArrayIndex(juliaFormula, stateNames, namesParamDyn, namesNonDynParam, paramData)
         strObserveble *= "\t\t" * "return " * juliaFormula * "\n"
         strObserveble *= "\tend\n\n"
