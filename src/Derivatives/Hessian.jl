@@ -96,7 +96,7 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
                                                  solveOdeModelAllConditions!::Function, 
                                                  priorInfo::PriorInfo; 
                                                  returnJacobian::Bool=false,
-                                                 expIDSolve::Array{String, 1} = ["all")   
+                                                 expIDSolve::Array{String, 1} = ["all"])   
 
     # Avoid incorrect non-zero values 
     out .= 0.0

@@ -84,9 +84,9 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
     gradientDyanmicθ::Vector{Float64} = zeros(Float64, length(dynamicParamEst))
-    calcGradForwardEqDynParam!(gradientDyanmicθ, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, S, peTabModel, 
-                               sensealg, odeProblem, simulationInfo, θ_indices, measurementData, parameterInfo, 
-                               changeODEProblemParameters!, solveOdeModelAllConditions!, expIDSolve=expIDSolve)                            
+    computeGradientForwardEqDynamicθ!(gradientDyanmicθ, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, S, peTabModel, 
+                                      sensealg, odeProblem, simulationInfo, θ_indices, measurementData, parameterInfo, 
+                                      changeODEProblemParameters!, solveOdeModelAllConditions!, expIDSolve=expIDSolve)                            
     gradient[θ_indices.iθ_dynamic] .= gradientDyanmicθ
 
     # Happens when at least one forward pass fails and I set the gradient to 1e8 

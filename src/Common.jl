@@ -32,3 +32,60 @@ function setParamToFileValues!(paramMap, stateMap, paramData::ParamData)
     end
 
 end
+
+
+function computeσ(u::AbstractVector,
+                  t::Float64,
+                  θ_dynamic::Vector{Float64},
+                  θ_sd::Vector{Float64}, 
+                  θ_nonDynamic::Vector{Float64},
+                  peTabModel::PeTabModel,
+                  iMeasurement::Int64, 
+                  θ_indices::ParameterIndices)::Real
+
+    # Compute associated SD-value or extract said number if it is known 
+    if typeof(measurementData.sdParams[iMeasurement]) <: AbstractFloat
+        σ = measurementData.sdParams[iMeasurement]
+    else
+        mapSdParam = θ_indices.mapArraySdParam[θ_indices.indexSdParamMap[iMeasurement]]
+        σ = peTabModel.evalSd!(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterData, measurementData.observebleID[iMeasurement], mapSdParam)
+    end
+
+    return σ
+end
+
+
+# Compute observation function h
+function computehTransformed(u::AbstractVector,
+                             t::Float64,
+                             θ_dynamic::Vector{Float64},
+                             θ_observable::Vector{Float64}, 
+                             θ_nonDynamic::Vector{Float64},
+                             peTabModel::PeTabModel,
+                             iMeasurement::Int64, 
+                             θ_indices::ParameterIndices, 
+                             parameterInfo::ParameterInfo)::Real
+
+    mapObsParam = θ_indices.mapArrayObsParam[θ_indices.indexObsParamMap[iMeasurement]]
+    h = peTabModel.evalYmod(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurement], mapObsParam) 
+    # Transform yMod is necessary
+    hTransformed = transformObsOrData(h, measurementData.transformData[iMeasurement])
+
+    return hTransformed
+end
+
+
+"""
+    dualToFloat(x::ForwardDiff.Dual)::Real
+    
+    Via recursion convert a Dual to a Float.
+"""
+function dualToFloat(x::ForwardDiff.Dual)::Real
+    return dualToFloat(x.value)
+end
+"""
+    dualToFloat(x::AbstractFloat)::AbstractFloat
+"""
+function dualToFloat(x::AbstractFloat)::AbstractFloat
+    return x
+end

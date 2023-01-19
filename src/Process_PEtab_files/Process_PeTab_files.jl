@@ -766,13 +766,3 @@ function createFuncForTstops(modelDict::Dict, stateNames::Vector{String}, parame
     return stringTstop
 end
 
-
-# Function taking a Dual and making it into the underlaying float via recursion. This is needed 
-# if having events where t-stops depend on some of the parameter in odeProb.p, as here even though 
-# the parameter might be constant it can still be a Dual.
-function dualToFloat(x::AbstractFloat)
-    return x
-end
-function dualToFloat(x::ForwardDiff.Dual)
-    return dualToFloat(x.value)
-end

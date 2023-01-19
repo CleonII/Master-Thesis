@@ -5,7 +5,7 @@
 =#
 
 
-function computeGradientForwardEqDynParam!(gradient::Vector{Float64},
+function computeGradientForwardEqDynamicθ!(gradient::Vector{Float64},
                                            θ_dynamic::Vector{Float64},
                                            θ_sd::Vector{Float64},
                                            θ_observable::Vector{Float64},
@@ -50,7 +50,7 @@ function computeGradientForwardEqDynParam!(gradient::Vector{Float64},
         # In case the model is simulated first to a steady state we need to keep track of the post-equlibrium experimental 
         # condition Id to identify parameters specific to an experimental condition.
         postEqulibriumId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardSol] : conditionID
-        
+    
         # If we have a callback it needs to be properly handled 
         computeGradientForwardExpCond(gradient, sol, S, sensealg, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT,
                                        conditionID, postEqulibriumId, positionInSolArray, peTabModel, θ_indices, 
@@ -113,13 +113,13 @@ function computeGradientForwardExpCond!(gradient::Vector{Float64},
     ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, peTabModel) 
     
     # To compute 
-    compute∂G∂u = (out, u, p, t, i) -> begin compute∂G∂x(out, u, p, t, i, iPerTimePoint, 
+    compute∂G∂u = (out, u, p, t, i) -> begin compute∂G∂_(out, u, p, t, i, iPerTimePoint, 
                                                          measurementData, parameterInfo, 
                                                          θ_indices, peTabModel, 
                                                          θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
                                                          ∂h∂u, ∂σ∂u, compute∂G∂U=true)
                                             end
-    compute∂G∂p = (out, u, p, t, i) -> begin compute∂G∂x(out, u, p, t, i, iPerTimePoint, 
+    compute∂G∂p = (out, u, p, t, i) -> begin compute∂G∂_(out, u, p, t, i, iPerTimePoint, 
                                                          measurementData, parameterInfo, 
                                                          θ_indices, peTabModel, 
                                                          θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
