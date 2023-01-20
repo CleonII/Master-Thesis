@@ -1,65 +1,9 @@
-# Allocate derivates needed when computing ∂G∂u and ∂G∂p
-function allocateObservableFunctionDerivatives(sol::ODESolution, peTabModel::PeTabModel)
-
-    nModelStates = length(peTabModel.stateNames)
-    ∂h∂u = zeros(Float64, nModelStates)
-    ∂σ∂u = zeros(Float64, nModelStates)
-    ∂h∂p = zeros(Float64, length(sol.prob.p))
-    ∂σ∂p = zeros(Float64, length(sol.prob.p))
-    return ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p
-end
-
-
-function adjustGradientTransformedParameters!(gradient::Union{AbstractVector, SubArray}, 
-                                              _gradient::AbstractVector, 
-                                              ∂G∂p::AbstractVector, 
-                                              θ_dynamic::Vector{Float64},
-                                              θ_indices::ParameterIndices,
-                                              parameterInfo::ParameterInfo, 
-                                              postEqulibriumId::String; 
-                                              autoDiffSensitivites::Bool=false, 
-                                              adjoint::Bool=false)
-
-    # In case we compute the sensitivtes via automatic differentation the parameters in _gradient=S'*∂G∂u will appear in the 
-    # same order as they appear in θ_est. In case we do not compute sensitivtes via autodiff, or do adjoint sensitity analysis, 
-    # the parameters in _gradient=S'∂G∂u appear in the same order as in odeProblem.p.
-    if autoDiffSensitivites == true && adjoint == false
-        _gradient1 = _gradient[θ_indices.mapDynParEst.iDynParamInVecEst] .+ ∂G∂p[θ_indices.mapDynParEst.iDynParamInSys]
-        _gradient2 = _gradient[expMap.iDynEstVec] .+ ∂G∂p[expMap.iOdeProbDynParam]
-    elseif adjoint == false
-        _gradient1 = _gradient[θ_indices.mapDynParEst.iDynParamInSys] .+ ∂G∂p[θ_indices.mapDynParEst.iDynParamInSys]
-        _gradient2 = _gradient[expMap.iOdeProbDynParam] .+ ∂G∂p[expMap.iOdeProbDynParam]
-    end
-
-    # For adjoint sensitivity analysis ∂G∂p is already incorperated into the gradient, and the parameters appear in the 
-    # same order as in ODEProblem 
-    if adjoint == true
-        _gradient1 = _gradient[θ_indices.mapDynParEst.iDynParamInSys] 
-        _gradient2 = _gradient[expMap.iOdeProbDynParam]
-    end
-    
-    # Transform gradient parameter that for each experimental condition appear in the ODE system                                                             
-    gradient[θ_indices.mapDynParEst.iDynParamInVecEst] .+= transformGradient(_gradient1,
-                                                                             θ_dynamic[θ_indices.mapDynParEst.iDynParamInVecEst], 
-                                                                             θ_indices.θ_dynamicNames[θ_indices.mapDynParEst.iDynParamInVecEst], 
-                                                                             parameterInfo)
-    
-    # Transform gradient for parameters which are specific to certain experimental conditions. 
-    whichExpMap = findfirst(x -> x == postEqulibriumId, [θ_indices.mapExpCond[i].condID for i in eachindex(paramIndices.mapExpCond)])
-    expMap = θ_indices.mapExpCond[whichExpMap]                                          
-    gradient[expMap.iDynEstVec] .+= transformParamVecGrad(_gradient2,
-                                                          θ_dynamic[expMap.iDynEstVec], 
-                                                          θ_indices.θ_dynamicNames[expMap.iDynEstVec], 
-                                                          parameterInfo)                                   
-end
-
-
 function getIndicesParametersNotInODESystem(θ_indices::ParameterIndices)::Tuple
 
     θ_observableNames = θ_indices.θ_observableNames
     θ_sdNames = θ_indices.θ_sdNames
     θ_nonDynamicNames = θ_indices.θ_nonDynamicNames
-    iθ_notOdeSystemNames = θ_indices.iθ_notOdeSystemNames
+    iθ_notOdeSystemNames = θ_indices.θ_notOdeSystemNames
 
     iθ_sd = [findfirst(x -> x == θ_sdNames[i], iθ_notOdeSystemNames) for i in eachindex(θ_sdNames)]
     iθ_observable = [findfirst(x -> x == θ_observableNames[i],  iθ_notOdeSystemNames) for i in eachindex(θ_observableNames)]
@@ -67,6 +11,18 @@ function getIndicesParametersNotInODESystem(θ_indices::ParameterIndices)::Tuple
     iθ_notOdeSystem = θ_indices.iθ_notOdeSystem
 
     return iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem
+end
+
+
+function couldSolveODEModel(simulationInfo::SimulationInfo, expIDSolve::Vector{String})::Bool
+    @inbounds for i in eachindex(simulationInfo.solArrayGrad)
+        if expIDSolve[1] == "all" || simulationInfo.conditionIdSol[i] ∈ expIDSolve
+            if simulationInfo.solArrayGrad[i].retcode != :Success
+                return false
+            end
+        end
+    end
+    return true
 end
 
 
@@ -95,9 +51,12 @@ function compute∂G∂_(∂G∂_,
         ∂h∂_ .= 0.0
         ∂σ∂_ .= 0.0
 
-        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, iMeasurementData, θ_indices, parameterInfo)
-        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, iMeasurementData, θ_indices)
+        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, iMeasurementData, measurementData, θ_indices, parameterInfo)
+        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, iMeasurementData, measurementData, θ_indices, parameterInfo)
 
+        # Maps needed to correctly extract the right SD and observable parameters 
+        mapSdParam = θ_indices.mapArraySdParam[θ_indices.indexSdParamMap[iMeasurementData]]
+        mapObsParam = θ_indices.mapArrayObsParam[θ_indices.indexObsParamMap[iMeasurementData]]
         if compute∂G∂U == true
             peTabModel.evalDYmodDu(u, t, p, θ_observable, θ_nonDynamic, measurementData.observebleID[iMeasurementData], mapObsParam, ∂h∂_)
             peTabModel.evalDSdDu!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurementData], mapSdParam, ∂σ∂_)
@@ -122,8 +81,81 @@ function compute∂G∂_(∂G∂_,
             ∂G∂σ = -(hTransformed - yObs) / σ^2 
         end
 
-        ∂G∂_ .= (∂G∂h*∂h∂_ .+ ∂G∂σ*∂σ∂_)[:]
-        end
+        ∂G∂_ .+= (∂G∂h*∂h∂_ .+ ∂G∂σ*∂σ∂_)[:]
     end
     return
+end
+
+
+# Allocate derivates needed when computing ∂G∂u and ∂G∂p
+function allocateObservableFunctionDerivatives(sol::ODESolution, peTabModel::PeTabModel)
+
+    nModelStates = length(peTabModel.stateNames)
+    ∂h∂u = zeros(Float64, nModelStates)
+    ∂σ∂u = zeros(Float64, nModelStates)
+    ∂h∂p = zeros(Float64, length(sol.prob.p))
+    ∂σ∂p = zeros(Float64, length(sol.prob.p))
+    return ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p
+end
+
+
+function adjustGradientTransformedParameters!(gradient::Union{AbstractVector, SubArray}, 
+                                              _gradient::AbstractVector, 
+                                              ∂G∂p::Union{AbstractVector, Nothing}, 
+                                              θ_dynamic::Vector{Float64},
+                                              θ_indices::ParameterIndices,
+                                              parameterInfo::ParameterInfo, 
+                                              postEqulibriumId::String; 
+                                              autoDiffSensitivites::Bool=false, 
+                                              adjoint::Bool=false)
+
+    # Map for parameters specific to experimental condition. TODO: Use named tuple to improve mapping                                       
+    whichExpMap = findfirst(x -> x == postEqulibriumId, [θ_indices.mapExpCond[i].condID for i in eachindex(θ_indices.mapExpCond)])                                                
+    expMap = θ_indices.mapExpCond[whichExpMap]
+
+    # In case we compute the sensitivtes via automatic differentation the parameters in _gradient=S'*∂G∂u will appear in the 
+    # same order as they appear in θ_est. In case we do not compute sensitivtes via autodiff, or do adjoint sensitity analysis, 
+    # the parameters in _gradient=S'∂G∂u appear in the same order as in odeProblem.p.
+    if autoDiffSensitivites == true && adjoint == false
+        _gradient1 = _gradient[θ_indices.mapDynParEst.iDynParamInVecEst] .+ ∂G∂p[θ_indices.mapDynParEst.iDynParamInSys]
+        _gradient2 = _gradient[expMap.iDynEstVec] .+ ∂G∂p[expMap.iOdeProbDynParam]
+    elseif adjoint == false
+        _gradient1 = _gradient[θ_indices.mapDynParEst.iDynParamInSys] .+ ∂G∂p[θ_indices.mapDynParEst.iDynParamInSys]
+        _gradient2 = _gradient[expMap.iOdeProbDynParam] .+ ∂G∂p[expMap.iOdeProbDynParam]
+    end
+
+    # For adjoint sensitivity analysis ∂G∂p is already incorperated into the gradient, and the parameters appear in the 
+    # same order as in ODEProblem 
+    if adjoint == true
+        _gradient1 = _gradient[θ_indices.mapDynParEst.iDynParamInSys] 
+        _gradient2 = _gradient[expMap.iOdeProbDynParam]
+    end
+    
+    # Transform gradient parameter that for each experimental condition appear in the ODE system  
+    iChange = θ_indices.mapDynParEst.iDynParamInVecEst                                                          
+    gradient[iChange] .+= _adjustGradientTransformedParameters(_gradient1,
+                                                               θ_dynamic[θ_indices.mapDynParEst.iDynParamInVecEst], 
+                                                               θ_indices.θ_dynamicNames[θ_indices.mapDynParEst.iDynParamInVecEst], 
+                                                               parameterInfo)
+    
+    # Transform gradient for parameters which are specific to certain experimental conditions. 
+    whichExpMap = findfirst(x -> x == postEqulibriumId, [θ_indices.mapExpCond[i].condID for i in eachindex(θ_indices.mapExpCond)])
+    expMap = θ_indices.mapExpCond[whichExpMap]                                          
+    gradient[expMap.iDynEstVec] .+= _adjustGradientTransformedParameters(_gradient2,
+                                                                         θ_dynamic[expMap.iDynEstVec], 
+                                                                         θ_indices.θ_dynamicNames[expMap.iDynEstVec], 
+                                                                         parameterInfo)     
+end
+
+
+function _adjustGradientTransformedParameters(_gradient::AbstractVector, 
+                                              θ::AbstractVector,
+                                              θ_names::Union{Vector{String}, SubArray{String, 1, Vector{String}}},
+                                              parameterInfo::ParameterInfo)::AbstractVector
+    
+    iθ = [findfirst(x -> x == θ_names[i], parameterInfo.parameterID) for i in eachindex(θ_names)]
+    shouldTransform = [parameterInfo.logScale[i] == true ? true : false for i in iθ]
+    shouldNotTransform = .!shouldTransform
+
+    return log(10) .* _gradient .* θ .* shouldTransform .+ _gradient .* shouldNotTransform
 end

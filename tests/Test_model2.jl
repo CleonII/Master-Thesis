@@ -18,10 +18,7 @@ using Random
 using LinearAlgebra
 using Distributions
 using Printf
-using Ipopt
-using Optim
-using NLopt
-using LineSearches
+using Zygote
 using SciMLSensitivity
 using Zygote
 using Sundials
@@ -30,11 +27,8 @@ using Sundials
 # Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
-# Functions for solving ODE system 
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
-
 # PeTab importer to get cost, grad etc 
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_cost_grad_hessian.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))

@@ -16,7 +16,7 @@ function computeCost(θ_est::AbstractVector,
 
     cost = computeCostSolveODE(θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem, peTabModel, simulationInfo, 
                                θ_indices, measurementData, parameterInfo, changeODEProblemParameters!, solveOdeModelAllConditions!, 
-                               priorInfo, computeHessian=computeHessian, computeResiduals=computeResiduals, expIDSolve=expIDSolve)
+                               computeHessian=computeHessian, computeResiduals=computeResiduals, expIDSolve=expIDSolve)
 
     if priorInfo.hasPriors == true && computeHessian == false  
         θ_estT = transformθ(θ_est, θ_indices.namesParamEst, parameterInfo)
@@ -27,10 +27,10 @@ function computeCost(θ_est::AbstractVector,
 end
 
 
-function computeCostSolveODE(θ_dynamic::Vector{Float64},
-                             θ_sd::Vector{Float64},
-                             θ_observable::Vector{Float64},
-                             θ_nonDynamic::Vector{Float64},
+function computeCostSolveODE(θ_dynamic::AbstractVector,
+                             θ_sd::AbstractVector,
+                             θ_observable::AbstractVector,
+                             θ_nonDynamic::AbstractVector,
                              odeProblem::ODEProblem,
                              peTabModel::PeTabModel,
                              simulationInfo::SimulationInfo,
@@ -64,8 +64,10 @@ function computeCostSolveODE(θ_dynamic::Vector{Float64},
         return Inf
     end
 
-    cost = _computeCost(θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, simulationInfo, θ_indices, measurementData, parameterData, 
-                        expIDSolve, computeHessian=computeHessian, computeGradientDynamicθ=computeGradientDynamicθ, 
+    cost = _computeCost(θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, simulationInfo, θ_indices, measurementData, 
+                        parameterInfo, expIDSolve, 
+                        computeHessian=computeHessian, 
+                        computeGradientDynamicθ=computeGradientDynamicθ, 
                         computeResiduals=computeResiduals)
 
     return cost
@@ -93,9 +95,11 @@ function computeCostNotSolveODE(θ_dynamic::Vector{Float64},
     θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, parameterInfo)
     θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
 
-    cost = _computeCost(θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, simulationInfo, θ_indices, measurementData, parameterData, 
-                        expIDSolve, computeHessian=computeHessian, computeGradientNotSolveAutoDiff=computeGradientNotSolveAutoDiff, 
-                        computeGradientNotSolveAdjoint=computeGradientNotSolveAdjoint, computeGradientNotSolveForward=computeGradientNotSolveForward)
+    cost = _computeCost(θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, simulationInfo, θ_indices, 
+                        measurementData, parameterInfo, expIDSolve, 
+                        computeGradientNotSolveAutoDiff=computeGradientNotSolveAutoDiff, 
+                        computeGradientNotSolveAdjoint=computeGradientNotSolveAdjoint, 
+                        computeGradientNotSolveForward=computeGradientNotSolveForward)
 
     return cost
 end
@@ -132,7 +136,7 @@ function _computeCost(θ_dynamic::AbstractVector,
         end
 
         # Extract the ODE-solution for specific condition ID
-        odeSolution = odeSolArray[findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)]   
+        odeSolution = odeSolutionArray[findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)]   
         cost += computeCostExpCond(odeSolution, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, peTabModel, 
                                    conditionID, θ_indices, measurementData, parameterInfo, 
                                    computeResiduals=computeResiduals,
@@ -145,7 +149,7 @@ function _computeCost(θ_dynamic::AbstractVector,
         end
     end
 
-    return logLik
+    return cost
 end
 
 
@@ -174,17 +178,22 @@ function computeCostExpCond(odeSolution::Union{ODESolution, OrdinaryDiffEq.ODECo
         
         t = measurementData.tObs[i]
 
-        # In these cases we only save the ODE at observed time-points 
-        if computeGradientNotSolveForward == true || computeGradientNotSolveAutoDiff == trye || computeResiduals == true
-            u = dualToFloat.(odeSol[:, measurementData.iTObs[i]]) 
+        # In these cases we only save the ODE at observed time-points and we do not want 
+        # to extract Dual ODE solution 
+        if computeGradientNotSolveForward == true || computeGradientNotSolveAutoDiff == true
+            nModelStates = length(peTabModel.stateNames)
+            u = dualToFloat.(odeSolution[1:nModelStates, measurementData.iTObs[i]]) 
         # For adjoint sensitivity analysis we have a dense-ode solution 
         elseif computeGradientNotSolveAdjoint == true
             # In case we only have sol.t = 0.0 (or similar) interpolation does not work
-            u = length(odeSol.t) > 1 ? odeSolution(t) : odeSolAtT = odeSolution[1]
+            u = length(odeSolution.t) > 1 ? odeSolution(t) : odeSolution[1]
+        # When we want to extract dual number from the ODE solution 
+        else
+            u = odeSolution[:, measurementData.iTObs[i]] 
         end
 
-        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, i, θ_indices, parameterInfo)
-        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, i, θ_indices)
+        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, i, measurementData, θ_indices, parameterInfo)
+        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, i, measurementData, θ_indices, parameterInfo)
             
         # By default a positive ODE solution is not enforced (even though the user can provide it as option).
         # In case with transformations on the data the code can crash, hence Inf is returned in case the 

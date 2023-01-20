@@ -44,15 +44,16 @@ function computeGradientForwardEqDynamicθ!(gradient::Vector{Float64},
             continue
         end
 
-        sol = simulationInfo.solArrayGrad[findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)]
+        whichForwardSolution = findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)
+        sol = simulationInfo.solArrayGrad[whichForwardSolution]
         positionInSolArray = simulationInfo.posInSolArray[conditionID]
 
         # In case the model is simulated first to a steady state we need to keep track of the post-equlibrium experimental 
         # condition Id to identify parameters specific to an experimental condition.
-        postEqulibriumId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardSol] : conditionID
+        postEqulibriumId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardSolution] : conditionID
     
         # If we have a callback it needs to be properly handled 
-        computeGradientForwardExpCond(gradient, sol, S, sensealg, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT,
+        computeGradientForwardExpCond!(gradient, sol, S, sensealg, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT,
                                        conditionID, postEqulibriumId, positionInSolArray, peTabModel, θ_indices, 
                                        measurementData, parameterInfo)
     end
@@ -65,8 +66,8 @@ function solveForSensitivites(S::Matrix{Float64},
                               peTabModel::PeTabModel,
                               sensealg::SciMLSensitivity.AbstractForwardSensitivityAlgorithm,
                               θ_dynamic::AbstractVector, 
-                              changeODEProblemParameters!::Function,
                               solveOdeModelAllConditions!::Function,
+                              changeODEProblemParameters!::Function,
                               expIDSolve::Vector{String})
 
     nModelStates = length(peTabModel.stateNames)
@@ -81,12 +82,12 @@ function solveForSensitivites(S::Matrix{Float64},
                               peTabModel::PeTabModel,
                               sensealg::Symbol,
                               θ_dynamic::AbstractVector, 
-                              changeODEProblemParameters!::Function,
                               solveOdeModelAllConditions!::Function,
+                              changeODEProblemParameters!::Function,
                               expIDSolve::Vector{String})
 
     _odeProblem = remake(odeProblem, p = convert.(eltype(θ_dynamic), odeProblem.p), u0 = convert.(eltype(θ_dynamic), odeProblem.u0))
-    success = solveOdeModelAllCondUse!(simulationInfo.solArrayGrad, S, _odeProblem, θ_dynamic, expIDSolve)
+    success = solveOdeModelAllConditions!(simulationInfo.solArrayGrad, S, _odeProblem, θ_dynamic, expIDSolve)
 
     return success
 end
@@ -136,15 +137,14 @@ function computeGradientForwardExpCond!(gradient::Vector{Float64},
         u, _S = extract_local_sensitivities(sol, i, true)
         compute∂G∂u(∂G∂u, u, p, tSaveAt[i], i)
         compute∂G∂p(∂G∂p_, u, p, tSaveAt[i], i)
-        _gradient .+= _S'*dgDuOut 
+        _gradient .+= _S'*∂G∂u 
         ∂G∂p .+= ∂G∂p_
     end
 
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we want dY/dθ_log. We can adjust via;
     # dY/dθ_log = log(10) * θ * dY/dθ
-    adjustGradientToTransformedParameters!(gradient, _gradient, ∂G∂p, θ_dynamic, θ_indices, parameterInfo, 
-                                           postEqulibriumId, autoDiffSensitivites=false)
-
+    adjustGradientTransformedParameters!(gradient, _gradient, ∂G∂p, θ_dynamic, θ_indices, parameterInfo, 
+                                         postEqulibriumId, autoDiffSensitivites=false)
 end
 function computeGradientForwardExpCond!(gradient::Vector{Float64},
                                         sol::ODESolution,
@@ -168,13 +168,13 @@ function computeGradientForwardExpCond!(gradient::Vector{Float64},
     ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, peTabModel) 
     
     # To compute 
-    compute∂G∂u = (out, u, p, t, i) -> begin compute∂G∂x(out, u, p, t, i, iPerTimePoint, 
+    compute∂G∂u = (out, u, p, t, i) -> begin compute∂G∂_(out, u, p, t, i, iPerTimePoint, 
                                                          measurementData, parameterInfo, 
                                                          θ_indices, peTabModel, 
                                                          θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
                                                          ∂h∂u, ∂σ∂u, compute∂G∂U=true)
                                             end
-    compute∂G∂p = (out, u, p, t, i) -> begin compute∂G∂x(out, u, p, t, i, iPerTimePoint, 
+    compute∂G∂p = (out, u, p, t, i) -> begin compute∂G∂_(out, u, p, t, i, iPerTimePoint, 
                                                          measurementData, parameterInfo, 
                                                          θ_indices, peTabModel, 
                                                          θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
@@ -182,10 +182,10 @@ function computeGradientForwardExpCond!(gradient::Vector{Float64},
                                         end
       
     # Extract which parameters we compute gradient for in this specific experimental condition 
-    whichExpMap = findfirst(x -> x == postEqId, [θ_indices.mapExpCond[i].condID for i in eachindex(θ_indices.mapExpCond)])
-    iθ_experimentalCondition = vcat(θ_indices.mapDynParEst.iDynParamInVecEst, θ_indices.mapExpCond[whichExpMap])                                                                     
+    whichExpMap = findfirst(x -> x == postEqulibriumId, [θ_indices.mapExpCond[i].condID for i in eachindex(θ_indices.mapExpCond)])
+    iθ_experimentalCondition = vcat(θ_indices.mapDynParEst.iDynParamInVecEst, θ_indices.mapExpCond[whichExpMap].iDynEstVec)                                                                     
     
-    # Loop through solution and extract sensitivites                                                 
+    # Loop through solution and extract sensitivites                
     p = dualToFloat.(sol.prob.p)
     nModelStates = length(peTabModel.stateNames)
     tSaveAt = measurementData.tVecSave[conditionID]
@@ -206,6 +206,6 @@ function computeGradientForwardExpCond!(gradient::Vector{Float64},
 
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we want dY/dθ_log. We can adjust via;
     # dY/dθ_log = log(10) * θ * dY/dθ
-    adjustGradientToTransformedParameters!(gradient, _gradient, ∂G∂p, θ_dynamic, θ_indices, parameterInfo, 
-                                           postEqulibriumId, autoDiffSensitivites=true)
+    adjustGradientTransformedParameters!(gradient, _gradient, ∂G∂p, θ_dynamic, θ_indices, parameterInfo, 
+                                         postEqulibriumId, autoDiffSensitivites=true)
 end

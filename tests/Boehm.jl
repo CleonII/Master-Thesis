@@ -9,20 +9,16 @@ using Random
 using LinearAlgebra
 using Distributions
 using Printf
-using SciMLSensitivity
 using Zygote
-using BenchmarkTools
+using SciMLSensitivity
 using Sundials
 
 
 # Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
-# Functions for solving ODE system 
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
-
 # PeTab importer to get cost, grad etc 
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_cost_grad_hessian.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
@@ -81,16 +77,6 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
-        # Evaluate lower level adjoint sensitivity interfance gradient 
-        gradAdj = zeros(nParam)
-        peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
-        sqDiffGradAdjoint = sum((gradAdj - gradPython).^2)
-        if sqDiffGradAdjoint > 1e-4
-            @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
-            @printf("Does not pass test on adjoint gradient gradient\n")
-            return false
-        end
-
         gradZygote = zeros(nParam)
         peTabOpt.evalGradFZygote(gradZygote, paramVec)
         gradPython = collect(gradPythonMat[i, :])
@@ -98,6 +84,16 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
         if sqDiffGradZygote > 1e-5
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
             @printf("Does not pass test on gradient from Zygote\n")
+            return false
+        end
+
+        # Forward sensitivity equations using autodiff 
+        gradForwardEqAuto = zeros(nParam)
+        peTabOptAlt.evalGradFForwardEq(gradForwardEqAuto, paramVec)
+        sqDiffGradForwardEqAuto = sum((gradForwardEqAuto - gradPython).^2)
+        if sqDiffGradForwardEqAuto > 1e-5
+            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
+            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
             return false
         end
 
@@ -112,13 +108,13 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
-        # Forward sensitivity equations using autodiff 
-        gradForwardEqAuto = zeros(nParam)
-        peTabOptAlt.evalGradFForwardEq(gradForwardEqAuto, paramVec)
-        sqDiffGradForwardEqAuto = sum((gradForwardEq - gradPython).^2)
-        if sqDiffGradForwardEqAuto > 1e-5
-            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
-            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
+        # Evaluate lower level adjoint sensitivity interfance gradient 
+        gradAdj = zeros(nParam)
+        peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
+        sqDiffGradAdjoint = sum((gradAdj - gradPython).^2)
+        if sqDiffGradAdjoint > 1e-4
+            @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
+            @printf("Does not pass test on adjoint gradient gradient\n")
             return false
         end
 

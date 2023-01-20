@@ -181,7 +181,7 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
 end
 
 
-function sendPEtabStruct(structSend::Union{PeTabModel, ParamData, MeasurementData, SimulationInfo, ParameterIndices, PriorInfo}, 
+function sendPEtabStruct(structSend::Union{PeTabModel, ParameterInfo, MeasurementData, SimulationInfo, ParameterIndices, PriorInfo}, 
                          job::RemoteChannel, 
                          result::RemoteChannel, 
                          strSend::String, 

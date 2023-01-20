@@ -54,12 +54,13 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
 
         # In case the model is simulated first to a steady state we need to keep track of the post-equlibrium experimental 
         # condition Id to identify parameters specific to an experimental condition.
-        postEqulibriumId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardSol] : conditionID
-        sol = simulationInfo.solArrayGrad[whichForwardSol]
-        success = calcGradAdjExpCond!(gradient, sol, sensealg, tolerance, odeSolver, θ_dynamicT,
-                                      θ_sdT, θ_observableT, θ_nonDynamicT, conditionID, postEqulibriumId,
-                                      peTabModel, θ_indices, measurementData, parameterInfo, 
-                                      simulationInfo.simulateSS, evalVJPSSVec, simulationInfo.callbacks[whichForwardOdeSolution])
+        postEqulibriumId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardOdeSolution] : conditionID
+        sol = simulationInfo.solArrayGrad[whichForwardOdeSolution]
+        success = computeGradientAdjointExpCond!(gradient, sol, sensealg, tolerance, odeSolver, θ_dynamicT,
+                                                 θ_sdT, θ_observableT, θ_nonDynamicT, conditionID, postEqulibriumId,
+                                                 peTabModel, θ_indices, measurementData, parameterInfo, 
+                                                 simulationInfo.simulateSS, evalVJPSS, 
+                                                 simulationInfo.callbacks[whichForwardOdeSolution])
         if success == false
             gradient .= 1e8
             return
@@ -88,9 +89,9 @@ function generateVJPSSFunction(simulationInfo::SimulationInfo,
     _evalVJPSS = Vector{Function}(undef, length(preEqlibriumIDs))
     for i in eachindex(preEqlibriumIDs)
         
-        whichpreEqlibriumIDs = findfirst(x -> x == preEqIds[i], simulationInfo.preEqIdSol)
+        whichpreEqlibriumIDs = findfirst(x -> x == preEqlibriumIDs[i], simulationInfo.preEqIdSol)
         odeProblem = simulationInfo.solArrayPreEq[whichpreEqlibriumIDs].prob
-        ssOdeProblem = SteadyStateProblem(probUse)
+        ssOdeProblem = SteadyStateProblem(odeProblem)
         ySS, _evalVJPSSi = Zygote.pullback((p) ->    (
                                                       solve(ssOdeProblem, 
                                                             DynamicSS(odeSolver, abstol=simulationInfo.absTolSS, reltol=simulationInfo.relTolSS), 
@@ -103,7 +104,7 @@ function generateVJPSSFunction(simulationInfo::SimulationInfo,
     end
 
     evalVJPSS = Tuple(f for f in _evalVJPSS)
-    return NamedTuple{Tuple(Symbol(preEqlibriumID) for preEqlibriumIDs in preEqlibriumIDs)}(evalVJPSS)
+    return NamedTuple{Tuple(Symbol(preEqlibriumID) for preEqlibriumID in preEqlibriumIDs)}(evalVJPSS)
 end
 function generateVJPSSFunction(simulationInfo::SimulationInfo, 
                                sensealgSS::Union{QuadratureAdjoint, InterpolatingAdjoint}, 
@@ -123,7 +124,7 @@ function generateVJPSSFunction(simulationInfo::SimulationInfo,
 
     _evalVJPSS = Vector{Function}(undef, length(preEqlibriumIDs))
     for i in eachindex(preEqlibriumIDs)
-        whichPreEqlibriumID = findfirst(x -> x == preEqIds[i], simulationInfo.preEqIdSol)
+        whichPreEqlibriumID = findfirst(x -> x == preEqlibriumIDs[i], simulationInfo.preEqIdSol)
         # As we already have solved for steady state once and know the steady state time we here 
         # build a problem where we simulate exactly to said steady state.
         preEqulibriumOdeSolution = simulationInfo.solArrayPreEq[whichPreEqlibriumID]
@@ -245,6 +246,7 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
 
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we want dY/dθ_log. We can adjust via;
     # dY/dθ_log = log(10) * θ * dY/dθ
-    adjustGradientToTransformedParameters!(gradient, _gradient, ∂G∂p, θ_dynamic, θ_indices, parameterInfo, 
-                                           postEqulibriumId, adjoint=true)                           
+    adjustGradientTransformedParameters!(gradient, _gradient[:], nothing, θ_dynamic, θ_indices, parameterInfo, 
+                                         postEqulibriumId, adjoint=true)                           
+    return true                                         
 end

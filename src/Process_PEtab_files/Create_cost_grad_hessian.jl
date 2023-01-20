@@ -1,10 +1,31 @@
-include(joinpath(pwd(), "src", "PeTab_importer", "Common.jl"))
-include(joinpath(pwd(), "src", "PeTab_importer", "Map_parameters.jl"))
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_obs_u0_sd_common.jl"))
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_obs_u0_sd_functions.jl"))
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_obs_u0_sd_derivatives.jl"))
-include(joinpath(pwd(), "src", "PeTab_importer", "Process_PeTab_files.jl"))
-include(joinpath(pwd(), "src", "PeTab_importer", "Distributed.jl"))
+# PEtab structs 
+include(joinpath(pwd(), "src", "PeTab_structs.jl"))
+
+# Files related to computing the cost (likelihood)
+include(joinpath(pwd(), "src", "Compute_cost", "Compute_cost.jl"))
+include(joinpath(pwd(), "src", "Compute_cost", "Compute_cost_zygote.jl"))
+
+# Files related to computing derivatives 
+include(joinpath(pwd(), "src", "Derivatives", "Hessian.jl"))
+include(joinpath(pwd(), "src", "Derivatives", "Gradient.jl"))
+include(joinpath(pwd(), "src", "Derivatives", "Adjoint_sensitivity_analysis.jl"))
+include(joinpath(pwd(), "src", "Derivatives", "Forward_sensitivity_equations.jl"))
+include(joinpath(pwd(), "src", "Derivatives", "Gauss_newton.jl"))
+include(joinpath(pwd(), "src", "Derivatives", "Common.jl"))
+
+# Files related to solving the ODE-system 
+include(joinpath(pwd(), "src", "Solve_ODE", "Solve_ode_model.jl"))
+
+# Files related to distributed computing 
+include(joinpath(pwd(), "src", "Distributed", "Distributed.jl"))
+
+# Files related to processing PEtab files 
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Common.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Map_parameters.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_obs_u0_sd_common.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_obs_u0_sd_functions.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_obs_u0_sd_derivatives.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Process_PeTab_files.jl"))
 include(joinpath(pwd(), "src", "Common.jl"))
 
 
@@ -67,8 +88,8 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
     changeToExperimentalCondSenseEqUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEstSenseEq!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
     changeToExperimentalCondUse = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
-    changeModelParamUse! = (pVec, u0Vec, paramEst) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstIndices, peTabModel)
-    changeModelParamUse = (pVec, paramEst) -> changeModelParam(pVec, paramEst, paramEstIndices, peTabModel)
+    changeModelParamUse! = (pVec, u0Vec, paramEst) -> changeODEProblemParameters!(pVec, u0Vec, paramEst, paramEstIndices, peTabModel)
+    changeModelParamUse = (pVec, paramEst) -> changeODEProblemParameters(pVec, paramEst, paramEstIndices, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
     solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
@@ -86,25 +107,12 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                  however, Julia is currently running with ", nprocs(), " processes which does not match input 
                  value. Input argument nProcs must match nprocs()")
     elseif nProcs == 1
-        evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
-        evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)    
-        evalGradFAdjoint = (grad, paramVecEst) -> calcGradCostAdj!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo) 
-        evalGradFForwardEq = (grad, paramVecEst) -> calcGradForwardEq!(grad, paramVecEst, peTabModel, odeProbSenseEq, sensealgForward, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondForwardEq!, priorInfo) 
-        evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
-        # Sometimes even though the cost can be computed the ODE solver with Dual number can fail (as the error is 
-        # monitored slightly differently). When this happens we error out and the code crash, hence the need of a catch statement 
-        _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessian=true)
-        evalHess = (hessianMat, paramVec) -> begin 
-                                                if all([simulationInfo.solArray[i].retcode == :Success for i in eachindex(simulationInfo.solArray)])
-                                                    try 
-                                                        hessianMat .= Symmetric(ForwardDiff.hessian(_evalHess, paramVec))
-                                                    catch
-                                                        hessianMat .= 0.0
-                                                    end
-                                                else
-                                                    hessianMat .= 0.0
-                                                end
-                                            end
+        evalF = (paramVecEst) -> computeCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
+        evalGradF = (grad, paramVecEst) -> computeGradientAutoDiff!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)    
+        evalGradFAdjoint = (grad, paramVecEst) -> computeGradientAdjointEquations!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo) 
+        evalGradFForwardEq = (grad, paramVecEst) -> computeGradientForwardEquations!(grad, paramVecEst, peTabModel, odeProbSenseEq, sensealgForward, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondForwardEq!, priorInfo) 
+        evalHessApprox = (hessianMat, paramVecEst) -> computeHessianBlockApproximation!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
+        evalHess = (hessianMat, paramVecEst) -> computeHessian(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo)
     elseif nProcs > 1 && nprocs() == nProcs
         evalF, evalGradF, evalGradFForwardEq, evalGradFAdjoint, evalHess, evalHessApprox = setUpPEtabOptDistributed(peTabModel, solver, tol, 
                                                                                                                     adjSolver, adjSensealg, adjSensealgSS, adjTol,
@@ -112,10 +120,9 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                                                                                                                     parameterData, measurementData, 
                                                                                                                     simulationInfo, paramEstIndices, priorInfo, odeProb)
     end
-
-    evalFZygote = (paramVecEst) -> calcCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
-    evalGradFZygote = (grad, paramVecEst) -> calcGradZygote!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
-    evalHessGaussNewton = (hessian, paramVecEst) -> calcGaussNewtonHess!(hessian, paramVecEst, peTabModel, odeProb, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondGuassNewtonForwardEq!, priorInfo)      
+    evalFZygote = (paramVecEst) -> computeCostZygote(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
+    evalGradFZygote = (grad, paramVecEst) -> computeGradientZygote(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse, solveOdeModelAtCondZygoteUse, priorInfo)
+    evalHessGaussNewton = (hessian, paramVecEst) -> computeGaussNewtonHessianApproximation!(hessian, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondGuassNewtonForwardEq!, priorInfo)      
 
     # Lower and upper bounds for parameters to estimate 
     namesParamEst = paramEstIndices.namesParamEst
@@ -125,9 +132,9 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     paramVecNominal = [parameterData.paramVal[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)]
 
     # Transform upper and lower bounds if the case 
-    transformParamVec!(lowerBounds, namesParamEst, parameterData, revTransform=true)
-    transformParamVec!(upperBounds, namesParamEst, parameterData, revTransform=true)
-    paramVecNominalTransformed = transformParamVec(paramVecNominal, namesParamEst, parameterData, revTransform=true)
+    transformθ!(lowerBounds, namesParamEst, parameterData, reverseTransform=true)
+    transformθ!(upperBounds, namesParamEst, parameterData, reverseTransform=true)
+    paramVecNominalTransformed = transformθ(paramVecNominal, namesParamEst, parameterData, reverseTransform=true)
 
     peTabOpt = PeTabOpt(evalF, 
                         evalFZygote,
@@ -181,117 +188,4 @@ function evalPriors(paramVecTransformed,
 end
 
 
-"""
-    changeModelParam!(paramVecOdeModel, 
-                      stateVecOdeModel,
-                      paramVecEst,
-                      paramEstNames::Array{String, 1},
-                      paramIndices::ParameterIndices,
-                      peTabModel::PeTabModel)
 
-    Change the ODE parameter vector (paramVecOdeModel) and initial value vector (stateVecOdeModel)
-    values to the values in parameter vector used for parameter estimation paramVecEst. 
-    Basically, map the parameter-estiamtion vector to the ODE model.
-
-    The function can handle that paramVecEst is a Float64 vector or a vector of Duals for the 
-    gradient calculations. This function is used when computing the cost, and everything 
-    is set up by `setUpCostGradHess`. 
-     
-    See also: [`setUpCostGradHess`]
-"""
-function changeModelParam!(pOdeSys::AbstractVector, 
-                           u0::AbstractVector,
-                           paramVecEst::AbstractVector,
-                           paramIndices::ParameterIndices,
-                           peTabModel::PeTabModel)
-
-    mapDynParam = paramIndices.mapDynParEst
-    pOdeSys[mapDynParam.iDynParamInSys] .= paramVecEst[mapDynParam.iDynParamInVecEst]
-    peTabModel.evalU0!(u0, pOdeSys) 
-    
-    return nothing
-end
-
-
-function changeModelParam(pOdeSys::AbstractVector,
-                          paramVecEst::AbstractVector,
-                          paramIndices::ParameterIndices,
-                          peTabModel::PeTabModel)
-
-    # Helper function to not-inplace map parameters 
-    function mapParamToEst(iUse::Integer, mapDynParam::MapDynParEst)
-        whichIndex = findfirst(x -> x == iUse, mapDynParam.iDynParamInSys)
-        return mapDynParam.iDynParamInVecEst[whichIndex]
-    end
-
-    mapDynParam = paramIndices.mapDynParEst
-    pOdeSysRet = [i ∈ mapDynParam.iDynParamInSys ? paramVecEst[mapParamToEst(i, mapDynParam)] : pOdeSys[i] for i in eachindex(pOdeSys)]
-    u0Ret = peTabModel.evalU0(pOdeSysRet) 
-    
-    return pOdeSysRet, u0Ret   
-end
-
-
-"""
-    transformParamVec!(paramVec, namesParam::Array{String, 1}, ParameterInfo::ParameterInfo; revTransform::Bool=false)
-
-    Helper function which transforms in-place a parameter vector with parameters specied in namesParam according to the 
-    transformation for said parameter specifid in ParameterInfo.shouldTransform. In case revTransform is true 
-    performs the inverse parameter transformation (e.g exp10 instead of log10)
-"""
-function transformParamVec!(paramVec::AbstractVector, 
-                            namesParam::Array{String, 1}, 
-                            paramData::ParameterInfo; 
-                            revTransform::Bool=false) 
-    
-    @inbounds for i in eachindex(paramVec)
-        iParam = findfirst(x -> x == namesParam[i], paramData.parameterID)
-        if isnothing(iParam)
-            println("Warning : Could not find paramID for $namesParam")
-        end
-        if paramData.logScale[iParam] == true && revTransform == false
-            paramVec[i] = exp10(paramVec[i])
-        elseif paramData.logScale[iParam] == true && revTransform == true
-            paramVec[i] = log10(paramVec[i])
-        end
-    end
-end
-
-
-"""
-    transformParamVec!(paramVec, namesParam::Array{String, 1}, paramData::ParameterInfo; revTransform::Bool=false)
-
-    Helper function which returns a transformed parameter vector with parameters specied in namesParam according to the 
-    transformation for said parameter specifid in paramData.shouldTransform. In case revTransform is true 
-    performs the inverse parameter transformation (e.g exp10 instead of log10). 
-
-    The function is fully compatible with Zygote.
-"""
-function transformParamVec(paramVec::AbstractVector, 
-                           namesParam::Array{String, 1}, 
-                           paramData::ParameterInfo; 
-                           revTransform::Bool=false)::AbstractVector
-    
-    iParam = [findfirst(x -> x == namesParam[i], paramData.parameterID) for i in eachindex(namesParam)]
-    shouldTransform = [paramData.logScale[i] == true ? true : false for i in iParam]
-    shouldNotTransform = .!shouldTransform
-
-    if revTransform == false
-        return exp10.(paramVec) .* shouldTransform .+ paramVec .* shouldNotTransform
-    else
-        return log10.(paramVec) .* shouldTransform .+ paramVec .* shouldNotTransform
-    end
-end
-
-
-function transformParamVecGrad(gradientVec::AbstractVector, 
-                               dynamicParam::AbstractVector,
-                               namesParam::Union{Vector{String}, SubArray{String, 1, Vector{String}}},
-                               paramData::ParameterInfo)::AbstractVector
-    
-    iParam = [findfirst(x -> x == namesParam[i], paramData.parameterID) for i in eachindex(namesParam)]
-    shouldTransform = [paramData.logScale[i] == true ? true : false for i in iParam]
-    shouldNotTransform = .!shouldTransform
-
-    return log(10) .* gradientVec .* dynamicParam .* shouldTransform .+ gradientVec .* shouldNotTransform
-end

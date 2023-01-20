@@ -243,16 +243,16 @@ struct ParameterIndices{T4<:Array{<:ParamMap, 1},
                         T5<:MapDynParEst, 
                         T6<:Array{<:MapExpCond, 1}}
 
-    iDynParam::Vector{Int64}
-    iObsParam::Vector{Int64}
-    iSdParam::Vector{Int64}
-    iSdObsNonDynPar::Vector{Int64}
-    iNonDynParam::Vector{Int64}
-    namesDynParam::Vector{String}
-    namesObsParam::Vector{String}
-    namesSdParam::Vector{String}
-    namesSdObsNonDynPar::Vector{String}
-    namesNonDynParam::Vector{String}
+    iθ_dynamic::Vector{Int64}
+    iθ_observable::Vector{Int64}
+    iθ_sd::Vector{Int64}
+    iθ_notOdeSystem::Vector{Int64}
+    iθ_nonDynamic::Vector{Int64}
+    θ_dynamicNames::Vector{String}
+    θ_observableNames::Vector{String}
+    θ_sdNames::Vector{String}
+    θ_notOdeSystemNames::Vector{String}
+    θ_nonDynamicNames::Vector{String}
     namesParamEst::Vector{String}
     indexObsParamMap::Vector{Int64}
     indexSdParamMap::Vector{Int64}

@@ -20,7 +20,7 @@ function computeJacobianResidualsDynamicθ!(jacobian::Union{Matrix{Float64}, Sub
     θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
 
     # Solve the expanded ODE system for the sensitivites
-    success = solveForSensitivites(S, odeProblem, simulationInfo, peTabModel, sensealg, θ_dynamicT, 
+    success = solveForSensitivites(S, odeProblem, simulationInfo, peTabModel, :AutoDiff, θ_dynamicT, 
                                    solveOdeModelAllConditions!, changeODEProblemParameters!, expIDSolve)
     if success != true
         println("Failed to solve sensitivity equations")
@@ -44,56 +44,58 @@ function computeJacobianResidualsDynamicθ!(jacobian::Union{Matrix{Float64}, Sub
         postEqulibriumId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardSol] : conditionID
 
         # If we have a callback it needs to be properly handled 
-        calcJacResidualsForwardSenseEqExpCond!(jacobian, sol, S, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT,
-                                               conditionID, postEqulibriumId, positionInSolArray, peTabModel, θ_indices, 
-                                               measurementData, parameterInfo)
+        computeJacobianResidualsExpCond!(jacobian, sol, S, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT,
+                                         conditionID, postEqulibriumId, positionInSolArray, peTabModel, θ_indices, 
+                                         measurementData, parameterInfo)
     end
 end
 
 
-function computeJacobianResidualsExpCond(jacobian::AbstractMatrix,
-                                         sol::ODESolution,
-                                         S::Matrix{Float64},
-                                         θ_dynamic::Vector{Float64},
-                                         θ_sd::Vector{Float64}, 
-                                         θ_observable::Vector{Float64}, 
-                                         θ_nonDynamic::Vector{Float64},
-                                         conditionID::String,
-                                         postEqulibriumId::String,
-                                         positionInSolArray::UnitRange{Int64},
-                                         peTabModel::PeTabModel,
-                                         θ_indices::ParameterIndices,
-                                         measurementData::MeasurementData, 
-                                         parameterInfo::ParameterInfo)
+function computeJacobianResidualsExpCond!(jacobian::AbstractMatrix,
+                                          sol::ODESolution,
+                                          S::Matrix{Float64},
+                                          θ_dynamic::Vector{Float64},
+                                          θ_sd::Vector{Float64}, 
+                                          θ_observable::Vector{Float64}, 
+                                          θ_nonDynamic::Vector{Float64},
+                                          conditionID::String,
+                                          postEqulibriumId::String,
+                                          positionInSolArray::UnitRange{Int64},
+                                          peTabModel::PeTabModel,
+                                          θ_indices::ParameterIndices,
+                                          measurementData::MeasurementData, 
+                                          parameterInfo::ParameterInfo)
 
     iPerTimePoint = measurementData.iGroupedTObs[conditionID]
     # Pre allcoate vectors needed for computations 
     ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, peTabModel) 
     
     # To compute 
-    compute∂G∂u = (out, u, p, t, i) -> begin compute∂G∂_(out, u, p, t, i, iPerTimePoint, 
+    compute∂G∂u = (out, u, p, t, i, it) -> begin compute∂G∂_(out, u, p, t, i, it, 
                                                          measurementData, parameterInfo, 
                                                          θ_indices, peTabModel, 
                                                          θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
                                                          ∂h∂u, ∂σ∂u, compute∂G∂U=true, 
                                                          computeResiduals=true)
                                             end
-    compute∂G∂p = (out, u, p, t, i) -> begin compute∂G∂_(out, u, p, t, i, iPerTimePoint, 
+    compute∂G∂p = (out, u, p, t, i, it) -> begin compute∂G∂_(out, u, p, t, i, it, 
                                                          measurementData, parameterInfo, 
                                                          θ_indices, peTabModel, 
                                                          θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
                                                          ∂h∂p, ∂σ∂p, compute∂G∂U=false, 
                                                          computeResiduals=true)
-                                        end
-      
+                                            end
+    
+    # Extract relevant parameters for the experimental conditions 
+    whichExpMap = findfirst(x -> x == postEqulibriumId, [θ_indices.mapExpCond[i].condID for i in eachindex(θ_indices.mapExpCond)])
+    iθ_experimentalCondition = vcat(θ_indices.mapDynParEst.iDynParamInVecEst, θ_indices.mapExpCond[whichExpMap].iDynEstVec)                                                                     
+
     # Loop through solution and extract sensitivites                                                 
     tSaveAt = measurementData.tVecSave[conditionID]
+    nModelStates = length(peTabModel.stateNames)
     p = dualToFloat.(sol.prob.p)
     ∂G∂p = zeros(Float64, length(sol.prob.p))    
-    ∂G∂u = zeros(Float64, length(peTabModel.stateNames))
-    # Extract relevant parameters for the experimental conditions 
-    expMap = paramIndices.mapExpCond[findfirst(x -> x == postEqId, [paramIndices.mapExpCond[i].condID for i in eachindex(paramIndices.mapExpCond)])]             
-    iθ_experimentalCondition = vcat(θ_indices.mapDynParEst.iDynParamInVecEst, θ_indices.mapExpCond[whichExpMap])                                                                     
+    ∂G∂u = zeros(Float64, nModelStates)
     for i in eachindex(tSaveAt)     
         u = dualToFloat.(sol[:, i])
         t = tSaveAt[i]
@@ -160,9 +162,9 @@ end
 function computeResidualsExpCond!(residuals::AbstractVector, 
                                   odeSolution::Union{ODESolution, OrdinaryDiffEq.ODECompositeSolution},
                                   θ_dynamic::Vector{Float64},
-                                  θ_sd::Vector{Float64}, 
-                                  θ_observable::Vector{Float64}, 
-                                  θ_nonDynamic::Vector{Float64},
+                                  θ_sd::AbstractVector, 
+                                  θ_observable::AbstractVector, 
+                                  θ_nonDynamic::AbstractVector,
                                   peTabModel::PeTabModel,
                                   conditionID::String,
                                   θ_indices::ParameterIndices,
@@ -178,9 +180,9 @@ function computeResidualsExpCond!(residuals::AbstractVector,
     for i in measurementData.iPerConditionId[conditionID]
         
         t = measurementData.tObs[i]
-        u = dualToFloat.(odeSol[1:nModelStates, measurementData.iTObs[i]])
-        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, i, θ_indices, parameterInfo)
-        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, i, θ_indices)
+        u = dualToFloat.(odeSolution[1:nModelStates, measurementData.iTObs[i]])
+        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, i, measurementData, θ_indices, parameterInfo)
+        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, i, measurementData, θ_indices, parameterInfo)
             
         # By default a positive ODE solution is not enforced (even though the user can provide it as option).
         # In case with transformations on the data the code can crash, hence Inf is returned in case the 
@@ -200,4 +202,3 @@ function computeResidualsExpCond!(residuals::AbstractVector,
     end
     return true
 end
-

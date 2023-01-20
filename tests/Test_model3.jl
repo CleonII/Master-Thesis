@@ -15,7 +15,6 @@
 # used in the TerminateSteadyState used to terminate steady state simulation.
 
 
-using Distributions
 using ModelingToolkit 
 using DifferentialEquations
 using DataFrames
@@ -27,21 +26,16 @@ using Random
 using LinearAlgebra
 using Distributions
 using Printf
-using Ipopt
-using Optim
-using SciMLSensitivity
 using Zygote
+using SciMLSensitivity
 using Sundials
 
 
 # Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
-# Functions for solving ODE system 
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
-
 # PeTab importer to get cost, grad etc 
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_cost_grad_hessian.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
@@ -49,8 +43,6 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
-# For testing residuals
-include(joinpath(pwd(), "tests", "Test_residuals.jl"))
 
 function getSolAlgebraicSS(peTabModel::PeTabModel, solver, tol::Float64, a::T1, b::T1, c::T1, d::T1) where T1<:Real
 

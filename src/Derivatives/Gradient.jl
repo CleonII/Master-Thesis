@@ -25,13 +25,14 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
     computeCostDynamicθ = (x) -> computeCostSolveODE(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, peTabModel, 
                                                      simulationInfo, θ_indices, measurementData, parameterInfo, 
                                                      changeODEProblemParameters!, solveOdeModelAllConditions!, 
-                                                     priorInfo, gradientDynamicθ=true, expIDSolve=expIDSolve)
+                                                     computeGradientDynamicθ=true, expIDSolve=expIDSolve)
     try 
         gradient[θ_indices.iθ_dynamic] .= ForwardDiff.gradient(computeCostDynamicθ, θ_dynamic)::Vector{Float64}
     catch
         gradient .= 1e8
         return
     end
+
 
     # Check if we could solve the ODE (first), and if Inf was returned (second)
     if couldSolveODEModel(simulationInfo, expIDSolve) == false
@@ -46,10 +47,10 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
     # Compute hessian for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(dynamicParamEst, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, paramIndices, measurementData, 
-                                                             parameterInfo, priorInfo, expIDSolve=expIDSolve, 
-                                                             gradientNotODESystemθ=true)
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             parameterInfo, expIDSolve=expIDSolve, 
+                                                             computeGradientNotSolveAutoDiff=true)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 end
 
@@ -83,7 +84,7 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
     end
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
-    gradientDyanmicθ::Vector{Float64} = zeros(Float64, length(dynamicParamEst))
+    gradientDyanmicθ::Vector{Float64} = zeros(Float64, length(θ_dynamic))
     computeGradientForwardEqDynamicθ!(gradientDyanmicθ, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, S, peTabModel, 
                                       sensealg, odeProblem, simulationInfo, θ_indices, measurementData, parameterInfo, 
                                       changeODEProblemParameters!, solveOdeModelAllConditions!, expIDSolve=expIDSolve)                            
@@ -98,10 +99,10 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
     # Compute gradient for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(dynamicParamEst, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, paramIndices, measurementData, 
-                                                             parameterInfo, priorInfo, expIDSolve=expIDSolve, 
-                                                             gradientForwardEquationsNotODESystemθ=true)
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             parameterInfo, expIDSolve=expIDSolve, 
+                                                             computeGradientNotSolveForward=true)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 
     # Account for priors. TODO : Refactor and make common to all gradient methods 
@@ -137,10 +138,10 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
-    gradientDyanmicθ::Vector{Float64} = zeros(Float64, length(dynamicParamEst))
+    gradientDyanmicθ::Vector{Float64} = zeros(Float64, length(θ_dynamic))
     computeGradientAdjointDynamicθ(gradientDyanmicθ, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem, adjointODESolver, 
                                    tolerance, sensealg, peTabModel, simulationInfo, θ_indices, measurementData, parameterInfo, 
-                                   changeODEProblemParameters!, solveOdeModelAllConditions!, priorInfo; expIDSolve=expIDSolve, 
+                                   changeODEProblemParameters!, solveOdeModelAllConditions!; expIDSolve=expIDSolve, 
                                    sensealgSS=sensealgSS)
     gradient[θ_indices.iθ_dynamic] .= gradientDyanmicθ
 
@@ -153,10 +154,10 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
     # Compute gradient for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(dynamicParamEst, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, paramIndices, measurementData, 
-                                                             parameterInfo, priorInfo, expIDSolve=expIDSolve, 
-                                                             gradientAdjointNotODESystemθ=true)
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             parameterInfo, expIDSolve=expIDSolve, 
+                                                             computeGradientNotSolveAdjoint=true)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 
     # Account for priors. TODO : Refactor and make common to all gradient methods 
@@ -187,18 +188,17 @@ function computeGradientZygote(gradient::Vector{Float64},
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
 
     # For Zygote the code must be out-of place. Hence a special likelihood funciton is needed.
-    computeGradientZygoteDynamicθ = (x) -> computeCostZygote(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, 
-                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
-                                                             parameterInfo, changeODEProblemParameters, 
-                                                             solveOdeModelAllConditions, priorInfo, gradientDynθ=true)
-    grad[paramIndices.iDynParam] .= Zygote.gradient(computeGradientZygoteDynamicθ, θ_dynamic)[1]
+    computeGradientZygoteDynamicθ = (x) -> _computeCostZygote(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, 
+                                                              peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                              parameterInfo, changeODEProblemParameters, 
+                                                              solveOdeModelAllConditions)
+    gradient[θ_indices.iθ_dynamic] .= Zygote.gradient(computeGradientZygoteDynamicθ, θ_dynamic)[1]
 
     # Compute gradient for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(dynamicParamEst, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, paramIndices, measurementData, 
-                                                             parameterInfo, priorInfo, expIDSolve=expIDSolve, 
-                                                             gradientNotODESystemθ=true)
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             parameterInfo)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 end

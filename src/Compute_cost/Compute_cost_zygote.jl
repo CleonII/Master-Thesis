@@ -16,8 +16,7 @@ function computeCostZygote(θ_est,
 
     cost = _computeCostZygote(θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem,
                               peTabModel, simulationInfo, θ_indices, measurementData,
-                              parameterInfo, changeODEProblemParameters, solveOdeModelAllConditions, 
-                              computeGradientDynamicθ=false)
+                              parameterInfo, changeODEProblemParameters, solveOdeModelAllConditions)
 
     if priorInfo.hasPriors == true
         θ_estT = transformθ(θ_est, θ_indices.namesParamEst, parameterInfo)
@@ -38,10 +37,9 @@ function _computeCostZygote(θ_dynamic,
                             simulationInfo::SimulationInfo,
                             θ_indices::ParameterIndices,
                             measurementData::MeasurementData,
-                            paramterInfo::ParameterInfo,
+                            parameterInfo::ParameterInfo,
                             changeODEProblemParameters::Function,
-                            solveOdeModelAllConditions::Function;
-                            computeGradientDynamicθ::Bool=false)::Real
+                            solveOdeModelAllConditions::Function)::Real
 
     θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, parameterInfo)
     θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, parameterInfo)
@@ -62,9 +60,8 @@ function _computeCostZygote(θ_dynamic,
             return Inf
         end
 
-        cost += _computeCost(odeSolution, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, 
-                             conditionID, θ_indices, measurementData, paramterInfo, 
-                             computeGradientNotSolveAdjoint=computeGradientDynamicθ)
+        cost += computeCostExpCond(odeSolution, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, 
+                                   conditionID, θ_indices, measurementData, parameterInfo)
 
         if isinf(cost)
             return cost

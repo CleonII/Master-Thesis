@@ -17,10 +17,10 @@ function computeHessian(hessian::Matrix{Float64},
                         priorInfo::PriorInfo; 
                         expIDSolve::Array{String, 1} = ["all"])
 
-    _evalHessian = (θ_est) -> computeLogLikelihood(θ_est, odeProblem, peTabModel, simulationInfo, θ_indices, 
-                                                   measurementData, parameterInfo, changeODEProblemParameters!, 
-                                                   solveOdeModelAllConditions!, priorInfo, hessian=true, 
-                                                   expIDSolve=expIDSolve)
+    _evalHessian = (θ_est) -> computeCost(θ_est, odeProblem, peTabModel, simulationInfo, θ_indices, 
+                                          measurementData, parameterInfo, changeODEProblemParameters!, 
+                                          solveOdeModelAllConditions!, priorInfo, computeHessian=true, 
+                                          expIDSolve=expIDSolve)
     
     # Only try to compute hessian if we could compute the cost 
     if all([simulationInfo.solArray[i].retcode == :Success for i in eachindex(simulationInfo.solArray)])
@@ -57,7 +57,7 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
     computeCostDynamicθ = (x) -> computeCostSolveODE(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, peTabModel, 
                                                      simulationInfo, θ_indices, measurementData, parameterInfo, 
                                                      changeODEProblemParameters!, solveOdeModelAllConditions!, 
-                                                     priorInfo, hessianDynanmicParameters=true, 
+                                                     computeHessian=true, 
                                                      expIDSolve=expIDSolve)
     try 
         @views ForwardDiff.hessian!(hessian[θ_indices.iθ_dynamic, θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic)
@@ -77,9 +77,10 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
     # Compute hessian for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(dynamicParamEst, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, paramIndices, measurementData, 
-                                                             parameterInfo, priorInfo, expIDSolve=expIDSolve)
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             parameterInfo, expIDSolve=expIDSolve, 
+                                                             computeGradientNotSolveAutoDiff=true)
     @views ForwardDiff.hessian!(hessian[iθ_notOdeSystem, iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 end
 
@@ -108,18 +109,18 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
     # pre-equlibrita model). Here we pre-allocate said matrix.
     nModelStates = length(odeProblem.u0)
     nTimePointsSaveAt::Int64 = sum([length(measurementData.tVecSave[conditionId]) for conditionId in simulationInfo.conditionIdSol])
-    S::Matrix{Float64} = zeros(Float64, (nTimePointsSaveAt*nModelStates, length(dynamicParamEst)))
+    S::Matrix{Float64} = zeros(Float64, (nTimePointsSaveAt*nModelStates, length(θ_dynamic)))
 
     # For Guass-Newton we compute the gradient via J*J' where J is the Jacobian of the residuals, here we pre-allocate 
     # the entire matrix.
     jacobian::Matrix{Float64} = zeros(length(θ_est), length(measurementData.tObs))
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
-    computeJacobianResidualsDynamicθ((@view jacobian[θ_indices.iθ_dynamic, :]), θ_dynamic, θ_sd,
-                                     θ_observable, θ_nonDynamic, S, peTabModel, odeProblem,
-                                     simulationInfo, θ_indices, measurementData, parameterInfo, 
-                                     changeODEProblemParameters!, solveOdeModelAllConditions!;
-                                     expIDSolve=expIDSolve)
+    computeJacobianResidualsDynamicθ!((@view jacobian[θ_indices.iθ_dynamic, :]), θ_dynamic, θ_sd,
+                                      θ_observable, θ_nonDynamic, S, peTabModel, odeProblem,
+                                      simulationInfo, θ_indices, measurementData, parameterInfo, 
+                                      changeODEProblemParameters!, solveOdeModelAllConditions!;
+                                      expIDSolve=expIDSolve)
 
     # Happens when at least one forward pass fails
     if all(jacobian[θ_indices.iθ_dynamic, :] .== 1e8)

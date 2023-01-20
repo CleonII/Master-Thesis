@@ -51,27 +51,3 @@ function transformObsOrData(val, transform::Symbol)
         println("Only :lin, :log10 and :log are supported.")
     end
 end
-
-
-function splitParameterVector(θ_est::AbstractVector, 
-                              θ_indices::ParameterIndices)::Tuple{AbstractVector, AbstractVector, AbstractVector, AbstractVector} 
-
-    θ_dynamic = θ_est[θ_indices.iθ_dynamic]
-    θ_observable = θ_est[θ_indices.iθ_observable]
-    θ_sd = θ_est[θ_indices.iθ_sd]
-    θ_nonDynamic = θ_est[θ_indices.iθ_sd]
-
-    return θ_dynamic, θ_observable, θ_sd, θ_nonDynamic
-end
-
-
-function couldSolveODEModel(simulationInfo::SimulationInfo, expIDSolve::Vector{String})::Bool
-    @inbounds for i in eachindex(simulationInfo.solArrayGrad)
-        if expIDSolve[1] == "all" || simulationInfo.conditionIdSol[i] ∈ expIDSolve
-            if simulationInfo.solArrayGrad[i].retcode != :Success
-                return false
-            end
-        end
-    end
-    return true
-end

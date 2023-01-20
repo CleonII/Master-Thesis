@@ -163,7 +163,7 @@ end
 
     Process the PeTab parameterData file into a type-stable Julia struct.
 """
-function processParameterData(parameterData::DataFrame)::ParamData
+function processParameterData(parameterData::DataFrame)::ParameterInfo
 
     nParam = length(parameterData[!, "estimate"])
 
@@ -197,7 +197,7 @@ function processParameterData(parameterData::DataFrame)::ParamData
     end
     nParamEst::Int = Int(sum(shouldEst))
 
-    return ParamData(paramVal, lb, ub, paramId, logScale, shouldEst, nParamEst)
+    return ParameterInfo(paramVal, lb, ub, paramId, logScale, shouldEst, nParamEst)
 end
 
 

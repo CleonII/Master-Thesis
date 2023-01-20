@@ -10,7 +10,7 @@
     Used when setting up the PeTab cost function, and when solving the ODE-system 
     for the values in the parameters-file. 
 """
-function setParamToFileValues!(paramMap, stateMap, paramData::ParamData)
+function setParamToFileValues!(paramMap, stateMap, paramData::ParameterInfo)
 
     parameterNames = paramData.parameterID
     parameterNamesStr = string.([paramMap[i].first for i in eachindex(paramMap)])
@@ -30,25 +30,38 @@ function setParamToFileValues!(paramMap, stateMap, paramData::ParamData)
             stateMap[i_state] = Pair(stateMap[i_state].first, valChangeTo)
         end
     end
+end
 
+
+function splitParameterVector(θ_est::AbstractVector, 
+                              θ_indices::ParameterIndices)::Tuple{AbstractVector, AbstractVector, AbstractVector, AbstractVector} 
+
+    θ_dynamic = θ_est[θ_indices.iθ_dynamic]
+    θ_observable = θ_est[θ_indices.iθ_observable]
+    θ_sd = θ_est[θ_indices.iθ_sd]
+    θ_nonDynamic = θ_est[θ_indices.iθ_nonDynamic]
+
+    return θ_dynamic, θ_observable, θ_sd, θ_nonDynamic
 end
 
 
 function computeσ(u::AbstractVector,
                   t::Float64,
-                  θ_dynamic::Vector{Float64},
-                  θ_sd::Vector{Float64}, 
-                  θ_nonDynamic::Vector{Float64},
+                  θ_dynamic::AbstractVector,
+                  θ_sd::AbstractVector, 
+                  θ_nonDynamic::AbstractVector,
                   peTabModel::PeTabModel,
                   iMeasurement::Int64, 
-                  θ_indices::ParameterIndices)::Real
+                  measurementData::MeasurementData,
+                  θ_indices::ParameterIndices, 
+                  parameterInfo::ParameterInfo)::Real
 
     # Compute associated SD-value or extract said number if it is known 
     if typeof(measurementData.sdParams[iMeasurement]) <: AbstractFloat
         σ = measurementData.sdParams[iMeasurement]
     else
         mapSdParam = θ_indices.mapArraySdParam[θ_indices.indexSdParamMap[iMeasurement]]
-        σ = peTabModel.evalSd!(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterData, measurementData.observebleID[iMeasurement], mapSdParam)
+        σ = peTabModel.evalSd!(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurement], mapSdParam)
     end
 
     return σ
@@ -58,11 +71,12 @@ end
 # Compute observation function h
 function computehTransformed(u::AbstractVector,
                              t::Float64,
-                             θ_dynamic::Vector{Float64},
-                             θ_observable::Vector{Float64}, 
-                             θ_nonDynamic::Vector{Float64},
+                             θ_dynamic::AbstractVector,
+                             θ_observable::AbstractVector, 
+                             θ_nonDynamic::AbstractVector,
                              peTabModel::PeTabModel,
                              iMeasurement::Int64, 
+                             measurementData::MeasurementData,
                              θ_indices::ParameterIndices, 
                              parameterInfo::ParameterInfo)::Real
 
@@ -72,6 +86,78 @@ function computehTransformed(u::AbstractVector,
     hTransformed = transformObsOrData(h, measurementData.transformData[iMeasurement])
 
     return hTransformed
+end
+
+
+# Transform parameter from log10 scale to normal scale, or reverse transform
+function transformθ!(θ::AbstractVector, 
+                     θ_names::Vector{String}, 
+                     parameterInfo::ParameterInfo; 
+                     reverseTransform::Bool=false) 
+    
+    @inbounds for i in eachindex(θ)
+        iParam = findfirst(x -> x == θ_names[i], parameterInfo.parameterID)
+        if isnothing(iParam)
+            println("Warning : Could not find parameter ID for ", θ_names[i])
+        end
+        if parameterInfo.logScale[iParam] == true && reverseTransform == false
+            θ[i] = exp10(θ[i])
+        elseif parameterInfo.logScale[iParam] == true && reverseTransform == true
+            θ[i] = log10(θ[i])
+        end
+    end
+end
+
+
+# Transform parameter from log10 scale to normal scale, or reverse transform
+function transformθ(θ::AbstractVector, 
+                    θ_names::Vector{String}, 
+                    parameterInfo::ParameterInfo; 
+                    reverseTransform::Bool=false)::AbstractVector
+    
+    iθ = [findfirst(x -> x == θ_names[i], parameterInfo.parameterID) for i in eachindex(θ_names)]
+    shouldTransform = [parameterInfo.logScale[i] == true ? true : false for i in iθ]
+    shouldNotTransform = .!shouldTransform
+
+    if reverseTransform == false
+        out = exp10.(θ) .* shouldTransform .+ θ .* shouldNotTransform
+    else
+        out = log10.(θ) .* shouldTransform .+ θ .* shouldNotTransform
+    end
+    return out
+end
+
+
+function changeODEProblemParameters!(pODEProblem::AbstractVector, 
+                                     u0::AbstractVector,
+                                     θ::AbstractVector,
+                                     θ_indices::ParameterIndices,
+                                     peTabModel::PeTabModel)
+
+    mapDynParam = θ_indices.mapDynParEst
+    pODEProblem[mapDynParam.iDynParamInSys] .= θ[mapDynParam.iDynParamInVecEst]
+    peTabModel.evalU0!(u0, pODEProblem) 
+    
+    return nothing
+end
+
+
+function changeODEProblemParameters(pODEProblem::AbstractVector, 
+                                    θ::AbstractVector,
+                                    θ_indices::ParameterIndices,
+                                    peTabModel::PeTabModel)
+
+    # Helper function to not-inplace map parameters 
+    function mapParamToEst(j::Integer, mapDynParam::MapDynParEst)
+        whichIndex = findfirst(x -> x == j, mapDynParam.iDynParamInSys)
+        return mapDynParam.iDynParamInVecEst[whichIndex]
+    end
+
+    mapDynParam = θ_indices.mapDynParEst
+    outpODEProblem = [i ∈ mapDynParam.iDynParamInSys ? θ[mapParamToEst(i, mapDynParam)] : pODEProblem[i] for i in eachindex(pODEProblem)]
+    outu0Ret = peTabModel.evalU0(outpODEProblem) 
+    
+    return outpODEProblem, outu0Ret
 end
 
 

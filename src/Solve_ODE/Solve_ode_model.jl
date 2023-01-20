@@ -771,7 +771,7 @@ end
 function changeExperimentalCond!(paramVec, 
                                  stateVec, 
                                  expID::String, 
-                                 parameterData::ParamData,
+                                 parameterData::ParameterInfo,
                                  experimentalConditions::DataFrame,
                                  peTabModel::PeTabModel)
 
@@ -880,7 +880,7 @@ end
 function changeExperimentalCond!(paramVec, 
                                  stateVec, 
                                  expID::String, 
-                                 parameterData::ParamData,
+                                 parameterData::ParameterInfo,
                                  experimentalConditions::DataFrame,
                                  peTabModel::PeTabModel)
 
