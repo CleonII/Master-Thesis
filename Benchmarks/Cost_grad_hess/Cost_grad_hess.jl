@@ -287,20 +287,19 @@ if ARGS[1] == "Bachman_fix_param"
     peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel, forceBuildJlFile=false)
     nDynParam = getNDynParam(peTabModel)
     tol = 1e-8
-
     for nParamFix in 1:(nDynParam-1)
         for i in 1:10
             peTabModelFewerParam = getPEtabModelNparamFixed(peTabModel, nParamFix)
             # Check Gradient 
             for sensealgInfo in sensealgInfoTot
                 benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
-                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5)
+                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=10)
                 benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
-                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5, chunkSize=1)
+                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=10, chunkSize=1)
             end
-        end
-        if isdir(peTabModelFewerParam.dirModel)
-            rm(peTabModelFewerParam.dirModel, recursive=true)
+            if isdir(peTabModelFewerParam.dirModel)
+                rm(peTabModelFewerParam.dirModel, recursive=true)
+            end
         end
     end
 end
