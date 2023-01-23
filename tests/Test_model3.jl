@@ -43,6 +43,9 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
+# For testing residuals
+include(joinpath(pwd(), "tests", "Test_residuals.jl"))
+
 
 function getSolAlgebraicSS(peTabModel::PeTabModel, solver, tol::Float64, a::T1, b::T1, c::T1, d::T1) where T1<:Real
 
@@ -97,6 +100,7 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
     paramData = processParameterData(parameterDataFile) 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
+    θ_indices = computeIndicesθ(paramData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     
     # Extract experimental conditions for simulations 
     simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData, absTolSS=1e-12, relTolSS=1e-10)
@@ -119,7 +123,8 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
 
         prob = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 9.7), peTabModel.paramMap, jac=true)
         prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
-        changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, paramData, experimentalConditionsFile, peTabModel)
+        θ_est = getFileODEvalues(peTabModel)
+        changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCondEst!(pVec, u0Vec, expID, θ_est, peTabModel, θ_indices)
         
         # Solve ODE system with steady state simulation 
         solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)

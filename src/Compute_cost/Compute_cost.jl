@@ -19,8 +19,8 @@ function computeCost(θ_est::AbstractVector,
                                computeHessian=computeHessian, computeResiduals=computeResiduals, expIDSolve=expIDSolve)
 
     if priorInfo.hasPriors == true && computeHessian == false  
-        θ_estT = transformθ(θ_est, θ_indices.namesParamEst, parameterInfo)
-        cost += evalPriors(θ_estT, θ_est, θ_indices.namesParamEst, θ_indices, priorInfo)
+        θ_estT = transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+        cost += evalPriors(θ_estT, θ_est, θ_indices.θ_estNames, θ_indices, priorInfo)
     end
 
     return cost
@@ -213,7 +213,7 @@ function computeCostExpCond(odeSolution::Union{ODESolution, OrdinaryDiffEq.ODECo
                 println("Transformation ", measurementData.transformData[i], "not yet supported.")
                 return Inf
             end   
-        else
+        elseif computeResiduals == true
             if measurementData.transformData[i] == :lin
                 cost += ((hTransformed - measurementData.yObsNotTransformed[i]) / σ)
             elseif measurementData.transformData[i] == :log10

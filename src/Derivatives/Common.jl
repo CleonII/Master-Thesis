@@ -55,14 +55,14 @@ function compute∂G∂_(∂G∂_,
         σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, iMeasurementData, measurementData, θ_indices, parameterInfo)
 
         # Maps needed to correctly extract the right SD and observable parameters 
-        mapSdParam = θ_indices.mapArraySdParam[θ_indices.indexSdParamMap[iMeasurementData]]
-        mapObsParam = θ_indices.mapArrayObsParam[θ_indices.indexObsParamMap[iMeasurementData]]
+        mapθ_sd = θ_indices.mapθ_sd[iMeasurementData]
+        mapθ_observable = θ_indices.mapθ_observable[iMeasurementData]
         if compute∂G∂U == true
-            peTabModel.evalDYmodDu(u, t, p, θ_observable, θ_nonDynamic, measurementData.observebleID[iMeasurementData], mapObsParam, ∂h∂_)
-            peTabModel.evalDSdDu!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurementData], mapSdParam, ∂σ∂_)
+            peTabModel.evalDYmodDu(u, t, p, θ_observable, θ_nonDynamic, measurementData.observebleID[iMeasurementData], mapθ_observable, ∂h∂_)
+            peTabModel.evalDSdDu!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurementData], mapθ_sd, ∂σ∂_)
         else
-            peTabModel.evalDYmodDp(u, t, p, θ_observable, θ_nonDynamic, measurementData.observebleID[iMeasurementData], mapObsParam, ∂h∂_)
-            peTabModel.evalDSdDp!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurementData], mapSdParam, ∂σ∂_)
+            peTabModel.evalDYmodDp(u, t, p, θ_observable, θ_nonDynamic, measurementData.observebleID[iMeasurementData], mapθ_observable, ∂h∂_)
+            peTabModel.evalDSdDp!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurementData], mapθ_sd, ∂σ∂_)
         end
 
         if measurementData.transformData[iMeasurementData] == :log10
@@ -109,42 +109,38 @@ function adjustGradientTransformedParameters!(gradient::Union{AbstractVector, Su
                                               autoDiffSensitivites::Bool=false, 
                                               adjoint::Bool=false)
 
-    # Map for parameters specific to experimental condition. TODO: Use named tuple to improve mapping                                       
-    whichExpMap = findfirst(x -> x == postEqulibriumId, [θ_indices.mapExpCond[i].condID for i in eachindex(θ_indices.mapExpCond)])                                                
-    expMap = θ_indices.mapExpCond[whichExpMap]
-
+    mapConditionId = θ_indices.mapsConiditionId[Symbol(postEqulibriumId)]                                 
+    
     # In case we compute the sensitivtes via automatic differentation the parameters in _gradient=S'*∂G∂u will appear in the 
     # same order as they appear in θ_est. In case we do not compute sensitivtes via autodiff, or do adjoint sensitity analysis, 
     # the parameters in _gradient=S'∂G∂u appear in the same order as in odeProblem.p.
     if autoDiffSensitivites == true && adjoint == false
-        _gradient1 = _gradient[θ_indices.mapDynParEst.iDynParamInVecEst] .+ ∂G∂p[θ_indices.mapDynParEst.iDynParamInSys]
-        _gradient2 = _gradient[expMap.iDynEstVec] .+ ∂G∂p[expMap.iOdeProbDynParam]
+        _gradient1 = _gradient[θ_indices.mapODEProblem.iθDynamic] .+ ∂G∂p[θ_indices.mapODEProblem.iODEProblemθDynamic]
+        _gradient2 = _gradient[mapConditionId.iθDynamic] .+ ∂G∂p[mapConditionId.iODEProblemθDynamic]
     elseif adjoint == false
-        _gradient1 = _gradient[θ_indices.mapDynParEst.iDynParamInSys] .+ ∂G∂p[θ_indices.mapDynParEst.iDynParamInSys]
-        _gradient2 = _gradient[expMap.iOdeProbDynParam] .+ ∂G∂p[expMap.iOdeProbDynParam]
+        _gradient1 = _gradient[θ_indices.mapODEProblem.iODEProblemθDynamic] .+ ∂G∂p[θ_indices.mapODEProblem.iODEProblemθDynamic]
+        _gradient2 = _gradient[mapConditionId.iODEProblemθDynamic] .+ ∂G∂p[mapConditionId.iODEProblemθDynamic]
     end
 
     # For adjoint sensitivity analysis ∂G∂p is already incorperated into the gradient, and the parameters appear in the 
     # same order as in ODEProblem 
     if adjoint == true
-        _gradient1 = _gradient[θ_indices.mapDynParEst.iDynParamInSys] 
-        _gradient2 = _gradient[expMap.iOdeProbDynParam]
+        _gradient1 = _gradient[θ_indices.mapODEProblem.iODEProblemθDynamic] 
+        _gradient2 = _gradient[mapConditionId.iODEProblemθDynamic]
     end
     
     # Transform gradient parameter that for each experimental condition appear in the ODE system  
-    iChange = θ_indices.mapDynParEst.iDynParamInVecEst                                                          
+    iChange = θ_indices.mapODEProblem.iθDynamic                                                          
     gradient[iChange] .+= _adjustGradientTransformedParameters(_gradient1,
-                                                               θ_dynamic[θ_indices.mapDynParEst.iDynParamInVecEst], 
-                                                               θ_indices.θ_dynamicNames[θ_indices.mapDynParEst.iDynParamInVecEst], 
+                                                               θ_dynamic[θ_indices.mapODEProblem.iθDynamic], 
+                                                               θ_indices.θ_dynamicNames[θ_indices.mapODEProblem.iθDynamic], 
                                                                parameterInfo)
     
     # Transform gradient for parameters which are specific to certain experimental conditions. 
-    whichExpMap = findfirst(x -> x == postEqulibriumId, [θ_indices.mapExpCond[i].condID for i in eachindex(θ_indices.mapExpCond)])
-    expMap = θ_indices.mapExpCond[whichExpMap]                                          
-    gradient[expMap.iDynEstVec] .+= _adjustGradientTransformedParameters(_gradient2,
-                                                                         θ_dynamic[expMap.iDynEstVec], 
-                                                                         θ_indices.θ_dynamicNames[expMap.iDynEstVec], 
-                                                                         parameterInfo)     
+    gradient[mapConditionId.iθDynamic] .+= _adjustGradientTransformedParameters(_gradient2,
+                                                                                θ_dynamic[mapConditionId.iθDynamic], 
+                                                                                θ_indices.θ_dynamicNames[mapConditionId.iθDynamic], 
+                                                                                parameterInfo)     
 end
 
 
@@ -157,5 +153,5 @@ function _adjustGradientTransformedParameters(_gradient::AbstractVector,
     shouldTransform = [parameterInfo.logScale[i] == true ? true : false for i in iθ]
     shouldNotTransform = .!shouldTransform
 
-    return log(10) .* _gradient .* θ .* shouldTransform .+ _gradient .* shouldNotTransform
+    return @. log(10) * _gradient * θ * shouldTransform + _gradient * shouldNotTransform
 end

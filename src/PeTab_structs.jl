@@ -193,28 +193,28 @@ end
 
     See also: [`getIndicesParam`, `buildMapParameters`]
 """
-struct ParamMap
-    shouldEst::Array{Bool, 1}
-    indexUse::Array{Int64, 1}
-    valuesConst::Vector{Float64}
-    nParam::Int64
+struct θObsOrSdParameterMap
+    shouldEstimate::Array{Bool, 1}
+    indexInθ::Array{Int64, 1}
+    constantValues::Vector{Float64}
+    nParameters::Int64
+    isSingleConstant::Bool
 end
 
 
-struct MapExpCond
-    condID::String
-    expCondParamConstVal::Vector{Float64}
-    iOdeProbParamConstVal::Vector{Int64}
-    expCondStateConstVal::Vector{Float64}
-    iOdeProbStateConstVal::Vector{Int64}
-    iDynEstVec::Vector{Int64}
-    iOdeProbDynParam::Vector{Int64}
+struct MapConditionId
+    constantParameters::Vector{Float64}
+    iODEProblemConstantParameters::Vector{Int64}
+    constantsStates::Vector{Float64}
+    iODEProblemConstantStates::Vector{Int64}
+    iθDynamic::Vector{Int64}
+    iODEProblemθDynamic::Vector{Int64}
 end
 
 
-struct MapDynParEst
-    iDynParamInSys::Vector{Int64}
-    iDynParamInVecEst::Vector{Int64}
+struct MapODEProblem
+    iθDynamic::Vector{Int64}
+    iODEProblemθDynamic::Vector{Int64}
 end
 
 
@@ -239,28 +239,25 @@ end
 
     See also: [`getIndicesParam`, `ParamMap`]
 """
-struct ParameterIndices{T4<:Array{<:ParamMap, 1}, 
-                        T5<:MapDynParEst, 
-                        T6<:Array{<:MapExpCond, 1}}
+struct ParameterIndices{T4<:Vector{<:θObsOrSdParameterMap}, 
+                        T5<:MapODEProblem, 
+                        T6<:NamedTuple}
 
     iθ_dynamic::Vector{Int64}
     iθ_observable::Vector{Int64}
     iθ_sd::Vector{Int64}
-    iθ_notOdeSystem::Vector{Int64}
     iθ_nonDynamic::Vector{Int64}
+    iθ_notOdeSystem::Vector{Int64}
     θ_dynamicNames::Vector{String}
     θ_observableNames::Vector{String}
     θ_sdNames::Vector{String}
-    θ_notOdeSystemNames::Vector{String}
     θ_nonDynamicNames::Vector{String}
-    namesParamEst::Vector{String}
-    indexObsParamMap::Vector{Int64}
-    indexSdParamMap::Vector{Int64}
-    mapArrayObsParam::T4
-    mapArraySdParam::T4
-    mapDynParEst::T5
-    mapExpCond::T6
-    constParamPerCond::Vector{Vector{Float64}}
+    θ_notOdeSystemNames::Vector{String}
+    θ_estNames::Vector{String}
+    mapθ_observable::T4
+    mapθ_sd::T4
+    mapODEProblem::T5
+    mapsConiditionId::T6
 end
 
 

@@ -165,7 +165,6 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
     # Pre allcoate vectors needed for computations 
     ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, peTabModel) 
     
-    # To compute 
     compute∂G∂u = (out, u, p, t, i) -> begin compute∂G∂_(out, u, p, t, i, iPerTimePoint, 
                                                          measurementData, parameterInfo, 
                                                          θ_indices, peTabModel, 

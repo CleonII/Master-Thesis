@@ -66,7 +66,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData, sensealg=sensealg, absTolSS=absTolSS, relTolSS=relTolSS)
 
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
-    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
+    paramEstIndices = computeIndicesθ(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     
     # Set up potential prior for the parameters to estimate 
     priorInfo::PriorInfo = getPriorInfo(paramEstIndices, parameterDataFile)
@@ -86,7 +86,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
 
     # Functions to map experimental conditions and parameters correctly to the ODE model 
     changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
-    changeToExperimentalCondSenseEqUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEstSenseEq!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
+    changeToExperimentalCondSenseEqUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices, computeForwardSensitivites=true)
     changeToExperimentalCondUse = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
     changeModelParamUse! = (pVec, u0Vec, paramEst) -> changeODEProblemParameters!(pVec, u0Vec, paramEst, paramEstIndices, peTabModel)
     changeModelParamUse = (pVec, paramEst) -> changeODEProblemParameters(pVec, paramEst, paramEstIndices, peTabModel)
@@ -125,7 +125,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     evalHessGaussNewton = (hessian, paramVecEst) -> computeGaussNewtonHessianApproximation!(hessian, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondGuassNewtonForwardEq!, priorInfo)      
 
     # Lower and upper bounds for parameters to estimate 
-    namesParamEst = paramEstIndices.namesParamEst
+    namesParamEst = paramEstIndices.θ_estNames
     lowerBounds = [parameterData.lowerBounds[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)] 
     upperBounds = [parameterData.upperBounds[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)] 
     # Parameter with nominal values in PeTab file 
@@ -162,7 +162,7 @@ end
 function evalPriors(paramVecTransformed::AbstractVector, 
                     paramVecNotTransformed::AbstractVector,
                     namesParamVec::Array{String, 1}, 
-                    paramEstIndices::ParameterIndices, 
+                    θ_indices::ParameterIndices, 
                     priorInfo::PriorInfo)::Real
 
     if priorInfo.hasPriors == false
@@ -172,7 +172,7 @@ function evalPriors(paramVecTransformed::AbstractVector,
     k = 0
     priorContribution = 0.0
     for i in eachindex(paramVecNotTransformed)
-        iParam = findfirst(x -> x == namesParamVec[i], paramEstIndices.namesParamEst)
+        iParam = findfirst(x -> x == namesParamVec[i], θ_indices.θ_estNames)
         if priorInfo.priorOnParamScale[iParam] == true
             pInput = paramVecNotTransformed[i]
         else

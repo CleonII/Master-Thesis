@@ -648,338 +648,103 @@ end
 
 
 # Change experimental condition when running parameter estimation. A lot of heavy lifting here is done by 
-# an index which correctly maps parameters for an experimental condition to the ODE model.
-function changeExperimentalCondEst!(paramVec::AbstractVector, 
-                                    stateVec::AbstractVector, 
-                                    expID::String, 
-                                    dynParamEst,
+# an index which correctly maps parameters for a conditionId to the ODEProblem.
+function changeExperimentalCondEst!(pODEProblem::AbstractVector, 
+                                    u0::AbstractVector, 
+                                    conditionId::String, 
+                                    θ_dynamic::AbstractVector,
                                     peTabModel::PeTabModel, 
-                                    paramEstIndices::ParameterIndices)
+                                    θ_indices::ParameterIndices;
+                                    computeForwardSensitivites::Bool=false)
 
-    whichExpMap = findfirst(x -> x == expID, [paramEstIndices.mapExpCond[i].condID for i in eachindex(paramEstIndices.mapExpCond)])
-    expMap = paramEstIndices.mapExpCond[whichExpMap] 
+    mapConditionId = θ_indices.mapsConiditionId[Symbol(conditionId)] 
 
     # Constant parameters 
-    paramVec[expMap.iOdeProbParamConstVal] .= expMap.expCondParamConstVal
+    pODEProblem[mapConditionId.iODEProblemConstantParameters] .= mapConditionId.constantParameters
 
     # Parameters to estimate 
-    paramVec[expMap.iOdeProbDynParam] .= dynParamEst[expMap.iDynEstVec]
+    pODEProblem[mapConditionId.iODEProblemθDynamic] .= θ_dynamic[mapConditionId.iθDynamic]
 
-    # When computing the gradient the paramMap must be able to handle dual 
-    peTabModel.evalU0!(stateVec, paramVec) 
+    # Given changes in parameters initial values might have to be re-evaluated 
+    nModelStates = length(peTabModel.stateNames)
+    peTabModel.evalU0!((@view u0[1:nModelStates]), pODEProblem) 
 
-    # Account for any potential events 
+    # Account for any potential events (callbacks) which are active at time zero
     for f! in peTabModel.checkCallbackActive
-        f!(stateVec, paramVec)
+        f!(u0, pODEProblem)
     end
 
     # In case an experimental condition maps directly to the initial value of a state. 
-    if !isempty(expMap.expCondStateConstVal)
-        stateVec[iOdeProbStateConstVal] .= expCondStateConstVal
+    if !isempty(mapConditionId.iODEProblemConstantStates)
+        u0[mapConditionId.iODEProblemConstantStates] .= mapConditionId.constantsStates
+    end
+
+    # In case we solve the forward sensitivity equations we must adjust the initial sensitives 
+    # by computing the jacobian at t0
+    if computeForwardSensitivites == true
+        St0::Matrix{Float64} = Matrix{Float64}(undef, (nModelStates, length(pODEProblem)))
+        ForwardDiff.jacobian!(St0, peTabModel.evalU0, pODEProblem)
+        u0[(nModelStates+1):end] .= vec(St0)
     end
 
     return nothing
 end                                 
+                             
 
-
-# Change experimental conditions when solving the expanded sensitity equations ODE system 
-function changeExperimentalCondEstSenseEq!(paramVec::AbstractVector, 
-                                           stateVec::AbstractVector, 
-                                           expID::String, 
-                                           dynParamEst,
-                                           peTabModel::PeTabModel, 
-                                           paramEstIndices::ParameterIndices)
-
-    whichExpMap = findfirst(x -> x == expID, [paramEstIndices.mapExpCond[i].condID for i in eachindex(paramEstIndices.mapExpCond)])
-    expMap = paramEstIndices.mapExpCond[whichExpMap] 
-
-    # Constant parameters 
-    paramVec[expMap.iOdeProbParamConstVal] .= expMap.expCondParamConstVal
-
-    # Parameters to estimate 
-    paramVec[expMap.iOdeProbDynParam] .= dynParamEst[expMap.iDynEstVec]
-
-    # When computing the gradient the paramMap must be able to handle dual 
-    nStates = length(peTabModel.stateNames)
-    peTabModel.evalU0!((@view stateVec[1:nStates]), paramVec) 
-
-    # Account for any potential events active at time zero
-    for f! in peTabModel.checkCallbackActive
-        f!(stateVec, paramVec)
-    end
-
-    # In case an experimental condition maps directly to the initial value of a state. 
-    if !isempty(expMap.expCondStateConstVal)
-        stateVec[iOdeProbStateConstVal] .= expCondStateConstVal
-    end
-
-    # For initial values in the expanded ODE system the sensitivites at time zero are required 
-    sMatAtT0::Matrix{Float64} = Matrix{Float64}(undef, (nStates, length(paramVec)))
-    ForwardDiff.jacobian!(sMatAtT0, peTabModel.evalU0, paramVec)
-    stateVec[(nStates+1):end] .= vec(sMatAtT0)
-
-    return nothing
-end                                 
-
-
-function changeExperimentalCondEst(paramVec::AbstractVector, 
-                                   stateVec::AbstractVector, 
-                                   expID::String, 
-                                   dynParamEst,
+function changeExperimentalCondEst(pODEProblem::AbstractVector, 
+                                   u0::AbstractVector, 
+                                   conditionId::String, 
+                                   θ_dynamic::AbstractVector,
                                    peTabModel::PeTabModel, 
-                                   paramEstIndices::ParameterIndices)
+                                   θ_indices::ParameterIndices)
 
-    whichExpMap = findfirst(x -> x == expID, [paramEstIndices.mapExpCond[i].condID for i in eachindex(paramEstIndices.mapExpCond)])
-    expMap = paramEstIndices.mapExpCond[whichExpMap] 
-    constParamCond = paramEstIndices.constParamPerCond[whichExpMap]
+    mapConditionId = θ_indices.mapsConiditionId[Symbol(conditionId)] 
     
     # For a non-mutating way of mapping constant parameters 
-    function mapConstantParam(iUse::Integer, expMap)
-        whichIndex = findfirst(x -> x == iUse, expMap.iOdeProbParamConstVal)
+    function iConstantParam(iUse::Integer)
+        whichIndex = findfirst(x -> x == iUse, mapConditionId.iODEProblemConstantParameters)
         return whichIndex
     end
     # For a non-mutating mapping of parameters to estimate 
-    function mapParamToEst(iUse::Integer, expMap)
-        whichIndex = findfirst(x -> x == iUse, expMap.iOdeProbDynParam)
-        return expMap.iDynEstVec[whichIndex]
+    function iParametersEst(iUse::Integer)
+        whichIndex = findfirst(x -> x == iUse, mapConditionId.iODEProblemθDynamic)
+        return mapConditionId.iθDynamic[whichIndex]
     end
     
     # Constant parameters 
-    paramVecRet = [i ∈ expMap.iOdeProbParamConstVal ? constParamCond[mapConstantParam(i, expMap)] : paramVec[i] for i in eachindex(paramVec)]
+    _pODEProblem = [i ∈ mapConditionId.iODEProblemConstantParameters ? mapConditionId.constantParameters[iConstantParam(i)] : pODEProblem[i] for i in eachindex(pODEProblem)]
     
     # Parameters to estimate 
-    paramVecRetRet = [i ∈ expMap.iOdeProbDynParam ? dynParamEst[mapParamToEst(i, expMap)] : paramVecRet[i] for i in eachindex(paramVec)]    
+    __pODEProblem = [i ∈ mapConditionId.iODEProblemθDynamic ? θ_dynamic[iParametersEst(i)] : _pODEProblem[i] for i in eachindex(_pODEProblem)]    
     
     # When using AD as Zygote we must use the non-mutating version of evalU0
-    stateVecRet = peTabModel.evalU0(paramVecRetRet) 
+    _u0 = peTabModel.evalU0(__pODEProblem) 
 
     # In case an experimental condition maps directly to the initial value of a state. 
-    # To fix if above works.
-    if !isempty(expMap.expCondStateConstVal)
-        stateVec[iOdeProbStateConstVal] .= expCondStateConstVal
+    # Very rare, will fix if ever needed for slow Zygote 
+    if !isempty(mapConditionId.iODEProblemConstantStates)
+        u0[mapConditionId.iODEProblemConstantStates] .= mapConditionId.constantsStates
     end
 
     # Account for any potential events 
     for f! in peTabModel.checkCallbackActive
-        f!(stateVecRet, paramVecRetRet)
+        f!(_u0, __pODEProblem)
     end
 
-    return paramVecRetRet, stateVecRet
+    return __pODEProblem, _u0
 end     
 
 
-function changeExperimentalCond!(paramVec, 
-                                 stateVec, 
-                                 expID::String, 
-                                 parameterData::ParameterInfo,
-                                 experimentalConditions::DataFrame,
-                                 peTabModel::PeTabModel)
+function getFileODEvalues(peTabModel::PeTabModel)
+  
+    # Change model parameters 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
+    parameterInfo = processParameterData(parameterDataFile)
+    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
+    θ_indices = computeIndicesθ(parameterInfo, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
 
-    # TODO : Several things can be precomputed for this function
+    θ_estNames = θ_indices.θ_estNames
+    θ_est = parameterInfo.paramVal[findall(x -> x ∈ θ_estNames, parameterInfo.parameterID)]
 
-    # When computing the gradient the paramMap must be able to handle dual 
-    # numbers, hence creating a paramMapUse
-    paramMapUse = convert.(Pair{Num, eltype(paramVec)}, peTabModel.paramMap)
-
-    # Extract names of parameters to change for specific experimental condition 
-    colNames = names(experimentalConditions)
-    i_start = "conditionName" in colNames ? 3 : 2
-    paramStateChange = colNames[i_start:end]
-    if isempty(paramStateChange)
-        return 
-    end
-
-    # As values to change to can be a parameter or value they storing them as string initally is required 
-    valsChangeTo = string.(Vector(experimentalConditions[getRowExpId(expID, experimentalConditions), i_start:end]))
-    
-    # To help with mapping extract parameter names as string
-    parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
-    stateNamesStr = replace.(string.(peTabModel.stateNames), "(t)" => "")
-    
-    # Get number of states and parameters to change 
-    nParamChange = length(intersect(paramStateChange, parameterNamesStr))
-    nStateChange = length(intersect(paramStateChange, stateNamesStr))
-        
-    # Keep tab of which parameters are changed.
-    iParamChange = Array{Int64, 1}(undef, nParamChange)
-    iStateChange = Array{Int64, 1}(undef, nStateChange)
-    valChangeU0 = Array{Float64, 1}(undef, nStateChange)
-    iP, iS = 1, 1
-    changeParam::Bool = true
-    for i in eachindex(paramStateChange)
-        
-        variable = paramStateChange[i]
-        # If param is a model parameter change said parameter. If param is one state according to PeTab 
-        # standard the initial value for said state should be changed. 
-        iChangeP = findfirst(x -> x == variable, string.(parameters(peTabModel.odeSystem))) # Do not change to map correctly to ODE-sys
-        iChangeS = findfirst(x -> x == variable, stateNamesStr) # Can be precomputed but is not expansive
-        if !isnothing(iChangeP)
-            iParamChange[iP] = iChangeP
-            changeParam = true
-            iP += 1
-        elseif !isnothing(iChangeS)
-            iStateChange[iS] = iChangeS
-            changeParam = false
-        else
-            println("Error : $variable cannot be mapped to experimental condition")
-        end
-
-        # Extract value param should be changed to 
-        valChangeTo::Float64 = 0.0
-        if isNumber(valsChangeTo[i])
-            valChangeTo = parse(Float64, valsChangeTo[i])
-
-        # In case the value to change to is given as parameter look for said value in parameterData struct 
-        # (where all parameters are stored)
-        elseif findfirst(x -> x == valsChangeTo[i], parameterData.parameterID) != nothing
-            iVal = findfirst(x -> x == valsChangeTo[i], parameterData.parameterID)
-            valChangeTo = parameterData.paramVal[iVal]
-
-        else
-            println("Error : Simulation parameter not found for experimental condition $expID")
-            println("valsChangeTo[$i] = ", valsChangeTo[i])
-        end
-
-        # Identify which index param corresponds to the in paramMap 
-        if changeParam == true        
-            iParam = findfirst(x -> x == variable, parameterNamesStr)
-            if !isnothing(iParam)
-                paramMapUse[iParam] = Pair(paramMapUse[iParam].first, valChangeTo) 
-            else
-                println("Error : Simulation parameter to change not found for experimental condition $expID")
-            end
-
-        # In case a state is changed 
-        else
-            valChangeU0[iS] = valChangeTo
-            iS += 1
-        end
-    end
-
-    # To prevent that all parameter values are reset to their defualt values  
-    # only change the parameter values for the parameters change with the 
-    # new experimental condition. 
-    newVal = ModelingToolkit.varmap_to_vars(paramMapUse, peTabModel.paramNames)
-    paramVec[iParamChange] .= newVal[iParamChange]
-    peTabModel.evalU0!(stateVec, paramVec) 
-
-    # In case an experimental condition maps directly to the initial value of a state. 
-    if !isempty(iStateChange)
-        stateVec[iStateChange] .= valChangeU0
-    end
-
-    # Account for any potential events 
-    for f! in peTabModel.checkCallbackActive
-        f!(stateVec, paramVec)
-    end
-
-    return nothing
-end
-
-
-function changeExperimentalCond!(paramVec, 
-                                 stateVec, 
-                                 expID::String, 
-                                 parameterData::ParameterInfo,
-                                 experimentalConditions::DataFrame,
-                                 peTabModel::PeTabModel)
-
-    # TODO : Several things can be precomputed for this function
-
-    # When computing the gradient the paramMap must be able to handle dual 
-    # numbers, hence creating a paramMapUse
-    paramMapUse = convert.(Pair{Num, eltype(paramVec)}, peTabModel.paramMap)
-
-    # Extract names of parameters to change for specific experimental condition 
-    colNames = names(experimentalConditions)
-    i_start = "conditionName" in colNames ? 3 : 2
-    paramStateChange = colNames[i_start:end]
-    if isempty(paramStateChange)
-    return 
-    end
-
-    # As values to change to can be a parameter or value they storing them as string initally is required 
-    valsChangeTo = string.(Vector(experimentalConditions[getRowExpId(expID, experimentalConditions), i_start:end]))
-
-    # To help with mapping extract parameter names as string
-    parameterNamesStr = string.([paramMapUse[i].first for i in eachindex(paramMapUse)])
-    stateNamesStr = replace.(string.(peTabModel.stateNames), "(t)" => "")
-
-    # Get number of states and parameters to change 
-    nParamChange = length(intersect(paramStateChange, parameterNamesStr))
-    nStateChange = length(intersect(paramStateChange, stateNamesStr))
-
-    # Keep tab of which parameters are changed.
-    iParamChange = Array{Int64, 1}(undef, nParamChange)
-    iStateChange = Array{Int64, 1}(undef, nStateChange)
-    valChangeU0 = Array{Float64, 1}(undef, nStateChange)
-    iP, iS = 1, 1
-    changeParam::Bool = true
-    for i in eachindex(paramStateChange)
-
-        variable = paramStateChange[i]
-        # If param is a model parameter change said parameter. If param is one state according to PeTab 
-        # standard the initial value for said state should be changed. 
-        iChangeP = findfirst(x -> x == variable, string.(parameters(peTabModel.odeSystem))) # Do not change to map correctly to ODE-sys
-        iChangeS = findfirst(x -> x == variable, stateNamesStr) # Can be precomputed but is not expansive
-        if !isnothing(iChangeP)
-            iParamChange[iP] = iChangeP
-            changeParam = true
-            iP += 1
-        elseif !isnothing(iChangeS)
-            iStateChange[iS] = iChangeS
-            changeParam = false
-        else
-            println("Error : $variable cannot be mapped to experimental condition")
-        end
-
-        # Extract value param should be changed to 
-        valChangeTo::Float64 = 0.0
-        if isNumber(valsChangeTo[i])
-            valChangeTo = parse(Float64, valsChangeTo[i])
-
-        # In case the value to change to is given as parameter look for said value in parameterData struct 
-        # (where all parameters are stored)
-        elseif findfirst(x -> x == valsChangeTo[i], parameterData.parameterID) != nothing
-            iVal = findfirst(x -> x == valsChangeTo[i], parameterData.parameterID)
-            valChangeTo = parameterData.paramVal[iVal]
-
-        else
-            println("Error : Simulation parameter not found for experimental condition $expID")
-            println("valsChangeTo[$i] = ", valsChangeTo[i])
-        end
-
-        # Identify which index param corresponds to the in paramMap 
-        if changeParam == true        
-            iParam = findfirst(x -> x == variable, parameterNamesStr)
-            if !isnothing(iParam)
-                paramMapUse[iParam] = Pair(paramMapUse[iParam].first, valChangeTo) 
-            else
-                println("Error : Simulation parameter to change not found for experimental condition $expID")
-            end
-
-            # In case a state is changed 
-        else
-            valChangeU0[iS] = valChangeTo
-            iS += 1
-        end
-    end
-
-    # To prevent that all parameter values are reset to their defualt values  
-    # only change the parameter values for the parameters change with the 
-    # new experimental condition. 
-    newVal = ModelingToolkit.varmap_to_vars(paramMapUse, peTabModel.paramNames)
-    paramVec[iParamChange] .= newVal[iParamChange]
-    peTabModel.evalU0!(stateVec, paramVec) 
-
-    # In case an experimental condition maps directly to the initial value of a state. 
-    if !isempty(iStateChange)
-        stateVec[iStateChange] .= valChangeU0
-    end
-
-    return nothing
-end
-
-function getRowExpId(expId::String, data::DataFrame; colSearch="conditionId") 
-    return findfirst(x -> x == expId, data[!, colSearch])
+    return θ_est[θ_indices.iθ_dynamic]
 end

@@ -1,7 +1,11 @@
 #=
     Functions specific to gradient compuations via forward sensitivity equations. Notice that we can solve the 
     forward system either via i) solving the expanded ODE-system or ii) by using AutoDiff to obtain the sensitivites, 
-    which efficiently are the jacobian of the ODESolution 
+    which efficiently are the jacobian of the ODESolution.
+
+    There are two cases. When we compute the Jacobian of the ODE-solution via autodiff (sensealg=:AutoDiff) we compute 
+    a big Jacobian matrix (sensitivity matrix) across all experimental condition, while using one of the Julia forward 
+    algorithms we compute a "small" Jacobian for each experimental condition.
 =#
 
 
@@ -182,8 +186,8 @@ function computeGradientForwardExpCond!(gradient::Vector{Float64},
                                         end
       
     # Extract which parameters we compute gradient for in this specific experimental condition 
-    whichExpMap = findfirst(x -> x == postEqulibriumId, [θ_indices.mapExpCond[i].condID for i in eachindex(θ_indices.mapExpCond)])
-    iθ_experimentalCondition = vcat(θ_indices.mapDynParEst.iDynParamInVecEst, θ_indices.mapExpCond[whichExpMap].iDynEstVec)                                                                     
+    mapConditionId = θ_indices.mapsConiditionId[Symbol(postEqulibriumId)]                                 
+    iθ_experimentalCondition = vcat(θ_indices.mapODEProblem.iθDynamic, mapConditionId.iθDynamic)                                                                     
     
     # Loop through solution and extract sensitivites                
     p = dualToFloat.(sol.prob.p)

@@ -36,12 +36,13 @@ function computeJacobianResidualsDynamicθ!(jacobian::Union{Matrix{Float64}, Sub
             continue
         end
 
-        sol = simulationInfo.solArrayGrad[findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)]
+        whichForwardODESolution = findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)
+        sol = simulationInfo.solArrayGrad[whichForwardODESolution]
         positionInSolArray = simulationInfo.posInSolArray[conditionID]
 
         # In case the model is simulated first to a steady state we need to keep track of the post-equlibrium experimental 
         # condition Id to identify parameters specific to an experimental condition.
-        postEqulibriumId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardSol] : conditionID
+        postEqulibriumId = simulationInfo.simulateSS == true ? simulationInfo.postEqIdSol[whichForwardODESolution] : conditionID
 
         # If we have a callback it needs to be properly handled 
         computeJacobianResidualsExpCond!(jacobian, sol, S, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT,
@@ -87,8 +88,8 @@ function computeJacobianResidualsExpCond!(jacobian::AbstractMatrix,
                                             end
     
     # Extract relevant parameters for the experimental conditions 
-    whichExpMap = findfirst(x -> x == postEqulibriumId, [θ_indices.mapExpCond[i].condID for i in eachindex(θ_indices.mapExpCond)])
-    iθ_experimentalCondition = vcat(θ_indices.mapDynParEst.iDynParamInVecEst, θ_indices.mapExpCond[whichExpMap].iDynEstVec)                                                                     
+    mapConditionId = θ_indices.mapsConiditionId[Symbol(postEqulibriumId)]                                 
+    iθ_experimentalCondition = vcat(θ_indices.mapODEProblem.iθDynamic, mapConditionId.iθDynamic)                                                                     
 
     # Loop through solution and extract sensitivites                                                 
     tSaveAt = measurementData.tVecSave[conditionID]

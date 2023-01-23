@@ -7,7 +7,7 @@ function checkGradientResiduals(peTabModel::PeTabModel, solver, tol; verbose::Bo
     simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
 
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
-    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
+    paramEstIndices = computeIndicesθ(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
         
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
@@ -26,7 +26,7 @@ function checkGradientResiduals(peTabModel::PeTabModel, solver, tol; verbose::Bo
     evalJacResiduals = (out, paramVecEst) -> computeGaussNewtonHessianApproximation!(out, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondGuassNewtonForwardEq!, priorInfo, returnJacobian=true)      
 
     # Extract parameter vector 
-    namesParamEst = paramEstIndices.namesParamEst
+    namesParamEst = paramEstIndices.θ_estNames
     paramVecNominal = [parameterData.paramVal[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)]
     paramVec = transformθ(paramVecNominal, namesParamEst, parameterData, reverseTransform=true)
 

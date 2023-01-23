@@ -57,11 +57,11 @@ function computeσ(u::AbstractVector,
                   parameterInfo::ParameterInfo)::Real
 
     # Compute associated SD-value or extract said number if it is known 
-    if typeof(measurementData.sdParams[iMeasurement]) <: AbstractFloat
-        σ = measurementData.sdParams[iMeasurement]
+    mapθ_sd = θ_indices.mapθ_sd[iMeasurement]
+    if mapθ_sd.isSingleConstant == true
+        σ = mapθ_sd.constantValues[1]
     else
-        mapSdParam = θ_indices.mapArraySdParam[θ_indices.indexSdParamMap[iMeasurement]]
-        σ = peTabModel.evalSd!(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurement], mapSdParam)
+        σ = peTabModel.evalSd!(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurement], mapθ_sd)
     end
 
     return σ
@@ -80,12 +80,57 @@ function computehTransformed(u::AbstractVector,
                              θ_indices::ParameterIndices, 
                              parameterInfo::ParameterInfo)::Real
 
-    mapObsParam = θ_indices.mapArrayObsParam[θ_indices.indexObsParamMap[iMeasurement]]
-    h = peTabModel.evalYmod(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurement], mapObsParam) 
+    mapθ_observable = θ_indices.mapθ_observable[iMeasurement]
+    h = peTabModel.evalYmod(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurement], mapθ_observable) 
     # Transform yMod is necessary
     hTransformed = transformObsOrData(h, measurementData.transformData[iMeasurement])
 
     return hTransformed
+end
+
+
+# Function to extract observable or noise parameters when computing h or σ
+function getObsOrSdParam(θ::AbstractVector, parameterMap::θObsOrSdParameterMap)
+
+    # Helper function to map SD or obs-parameters in non-mutating way 
+    function map1Tmp(iVal)
+        whichI = sum(parameterMap.shouldEstimate[1:iVal])
+        return parameterMap.indexInθ[whichI]
+    end
+    function map2Tmp(iVal)
+        whichI = sum(.!parameterMap.shouldEstimate[1:iVal])
+        return whichI
+    end
+
+    # In case of no SD/observable parameter exit function
+    if parameterMap.nParameters == 0
+        return
+    end
+
+    # In case of single-value return do not have to return an array and think about type
+    if parameterMap.nParameters == 1 
+        if parameterMap.shouldEstimate[1] == true
+            return θ[parameterMap.indexInθ][1]
+        else
+            return parameterMap.constantValues[1]
+        end
+    end
+
+    nParametersToEstimte = sum(parameterMap.shouldEstimate)
+    if nParametersToEstimte == parameterMap.nParameters
+        return θ[parameterMap.indexInθ]
+
+    elseif nParametersToEstimte == 0
+        return parameterMap.constantValues        
+
+    # Computaionally most demanding case. Here a subset of the parameters 
+    # are to be estimated. This code must be non-mutating to support Zygote which 
+    # negatively affects performance 
+    elseif nParametersToEstimte > 0
+        _values = [parameterMap.shouldEstimate[i] == true ? θ[map1Tmp(i)] : 0.0 for i in 1:parameterMap.nParameters]
+        values = [parameterMap.shouldEstimate[i] == false ? parameterMap.constantValues[map2Tmp(i)] : _values[i] for i in 1:parameterMap.nParameters]
+        return values
+    end
 end
 
 
@@ -134,8 +179,8 @@ function changeODEProblemParameters!(pODEProblem::AbstractVector,
                                      θ_indices::ParameterIndices,
                                      peTabModel::PeTabModel)
 
-    mapDynParam = θ_indices.mapDynParEst
-    pODEProblem[mapDynParam.iDynParamInSys] .= θ[mapDynParam.iDynParamInVecEst]
+    mapODEProblem = θ_indices.mapODEProblem
+    pODEProblem[mapODEProblem.iODEProblemθDynamic] .= θ[mapODEProblem.iθDynamic]
     peTabModel.evalU0!(u0, pODEProblem) 
     
     return nothing
@@ -148,16 +193,16 @@ function changeODEProblemParameters(pODEProblem::AbstractVector,
                                     peTabModel::PeTabModel)
 
     # Helper function to not-inplace map parameters 
-    function mapParamToEst(j::Integer, mapDynParam::MapDynParEst)
-        whichIndex = findfirst(x -> x == j, mapDynParam.iDynParamInSys)
-        return mapDynParam.iDynParamInVecEst[whichIndex]
+    function mapParamToEst(j::Integer, mapDynParam::MapODEProblem)
+        whichIndex = findfirst(x -> x == j, mapDynParam.iODEProblemθDynamic)
+        return mapODEProblem.iθDynamic[whichIndex]
     end
 
-    mapDynParam = θ_indices.mapDynParEst
-    outpODEProblem = [i ∈ mapDynParam.iDynParamInSys ? θ[mapParamToEst(i, mapDynParam)] : pODEProblem[i] for i in eachindex(pODEProblem)]
-    outu0Ret = peTabModel.evalU0(outpODEProblem) 
+    mapODEProblem = θ_indices.mapODEProblem
+    outpODEProblem = [i ∈ mapODEProblem.iODEProblemθDynamic ? θ[mapParamToEst(i, mapODEProblem)] : pODEProblem[i] for i in eachindex(pODEProblem)]
+    outu0 = peTabModel.evalU0(outpODEProblem) 
     
-    return outpODEProblem, outu0Ret
+    return outpODEProblem, outu0
 end
 
 
@@ -186,23 +231,23 @@ function computeGradientPrior!(gradient::AbstractVector,
             
 
     _evalPriors = (θ_est) -> begin
-                                θ_estT = transformθ(θ_est, θ_indices.namesParamEst, parameterInfo)
-                                return evalPriors(θ_estT, θ_est, θ_indices.namesParamEst, θ_indices, priorInfo)
+                                θ_estT = transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+                                return evalPriors(θ_estT, θ_est, θ_indices.θ_estNames, θ_indices, priorInfo)
                             end
     gradient .+= ForwardDiff.gradient(_evalPriors, θ)                                
 end
 
 
 # Compute prior contribution to log-likelihood 
-function computeHessianPrior!(gradient::AbstractVector, 
+function computeHessianPrior!(hessian::AbstractVector, 
                               θ::AbstractVector, 
                               θ_indices::ParameterIndices, 
                               priorInfo::PriorInfo, 
                               parameterInfo::ParameterInfo)
 
     _evalPriors = (θ_est) -> begin
-                                θ_estT =  transformθ(θ_est, θ_indices.namesParamEst, parameterInfo)
-                                return evalPriors(θ_estT, θ_est, θ_indices.namesParamEst, θ_indices, priorInfo)
+                                θ_estT =  transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+                                return evalPriors(θ_estT, θ_est, θ_indices.θ_estNames, θ_indices, priorInfo)
                             end
-    gradient .+= ForwardDiff.hessian(_evalPriors, θ)                                
+    hessian .+= ForwardDiff.hessian(_evalPriors, θ)                                
 end

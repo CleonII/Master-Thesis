@@ -19,8 +19,8 @@ function computeCostZygote(θ_est,
                               parameterInfo, changeODEProblemParameters, solveOdeModelAllConditions)
 
     if priorInfo.hasPriors == true
-        θ_estT = transformθ(θ_est, θ_indices.namesParamEst, parameterInfo)
-        cost += evalPriors(θ_estT, θ_est, θ_indices.namesParamEst, θ_indices, priorInfo)
+        θ_estT = transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+        cost += evalPriors(θ_estT, θ_est, θ_indices.θ_estNames, θ_indices, priorInfo)
     end                                  
 
     return cost                          

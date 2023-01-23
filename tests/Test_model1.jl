@@ -80,10 +80,11 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
     paramData = processParameterData(parameterDataFile) 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
+    θ_indices = computeIndicesθ(paramData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     
     # Extract experimental conditions for simulations 
     simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
-
+    
     # Parameter values where to teast accuracy. Each column is a α, β, γ and δ
     u0 = [8.0, 4.0]
     paramMat = reshape([2.0, 3.0, 3.0, 5.0, 
@@ -103,7 +104,8 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         peTabModel.paramMap[6] = Pair(peTabModel.paramMap[6].first, β)
         prob = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true)
         prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
-        changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCond!(pVec, u0Vec, expID, paramData, experimentalConditionsFile, peTabModel)
+        θ_est = getFileODEvalues(peTabModel)
+        changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCondEst!(pVec, u0Vec, expID, θ_est, peTabModel, θ_indices)
         
         # Solve ODE system 
         solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)

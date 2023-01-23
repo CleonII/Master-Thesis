@@ -507,13 +507,13 @@ function checkForPeTabFile(fileSearchFor::String, dirModel::String)::String
 end
 
 
-function getPriorInfo(paramEstIndices::ParameterIndices, parameterDataFile::DataFrame)::PriorInfo
+function getPriorInfo(θ_indices::ParameterIndices, parameterDataFile::DataFrame)::PriorInfo
 
     if "objectivePriorType" ∉ names(parameterDataFile)
         return PriorInfo(Array{Function, 1}(undef, 0), Bool[], false)
     end
 
-    namesParamEst = paramEstIndices.namesParamEst
+    namesParamEst = θ_indices.θ_estNames
     priorLogPdf = Array{Function, 1}(undef, length(namesParamEst))
     priorOnParamScale = Array{Bool, 1}(undef, length(namesParamEst))
     paramID = string.(parameterDataFile[!, "parameterId"])
@@ -571,7 +571,7 @@ function getCallbacksForTimeDepedentPiecewise(odeSys::ODESystem, modelDict::Dict
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(dirModel, readObs=true)
     parameterData = processParameterData(parameterDataFile)
     measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    paramEstIndices = getIndicesParam(parameterData, measurementData, odeSys, experimentalConditionsFile)
+    θ_indices = computeIndicesθ(parameterData, measurementData, odeSys, experimentalConditionsFile)
 
     parameterNames = parameters(odeSys)
     stateNames = string.(states(odeSys))
@@ -589,7 +589,7 @@ function getCallbacksForTimeDepedentPiecewise(odeSys::ODESystem, modelDict::Dict
     else
         # In case we have events loop over each variable 
         for key in keys(modelDict["boolVariables"])
-            stringFunctions, stringSet =  createCallbackCont(key, modelDict, parameterNames, stateNames, paramEstIndices) 
+            stringFunctions, stringSet =  createCallbackCont(key, modelDict, parameterNames, stateNames, θ_indices) 
             stringWrite *= stringSet * "\n"
             stringWriteFunctions *= stringFunctions * "\n"
         end
@@ -620,7 +620,7 @@ function createCallbackCont(paramName::String,
                             modelDict::Dict, 
                             parameterNames::Vector{String}, 
                             stateNames::Vector{String}, 
-                            paramEstIndices::ParameterIndices)
+                            θ_indices::ParameterIndices)
 
     stringCallbackFunctions = ""
     stringCallbackSet = ""
@@ -634,7 +634,7 @@ function createCallbackCont(paramName::String,
     # For i) it must be a cont. event in order for us to be able to compute the gradient. For ii) we cannot compute 
     # tstops (the event times) prior to starting to solve the ODE.
     hasStates = triggerHasStates(activationFormula, stateNames)
-    hasParametersEst = triggerHasParametersToEst(activationFormula, parameterNames, paramEstIndices)
+    hasParametersEst = triggerHasParametersToEst(activationFormula, parameterNames, θ_indices)
     discreteEvent = true
     if hasParametersEst == true || hasStates == true
         discreteEvent = false
@@ -702,11 +702,11 @@ function triggerHasStates(activationFormula::AbstractString, stateNames::Vector{
 end
 
 
-function triggerHasParametersToEst(activationFormula::AbstractString, parameterNames::Vector{String}, paramEstIndices::ParameterIndices)::Bool
+function triggerHasParametersToEst(activationFormula::AbstractString, parameterNames::Vector{String}, θ_indices::ParameterIndices)::Bool
 
     # Parameters which are present for each experimental condition, and condition specific parameters 
-    indexParamEstODESys = paramEstIndices.mapDynParEst.iDynParamInSys
-    indexParamEstODESysCond = reduce(vcat, [paramEstIndices.mapExpCond[i].iOdeProbDynParam for i in eachindex(paramEstIndices.mapExpCond)])
+    indexParamEstODESys = θ_indices.mapODEProblem.iODEProblemθDynamic
+    indexParamEstODESysCond = reduce(vcat, [θ_indices.mapsConiditionId[i].iODEProblemθDynamic for i in keys(θ_indices.mapsConiditionId)])
 
     for i in eachindex(parameterNames)
         activationFormulaNew = replaceWholeWord(activationFormula, parameterNames[i], "integrator.p["*string(i)*"]")
