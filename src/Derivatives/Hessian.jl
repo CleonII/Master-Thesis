@@ -32,6 +32,10 @@ function computeHessian(hessian::Matrix{Float64},
     else
         hessian .= 0.0
     end
+
+    if priorInfo.hasPriors == true
+        computeHessianPrior!(hessian, θ_est, θ_indices, priorInfo, parameterInfo)
+    end
 end
 
 
@@ -82,6 +86,12 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveAutoDiff=true)
     @views ForwardDiff.hessian!(hessian[iθ_notOdeSystem, iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
+
+    # Even though this is a hessian approximation, due to ease of implementation and low run-time we compute the 
+    # full hessian for the priors 
+    if priorInfo.hasPriors == true
+        computeHessianPrior!(hessian, θ_est, θ_indices, priorInfo, parameterInfo)
+    end
 end
 
 

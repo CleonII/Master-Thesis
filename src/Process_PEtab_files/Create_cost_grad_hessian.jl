@@ -156,10 +156,11 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     return peTabOpt
 end
 
+
 # Evaluate contribution of potential prior to the final cost function value. Not mutating so works with both Zygote 
 # and forwardiff.
-function evalPriors(paramVecTransformed, 
-                    paramVecNotTransformed,
+function evalPriors(paramVecTransformed::AbstractVector, 
+                    paramVecNotTransformed::AbstractVector,
                     namesParamVec::Array{String, 1}, 
                     paramEstIndices::ParameterIndices, 
                     priorInfo::PriorInfo)::Real
@@ -186,6 +187,3 @@ function evalPriors(paramVecTransformed,
 
     return priorContribution
 end
-
-
-

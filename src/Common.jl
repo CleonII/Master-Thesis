@@ -175,3 +175,34 @@ end
 function dualToFloat(x::AbstractFloat)::AbstractFloat
     return x
 end
+
+
+# Compute prior contribution to log-likelihood 
+function computeGradientPrior!(gradient::AbstractVector, 
+                               θ::AbstractVector, 
+                               θ_indices::ParameterIndices, 
+                               priorInfo::PriorInfo, 
+                               parameterInfo::ParameterInfo)
+            
+
+    _evalPriors = (θ_est) -> begin
+                                θ_estT = transformθ(θ_est, θ_indices.namesParamEst, parameterInfo)
+                                return evalPriors(θ_estT, θ_est, θ_indices.namesParamEst, θ_indices, priorInfo)
+                            end
+    gradient .+= ForwardDiff.gradient(_evalPriors, θ)                                
+end
+
+
+# Compute prior contribution to log-likelihood 
+function computeHessianPrior!(gradient::AbstractVector, 
+                              θ::AbstractVector, 
+                              θ_indices::ParameterIndices, 
+                              priorInfo::PriorInfo, 
+                              parameterInfo::ParameterInfo)
+
+    _evalPriors = (θ_est) -> begin
+                                θ_estT =  transformθ(θ_est, θ_indices.namesParamEst, parameterInfo)
+                                return evalPriors(θ_estT, θ_est, θ_indices.namesParamEst, θ_indices, priorInfo)
+                            end
+    gradient .+= ForwardDiff.hessian(_evalPriors, θ)                                
+end

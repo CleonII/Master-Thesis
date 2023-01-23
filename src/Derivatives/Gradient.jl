@@ -52,6 +52,11 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveAutoDiff=true)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
+
+    # If we have prior contribution its gradient is computed via autodiff for all parameters 
+    if priorInfo.hasPriors == true
+        computeGradientPrior!(gradient, θ_est, θ_indices, priorInfo, parameterInfo)
+    end
 end
 
 
@@ -105,13 +110,8 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
                                                              computeGradientNotSolveForward=true)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 
-    # Account for priors. TODO : Refactor and make common to all gradient methods 
     if priorInfo.hasPriors == true
-        evalLogLikPrior = (pVec) ->     begin
-                                            paramVecEstTransformed = transformParamVec(pVec, paramIndices.namesParamEst, parameterData)
-                                            return evalPriors(paramVecEstTransformed, pVec, paramIndices.namesParamEst, paramIndices, priorInfo)
-                                        end
-        gradient .+= ForwardDiff.gradient(evalLogLikPrior, paramVecEst)
+        computeGradientPrior!(gradient, θ_est, θ_indices, priorInfo, parameterInfo)
     end
 end
 
@@ -160,13 +160,8 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
                                                              computeGradientNotSolveAdjoint=true)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 
-    # Account for priors. TODO : Refactor and make common to all gradient methods 
     if priorInfo.hasPriors == true
-        evalLogLikPrior = (pVec) ->     begin
-                                            paramVecEstTransformed = transformParamVec(pVec, paramIndices.namesParamEst, parameterData)
-                                            return evalPriors(paramVecEstTransformed, pVec, paramIndices.namesParamEst, paramIndices, priorInfo)
-                                        end
-        gradient .+= ForwardDiff.gradient(evalLogLikPrior, paramVecEst)
+        computeGradientPrior!(gradient, θ_est, θ_indices, priorInfo, parameterInfo)
     end
 end
 
@@ -201,4 +196,4 @@ function computeGradientZygote(gradient::Vector{Float64},
                                                              peTabModel, simulationInfo, θ_indices, measurementData, 
                                                              parameterInfo)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
-end
+end    
