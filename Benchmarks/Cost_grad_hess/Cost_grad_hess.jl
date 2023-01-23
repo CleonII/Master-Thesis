@@ -304,3 +304,40 @@ if ARGS[1] == "Bachman_fix_param"
     end
 end
 
+
+if ARGS[1] == "Bachman_test_chunks"
+
+    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
+    pathSave = dirSave * "Bachman_test_chunks.csv"
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+
+    Random.seed!(123)
+    solversCheck = [[QNDF(), "QNDF"]]
+    sensealgInfoTot = [[:ForwardDiff, nothing, "ForwardDiff"], 
+                       [:ForwardSenseEq, :AutoDiffForward, "ForEq_AutoDiff"]]
+
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
+    peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel, forceBuildJlFile=false)
+    nDynParam = getNDynParam(peTabModel)
+    chunkList = 1:(nDynParam-5)
+    tol = 1e-8
+    for nParamFix in [3, 4]
+        for i in 1:10
+            peTabModelFewerParam = getPEtabModelNparamFixed(peTabModel, nParamFix)
+            for nChunks in chunkList
+                # Check Gradient 
+                for sensealgInfo in sensealgInfoTot
+                    benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
+                                    pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=10, chunkSize=nChunks)
+                end
+            end
+            if isdir(peTabModelFewerParam.dirModel)
+                rm(peTabModelFewerParam.dirModel, recursive=true)
+            end
+        end
+    end
+end
+
+
