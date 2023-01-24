@@ -57,12 +57,8 @@ function JLToModellingToolkit(modelName::String, dirModel::String; writeToFile::
     modelFileJlSrc = dirModel * "/" * modelName * ".jl"
     modelFileJl = dirModel * "/" * modelName * "_fix.jl"
 
-    if isfile(modelFileJl)
-        rm(modelFileJl)
-    end
-
-    cp(modelFileJlSrc, modelFileJl)
-    include(modelFileJl)
+    # Read modelFile to work with it
+    include(modelFileJlSrc)
     expr = Expr(:call, Symbol("getODEModel_" * modelName))
     odeSys, stateMap, paramMap = eval(expr)
 
@@ -81,14 +77,14 @@ function JLToModellingToolkit(modelName::String, dirModel::String; writeToFile::
         modelDict["states"][string(stat.first)] = string(stat.second)
     end
 
-    println(modelDict["inputFunctions"])
     # Rewrite any time-dependent ifelse to boolean statements such that we can express these as events. 
     # This is recomended, as it often increases the stabillity when solving the ODE, and decreases run-time
     if ifElseToEvent == true
         timeDependentIfElseToBool!(modelDict)
     end
+
     (tmppath, tmpio) = mktemp()
-    open(modelFileJl) do io
+    open(modelFileJlSrc) do io
         for line in eachline(io, keep=true)
             for key in keys(modelDict["inputFunctions"])
                 # Fixes ModelingToolkit.@parameters 
@@ -116,6 +112,13 @@ function JLToModellingToolkit(modelName::String, dirModel::String; writeToFile::
                 # Fixes equations containing ifelse
                 if occursin(Regex(key * "\\s*~"), line)
                     line = "    " * modelDict["inputFunctions"][key]
+                end
+
+                # Fixes trueParameterValues
+                if occursin(Regex("trueParameterValues\\s*=\\s*\\["), line)
+                    for key in keys(modelDict["boolVariables"])
+                        line *= "    " * key * "=> 0.0,\n"
+                    end
                 end
 
             end
