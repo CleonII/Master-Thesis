@@ -36,6 +36,100 @@ function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::Str
 end
 
 
+
+"""
+    JLToModellingToolkit(modelName::String, dirModel::String)
+
+    Checks and fixes a Julia ModelingToolkit file and store 
+    the fixed file in dirModel with name modelName_fixed.jl. 
+
+"""
+function JLToModellingToolkit(modelName::String, dirModel::String; writeToFile::Bool=true, ifElseToEvent::Bool=true)
+
+    # Used to not break compatibility with replaceExplicitVariableWithRule in Create_obs_u0_sd_common.jl 
+    modelDict = Dict()
+    modelDict["boolVariables"] = Dict()
+    modelDict["modelRuleFunctions"] = Dict()
+    modelDict["inputFunctions"] = Dict()
+    modelDict["parameters"] = Dict()
+    modelDict["states"] = Dict()
+
+    modelFileJlSrc = dirModel * "/" * modelName * ".jl"
+    modelFileJl = dirModel * "/" * modelName * "_fix.jl"
+
+    if isfile(modelFileJl)
+        rm(modelFileJl)
+    end
+
+    cp(modelFileJlSrc, modelFileJl)
+    include(modelFileJl)
+    expr = Expr(:call, Symbol("getODEModel_" * modelName))
+    odeSys, stateMap, paramMap = eval(expr)
+
+    for eq in odeSys.eqs
+        key = replace(string(eq.lhs),"(t)" => "")
+        if !occursin("Differential", key)
+            modelDict["inputFunctions"][key] = key * "~" * string(eq.rhs)
+        end
+    end
+
+    for par in paramMap
+        modelDict["parameters"][string(par.first)] = string(par.second)
+    end
+
+    for stat in stateMap
+        modelDict["states"][string(stat.first)] = string(stat.second)
+    end
+
+    println(modelDict["inputFunctions"])
+    # Rewrite any time-dependent ifelse to boolean statements such that we can express these as events. 
+    # This is recomended, as it often increases the stabillity when solving the ODE, and decreases run-time
+    if ifElseToEvent == true
+        timeDependentIfElseToBool!(modelDict)
+    end
+    (tmppath, tmpio) = mktemp()
+    open(modelFileJl) do io
+        for line in eachline(io, keep=true)
+            for key in keys(modelDict["inputFunctions"])
+                # Fixes ModelingToolkit.@parameters 
+                if occursin("ModelingToolkit.@parameters", line)
+                    defineParameters = "    ModelingToolkit.@parameters"
+                    for key in keys(modelDict["parameters"])
+                        defineParameters = defineParameters * " " * key
+                    end
+                    line = defineParameters
+                end
+                
+                # Fixed parameterArray
+                if occursin(Regex("parameterArray\\s*=\\s*\\["), line)
+                    defineParameters = "    parameterArray = ["
+                    for (index, key) in enumerate(keys(modelDict["parameters"]))
+                        if index < length(modelDict["parameters"])
+                           defineParameters = defineParameters * key * ", "
+                        else
+                           defineParameters = defineParameters * key * "]"
+                        end
+                    end
+                        line = defineParameters
+                end
+
+                # Fixes equations containing ifelse
+                if occursin(Regex(key * "\\s*~"), line)
+                    line = "    " * modelDict["inputFunctions"][key]
+                end
+
+            end
+            write(tmpio, line)
+        end
+    end
+    close(tmpio)
+    mv(tmppath, modelFileJl, force=true)
+
+    return modelDict, modelFileJl
+
+end
+
+
 # Rewrites triggers in events to propper form for ModelingToolkit
 function asTrigger(triggerFormula)
     if "geq" == triggerFormula[1:3]
