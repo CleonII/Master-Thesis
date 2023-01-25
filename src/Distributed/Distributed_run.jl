@@ -7,9 +7,9 @@ function runProcess(jobs, results)
     # Import structs needed to compute the cost, gradient, and hessian
     peTabModel::PeTabModel = take!(jobs)[1]
     put!(results, tuple(:Done))
-    parameterData::ParameterInfo = take!(jobs)[1]
+    parameterData::ParametersInfo = take!(jobs)[1]
     put!(results, tuple(:Done))
-    measurementData::MeasurementData = take!(jobs)[1]
+    measurementInfo::MeasurementsInfo = take!(jobs)[1]
     put!(results, tuple(:Done))
     simulationInfo::SimulationInfo = take!(jobs)[1]
     put!(results, tuple(:Done))
@@ -48,14 +48,14 @@ function runProcess(jobs, results)
         solveOdeModelAllCondForwardEq! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondSenseEqUse!, simulationInfo, forwardSolver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
     end
     
-    evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
-    evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
-    evalGradFAdjoint = (grad, paramVecEst) -> calcGradCostAdj!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo, expIDSolve=expIDs) 
-    evalGradFForwardEq = (grad, paramVecEst) -> calcGradForwardEq!(grad, paramVecEst, peTabModel, odeProbSenseEq, sensealgForward, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondForwardEq!, priorInfo, expIDSolve=expIDs) 
+    evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
+    evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
+    evalGradFAdjoint = (grad, paramVecEst) -> calcGradCostAdj!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo, expIDSolve=expIDs) 
+    evalGradFForwardEq = (grad, paramVecEst) -> calcGradForwardEq!(grad, paramVecEst, peTabModel, odeProbSenseEq, sensealgForward, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondForwardEq!, priorInfo, expIDSolve=expIDs) 
 
-    evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
+    evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
     
-    _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessian=true, expIDSolve=expIDs)
+    _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessian=true, expIDSolve=expIDs)
     evalHess = (hessianMat, paramVec) ->    begin 
                                                 computeH = true
                                                 @inbounds for i in eachindex(simulationInfo.solArray)

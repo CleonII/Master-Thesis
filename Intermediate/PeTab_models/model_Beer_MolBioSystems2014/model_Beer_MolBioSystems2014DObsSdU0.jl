@@ -2,12 +2,12 @@ function evalDYmodDu(u, t, p, obsPar, nonDynParam, observableId, mapObsParam, ou
 
 	Glu, cGlu, Ind, Bac= u 
 	lag_bool1, kdegi, medium, Bacmax, ksyn, kdim, tau, init_Bac, beta = p 
-	if observableId == "Bacnorm" 
+	if observableId == :Bacnorm 
 		out[4] = 1
 		return nothing
 	end
 
-	if observableId == "IndconcNormRange" 
+	if observableId == :IndconcNormRange 
 		out[3] = 1
 		return nothing
 	end
@@ -18,11 +18,11 @@ function evalDYmodDp(u, t, p, obsPar, nonDynParam, observableId, mapObsParam, ou
 
 	Glu, cGlu, Ind, Bac= u 
 	lag_bool1, kdegi, medium, Bacmax, ksyn, kdim, tau, init_Bac, beta = p 
-	if observableId == "Bacnorm" 
+	if observableId == :Bacnorm 
 		return nothing
 	end
 
-	if observableId == "IndconcNormRange" 
+	if observableId == :IndconcNormRange 
 		return nothing
 	end
 

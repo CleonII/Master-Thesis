@@ -10,15 +10,15 @@
     Used when setting up the PeTab cost function, and when solving the ODE-system 
     for the values in the parameters-file. 
 """
-function setParamToFileValues!(paramMap, stateMap, paramData::ParameterInfo)
+function setParamToFileValues!(paramMap, stateMap, paramData::ParametersInfo)
 
-    parameterNames = paramData.parameterID
+    parameterNames = paramData.parameterId
     parameterNamesStr = string.([paramMap[i].first for i in eachindex(paramMap)])
     stateNamesStr = replace.(string.([stateMap[i].first for i in eachindex(stateMap)]), "(t)" => "")
     for i in eachindex(parameterNames)
         
         parameterName = parameterNames[i]
-        valChangeTo = paramData.paramVal[i]
+        valChangeTo = paramData.nominalValue[i]
         
         # Check for value to change to in parameter file 
         i_param = findfirst(x -> x == parameterName, parameterNamesStr)
@@ -52,16 +52,16 @@ function computeσ(u::AbstractVector,
                   θ_nonDynamic::AbstractVector,
                   peTabModel::PeTabModel,
                   iMeasurement::Int64, 
-                  measurementData::MeasurementData,
+                  measurementInfo::MeasurementsInfo,
                   θ_indices::ParameterIndices, 
-                  parameterInfo::ParameterInfo)::Real
+                  parameterInfo::ParametersInfo)::Real
 
     # Compute associated SD-value or extract said number if it is known 
     mapθ_sd = θ_indices.mapθ_sd[iMeasurement]
     if mapθ_sd.isSingleConstant == true
         σ = mapθ_sd.constantValues[1]
     else
-        σ = peTabModel.evalSd!(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurement], mapθ_sd)
+        σ = peTabModel.evalSd!(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_sd)
     end
 
     return σ
@@ -76,14 +76,14 @@ function computehTransformed(u::AbstractVector,
                              θ_nonDynamic::AbstractVector,
                              peTabModel::PeTabModel,
                              iMeasurement::Int64, 
-                             measurementData::MeasurementData,
+                             measurementInfo::MeasurementsInfo,
                              θ_indices::ParameterIndices, 
-                             parameterInfo::ParameterInfo)::Real
+                             parameterInfo::ParametersInfo)::Real
 
     mapθ_observable = θ_indices.mapθ_observable[iMeasurement]
-    h = peTabModel.evalYmod(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurement], mapθ_observable) 
+    h = peTabModel.evalYmod(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_observable) 
     # Transform yMod is necessary
-    hTransformed = transformObsOrData(h, measurementData.transformData[iMeasurement])
+    hTransformed = transformObsOrData(h, measurementInfo.measurementTransformation[iMeasurement])
 
     return hTransformed
 end
@@ -136,19 +136,21 @@ end
 
 # Transform parameter from log10 scale to normal scale, or reverse transform
 function transformθ!(θ::AbstractVector, 
-                     θ_names::Vector{String}, 
-                     parameterInfo::ParameterInfo; 
+                     θ_names::Vector{Symbol}, 
+                     parameterInfo::ParametersInfo; 
                      reverseTransform::Bool=false) 
     
     @inbounds for i in eachindex(θ)
-        iParam = findfirst(x -> x == θ_names[i], parameterInfo.parameterID)
+        iParam = findfirst(x -> x == θ_names[i], parameterInfo.parameterId)
         if isnothing(iParam)
             println("Warning : Could not find parameter ID for ", θ_names[i])
         end
-        if parameterInfo.logScale[iParam] == true && reverseTransform == false
-            θ[i] = exp10(θ[i])
-        elseif parameterInfo.logScale[iParam] == true && reverseTransform == true
-            θ[i] = log10(θ[i])
+        if parameterInfo.parameterScale[iParam] == :lin
+            θ[i] = θ[i]
+        elseif parameterInfo.parameterScale[iParam] == :log10
+            θ[i] = reverseTransform == true ? log10(θ[i]) : exp10(θ[i]) 
+        elseif parameterInfo.parameterScale[iParam] == :log
+            θ[i] = reverseTransform == true ? log(θ[i]) : exp(θ[i]) 
         end
     end
 end
@@ -156,12 +158,12 @@ end
 
 # Transform parameter from log10 scale to normal scale, or reverse transform
 function transformθ(θ::AbstractVector, 
-                    θ_names::Vector{String}, 
-                    parameterInfo::ParameterInfo; 
+                    θ_names::Vector{Symbol}, 
+                    parameterInfo::ParametersInfo; 
                     reverseTransform::Bool=false)::AbstractVector
     
-    iθ = [findfirst(x -> x == θ_names[i], parameterInfo.parameterID) for i in eachindex(θ_names)]
-    shouldTransform = [parameterInfo.logScale[i] == true ? true : false for i in iθ]
+    iθ = [findfirst(x -> x == θ_names[i], parameterInfo.parameterId) for i in eachindex(θ_names)]
+    shouldTransform = [parameterInfo.parameterScale[i] == :log10 ? true : false for i in iθ]
     shouldNotTransform = .!shouldTransform
 
     if reverseTransform == false
@@ -227,7 +229,7 @@ function computeGradientPrior!(gradient::AbstractVector,
                                θ::AbstractVector, 
                                θ_indices::ParameterIndices, 
                                priorInfo::PriorInfo, 
-                               parameterInfo::ParameterInfo)
+                               parameterInfo::ParametersInfo)
             
 
     _evalPriors = (θ_est) -> begin
@@ -243,7 +245,7 @@ function computeHessianPrior!(hessian::AbstractVector,
                               θ::AbstractVector, 
                               θ_indices::ParameterIndices, 
                               priorInfo::PriorInfo, 
-                              parameterInfo::ParameterInfo)
+                              parameterInfo::ParametersInfo)
 
     _evalPriors = (θ_est) -> begin
                                 θ_estT =  transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)

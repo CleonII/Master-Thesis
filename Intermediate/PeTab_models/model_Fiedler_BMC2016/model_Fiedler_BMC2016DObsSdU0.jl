@@ -2,13 +2,13 @@ function evalDYmodDu(u, t, p, obsPar, nonDynParam, observableId, mapObsParam, ou
 
 	RAF, MEK, pMEK, pERK, pRAF, ERK= u 
 	ERK_total, UO126, k10, RAF_total, K_3, cyt, k4, Sorafenib, K_2, k6, k11, tau1, MEK_total, K_1, k3, tau2, k5, k2 = p 
-	if observableId == "pErk" 
+	if observableId == :pErk 
 		observableParameter1_pErk = getObsOrSdParam(obsPar, mapObsParam)
 		out[4] = observableParameter1_pErk
 		return nothing
 	end
 
-	if observableId == "pMek" 
+	if observableId == :pMek 
 		observableParameter1_pMek = getObsOrSdParam(obsPar, mapObsParam)
 		out[3] = observableParameter1_pMek
 		return nothing
@@ -20,11 +20,11 @@ function evalDYmodDp(u, t, p, obsPar, nonDynParam, observableId, mapObsParam, ou
 
 	RAF, MEK, pMEK, pERK, pRAF, ERK= u 
 	ERK_total, UO126, k10, RAF_total, K_3, cyt, k4, Sorafenib, K_2, k6, k11, tau1, MEK_total, K_1, k3, tau2, k5, k2 = p 
-	if observableId == "pErk" 
+	if observableId == :pErk 
 		return nothing
 	end
 
-	if observableId == "pMek" 
+	if observableId == :pMek 
 		return nothing
 	end
 

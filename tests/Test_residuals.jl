@@ -1,10 +1,10 @@
 function checkGradientResiduals(peTabModel::PeTabModel, solver, tol; verbose::Bool=true)
 
     # Process PeTab files into type-stable Julia structs 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    parameterData = processParameterData(parameterDataFile)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(peTabModel.dirModel, readObservables=true)
+    parameterData = processParameters(parameterDataFile)
+    measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
+    simulationInfo = processSimulationInfo(peTabModel, measurementData)
 
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
     paramEstIndices = computeIndicesθ(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
@@ -27,10 +27,10 @@ function checkGradientResiduals(peTabModel::PeTabModel, solver, tol; verbose::Bo
 
     # Extract parameter vector 
     namesParamEst = paramEstIndices.θ_estNames
-    paramVecNominal = [parameterData.paramVal[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)]
+    paramVecNominal = [parameterData.nominalValue[findfirst(x -> x == namesParamEst[i], parameterData.parameterId)] for i in eachindex(namesParamEst)]
     paramVec = transformθ(paramVecNominal, namesParamEst, parameterData, reverseTransform=true)
 
-    jacOut = zeros(length(paramVec), length(measurementData.tObs))
+    jacOut = zeros(length(paramVec), length(measurementData.time))
     residualGrad = ForwardDiff.gradient(evalResiduals, paramVec)
     evalJacResiduals(jacOut, paramVec)
     sqDiff = sum((sum(jacOut, dims=2) - residualGrad))

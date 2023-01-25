@@ -9,20 +9,16 @@ using Random
 using LinearAlgebra
 using Distributions
 using Printf
-using SciMLSensitivity
-using BenchmarkTools
 using Zygote
+using SciMLSensitivity
 using Sundials
 
 
 # Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
-# Functions for solving ODE system 
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
-
 # PeTab importer to get cost, grad etc 
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_cost_grad_hessian.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
@@ -54,7 +50,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
     gradPythonMat = gradPythonMat[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
 
     # For correct indexing when comparing gradient or when inputing PyPesto vector to Julia 
-    iUse = [findfirst(x -> x == peTabOpt.namesParam[i], names(paramMat)) for i in eachindex(peTabOpt.namesParam)]
+    iUse = [findfirst(x -> x == string(peTabOpt.namesParam[i]), names(paramMat)) for i in eachindex(peTabOpt.namesParam)]
 
     for i in 1:nrow(paramMat)
         

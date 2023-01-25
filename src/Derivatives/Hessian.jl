@@ -10,20 +10,20 @@ function computeHessian(hessian::Matrix{Float64},
                         peTabModel::PeTabModel,
                         simulationInfo::SimulationInfo,
                         θ_indices::ParameterIndices,
-                        measurementData::MeasurementData,
-                        parameterInfo::ParameterInfo, 
+                        measurementInfo::MeasurementsInfo,
+                        parameterInfo::ParametersInfo, 
                         changeODEProblemParameters!::Function,
                         solveOdeModelAllConditions!::Function, 
                         priorInfo::PriorInfo; 
-                        expIDSolve::Array{String, 1} = ["all"])
+                        expIDSolve::Vector{Symbol} = [:all])
 
     _evalHessian = (θ_est) -> computeCost(θ_est, odeProblem, peTabModel, simulationInfo, θ_indices, 
-                                          measurementData, parameterInfo, changeODEProblemParameters!, 
+                                          measurementInfo, parameterInfo, changeODEProblemParameters!, 
                                           solveOdeModelAllConditions!, priorInfo, computeHessian=true, 
                                           expIDSolve=expIDSolve)
     
     # Only try to compute hessian if we could compute the cost 
-    if all([simulationInfo.solArray[i].retcode == :Success for i in eachindex(simulationInfo.solArray)])
+    if all([simulationInfo.odeSolutions[id].retcode == :Success for id in simulationInfo.experimentalConditionId])
         try 
             hessian .= Symmetric(ForwardDiff.hessian(_evalHessian, θ_est))
         catch
@@ -45,12 +45,12 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
                                            peTabModel::PeTabModel,
                                            simulationInfo::SimulationInfo,
                                            θ_indices::ParameterIndices,
-                                           measurementData::MeasurementData,
-                                           parameterInfo::ParameterInfo, 
+                                           measurementInfo::MeasurementsInfo,
+                                           parameterInfo::ParametersInfo, 
                                            changeODEProblemParameters!::Function,
                                            solveOdeModelAllConditions!::Function, 
                                            priorInfo::PriorInfo; 
-                                           expIDSolve::Array{String, 1} = ["all"]) 
+                                           expIDSolve::Vector{Symbol} = [:all]) 
 
     # Avoid incorrect non-zero values 
     hessian .= 0.0
@@ -59,7 +59,7 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
 
     # Compute hessian for parameters which are a part of the ODE-system (dynamic parameters)
     computeCostDynamicθ = (x) -> computeCostSolveODE(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, peTabModel, 
-                                                     simulationInfo, θ_indices, measurementData, parameterInfo, 
+                                                     simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                                      changeODEProblemParameters!, solveOdeModelAllConditions!, 
                                                      computeHessian=true, 
                                                      expIDSolve=expIDSolve)
@@ -82,7 +82,7 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
     computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             peTabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveAutoDiff=true)
     @views ForwardDiff.hessian!(hessian[iθ_notOdeSystem, iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
@@ -101,13 +101,13 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
                                                  peTabModel::PeTabModel,
                                                  simulationInfo::SimulationInfo,
                                                  θ_indices::ParameterIndices,
-                                                 measurementData::MeasurementData,
-                                                 parameterInfo::ParameterInfo, 
+                                                 measurementInfo::MeasurementsInfo,
+                                                 parameterInfo::ParametersInfo, 
                                                  changeODEProblemParameters!::Function,
                                                  solveOdeModelAllConditions!::Function, 
                                                  priorInfo::PriorInfo; 
                                                  returnJacobian::Bool=false,
-                                                 expIDSolve::Array{String, 1} = ["all"])   
+                                                 expIDSolve::Vector{Symbol} = [:all])   
 
     # Avoid incorrect non-zero values 
     out .= 0.0
@@ -118,17 +118,17 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
     # sensitivity matrix all experimental conditions (to efficiently levarage autodiff and handle scenarios are 
     # pre-equlibrita model). Here we pre-allocate said matrix.
     nModelStates = length(odeProblem.u0)
-    nTimePointsSaveAt::Int64 = sum([length(measurementData.tVecSave[conditionId]) for conditionId in simulationInfo.conditionIdSol])
+    nTimePointsSaveAt = sum(length(simulationInfo.timeObserved[experimentalConditionId]) for experimentalConditionId in simulationInfo.experimentalConditionId)
     S::Matrix{Float64} = zeros(Float64, (nTimePointsSaveAt*nModelStates, length(θ_dynamic)))
 
     # For Guass-Newton we compute the gradient via J*J' where J is the Jacobian of the residuals, here we pre-allocate 
     # the entire matrix.
-    jacobian::Matrix{Float64} = zeros(length(θ_est), length(measurementData.tObs))
+    jacobian::Matrix{Float64} = zeros(length(θ_est), length(measurementInfo.time))
 
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
     computeJacobianResidualsDynamicθ!((@view jacobian[θ_indices.iθ_dynamic, :]), θ_dynamic, θ_sd,
                                       θ_observable, θ_nonDynamic, S, peTabModel, odeProblem,
-                                      simulationInfo, θ_indices, measurementData, parameterInfo, 
+                                      simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                       changeODEProblemParameters!, solveOdeModelAllConditions!;
                                       expIDSolve=expIDSolve)
 
@@ -143,7 +143,7 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
     computeResidualsNotODESystemθ = (x) -> computeResidualsNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], 
                                                 x[iθ_nonDynamic], peTabModel, simulationInfo, θ_indices, 
-                                                measurementData, parameterInfo, expIDSolve=expIDSolve)
+                                                measurementInfo, parameterInfo, expIDSolve=expIDSolve)
     @views ForwardDiff.jacobian!(jacobian[iθ_notOdeSystem, :]', computeResidualsNotODESystemθ, θ_est[iθ_notOdeSystem])
 
     if priorInfo.hasPriors == true

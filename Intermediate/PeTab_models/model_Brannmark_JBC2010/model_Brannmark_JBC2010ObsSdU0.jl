@@ -3,17 +3,17 @@ function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, ma
 	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp= u 
 	k1a, k1aBasic, k1b, k1c, k1d, k1e, k1f, k1g, k1r, k21, k22, k3, km2, km3 = dynPar 
 
-	if observableId == "IR1_P" 
+	if observableId == :IR1_P 
 		observableParameter1_IR1_P = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_IR1_P * ( IRp + IRiP ) 
 	end
 
-	if observableId == "IRS1_P" 
+	if observableId == :IRS1_P 
 		observableParameter1_IRS1_P = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_IRS1_P * IRSiP 
 	end
 
-	if observableId == "IRS1_P_DosR" 
+	if observableId == :IRS1_P_DosR 
 		observableParameter1_IRS1_P_DosR = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_IRS1_P_DosR * IRSiP 
 	end
@@ -59,17 +59,17 @@ function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapS
 	IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp= u 
 	k1a, k1aBasic, k1b, k1c, k1d, k1e, k1f, k1g, k1r, k21, k22, k3, km2, km3 = dynPar 
 
-	if observableId == "IR1_P" 
+	if observableId == :IR1_P 
 		noiseParameter1_IR1_P = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_IR1_P 
 	end
 
-	if observableId == "IRS1_P" 
+	if observableId == :IRS1_P 
 		noiseParameter1_IRS1_P = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_IRS1_P 
 	end
 
-	if observableId == "IRS1_P_DosR" 
+	if observableId == :IRS1_P_DosR 
 		noiseParameter1_IRS1_P_DosR = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_IRS1_P_DosR 
 	end

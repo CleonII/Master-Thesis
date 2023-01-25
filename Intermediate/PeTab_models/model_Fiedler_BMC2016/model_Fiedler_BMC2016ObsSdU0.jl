@@ -2,16 +2,16 @@ function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, ma
 
 	RAF, MEK, pMEK, pERK, pRAF, ERK= u 
 	K_1, K_2, K_3, k10, k11, k2, k3, k4, k5, k6, tau1, tau2 = dynPar 
-	ERK_total_C = paramData.paramVal[1] 
-	MEK_total_C = paramData.paramVal[5] 
-	RAF_total_C = paramData.paramVal[6] 
+	ERK_total_C = paramData.nominalValue[1] 
+	MEK_total_C = paramData.nominalValue[5] 
+	RAF_total_C = paramData.nominalValue[6] 
 
-	if observableId == "pErk" 
+	if observableId == :pErk 
 		observableParameter1_pErk = getObsOrSdParam(obsPar, mapObsParam)
 		return pERK * observableParameter1_pErk 
 	end
 
-	if observableId == "pMek" 
+	if observableId == :pMek 
 		observableParameter1_pMek = getObsOrSdParam(obsPar, mapObsParam)
 		return pMEK * observableParameter1_pMek 
 	end
@@ -50,16 +50,16 @@ function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapS
 
 	RAF, MEK, pMEK, pERK, pRAF, ERK= u 
 	K_1, K_2, K_3, k10, k11, k2, k3, k4, k5, k6, tau1, tau2 = dynPar 
-	ERK_total_C = paramData.paramVal[1] 
-	MEK_total_C = paramData.paramVal[5] 
-	RAF_total_C = paramData.paramVal[6] 
+	ERK_total_C = paramData.nominalValue[1] 
+	MEK_total_C = paramData.nominalValue[5] 
+	RAF_total_C = paramData.nominalValue[6] 
 
-	if observableId == "pErk" 
+	if observableId == :pErk 
 		noiseParameter1_pErk, noiseParameter2_pErk = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pErk * noiseParameter2_pErk 
 	end
 
-	if observableId == "pMek" 
+	if observableId == :pMek 
 		noiseParameter1_pMek, noiseParameter2_pMek = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pMek * noiseParameter2_pMek 
 	end

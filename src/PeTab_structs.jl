@@ -82,7 +82,7 @@ struct PeTabOpt{F1<:Function,
     evalHessApprox::F8
     evalHessGaussNewton::F9
     nParamEst::Int64
-    namesParam::Array{String, 1}
+    namesParam::Vector{Symbol}
     paramVecNotTransformed::Vector{Float64}
     paramVecTransformed::Vector{Float64}
     lowerBounds::Vector{Float64}
@@ -102,16 +102,14 @@ end
 
     See also: [`processParameterData`]
 """
-struct ParameterInfo{T1<:Array{<:AbstractFloat}}
-
-    # TODO: logScale make symbol to support more transformations 
-    paramVal::T1
-    lowerBounds::T1
-    upperBounds::T1
-    parameterID::Vector{String}
-    logScale::Vector{Bool}
-    shouldEst::Vector{Bool}
-    nParamEst::Int64
+struct ParametersInfo
+    nominalValue::Vector{Float64}
+    lowerBound::Vector{Float64}
+    upperBound::Vector{Float64}
+    parameterId::Vector{Symbol}
+    parameterScale::Vector{Symbol}
+    estimate::Vector{Bool}
+    nParametersToEstimate::Int64
 end
 
 
@@ -119,80 +117,51 @@ end
     MeasurementData
 
     Struct storing the data in the PeTab measurementData-file in type-stable manner.
-
-    Transform data supports log and log10 transformations of the data.  
-
+    
     See also: [`processMeasurementData`]
 """
-struct MeasurementData{T6<:Array{<:Union{<:String, <:AbstractFloat}, 1}}
+struct MeasurementsInfo{T<:Vector{<:Union{<:String, <:AbstractFloat}}}
                     
-    yObsNotTransformed::Vector{Float64}
-    yObsTransformed::Vector{Float64}
-    tObs::Vector{Float64}
-    observebleID::Vector{String}
-    conditionId::Vector{String}  # Sum of pre-eq + simulation-cond id 
-    sdParams::T6
-    transformData::Vector{Symbol} # Only done once 
-    obsParam::Vector{String}
-    tVecSave::Dict{String, Vector{Float64}}
-    iTObs::Vector{Int64}
-    iPerConditionId::Dict{String, Vector{Int64}}
-    preEqCond::Vector{String}
-    simCond::Vector{String}
-    iGroupedTObs::Dict{String, Vector{Vector{Int64}}}
+    measurement::Vector{Float64}
+    measurementT::Vector{Float64}
+    measurementTransformation::Vector{Symbol}
+    time::Vector{Float64}
+    observableId::Vector{Symbol} 
+    preEquilibrationConditionId::Vector{Symbol}
+    simulationConditionId::Vector{Symbol}
+    noiseParameters::T
+    observableParameters::Vector{String}
 end
 
 
-"""
-    SimulationInfo
-
-    Struct storing simulation (forward ODE-solution) information. Specifcially 
-    stores the experimental ID:s from the experimentalCondition - PeTab file;
-    firstExpIds (preequilibration ID:s), the shiftExpIds (postequilibration), and
-    simulateSS (whether or not to simulate ODE-model to steady state). Further 
-    stores a solArray with the ODE solution where conditionIdSol of the ID for 
-    each forward solution. It also stores for each experimental condition which 
-    time-points we have observed data at
-
-    See also: [`getSimulationInfo`]
-"""
-struct SimulationInfo{T4<:Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}, 
-                      T5<:Dict{<:String, <:Vector{<:Float64}}, 
-                      T6<:Vector{<:SciMLBase.DECallback}, 
+struct SimulationInfo{T1<:NamedTuple,
+                      T2<:NamedTuple,
+                      T3<:NamedTuple,
+                      T4<:NamedTuple,
+                      T5<:NamedTuple,
+                      T6<:Dict{<:Symbol, <:SciMLBase.DECallback},
                       T7<:Union{<:SciMLSensitivity.AbstractForwardSensitivityAlgorithm, <:SciMLSensitivity.AbstractAdjointSensitivityAlgorithm}}
-    firstExpIds::Vector{String}
-    shiftExpIds::Vector{Vector{String}}
-    preEqIdSol::Vector{String}
-    postEqIdSol::Vector{String}
-    conditionIdSol::Vector{String}
-    tMaxForwardSim::Vector{Float64}
-    simulateSS::Bool
-    solArray::T4
-    solArrayGrad::T4
-    solArrayPreEq::T4
+    
+    preEquilibrationConditionId::Vector{Symbol}
+    simulationConditionId::Vector{Symbol}
+    experimentalConditionId::Vector{Symbol}
+    haspreEquilibrationConditionId::Bool
+    odeSolutions::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}}
+    odeSolutionsDerivatives::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}}
+    odePreEqulibriumSolutions::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}}
+    timeMax::T1
+    timeObserved::T2
+    iMeasurements::T3
+    iTimeODESolution::Vector{Int64}
+    iPerTimePoint::T4
+    timePositionInODESolutions::T5
     absTolSS::Float64
     relTolSS::Float64
-    tVecSave::T5
-    posInSolArray::Dict{String, UnitRange{Int64}}
     callbacks::T6
-    sensealg::T7
+    sensealg::T7 # sensealg for potential callbacks 
 end
 
 
-"""
-    ParamMap
-
-    Struct which makes out a map to correctly for an observation extract the correct observable 
-    or sd-param via the getObsOrSdParam function when computing the likelihood. Correctly built 
-    by `buildMapParameters`, and is part of the ParameterIndices-struct.
-
-    For noise or observable parameters belong to an observation, e.g (obsParam1, obsParam2), 
-    this struct stores which parameters should be estimtated, and for those parameters which 
-    index they correspond to in the parameter estimation vector. For constant parameters 
-    the struct stores the values. 
-
-    See also: [`getIndicesParam`, `buildMapParameters`]
-"""
 struct θObsOrSdParameterMap
     shouldEstimate::Array{Bool, 1}
     indexInθ::Array{Int64, 1}
@@ -248,12 +217,12 @@ struct ParameterIndices{T4<:Vector{<:θObsOrSdParameterMap},
     iθ_sd::Vector{Int64}
     iθ_nonDynamic::Vector{Int64}
     iθ_notOdeSystem::Vector{Int64}
-    θ_dynamicNames::Vector{String}
-    θ_observableNames::Vector{String}
-    θ_sdNames::Vector{String}
-    θ_nonDynamicNames::Vector{String}
-    θ_notOdeSystemNames::Vector{String}
-    θ_estNames::Vector{String}
+    θ_dynamicNames::Vector{Symbol}
+    θ_observableNames::Vector{Symbol}
+    θ_sdNames::Vector{Symbol}
+    θ_nonDynamicNames::Vector{Symbol}
+    θ_notOdeSystemNames::Vector{Symbol}
+    θ_estNames::Vector{Symbol}
     mapθ_observable::T4
     mapθ_sd::T4
     mapODEProblem::T5
@@ -265,4 +234,9 @@ struct PriorInfo{T1 <: Vector{<:Function}}
     logpdf::T1
     priorOnParamScale::Vector{Bool}
     hasPriors::Bool
+end
+
+
+struct PEtabFileError <: Exception
+    var::String
 end

@@ -6,8 +6,8 @@ function computeCostZygote(θ_est,
                            peTabModel::PeTabModel,
                            simulationInfo::SimulationInfo,
                            θ_indices::ParameterIndices,
-                           measurementData::MeasurementData,
-                           parameterInfo::ParameterInfo,
+                           measurementInfo::MeasurementsInfo,
+                           parameterInfo::ParametersInfo,
                            changeODEProblemParameters::Function,
                            solveOdeModelAllConditions::Function,
                            priorInfo::PriorInfo)
@@ -15,7 +15,7 @@ function computeCostZygote(θ_est,
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices)                     
 
     cost = _computeCostZygote(θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem,
-                              peTabModel, simulationInfo, θ_indices, measurementData,
+                              peTabModel, simulationInfo, θ_indices, measurementInfo,
                               parameterInfo, changeODEProblemParameters, solveOdeModelAllConditions)
 
     if priorInfo.hasPriors == true
@@ -36,8 +36,8 @@ function _computeCostZygote(θ_dynamic,
                             peTabModel::PeTabModel,
                             simulationInfo::SimulationInfo,
                             θ_indices::ParameterIndices,
-                            measurementData::MeasurementData,
-                            parameterInfo::ParameterInfo,
+                            measurementInfo::MeasurementsInfo,
+                            parameterInfo::ParametersInfo,
                             changeODEProblemParameters::Function,
                             solveOdeModelAllConditions::Function)::Real
 
@@ -52,16 +52,16 @@ function _computeCostZygote(θ_dynamic,
     # Compute yMod and sd-val by looping through all experimental conditons. At the end 
     # update the likelihood 
     cost = convert(eltype(θ_dynamic), 0.0)
-    for conditionID in keys(measurementData.iPerConditionId)
+    for experimentalConditionId in simulationInfo.experimentalConditionId
         
-        tMax = simulationInfo.tMaxForwardSim[findfirst(x -> x == conditionID, simulationInfo.conditionIdSol)]
-        odeSolution, success = solveOdeModelAllConditions(_odeProblem, conditionID, θ_dynamicT, tMax)
+        tMax = simulationInfo.timeMax[experimentalConditionId]
+        odeSolution, success = solveOdeModelAllConditions(_odeProblem, experimentalConditionId, θ_dynamicT, tMax)
         if success != true
             return Inf
         end
 
         cost += computeCostExpCond(odeSolution, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, 
-                                   conditionID, θ_indices, measurementData, parameterInfo)
+                                   experimentalConditionId, θ_indices, measurementInfo, parameterInfo, simulationInfo)
 
         if isinf(cost)
             return cost

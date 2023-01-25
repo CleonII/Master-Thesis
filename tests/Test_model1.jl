@@ -76,14 +76,14 @@ end
 function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
 
     # Set values to PeTab file values 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    paramData = processParameterData(parameterDataFile) 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(peTabModel.dirModel, readObservables=true)
+    measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
+    paramData = processParameters(parameterDataFile) 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
     θ_indices = computeIndicesθ(paramData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     
     # Extract experimental conditions for simulations 
-    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
+    simulationInfo = processSimulationInfo(peTabModel, measurementData)
     
     # Parameter values where to teast accuracy. Each column is a α, β, γ and δ
     u0 = [8.0, 4.0]
@@ -108,8 +108,8 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCondEst!(pVec, u0Vec, expID, θ_est, peTabModel, θ_indices)
         
         # Solve ODE system 
-        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
-        solNumeric = solArray[1]
+        odeSolutions, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
+        solNumeric = odeSolutions[simulationInfo.experimentalConditionId[1]]
         
         # Compare against analytical solution 
         sqDiff = 0.0
@@ -377,7 +377,7 @@ end
 
 
 peTabModel = setUpPeTabModel("Test_model1", pwd() * "/tests/Test_model1/", forceBuildJlFile=true)
-passTest = testOdeSol(peTabModel, Vern9(), 1e-9, printRes=false)
+passTest = testOdeSol(peTabModel, Vern9(), 1e-9, printRes=true)
 if passTest == true
     @printf("Passed test for ODE solution\n")
 else

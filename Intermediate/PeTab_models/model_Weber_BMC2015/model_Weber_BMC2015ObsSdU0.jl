@@ -2,45 +2,45 @@ function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, ma
 
 	CERTERa, PI4K3B, CERT, CERTTGNa, PKDDAGa, PKD, PI4K3Ba= u 
 	a11, a12, a21, a22, a31, a32, a33, m11, m22, m31, m33, p11, p12, p13, p21, p22, p31, p32, p33, pu3, pu4, pu5, pu6, s12, s21, s31 = dynPar 
-	pu2_C = paramData.paramVal[20] 
-	std_yPKDt_C = paramData.paramVal[33] 
-	std_yPI4K3Bt_C = paramData.paramVal[34] 
-	std_yCERTt_C = paramData.paramVal[35] 
+	pu2_C = paramData.nominalValue[20] 
+	std_yPKDt_C = paramData.nominalValue[33] 
+	std_yPI4K3Bt_C = paramData.nominalValue[34] 
+	std_yCERTt_C = paramData.nominalValue[35] 
 
-	if observableId == "yCERTpRN24" 
+	if observableId == :yCERTpRN24 
 		observableParameter1_yCERTpRN24 = getObsOrSdParam(obsPar, mapObsParam)
 		return CERT * observableParameter1_yCERTpRN24 / ( CERT + CERTERa + CERTTGNa ) 
 	end
 
-	if observableId == "yCERTt" 
+	if observableId == :yCERTt 
 		return CERT + CERTERa + CERTTGNa 
 	end
 
-	if observableId == "yPI4K3BpRN24" 
+	if observableId == :yPI4K3BpRN24 
 		observableParameter1_yPI4K3BpRN24 = getObsOrSdParam(obsPar, mapObsParam)
 		return PI4K3Ba * observableParameter1_yPI4K3BpRN24 / ( PI4K3B + PI4K3Ba ) 
 	end
 
-	if observableId == "yPI4K3Bt" 
+	if observableId == :yPI4K3Bt 
 		return PI4K3B + PI4K3Ba 
 	end
 
-	if observableId == "yPKDpN0" 
+	if observableId == :yPKDpN0 
 		observableParameter1_yPKDpN0 = getObsOrSdParam(obsPar, mapObsParam)
 		return PKDDAGa * observableParameter1_yPKDpN0 
 	end
 
-	if observableId == "yPKDpN24" 
+	if observableId == :yPKDpN24 
 		observableParameter1_yPKDpN24 = getObsOrSdParam(obsPar, mapObsParam)
 		return PKDDAGa * observableParameter1_yPKDpN24 
 	end
 
-	if observableId == "yPKDpN25" 
+	if observableId == :yPKDpN25 
 		observableParameter1_yPKDpN25 = getObsOrSdParam(obsPar, mapObsParam)
 		return PKDDAGa * observableParameter1_yPKDpN25 
 	end
 
-	if observableId == "yPKDt" 
+	if observableId == :yPKDt 
 		return PKD + PKDDAGa 
 	end
 
@@ -80,47 +80,47 @@ function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapS
 
 	CERTERa, PI4K3B, CERT, CERTTGNa, PKDDAGa, PKD, PI4K3Ba= u 
 	a11, a12, a21, a22, a31, a32, a33, m11, m22, m31, m33, p11, p12, p13, p21, p22, p31, p32, p33, pu3, pu4, pu5, pu6, s12, s21, s31 = dynPar 
-	pu2_C = paramData.paramVal[20] 
-	std_yPKDt_C = paramData.paramVal[33] 
-	std_yPI4K3Bt_C = paramData.paramVal[34] 
-	std_yCERTt_C = paramData.paramVal[35] 
+	pu2_C = paramData.nominalValue[20] 
+	std_yPKDt_C = paramData.nominalValue[33] 
+	std_yPI4K3Bt_C = paramData.nominalValue[34] 
+	std_yCERTt_C = paramData.nominalValue[35] 
 
-	if observableId == "yCERTpRN24" 
+	if observableId == :yCERTpRN24 
 		noiseParameter1_yCERTpRN24 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_yCERTpRN24 
 	end
 
-	if observableId == "yCERTt" 
+	if observableId == :yCERTt 
 		noiseParameter1_yCERTt = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_yCERTt 
 	end
 
-	if observableId == "yPI4K3BpRN24" 
+	if observableId == :yPI4K3BpRN24 
 		noiseParameter1_yPI4K3BpRN24 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_yPI4K3BpRN24 
 	end
 
-	if observableId == "yPI4K3Bt" 
+	if observableId == :yPI4K3Bt 
 		noiseParameter1_yPI4K3Bt = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_yPI4K3Bt 
 	end
 
-	if observableId == "yPKDpN0" 
+	if observableId == :yPKDpN0 
 		noiseParameter1_yPKDpN0 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_yPKDpN0 
 	end
 
-	if observableId == "yPKDpN24" 
+	if observableId == :yPKDpN24 
 		noiseParameter1_yPKDpN24 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_yPKDpN24 
 	end
 
-	if observableId == "yPKDpN25" 
+	if observableId == :yPKDpN25 
 		noiseParameter1_yPKDpN25 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_yPKDpN25 
 	end
 
-	if observableId == "yPKDt" 
+	if observableId == :yPKDt 
 		noiseParameter1_yPKDt = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_yPKDt 
 	end

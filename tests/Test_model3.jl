@@ -72,15 +72,15 @@ function calcCostAlgebraic(paramVec, peTabModel, solver, tol)
     
     a, b, c, d = paramVec
 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(peTabModel.dirModel, readObservables=true)
+    measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
 
     solArrayAlg = getSolAlgebraicSS(peTabModel, solver, tol, a, b, c, d)
     logLik = 0.0
-    for i in eachindex(measurementData.tObs)
-        yObs = measurementData.yObsNotTransformed[i]
-        t = measurementData.tObs[i]
-        if measurementData.conditionId[i] == "defaultdouble"
+    for i in eachindex(measurementData.time)
+        yObs = measurementData.measurement[i]
+        t = measurementData.time[i]
+        if measurementData.simulationConditionId[i] == :double
             yMod = solArrayAlg[1](t)[1]
         else
             yMod = solArrayAlg[2](t)[2]
@@ -96,14 +96,14 @@ end
 function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
    
     # Set values to PeTab file values 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    paramData = processParameterData(parameterDataFile) 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(peTabModel.dirModel, readObservables=true)
+    measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
+    paramData = processParameters(parameterDataFile) 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
     θ_indices = computeIndicesθ(paramData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     
     # Extract experimental conditions for simulations 
-    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData, absTolSS=1e-12, relTolSS=1e-10)
+    simulationInfo = processSimulationInfo(peTabModel, measurementData, absTolSS=1e-12, relTolSS=1e-10)
 
     # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
     # a, b, c, d
@@ -134,8 +134,8 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         
         # Compare against analytical solution 
         sqDiff = 0.0
-        for i in eachindex(solArray)
-            solNum = solArray[i]
+        for i in eachindex(simulationInfo.experimentalConditionId)
+            solNum = solArray[simulationInfo.experimentalConditionId[i]]
             solAlg = solArrayAlg[i]
             sqDiff += sum((Array(solNum) - Array(solAlg(solNum.t))).^2)
         end

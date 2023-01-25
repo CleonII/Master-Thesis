@@ -60,14 +60,14 @@ include(joinpath(pwd(), "src", "Optimizers", "Set_up_forward_gradient.jl"))
 function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
    
     # Set values to PeTab file values 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    paramData = processParameterData(parameterDataFile) 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(peTabModel.dirModel, readObservables=true)
+    measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
+    paramData = processParameters(parameterDataFile) 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
     θ_indices = computeIndicesθ(paramData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
     
     # Extract experimental conditions for simulations 
-    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
+    simulationInfo = processSimulationInfo(peTabModel, measurementData)
 
     # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
     u0 = [8.0, 4.0]
@@ -90,7 +90,7 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         
         # Solve ODE system 
         solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
-        solNumeric = solArray[1]
+        solNumeric = solArray[simulationInfo.experimentalConditionId[1]]
         
         # Compare against analytical solution 
         sqDiff = 0.0

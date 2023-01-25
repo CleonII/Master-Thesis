@@ -10,8 +10,8 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
                                   adjTol::Float64,
                                   forwardSolver::SciMLAlgorithm, 
                                   sensealgForward::Union{Symbol, SciMLSensitivity.AbstractForwardSensitivityAlgorithm},
-                                  parameterData::ParameterInfo,
-                                  measurementData::MeasurementData, 
+                                  parameterData::ParametersInfo,
+                                  measurementInfo::MeasurementsInfo, 
                                   simulationInfo::SimulationInfo, 
                                   paramEstIndices::ParameterIndices, 
                                   pirorInfo::PriorInfo,
@@ -50,7 +50,7 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
     for i in 1:nProcs
         sendPEtabStruct(peTabModel, jobs[i], results[i], "PEtab model", procs()[i])
         sendPEtabStruct(parameterData, jobs[i], results[i], "Parameter data", procs()[i])
-        sendPEtabStruct(measurementData, jobs[i], results[i], "Measurement data", procs()[i])
+        sendPEtabStruct(measurementInfo, jobs[i], results[i], "Measurement data", procs()[i])
         sendPEtabStruct(simulationInfo, jobs[i], results[i], "Simulation info", procs()[i])
         sendPEtabStruct(paramEstIndices, jobs[i], results[i], "Parameter indices", procs()[i])
         sendPEtabStruct(pirorInfo, jobs[i], results[i], "Prior info", procs()[i])
@@ -181,7 +181,7 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
 end
 
 
-function sendPEtabStruct(structSend::Union{PeTabModel, ParameterInfo, MeasurementData, SimulationInfo, ParameterIndices, PriorInfo}, 
+function sendPEtabStruct(structSend::Union{PeTabModel, ParametersInfo, MeasurementsInfo, SimulationInfo, ParameterIndices, PriorInfo}, 
                          job::RemoteChannel, 
                          result::RemoteChannel, 
                          strSend::String, 

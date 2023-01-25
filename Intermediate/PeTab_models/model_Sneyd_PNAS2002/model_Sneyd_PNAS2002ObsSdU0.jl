@@ -3,7 +3,7 @@ function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, ma
 	IPR_S, IPR_I2, IPR_R, IPR_O, IPR_I1, IPR_A= u 
 	k1, k2, k3, k4, k_1, k_2, k_3, k_4, l2, l4, l6, l_2, l_4, l_6 = dynPar 
 
-	if observableId == "open_probability" 
+	if observableId == :open_probability 
 		return ( 0.9 * IPR_A + 0.1 * IPR_O ) ^ 4 
 	end
 
@@ -42,7 +42,7 @@ function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapS
 	IPR_S, IPR_I2, IPR_R, IPR_O, IPR_I1, IPR_A= u 
 	k1, k2, k3, k4, k_1, k_2, k_3, k_4, l2, l4, l6, l_2, l_4, l_6 = dynPar 
 
-	if observableId == "open_probability" 
+	if observableId == :open_probability 
 		noiseParameter1_open_probability = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_open_probability 
 	end

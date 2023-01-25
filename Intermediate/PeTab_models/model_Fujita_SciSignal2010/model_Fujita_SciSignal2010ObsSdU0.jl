@@ -3,17 +3,17 @@ function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, ma
 	pAkt_S6, pAkt, pS6, EGFR, pEGFR_Akt, pEGFR, Akt, S6, EGF_EGFR= u 
 	EGFR_turnover, init_AKT, init_EGFR, init_S6, reaction_1_k1, reaction_1_k2, reaction_2_k1, reaction_2_k2, reaction_3_k1, reaction_4_k1, reaction_5_k1, reaction_5_k2, reaction_6_k1, reaction_7_k1, reaction_8_k1, reaction_9_k1 = dynPar 
 
-	if observableId == "pAkt_tot" 
+	if observableId == :pAkt_tot 
 		observableParameter1_pAkt_tot = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_pAkt_tot * ( pAkt + pAkt_S6 ) 
 	end
 
-	if observableId == "pEGFR_tot" 
+	if observableId == :pEGFR_tot 
 		observableParameter1_pEGFR_tot = getObsOrSdParam(obsPar, mapObsParam)
 		return observableParameter1_pEGFR_tot * ( pEGFR + pEGFR_Akt ) 
 	end
 
-	if observableId == "pS6_tot" 
+	if observableId == :pS6_tot 
 		observableParameter1_pS6_tot = getObsOrSdParam(obsPar, mapObsParam)
 		return pS6 * observableParameter1_pS6_tot 
 	end
@@ -59,17 +59,17 @@ function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapS
 	pAkt_S6, pAkt, pS6, EGFR, pEGFR_Akt, pEGFR, Akt, S6, EGF_EGFR= u 
 	EGFR_turnover, init_AKT, init_EGFR, init_S6, reaction_1_k1, reaction_1_k2, reaction_2_k1, reaction_2_k2, reaction_3_k1, reaction_4_k1, reaction_5_k1, reaction_5_k2, reaction_6_k1, reaction_7_k1, reaction_8_k1, reaction_9_k1 = dynPar 
 
-	if observableId == "pAkt_tot" 
+	if observableId == :pAkt_tot 
 		noiseParameter1_pAkt_tot = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pAkt_tot 
 	end
 
-	if observableId == "pEGFR_tot" 
+	if observableId == :pEGFR_tot 
 		noiseParameter1_pEGFR_tot = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pEGFR_tot 
 	end
 
-	if observableId == "pS6_tot" 
+	if observableId == :pS6_tot 
 		noiseParameter1_pS6_tot = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_pS6_tot 
 	end

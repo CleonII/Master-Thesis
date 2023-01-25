@@ -14,10 +14,10 @@ function getIndicesParametersNotInODESystem(θ_indices::ParameterIndices)::Tuple
 end
 
 
-function couldSolveODEModel(simulationInfo::SimulationInfo, expIDSolve::Vector{String})::Bool
-    @inbounds for i in eachindex(simulationInfo.solArrayGrad)
-        if expIDSolve[1] == "all" || simulationInfo.conditionIdSol[i] ∈ expIDSolve
-            if simulationInfo.solArrayGrad[i].retcode != :Success
+function couldSolveODEModel(simulationInfo::SimulationInfo, expIDSolve::Vector{Symbol})::Bool
+    for experimentalId in simulationInfo.experimentalConditionId 
+        if expIDSolve[1] == :all || experimentalId ∈ expIDSolve
+            if simulationInfo.odeSolutionsDerivatives[experimentalId].retcode != :Success
                 return false
             end
         end
@@ -33,8 +33,8 @@ function compute∂G∂_(∂G∂_,
                      t::Float64, 
                      i::Integer, 
                      iPerTimePoint::Vector{Vector{Int64}}, 
-                     measurementData::MeasurementData, 
-                     parameterInfo::ParameterInfo,
+                     measurementInfo::MeasurementsInfo, 
+                     parameterInfo::ParametersInfo,
                      θ_indices::ParameterIndices,
                      peTabModel::PeTabModel, 
                      θ_dynamic::Vector{Float64},
@@ -51,25 +51,25 @@ function compute∂G∂_(∂G∂_,
         ∂h∂_ .= 0.0
         ∂σ∂_ .= 0.0
 
-        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, iMeasurementData, measurementData, θ_indices, parameterInfo)
-        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, iMeasurementData, measurementData, θ_indices, parameterInfo)
+        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, iMeasurementData, measurementInfo, θ_indices, parameterInfo)
+        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, iMeasurementData, measurementInfo, θ_indices, parameterInfo)
 
         # Maps needed to correctly extract the right SD and observable parameters 
         mapθ_sd = θ_indices.mapθ_sd[iMeasurementData]
         mapθ_observable = θ_indices.mapθ_observable[iMeasurementData]
         if compute∂G∂U == true
-            peTabModel.evalDYmodDu(u, t, p, θ_observable, θ_nonDynamic, measurementData.observebleID[iMeasurementData], mapθ_observable, ∂h∂_)
-            peTabModel.evalDSdDu!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurementData], mapθ_sd, ∂σ∂_)
+            peTabModel.evalDYmodDu(u, t, p, θ_observable, θ_nonDynamic, measurementInfo.observableId[iMeasurementData], mapθ_observable, ∂h∂_)
+            peTabModel.evalDSdDu!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurementData], mapθ_sd, ∂σ∂_)
         else
-            peTabModel.evalDYmodDp(u, t, p, θ_observable, θ_nonDynamic, measurementData.observebleID[iMeasurementData], mapθ_observable, ∂h∂_)
-            peTabModel.evalDSdDp!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementData.observebleID[iMeasurementData], mapθ_sd, ∂σ∂_)
+            peTabModel.evalDYmodDp(u, t, p, θ_observable, θ_nonDynamic, measurementInfo.observableId[iMeasurementData], mapθ_observable, ∂h∂_)
+            peTabModel.evalDSdDp!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurementData], mapθ_sd, ∂σ∂_)
         end
 
-        if measurementData.transformData[iMeasurementData] == :log10
-            yObs = measurementData.yObsTransformed[iMeasurementData]
+        if measurementInfo.measurementTransformation[iMeasurementData] == :log10
+            yObs = measurementInfo.measurementT[iMeasurementData]
             ∂h∂_ .*= 1 / (log(10) * exp10(hTransformed))
-        elseif measurementData.transformData[iMeasurementData] == :lin
-            yObs = measurementData.yObsNotTransformed[iMeasurementData]
+        elseif measurementInfo.measurementTransformation[iMeasurementData] == :lin
+            yObs = measurementInfo.measurement[iMeasurementData]
         end
 
         # In case of Guass Newton approximation we target the residuals (y_mod - y_obs)/σ
@@ -104,12 +104,12 @@ function adjustGradientTransformedParameters!(gradient::Union{AbstractVector, Su
                                               ∂G∂p::Union{AbstractVector, Nothing}, 
                                               θ_dynamic::Vector{Float64},
                                               θ_indices::ParameterIndices,
-                                              parameterInfo::ParameterInfo, 
-                                              postEqulibriumId::String; 
+                                              parameterInfo::ParametersInfo, 
+                                              simulationConditionId::Symbol; 
                                               autoDiffSensitivites::Bool=false, 
                                               adjoint::Bool=false)
 
-    mapConditionId = θ_indices.mapsConiditionId[Symbol(postEqulibriumId)]                                 
+    mapConditionId = θ_indices.mapsConiditionId[simulationConditionId]                                 
     
     # In case we compute the sensitivtes via automatic differentation the parameters in _gradient=S'*∂G∂u will appear in the 
     # same order as they appear in θ_est. In case we do not compute sensitivtes via autodiff, or do adjoint sensitity analysis, 
@@ -144,14 +144,23 @@ function adjustGradientTransformedParameters!(gradient::Union{AbstractVector, Su
 end
 
 
+# TODO : We need to recompute transformations
 function _adjustGradientTransformedParameters(_gradient::AbstractVector, 
                                               θ::AbstractVector,
-                                              θ_names::Union{Vector{String}, SubArray{String, 1, Vector{String}}},
-                                              parameterInfo::ParameterInfo)::AbstractVector
+                                              θ_names::Vector{Symbol},
+                                              parameterInfo::ParametersInfo)::AbstractVector
     
-    iθ = [findfirst(x -> x == θ_names[i], parameterInfo.parameterID) for i in eachindex(θ_names)]
-    shouldTransform = [parameterInfo.logScale[i] == true ? true : false for i in iθ]
-    shouldNotTransform = .!shouldTransform
+    parameterScale = [parameterInfo.parameterScale[findfirst(x -> x == θ_names[i], parameterInfo.parameterId)] for i in eachindex(θ_names)]
+    out = similar(_gradient)
+    for i in eachindex(θ)
+        if parameterScale[i] == :log10
+            out[i] = log(10) * _gradient[i] * θ[i]
+        elseif parameterScale[i] == :log
+            out[i] = _gradient[i] * θ[i]
+        else
+            out[i] = _gradient[i] 
+        end
+    end
 
-    return @. log(10) * _gradient * θ * shouldTransform + _gradient * shouldNotTransform
+    return out
 end

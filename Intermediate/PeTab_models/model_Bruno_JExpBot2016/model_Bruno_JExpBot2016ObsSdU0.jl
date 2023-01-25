@@ -3,27 +3,27 @@ function evalYmod(u, t, dynPar, obsPar, nonDynParam, paramData, observableId, ma
 	b10, bio, ohbio, zea, bcry, ohb10, bcar= u 
 	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, k5, kb1, kb2, kc1, kc2, kc4, szea = dynPar 
 
-	if observableId == "ob10" 
+	if observableId == :ob10 
 		return b10 
 	end
 
-	if observableId == "obcar" 
+	if observableId == :obcar 
 		return bcar 
 	end
 
-	if observableId == "obcry" 
+	if observableId == :obcry 
 		return bcry 
 	end
 
-	if observableId == "obio" 
+	if observableId == :obio 
 		return bio 
 	end
 
-	if observableId == "oohb10" 
+	if observableId == :oohb10 
 		return ohb10 
 	end
 
-	if observableId == "ozea" 
+	if observableId == :ozea 
 		return zea 
 	end
 
@@ -64,32 +64,32 @@ function evalSd!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapS
 	b10, bio, ohbio, zea, bcry, ohb10, bcar= u 
 	init_b10_1, init_bcar1, init_bcar2, init_bcry_1, init_ohb10_1, init_zea_1, k5, kb1, kb2, kc1, kc2, kc4, szea = dynPar 
 
-	if observableId == "ob10" 
+	if observableId == :ob10 
 		noiseParameter1_ob10 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_ob10 
 	end
 
-	if observableId == "obcar" 
+	if observableId == :obcar 
 		noiseParameter1_obcar = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_obcar 
 	end
 
-	if observableId == "obcry" 
+	if observableId == :obcry 
 		noiseParameter1_obcry = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_obcry 
 	end
 
-	if observableId == "obio" 
+	if observableId == :obio 
 		noiseParameter1_obio = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_obio 
 	end
 
-	if observableId == "oohb10" 
+	if observableId == :oohb10 
 		noiseParameter1_oohb10 = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_oohb10 
 	end
 
-	if observableId == "ozea" 
+	if observableId == :ozea 
 		noiseParameter1_ozea = getObsOrSdParam(sdPar, mapSdParam)
 		return noiseParameter1_ozea 
 	end

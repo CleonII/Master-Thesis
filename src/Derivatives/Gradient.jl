@@ -13,17 +13,17 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
                                   peTabModel::PeTabModel,
                                   simulationInfo::SimulationInfo,
                                   θ_indices::ParameterIndices,
-                                  measurementData::MeasurementData,
-                                  parameterInfo::ParameterInfo, 
+                                  measurementInfo::MeasurementsInfo,
+                                  parameterInfo::ParametersInfo, 
                                   changeODEProblemParameters!::Function,
                                   solveOdeModelAllConditions!::Function, 
                                   priorInfo::PriorInfo;
-                                  expIDSolve::Array{String, 1} = ["all"])     
+                                  expIDSolve::Vector{Symbol} = [:all])     
 
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
     # Compute hessian for parameters which are a part of the ODE-system (dynamic parameters)
     computeCostDynamicθ = (x) -> computeCostSolveODE(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, peTabModel, 
-                                                     simulationInfo, θ_indices, measurementData, parameterInfo, 
+                                                     simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                                      changeODEProblemParameters!, solveOdeModelAllConditions!, 
                                                      computeGradientDynamicθ=true, expIDSolve=expIDSolve)
     try 
@@ -48,7 +48,7 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
     computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             peTabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveAutoDiff=true)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
@@ -68,12 +68,12 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
                                           sensealg::Union{Symbol, SciMLSensitivity.AbstractForwardSensitivityAlgorithm},
                                           simulationInfo::SimulationInfo,
                                           θ_indices::ParameterIndices,
-                                          measurementData::MeasurementData,
-                                          parameterInfo::ParameterInfo, 
+                                          measurementInfo::MeasurementsInfo,
+                                          parameterInfo::ParametersInfo, 
                                           changeODEProblemParameters!::Function,
                                           solveOdeModelAllConditions!::Function, 
                                           priorInfo::PriorInfo;
-                                          expIDSolve::Array{String, 1} = ["all"])   
+                                          expIDSolve::Vector{Symbol} = [:all])   
     
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
 
@@ -82,7 +82,7 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
     # pre-equlibrita model). Here we pre-allocate said matrix, or leave it empty.
     if sensealg == :AutoDiffForward
         nModelStates = length(odeProblem.u0)
-        nTimePointsSaveAt = sum([length(measurementData.tVecSave[conditionId]) for conditionId in simulationInfo.conditionIdSol])
+        nTimePointsSaveAt = sum(length(simulationInfo.timeObserved[experimentalConditionId]) for experimentalConditionId in simulationInfo.experimentalConditionId)
         S = zeros(Float64, (nTimePointsSaveAt*nModelStates, length(θ_dynamic)))
     else
         S = zeros(Float64, (0, 0))
@@ -91,7 +91,7 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
     gradientDyanmicθ::Vector{Float64} = zeros(Float64, length(θ_dynamic))
     computeGradientForwardEqDynamicθ!(gradientDyanmicθ, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, S, peTabModel, 
-                                      sensealg, odeProblem, simulationInfo, θ_indices, measurementData, parameterInfo, 
+                                      sensealg, odeProblem, simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                       changeODEProblemParameters!, solveOdeModelAllConditions!, expIDSolve=expIDSolve)                            
     gradient[θ_indices.iθ_dynamic] .= gradientDyanmicθ
 
@@ -105,7 +105,7 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
     computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             peTabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveForward=true)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
@@ -127,12 +127,12 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
                                           peTabModel::PeTabModel,
                                           simulationInfo::SimulationInfo,
                                           θ_indices::ParameterIndices,
-                                          measurementData::MeasurementData,
-                                          parameterInfo::ParameterInfo, 
+                                          measurementInfo::MeasurementsInfo,
+                                          parameterInfo::ParametersInfo, 
                                           changeODEProblemParameters!::Function,
                                           solveOdeModelAllConditions!::Function, 
                                           priorInfo::PriorInfo;
-                                          expIDSolve::Array{String, 1} = ["all"])   
+                                          expIDSolve::Vector{Symbol} = [:all])   
     
     # Split input into observeble and dynamic parameters 
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
@@ -140,7 +140,7 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
     gradientDyanmicθ::Vector{Float64} = zeros(Float64, length(θ_dynamic))
     computeGradientAdjointDynamicθ(gradientDyanmicθ, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem, adjointODESolver, 
-                                   tolerance, sensealg, peTabModel, simulationInfo, θ_indices, measurementData, parameterInfo, 
+                                   tolerance, sensealg, peTabModel, simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                    changeODEProblemParameters!, solveOdeModelAllConditions!; expIDSolve=expIDSolve, 
                                    sensealgSS=sensealgSS)
     gradient[θ_indices.iθ_dynamic] .= gradientDyanmicθ
@@ -155,7 +155,7 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
     computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             peTabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveAdjoint=true)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
@@ -173,8 +173,8 @@ function computeGradientZygote(gradient::Vector{Float64},
                                peTabModel::PeTabModel,
                                simulationInfo::SimulationInfo,
                                θ_indices::ParameterIndices,
-                               measurementData::MeasurementData,
-                               parameterInfo::ParameterInfo, 
+                               measurementInfo::MeasurementsInfo,
+                               parameterInfo::ParametersInfo, 
                                changeODEProblemParameters::Function,
                                solveOdeModelAllConditions::Function, 
                                priorInfo::PriorInfo)
@@ -184,7 +184,7 @@ function computeGradientZygote(gradient::Vector{Float64},
 
     # For Zygote the code must be out-of place. Hence a special likelihood funciton is needed.
     computeGradientZygoteDynamicθ = (x) -> _computeCostZygote(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, 
-                                                              peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                              peTabModel, simulationInfo, θ_indices, measurementInfo, 
                                                               parameterInfo, changeODEProblemParameters, 
                                                               solveOdeModelAllConditions)
     gradient[θ_indices.iθ_dynamic] .= Zygote.gradient(computeGradientZygoteDynamicθ, θ_dynamic)[1]
@@ -193,7 +193,7 @@ function computeGradientZygote(gradient::Vector{Float64},
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
     computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
-                                                             peTabModel, simulationInfo, θ_indices, measurementData, 
+                                                             peTabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 end    

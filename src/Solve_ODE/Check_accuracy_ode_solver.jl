@@ -54,7 +54,7 @@ end
     calcAccuracyOdeSolver(prob::ODEProblem, 
                           solArrayHighAccuracy::Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1},
                           changeToExperimentalCondUse!::Function, 
-                          measurementData::DataFrame,
+                          measurementInfo::DataFrame,
                           simulationInfo::SimulationInfo,
                           solver,
                           tol::Float64)::Float64

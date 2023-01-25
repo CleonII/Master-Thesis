@@ -26,14 +26,14 @@ function createFileYmodSdU0(modelName::String,
     stateNames = states(odeSys)
 
     # Read data on experimental conditions and parameter values 
-    experimentalConditionsFile, measurementDataFile, parameterBoundsFile, observablesDataFile = readDataFiles(dirModel, readObs=true)
-    paramData = processParameterData(parameterBoundsFile) # Model data in convient structure 
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
+    experimentalConditionsFile, measurementDataFile, parameterBoundsFile, observablesDataFile = readPEtabFiles(dirModel, readObservables=true)
+    paramData = processParameters(parameterBoundsFile) # Model data in convient structure 
+    measurementInfo = processMeasurements(measurementDataFile, observablesDataFile) 
     
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
-    paramIndices = computeIndicesθ(paramData, measurementData, odeSys, experimentalConditionsFile)
+    paramIndices = computeIndicesθ(paramData, measurementInfo, odeSys, experimentalConditionsFile)
     
-    createYmodFunction(modelName, dirModel, stateNames, paramData, paramIndices.θ_dynamicNames, paramIndices.θ_nonDynamicNames, observablesDataFile, modelDict)
+    createYmodFunction(modelName, dirModel, stateNames, paramData, string.(paramIndices.θ_dynamicNames), string.(paramIndices.θ_nonDynamicNames), observablesDataFile, modelDict)
     println("Done with Ymod function")
     println("")
     
@@ -45,7 +45,7 @@ function createFileYmodSdU0(modelName::String,
     println("Done with u0 function not in-place")
     println("")
 
-    createSdFunction(modelName, dirModel, paramData, stateNames, paramIndices.θ_dynamicNames, paramIndices.θ_nonDynamicNames, observablesDataFile, modelDict)
+    createSdFunction(modelName, dirModel, paramData, stateNames, string.(paramIndices.θ_dynamicNames), string.(paramIndices.θ_nonDynamicNames), observablesDataFile, modelDict)
     println("Done with sd function")
     println("")
 end
@@ -53,7 +53,7 @@ end
 
 """
     createTopOfFun(stateNames, 
-        paramData::ParameterInfo, 
+        paramData::ParametersInfo, 
         namesParamODEProb::Array{String, 1}, 
         namesNonDynParam::Array{String, 1},
         observablesData::DataFrame,
@@ -63,7 +63,7 @@ end
     Also adds them as variables for Symbolics.jl
 """
 function createTopOfFun(stateNames, 
-                        paramData::ParameterInfo, 
+                        paramData::ParametersInfo, 
                         namesParamODEProb::Array{String, 1}, 
                         namesNonDynParam::Array{String, 1},
                         observablesData::DataFrame,
@@ -100,9 +100,9 @@ function createTopOfFun(stateNames,
     # Extract constant parameters. To avoid cluttering the function only constant parameters that are used to 
     # to compute yMod are written to file.
     paramConstStr = ""
-    for i in eachindex(paramData.parameterID)
-        if paramData.shouldEst[i] == false
-            paramConstStr *= "\t" * paramData.parameterID[i] * "_C = paramData.paramVal[" * string(i) *"] \n" 
+    for i in eachindex(paramData.parameterId)
+        if paramData.estimate[i] == false
+            paramConstStr *= "\t" * string(paramData.parameterId[i]) * "_C = paramData.nominalValue[" * string(i) *"] \n" 
         end
     end
     paramConstStr *= "\n"
@@ -118,7 +118,7 @@ function createTopOfFun(stateNames,
     explicitRules = ""
     tmpFormulaConCat = ""
     
-    observableIDs = String.(observablesData[!, "observableId"])
+    observableIDs = string.(observablesData[!, "observableId"])
     for i in eachindex(observableIDs)
         # Concatenates all formulae and afterwards checks if any explicit rule variable is used there.
         if obsFun == true
@@ -147,7 +147,7 @@ end
     createYmodFunction(modelName::String, 
                        dirModel::String, 
                        stateNames, 
-                       paramData::ParameterInfo, 
+                       paramData::ParametersInfo, 
                        namesParamDyn::Array{String, 1}, 
                        observablesData::DataFrame,
                        modelDict::Dict)
@@ -163,7 +163,7 @@ end
 function createYmodFunction(modelName::String, 
                             dirModel::String, 
                             stateNames, 
-                            paramData::ParameterInfo, 
+                            paramData::ParametersInfo, 
                             namesParamDyn::Array{String, 1}, 
                             namesNonDynParam::Array{String, 1},
                             observablesData::DataFrame,
@@ -177,7 +177,7 @@ function createYmodFunction(modelName::String,
     strObserveble = ""
     for i in eachindex(observableIDs)
         # Each observebleID falls below its own if-statement 
-        strObserveble *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
+        strObserveble *= "\tif observableId == " * ":" * observableIDs[i] * " \n"
         tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
 
         # Extract observable parameters 
@@ -208,7 +208,7 @@ end
 """
     createU0Function(modelName::String, 
                          dirModel::String, 
-                         paramData::ParameterInfo, 
+                         paramData::ParametersInfo, 
                          namesParameter::Array{String, 1}, 
                          stateMap)
 
@@ -220,7 +220,7 @@ end
 """
 function createU0Function(modelName::String, 
                           dirModel::String, 
-                          paramData::ParameterInfo, 
+                          paramData::ParametersInfo, 
                           namesParameter::Array{String, 1}, 
                           stateMap;
                           inPlace::Bool=true)
@@ -283,7 +283,7 @@ end
 """
     createSdFunction(modelName::String, 
                           dirModel::String, 
-                          paramData::ParameterInfo, 
+                          paramData::ParametersInfo, 
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
                           observablesData::DataFrame,
@@ -297,7 +297,7 @@ end
 """
 function createSdFunction(modelName::String, 
                           dirModel::String, 
-                          paramData::ParameterInfo, 
+                          paramData::ParametersInfo, 
                           stateNames, 
                           namesParamDyn::Array{String, 1}, 
                           namesNonDynParam::Array{String, 1},
@@ -309,11 +309,11 @@ function createSdFunction(modelName::String,
     stateStr, paramDynStr, paramNonDynStr, paramConstStr, explicitRules, namesExplicitRules = createTopOfFun(stateNames, paramData, namesParamDyn, namesNonDynParam, observablesData, modelDict, false)
 
     # Write the formula for standard deviations to file
-    observableIDs = String.(observablesData[!, "observableId"])
+    observableIDs = string.(observablesData[!, "observableId"])
     strObserveble = ""
     for i in eachindex(observableIDs)
         # Each observebleID falls below its own if-statement 
-        strObserveble *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
+        strObserveble *= "\tif observableId == " * ":" * observableIDs[i] * " \n"
         tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
 
         # Extract noise parameters 
