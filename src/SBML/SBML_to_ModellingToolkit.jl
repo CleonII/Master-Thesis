@@ -41,12 +41,12 @@ end
     JLToModellingToolkit(modelName::String, dirModel::String)
 
     Checks and fixes a Julia ModelingToolkit file and store 
-    the fixed file in dirModel with name modelName_fixed.jl. 
+    the fixed file in dirModel with name modelName_fix.jl. 
 
 """
-function JLToModellingToolkit(modelName::String, dirModel::String; writeToFile::Bool=true, ifElseToEvent::Bool=true)
+function JLToModellingToolkit(modelName::String, dirModel::String; ifElseToEvent::Bool=true)
 
-    # Used to not break compatibility with replaceExplicitVariableWithRule in Create_obs_u0_sd_common.jl 
+    # Some parts of the modelDict are needed to create the other julia files for the model.
     modelDict = Dict()
     modelDict["boolVariables"] = Dict()
     modelDict["modelRuleFunctions"] = Dict()
@@ -83,50 +83,62 @@ function JLToModellingToolkit(modelName::String, dirModel::String; writeToFile::
         timeDependentIfElseToBool!(modelDict)
     end
 
-    (tmppath, tmpio) = mktemp()
+    listOfBoolVariables = collect(keys(modelDict["boolVariables"]))
+
+    # Make changes in a temporary file
+    (tmpPath, tmpIO) = mktemp()
     open(modelFileJlSrc) do io
         for line in eachline(io, keep=true)
-            for key in keys(modelDict["inputFunctions"])
-                # Fixes ModelingToolkit.@parameters 
-                if occursin("ModelingToolkit.@parameters", line)
-                    defineParameters = "    ModelingToolkit.@parameters"
-                    for key in keys(modelDict["parameters"])
-                        defineParameters = defineParameters * " " * key
-                    end
-                    line = defineParameters
-                end
-                
-                # Fixed parameterArray
-                if occursin(Regex("parameterArray\\s*=\\s*\\["), line)
-                    defineParameters = "    parameterArray = ["
-                    for (index, key) in enumerate(keys(modelDict["parameters"]))
-                        if index < length(modelDict["parameters"])
-                           defineParameters = defineParameters * key * ", "
-                        else
-                           defineParameters = defineParameters * key * "]"
-                        end
-                    end
-                        line = defineParameters
-                end
 
-                # Fixes equations containing ifelse
-                if occursin(Regex(key * "\\s*~"), line)
-                    line = "    " * modelDict["inputFunctions"][key]
+            # Adds boolVariables to the start of ModelingToolkit.@parameters
+            searchStr = Regex("(ModelingToolkit.@parameters\\s*)")
+            if occursin(searchStr, line)
+                tmpLine = ""
+                for key in listOfBoolVariables
+                    tmpLine *= key * " "
                 end
-
-                # Fixes trueParameterValues
-                if occursin(Regex("trueParameterValues\\s*=\\s*\\["), line)
-                    for key in keys(modelDict["boolVariables"])
-                        line *= "    " * key * "=> 0.0,\n"
-                    end
-                end
-
+                line = replace(line, searchStr => SubstitutionString("\\1" * tmpLine ))
             end
-            write(tmpio, line)
+
+            # Adds boolVariables to the start of parameterArray
+            searchStr = Regex("(parameterArray\\s*=\\s*\\[)")
+            if occursin(searchStr, line)
+                tmpLine = ""
+                for key in listOfBoolVariables
+                    tmpLine *= key * ", "
+                end
+                line = replace(line, searchStr => SubstitutionString("\\1" * tmpLine ))
+            end
+
+            # Fixes equations containing ifelse
+            if occursin("ifelse", line)
+                for key in keys(modelDict["inputFunctions"])
+                    if occursin(Regex(key * "\\s*~"), line)
+                        tmpLine = "    " * modelDict["inputFunctions"][key] * ",\n"
+                        # Removes comma if the last line in the list doesn't end with one. Looks nicer.
+                        if !occursin(Regex(",\\s*\n"), line)
+                            tmpLine = tmpLine[1:end-2] * "\n"
+                        end
+                    line = tmpLine
+                    end
+                end
+            end
+            
+            # Adds boolVariables to the start of trueParameterValues
+            searchStr = Regex("(trueParameterValues\\s*=\\s*\\[)")
+            if occursin(searchStr, line)
+                tmpLine = ""
+                for key in listOfBoolVariables
+                    tmpLine *= key * " => 0.0, "
+                end
+                line = replace(line, searchStr => SubstitutionString("\\1" * tmpLine ))
+            end
+            write(tmpIO, line)
         end
     end
-    close(tmpio)
-    mv(tmppath, modelFileJl, force=true)
+    close(tmpIO)
+    # Store the temporary file as in dirModel with the suffix _fix
+    mv(tmpPath, modelFileJl, force=true)
 
     return modelDict, modelFileJl
 
