@@ -18,10 +18,10 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
                                         sensealgSS=SteadyStateAdjoint(),
                                         expIDSolve::Vector{Symbol} = [:all])
 
-    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, parameterInfo)
-    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, parameterInfo)
-    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, parameterInfo)
-    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
+    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, θ_indices)
+    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, θ_indices)
+    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
+    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
 
     _odeProblem = remake(odeProblem, p = convert.(eltype(θ_dynamicT), odeProblem.p), u0 = convert.(eltype(θ_dynamicT), odeProblem.u0))
     changeODEProblemParameters!(_odeProblem.p, _odeProblem.u0, θ_dynamicT)
@@ -247,7 +247,7 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
 
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we want dY/dθ_log. We can adjust via;
     # dY/dθ_log = log(10) * θ * dY/dθ
-    adjustGradientTransformedParameters!(gradient, _gradient[:], nothing, θ_dynamic, θ_indices, parameterInfo, 
+    adjustGradientTransformedParameters!(gradient, _gradient[:], nothing, θ_dynamic, θ_indices, 
                                          simulationConditionId, adjoint=true)                           
     return true                                         
 end

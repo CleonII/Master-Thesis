@@ -55,7 +55,7 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
 
     # If we have prior contribution its gradient is computed via autodiff for all parameters 
     if priorInfo.hasPriors == true
-        computeGradientPrior!(gradient, θ_est, θ_indices, priorInfo, parameterInfo)
+        computeGradientPrior!(gradient, θ_est, θ_indices, priorInfo)
     end
 end
 
@@ -111,7 +111,7 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 
     if priorInfo.hasPriors == true
-        computeGradientPrior!(gradient, θ_est, θ_indices, priorInfo, parameterInfo)
+        computeGradientPrior!(gradient, θ_est, θ_indices, priorInfo)
     end
 end
 
@@ -161,7 +161,7 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 
     if priorInfo.hasPriors == true
-        computeGradientPrior!(gradient, θ_est, θ_indices, priorInfo, parameterInfo)
+        computeGradientPrior!(gradient, θ_est, θ_indices, priorInfo)
     end
 end
 
@@ -203,12 +203,11 @@ end
 function computeGradientPrior!(gradient::AbstractVector, 
                                θ::AbstractVector, 
                                θ_indices::ParameterIndices, 
-                               priorInfo::PriorInfo, 
-                               parameterInfo::ParametersInfo)
+                               priorInfo::PriorInfo)
             
 
     _evalPriors = (θ_est) -> begin
-                                θ_estT = transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+                                θ_estT = transformθ(θ_est, θ_indices.θ_estNames, θ_indices)
                                 return computePriors(θ_est, θ_estT, θ_indices.θ_estNames, priorInfo)
                             end
     gradient .+= ForwardDiff.gradient(_evalPriors, θ)                                

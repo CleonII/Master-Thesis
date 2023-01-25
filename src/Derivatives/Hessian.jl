@@ -34,7 +34,7 @@ function computeHessian(hessian::Matrix{Float64},
     end
 
     if priorInfo.hasPriors == true
-        computeHessianPrior!(hessian, θ_est, θ_indices, priorInfo, parameterInfo)
+        computeHessianPrior!(hessian, θ_est, θ_indices, priorInfo)
     end
 end
 
@@ -90,7 +90,7 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
     # Even though this is a hessian approximation, due to ease of implementation and low run-time we compute the 
     # full hessian for the priors 
     if priorInfo.hasPriors == true
-        computeHessianPrior!(hessian, θ_est, θ_indices, priorInfo, parameterInfo)
+        computeHessianPrior!(hessian, θ_est, θ_indices, priorInfo)
     end
 end
 
@@ -164,11 +164,10 @@ end
 function computeHessianPrior!(hessian::AbstractVector, 
                               θ::AbstractVector, 
                               θ_indices::ParameterIndices, 
-                              priorInfo::PriorInfo, 
-                              parameterInfo::ParametersInfo)
+                              priorInfo::PriorInfo)
 
     _evalPriors = (θ_est) -> begin
-                                θ_estT =  transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+                                θ_estT =  transformθ(θ_est, θ_indices.θ_estNames, θ_indices)
                                 return computePriors(θ_est, θ_estT, θ_indices.θ_estNames, priorInfo)
                             end
     hessian .+= ForwardDiff.hessian(_evalPriors, θ)                                

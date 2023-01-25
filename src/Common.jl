@@ -83,9 +83,28 @@ function computehTransformed(u::AbstractVector,
     mapθ_observable = θ_indices.mapθ_observable[iMeasurement]
     h = peTabModel.evalYmod(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_observable) 
     # Transform yMod is necessary
-    hTransformed = transformObsOrData(h, measurementInfo.measurementTransformation[iMeasurement])
+    hTransformed = transformMeasurementOrH(h, measurementInfo.measurementTransformation[iMeasurement])
 
     return hTransformed
+end
+
+
+"""
+    transformMeasurementOrH(val::Real, transformationArr::Array{Symbol, 1})
+
+    Transform val using either :lin (identify), :log10 and :log transforamtions.
+"""
+function transformMeasurementOrH(val::Real, transform::Symbol)::Real
+    if transform == :lin
+        return val
+    elseif transform == :log10
+        return val > 0 ? log10(val) : Inf
+    elseif transform == :log
+        return val > 0 ? log(val) : Inf
+    else
+        println("Error : $transform is not an allowed transformation")
+        println("Only :lin, :log10 and :log are supported.")
+    end
 end
 
 
@@ -137,21 +156,11 @@ end
 # Transform parameter from log10 scale to normal scale, or reverse transform
 function transformθ!(θ::AbstractVector, 
                      θ_names::Vector{Symbol}, 
-                     parameterInfo::ParametersInfo; 
+                     θ_indices::ParameterIndices; 
                      reverseTransform::Bool=false) 
     
-    @inbounds for i in eachindex(θ)
-        iParam = findfirst(x -> x == θ_names[i], parameterInfo.parameterId)
-        if isnothing(iParam)
-            println("Warning : Could not find parameter ID for ", θ_names[i])
-        end
-        if parameterInfo.parameterScale[iParam] == :lin
-            θ[i] = θ[i]
-        elseif parameterInfo.parameterScale[iParam] == :log10
-            θ[i] = reverseTransform == true ? log10(θ[i]) : exp10(θ[i]) 
-        elseif parameterInfo.parameterScale[iParam] == :log
-            θ[i] = reverseTransform == true ? log(θ[i]) : exp(θ[i]) 
-        end
+    @inbounds for (i, θ_name) in pairs(θ_names)
+        θ[i] = transformθElement(θ[i], θ_indices.θ_scale[θ_name], reverseTransform=reverseTransform)
     end
 end
 
@@ -159,13 +168,38 @@ end
 # Transform parameter from log10 scale to normal scale, or reverse transform
 function transformθ(θ::AbstractVector, 
                     θ_names::Vector{Symbol}, 
-                    parameterInfo::ParametersInfo; 
+                    θ_indices::ParameterIndices; 
                     reverseTransform::Bool=false)::AbstractVector
+    
+    out = [transformθElement(θ[i], θ_indices.θ_scale[θ_name], reverseTransform=reverseTransform) for (i, θ_name) in pairs(θ_names)]
+    return out
+end
+
+
+function transformθElement(θ_element, 
+                           scale::Symbol; 
+                           reverseTransform::Bool=false)::Real
+
+    if scale == :lin                     
+        return θ_element
+    elseif scale == :log10
+        return reverseTransform == true ? log10(θ_element) : exp10(θ_element) 
+    elseif scale == :log
+        return reverseTransform == true ? log(θ_element) : exp(θ_element) 
+    end
+end
+
+
+# Transform parameter from log10 scale to normal scale, or reverse transform
+function transformθZygote(θ::AbstractVector, 
+                          θ_names::Vector{Symbol}, 
+                          parameterInfo::ParametersInfo; 
+                          reverseTransform::Bool=false)::AbstractVector
     
     iθ = [findfirst(x -> x == θ_names[i], parameterInfo.parameterId) for i in eachindex(θ_names)]
     shouldTransform = [parameterInfo.parameterScale[i] == :log10 ? true : false for i in iθ]
     shouldNotTransform = .!shouldTransform
-
+                      
     if reverseTransform == false
         out = exp10.(θ) .* shouldTransform .+ θ .* shouldNotTransform
     else

@@ -39,6 +39,10 @@ function computeIndicesθ(parameterInfo::ParametersInfo,
     # Set up a map for changing between experimental conditions 
     mapsConditionId = getMapsConditionId(odeSystem, parameterInfo, experimentalConditionsFile, θ_dynamicNames)
 
+    # Set up a named tuple tracking the transformation of each parameter 
+    _θ_scale = [parameterInfo.parameterScale[findfirst(x -> x == θ_name, parameterInfo.parameterId)] for θ_name in θ_estNames]
+    θ_scale::NamedTuple = NamedTuple{Tuple(name for name in θ_estNames)}(Tuple(scale for scale in _θ_scale))
+
     θ_indices = ParameterIndices(iθ_dynamic, 
                                  iθ_observable, 
                                  iθ_sd, 
@@ -50,6 +54,7 @@ function computeIndicesθ(parameterInfo::ParametersInfo,
                                  θ_nonDynamicNames,
                                  iθ_notOdeSystemNames,                                     
                                  θ_estNames, 
+                                 θ_scale,
                                  mapθ_observable, 
                                  mapθ_sd, 
                                  mapODEProblem, 

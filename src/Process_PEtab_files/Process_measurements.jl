@@ -76,8 +76,7 @@ function processMeasurements(measurementsFile::DataFrame, observablesFile::DataF
             measurementTransformation[i] = Symbol(observablesFile[iRow, "observableTransformation"]) 
         end
     end
-    measurementT::Vector{Float64} = deepcopy(measurement)
-    transformYobsOrYmodArr!(measurementT, measurementTransformation)
+    measurementT::Vector{Float64} = [transformMeasurementOrH(measurement[i], measurementTransformation[i]) for i in eachindex(measurement)]
     
     return MeasurementsInfo(measurement, measurementT, measurementTransformation, time, observableId, 
                            preEquilibrationConditionId, simulationConditionId, noiseParameters, 

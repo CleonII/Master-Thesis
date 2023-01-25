@@ -272,9 +272,9 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     paramVecNominal = [parameterData.nominalValue[findfirst(x -> x == namesParamEst[i], parameterData.parameterId)] for i in eachindex(namesParamEst)]
 
     # Transform upper and lower bounds if the case 
-    transformθ!(lowerBounds, namesParamEst, parameterData, reverseTransform=true)
-    transformθ!(upperBounds, namesParamEst, parameterData, reverseTransform=true)
-    paramVecNominalTransformed = transformθ(paramVecNominal, namesParamEst, parameterData, reverseTransform=true)
+    transformθ!(lowerBounds, namesParamEst, paramEstIndices, reverseTransform=true)
+    transformθ!(upperBounds, namesParamEst, paramEstIndices, reverseTransform=true)
+    paramVecNominalTransformed = transformθ(paramVecNominal, namesParamEst, paramEstIndices, reverseTransform=true)
 
     peTabOpt = PeTabOpt(evalF, 
                         evalFZygote,

@@ -210,7 +210,8 @@ end
 """
 struct ParameterIndices{T4<:Vector{<:θObsOrSdParameterMap}, 
                         T5<:MapODEProblem, 
-                        T6<:NamedTuple}
+                        T6<:NamedTuple, 
+                        T7<:NamedTuple}
 
     iθ_dynamic::Vector{Int64}
     iθ_observable::Vector{Int64}
@@ -223,6 +224,7 @@ struct ParameterIndices{T4<:Vector{<:θObsOrSdParameterMap},
     θ_nonDynamicNames::Vector{Symbol}
     θ_notOdeSystemNames::Vector{Symbol}
     θ_estNames::Vector{Symbol}
+    θ_scale::T7
     mapθ_observable::T4
     mapθ_sd::T4
     mapODEProblem::T5

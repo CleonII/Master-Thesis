@@ -26,10 +26,10 @@ function computeGradientForwardEqDynamicθ!(gradient::Vector{Float64},
                                            solveOdeModelAllConditions!::Function;
                                            expIDSolve::Vector{Symbol} = [:all])
 
-    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, parameterInfo)
-    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, parameterInfo)
-    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, parameterInfo)
-    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
+    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, θ_indices)
+    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, θ_indices)
+    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
+    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
 
     # Solve the expanded ODE system for the sensitivites
     success = solveForSensitivites(S, odeProblem, simulationInfo, peTabModel, sensealg, θ_dynamicT, 
@@ -143,7 +143,7 @@ function computeGradientForwardExpCond!(gradient::Vector{Float64},
 
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we want dY/dθ_log. We can adjust via;
     # dY/dθ_log = log(10) * θ * dY/dθ
-    adjustGradientTransformedParameters!(gradient, _gradient, ∂G∂p, θ_dynamic, θ_indices, parameterInfo, 
+    adjustGradientTransformedParameters!(gradient, _gradient, ∂G∂p, θ_dynamic, θ_indices, 
                                          simulationConditionId, autoDiffSensitivites=false)
 end
 function computeGradientForwardExpCond!(gradient::Vector{Float64},
@@ -207,6 +207,6 @@ function computeGradientForwardExpCond!(gradient::Vector{Float64},
 
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we want dY/dθ_log. We can adjust via;
     # dY/dθ_log = log(10) * θ * dY/dθ
-    adjustGradientTransformedParameters!(gradient, _gradient, ∂G∂p, θ_dynamic, θ_indices, parameterInfo, 
+    adjustGradientTransformedParameters!(gradient, _gradient, ∂G∂p, θ_dynamic, θ_indices, 
                                          simulationConditionId, autoDiffSensitivites=true)
 end

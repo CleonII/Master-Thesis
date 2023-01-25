@@ -19,7 +19,7 @@ function computeCostZygote(θ_est,
                               parameterInfo, changeODEProblemParameters, solveOdeModelAllConditions)
 
     if priorInfo.hasPriors == true
-        θ_estT = transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+        θ_estT = transformθZygote(θ_est, θ_indices.θ_estNames, parameterInfo)
         cost += computePriors(θ_est, θ_estT, θ_indices.θ_estNames, priorInfo)
     end                                  
 
@@ -41,10 +41,10 @@ function _computeCostZygote(θ_dynamic,
                             changeODEProblemParameters::Function,
                             solveOdeModelAllConditions::Function)::Real
 
-    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, parameterInfo)
-    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, parameterInfo)
-    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, parameterInfo)
-    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
+    θ_dynamicT = transformθZygote(θ_dynamic, θ_indices.θ_dynamicNames, parameterInfo)
+    θ_sdT = transformθZygote(θ_sd, θ_indices.θ_sdNames, parameterInfo)
+    θ_observableT = transformθZygote(θ_observable, θ_indices.θ_observableNames, parameterInfo)
+    θ_nonDynamicT = transformθZygote(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
                                                             
     _p, _u0 = changeODEProblemParameters(odeProblem.p, θ_dynamicT)
     _odeProblem = remake(odeProblem, p = convert.(eltype(θ_dynamic), _p), u0 = convert.(eltype(θ_dynamic), _u0))

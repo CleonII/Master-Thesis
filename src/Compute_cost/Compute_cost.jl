@@ -19,7 +19,7 @@ function computeCost(θ_est::AbstractVector,
                                computeHessian=computeHessian, computeResiduals=computeResiduals, expIDSolve=expIDSolve)
 
     if priorInfo.hasPriors == true && computeHessian == false  
-        θ_estT = transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+        θ_estT = transformθ(θ_est, θ_indices.θ_estNames, θ_indices)
         cost += computePriors(θ_est, θ_estT, θ_indices.θ_estNames, priorInfo)
     end
 
@@ -44,10 +44,10 @@ function computeCostSolveODE(θ_dynamic::AbstractVector,
                              computeResiduals::Bool=false,
                              expIDSolve::Vector{Symbol} = [:all])::Real
 
-    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, parameterInfo)
-    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, parameterInfo)
-    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, parameterInfo)
-    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
+    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, θ_indices)
+    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, θ_indices)
+    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
+    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
 
     _odeProblem = remake(odeProblem, p = convert.(eltype(θ_dynamicT), odeProblem.p), u0 = convert.(eltype(θ_dynamicT), odeProblem.u0))
     changeODEProblemParameters!(_odeProblem.p, _odeProblem.u0, θ_dynamicT)
@@ -90,10 +90,10 @@ function computeCostNotSolveODE(θ_dynamic::Vector{Float64},
 
     # To be able to use ReverseDiff sdParamEstUse and obsParamEstUse cannot be overwritten. 
     # Hence new vectors have to be created. Minimal overhead.
-    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, parameterInfo)
-    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, parameterInfo)
-    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, parameterInfo)
-    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
+    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, θ_indices)
+    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, θ_indices)
+    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
+    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
 
     cost = _computeCost(θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, simulationInfo, θ_indices, 
                         measurementInfo, parameterInfo, expIDSolve, 

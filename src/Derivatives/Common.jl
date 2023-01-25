@@ -104,7 +104,6 @@ function adjustGradientTransformedParameters!(gradient::Union{AbstractVector, Su
                                               ∂G∂p::Union{AbstractVector, Nothing}, 
                                               θ_dynamic::Vector{Float64},
                                               θ_indices::ParameterIndices,
-                                              parameterInfo::ParametersInfo, 
                                               simulationConditionId::Symbol; 
                                               autoDiffSensitivites::Bool=false, 
                                               adjoint::Bool=false)
@@ -134,30 +133,29 @@ function adjustGradientTransformedParameters!(gradient::Union{AbstractVector, Su
     gradient[iChange] .+= _adjustGradientTransformedParameters(_gradient1,
                                                                θ_dynamic[θ_indices.mapODEProblem.iθDynamic], 
                                                                θ_indices.θ_dynamicNames[θ_indices.mapODEProblem.iθDynamic], 
-                                                               parameterInfo)
+                                                               θ_indices)
     
     # Transform gradient for parameters which are specific to certain experimental conditions. 
     gradient[mapConditionId.iθDynamic] .+= _adjustGradientTransformedParameters(_gradient2,
                                                                                 θ_dynamic[mapConditionId.iθDynamic], 
                                                                                 θ_indices.θ_dynamicNames[mapConditionId.iθDynamic], 
-                                                                                parameterInfo)     
+                                                                                θ_indices)     
 end
 
 
-# TODO : We need to recompute transformations
 function _adjustGradientTransformedParameters(_gradient::AbstractVector, 
                                               θ::AbstractVector,
                                               θ_names::Vector{Symbol},
-                                              parameterInfo::ParametersInfo)::AbstractVector
+                                              θ_indices::ParameterIndices)::AbstractVector
     
-    parameterScale = [parameterInfo.parameterScale[findfirst(x -> x == θ_names[i], parameterInfo.parameterId)] for i in eachindex(θ_names)]
     out = similar(_gradient)
-    for i in eachindex(θ)
-        if parameterScale[i] == :log10
+    @inbounds for (i, θ_name) in pairs(θ_names)
+        θ_scale = θ_indices.θ_scale[θ_name]
+        if θ_scale == :log10
             out[i] = log(10) * _gradient[i] * θ[i]
-        elseif parameterScale[i] == :log
+        elseif θ_scale == :log
             out[i] = _gradient[i] * θ[i]
-        else
+        elseif θ_scale == :lin
             out[i] = _gradient[i] 
         end
     end

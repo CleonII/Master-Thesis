@@ -11,7 +11,7 @@ function checkGradientResiduals(peTabModel::PeTabModel, solver, tol; verbose::Bo
         
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
-    priorInfo::PriorInfo = getPriorInfo(paramEstIndices, parameterDataFile)
+    priorInfo::PriorInfo = processPriors(paramEstIndices, parameterDataFile)
 
     # The time-span 5e3 is overwritten when performing actual forward simulations 
     odeProb = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=false)
@@ -27,7 +27,7 @@ function checkGradientResiduals(peTabModel::PeTabModel, solver, tol; verbose::Bo
     # Extract parameter vector 
     namesParamEst = paramEstIndices.θ_estNames
     paramVecNominal = [parameterData.nominalValue[findfirst(x -> x == namesParamEst[i], parameterData.parameterId)] for i in eachindex(namesParamEst)]
-    paramVec = transformθ(paramVecNominal, namesParamEst, parameterData, reverseTransform=true)
+    paramVec = transformθ(paramVecNominal, namesParamEst, paramEstIndices, reverseTransform=true)
 
     jacOut = zeros(length(paramVec), length(measurementData.time))
     residualGrad = ForwardDiff.gradient(evalResiduals, paramVec)

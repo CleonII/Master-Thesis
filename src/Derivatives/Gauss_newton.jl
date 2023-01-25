@@ -14,10 +14,10 @@ function computeJacobianResidualsDynamicθ!(jacobian::Union{Matrix{Float64}, Sub
                                            solveOdeModelAllConditions!::Function;
                                            expIDSolve::Vector{Symbol} = [:all])
 
-    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, parameterInfo)
-    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, parameterInfo)
-    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, parameterInfo)
-    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
+    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, θ_indices)
+    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, θ_indices)
+    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
+    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
 
     # Solve the expanded ODE system for the sensitivites
     success = solveForSensitivites(S, odeProblem, simulationInfo, peTabModel, :AutoDiff, θ_dynamicT, 
@@ -108,7 +108,7 @@ function computeJacobianResidualsExpCond!(jacobian::AbstractMatrix,
             # Thus far have have computed dY/dθ for the residuals, but for parameters on the log-scale we want dY/dθ_log. 
             # We can adjust via; dY/dθ_log = log(10) * θ * dY/dθ
             adjustGradientTransformedParameters!((@views jacobian[iθ_experimentalCondition, iMeasurement]), _gradient, 
-                                                 ∂G∂p, θ_dynamic, θ_indices, parameterInfo, simulationConditionId, autoDiffSensitivites=true)
+                                                 ∂G∂p, θ_dynamic, θ_indices, simulationConditionId, autoDiffSensitivites=true)
                              
         end
     end
@@ -131,10 +131,10 @@ function computeResidualsNotSolveODE(θ_dynamic::Vector{Float64},
 
     # To be able to use ReverseDiff sdParamEstUse and obsParamEstUse cannot be overwritten. 
     # Hence new vectors have to be created.
-    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, parameterInfo)
-    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, parameterInfo)
-    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, parameterInfo)
-    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, parameterInfo)
+    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, θ_indices)
+    θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, θ_indices)
+    θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
+    θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
     
     # Compute residuals per experimental conditions
     odeSolutions = simulationInfo.odeSolutionsDerivatives
