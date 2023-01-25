@@ -305,6 +305,63 @@ if ARGS[1] == "Bachman_fix_param"
 end
 
 
+if ARGS[1] == "Lucarelli_fix_param"
+
+    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
+    pathSave = dirSave * "Lucarelli_fix_param.csv"
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+
+    Random.seed!(123)
+    solversCheck = [[QNDF(), "QNDF"]]
+    sensealgInfoTot = [[:ForwardDiff, nothing, "ForwardDiff"], 
+                       [:ForwardSenseEq, :AutoDiffForward, "ForEq_AutoDiff"]]
+
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Lucarelli_CellSystems2018/"
+    peTabModel = setUpPeTabModel("model_Lucarelli_CellSystems2018", dirModel, verbose=false, forceBuildJlFile=true)
+    nDynParam = getNDynParam(peTabModel)
+    tol = 1e-8
+    for nParamFix in 1:(nDynParam-1)
+        for i in 1:10
+            peTabModelFewerParam = getPEtabModelNparamFixed(peTabModel, nParamFix)
+            # Check Gradient 
+            for sensealgInfo in sensealgInfoTot
+                benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
+                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5)
+                benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
+                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5, chunkSize=1)
+            end
+            if isdir(peTabModelFewerParam.dirModel)
+                rm(peTabModelFewerParam.dirModel, recursive=true)
+            end
+        end
+    end
+
+    # Testing effect of chunk-size
+    pathSave = dirSave * "Lucarelli_chunk_size.csv"
+    chunkList = 1:nDynParam
+    for nParamFix in [0]
+        for i in 1:10
+            peTabModelFewerParam = getPEtabModelNparamFixed(peTabModel, nParamFix)
+            benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
+                                    pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5)
+            for nChunks in chunkList
+                # Check Gradient 
+                for sensealgInfo in sensealgInfoTot
+                    benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
+                                    pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5, chunkSize=nChunks)
+                end
+            end
+            if isdir(peTabModelFewerParam.dirModel)
+                rm(peTabModelFewerParam.dirModel, recursive=true)
+            end
+        end
+    end
+    
+end
+
+
 if ARGS[1] == "Bachman_test_chunks"
 
     dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
