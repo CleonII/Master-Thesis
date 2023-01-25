@@ -197,3 +197,19 @@ function computeGradientZygote(gradient::Vector{Float64},
                                                              parameterInfo)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])
 end    
+
+
+# Compute prior contribution to log-likelihood 
+function computeGradientPrior!(gradient::AbstractVector, 
+                               θ::AbstractVector, 
+                               θ_indices::ParameterIndices, 
+                               priorInfo::PriorInfo, 
+                               parameterInfo::ParametersInfo)
+            
+
+    _evalPriors = (θ_est) -> begin
+                                θ_estT = transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+                                return computePriors(θ_est, θ_estT, θ_indices.θ_estNames, priorInfo)
+                            end
+    gradient .+= ForwardDiff.gradient(_evalPriors, θ)                                
+end

@@ -224,37 +224,6 @@ function dualToFloat(x::AbstractFloat)::AbstractFloat
 end
 
 
-# Compute prior contribution to log-likelihood 
-function computeGradientPrior!(gradient::AbstractVector, 
-                               θ::AbstractVector, 
-                               θ_indices::ParameterIndices, 
-                               priorInfo::PriorInfo, 
-                               parameterInfo::ParametersInfo)
-            
-
-    _evalPriors = (θ_est) -> begin
-                                θ_estT = transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
-                                return evalPriors(θ_estT, θ_est, θ_indices.θ_estNames, θ_indices, priorInfo)
-                            end
-    gradient .+= ForwardDiff.gradient(_evalPriors, θ)                                
-end
-
-
-# Compute prior contribution to log-likelihood 
-function computeHessianPrior!(hessian::AbstractVector, 
-                              θ::AbstractVector, 
-                              θ_indices::ParameterIndices, 
-                              priorInfo::PriorInfo, 
-                              parameterInfo::ParametersInfo)
-
-    _evalPriors = (θ_est) -> begin
-                                θ_estT =  transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
-                                return evalPriors(θ_estT, θ_est, θ_indices.θ_estNames, θ_indices, priorInfo)
-                            end
-    hessian .+= ForwardDiff.hessian(_evalPriors, θ)                                
-end
-
-
 function getFileODEvalues(peTabModel::PeTabModel)
   
     # Change model parameters 

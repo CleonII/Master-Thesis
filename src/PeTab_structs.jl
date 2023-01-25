@@ -230,9 +230,10 @@ struct ParameterIndices{T4<:Vector{<:θObsOrSdParameterMap},
 end
 
 
-struct PriorInfo{T1 <: Vector{<:Function}}
+struct PriorInfo{T1 <: NamedTuple, 
+                 T2 <: NamedTuple}
     logpdf::T1
-    priorOnParamScale::Vector{Bool}
+    priorOnParameterScale::T2
     hasPriors::Bool
 end
 

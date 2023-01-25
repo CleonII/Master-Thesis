@@ -2,6 +2,7 @@
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
 # Files related to computing the cost (likelihood)
+include(joinpath(pwd(), "src", "Compute_cost", "Compute_priors.jl"))
 include(joinpath(pwd(), "src", "Compute_cost", "Compute_cost.jl"))
 include(joinpath(pwd(), "src", "Compute_cost", "Compute_cost_zygote.jl"))
 
@@ -208,7 +209,7 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     paramEstIndices = computeIndicesθ(parameterData, measurementInfo, peTabModel.odeSystem, experimentalConditionsFile)
     
     # Set up potential prior for the parameters to estimate 
-    priorInfo::PriorInfo = getPriorInfo(paramEstIndices, parameterDataFile)
+    priorInfo::PriorInfo = processPriors(paramEstIndices, parameterDataFile)
 
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
@@ -293,36 +294,4 @@ function setUpCostGradHess(peTabModel::PeTabModel,
                         peTabModel.dirModel * "Cube" * peTabModel.modelName * ".csv",
                         peTabModel)
     return peTabOpt
-end
-
-
-# Evaluate contribution of potential prior to the final cost function value. Not mutating so works with both Zygote 
-# and forwardiff.
-function evalPriors(paramVecTransformed::AbstractVector, 
-                    paramVecNotTransformed::AbstractVector,
-                    namesParamVec::Vector{Symbol}, 
-                    θ_indices::ParameterIndices, 
-                    priorInfo::PriorInfo)::Real
-
-    if priorInfo.hasPriors == false
-        return 0.0
-    end
-
-    k = 0
-    priorContribution = 0.0
-    for i in eachindex(paramVecNotTransformed)
-        iParam = findfirst(x -> x == namesParamVec[i], θ_indices.θ_estNames)
-        if priorInfo.priorOnParamScale[iParam] == true
-            pInput = paramVecNotTransformed[i]
-        else
-            pInput = paramVecTransformed[i]
-        end
-        priorContribution += priorInfo.logpdf[iParam](pInput)
-
-        if priorInfo.logpdf[iParam](pInput) != 0
-            k += 1
-        end
-    end
-
-    return priorContribution
 end

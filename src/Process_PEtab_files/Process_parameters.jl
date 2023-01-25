@@ -49,3 +49,67 @@ function processParameters(parametersFile::DataFrame)::ParametersInfo
 
     return ParametersInfo(nominalValue, lowerBound, upperBound, parameterId, parameterScale, estimate, nParametersToEstimate)
 end
+
+
+function processPriors(θ_indices::ParameterIndices, parametersFile::DataFrame)::PriorInfo
+
+    # In case there are no model priors 
+    if "objectivePriorType" ∉ names(parametersFile)
+        return PriorInfo(NamedTuple(), NamedTuple(), false)
+    end
+
+    # To track Priors we employ NamedTuples
+    θ_estNames = string.(θ_indices.θ_estNames)
+    priorLogpdf = Vector{Function}(undef, length(θ_estNames))
+    priorOnParameterScale = Vector{Bool}(undef, length(θ_estNames))
+
+    for i in eachindex(θ_estNames)
+
+        whichParameter = findfirst(x -> x == θ_estNames[i], string.(parametersFile[!, "parameterId"]))
+        prior = parametersFile[whichParameter, "objectivePriorType"]
+        
+        # In case the parameter lacks prior
+        if ismissing(prior)
+            priorLogpdf[i] = noPrior
+            priorOnParameterScale[i] = false
+            continue
+        end
+
+        # In case there is a prior is has associated parameters 
+        priorParameters = parse.(Float64, split(parametersFile[whichParameter, "objectivePriorParameters"], ";"))
+        if prior == "parameterScaleNormal"
+            priorLogpdf[i] = (x) -> logpdf(Normal(priorParameters[1], priorParameters[2]), x) 
+            priorOnParameterScale[i] = true
+        
+        elseif prior == "parameterScaleLaplace"
+            priorLogpdf[i] = (x) -> logpdf(Laplace(priorParameters[1], priorParameters[2]), x) 
+            priorOnParameterScale[i] = true
+        
+        elseif prior == "normal"
+            priorLogpdf[i] = (x) -> logpdf(Normal(priorParameters[1], priorParameters[2]), x) 
+            priorOnParameterScale[i] = false
+        
+        elseif prior == "laplace"
+            priorLogpdf[i] = (x) -> logpdf(Laplace(priorParameters[1], priorParameters[2]), x) 
+            priorOnParameterScale[i] = false
+        
+        elseif prior == "logNormal"
+            priorLogpdf[i] = (x) -> logpdf(LogNormal(priorParameters[1], priorParameters[2]), x) 
+            priorOnParameterScale[i] = false
+        
+        elseif prior == "logLaplace"
+            println("Error : Julia does not yet have support for log-laplace")
+        else
+            println("Error : PeTab standard does not support a prior of type ", priorF)
+        end
+    end
+
+    _priorLogpdf = NamedTuple{Tuple(name for name in θ_indices.θ_estNames)}(Tuple(logpdf for logpdf in priorLogpdf))
+    _priorOnParameterScale = NamedTuple{Tuple(name for name in θ_indices.θ_estNames)}(Tuple(scale for scale in priorOnParameterScale))
+
+    return PriorInfo(_priorLogpdf, _priorOnParameterScale, true)
+end
+# Helper function in case there is not any parameter priors 
+function noPrior(p::Real)::Real
+    return 0.0
+end

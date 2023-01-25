@@ -157,3 +157,19 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
         out .= jacobian
     end
 end
+
+
+
+# Compute prior contribution to log-likelihood, note θ in on the parameter scale (e.g might be on log-scale)
+function computeHessianPrior!(hessian::AbstractVector, 
+                              θ::AbstractVector, 
+                              θ_indices::ParameterIndices, 
+                              priorInfo::PriorInfo, 
+                              parameterInfo::ParametersInfo)
+
+    _evalPriors = (θ_est) -> begin
+                                θ_estT =  transformθ(θ_est, θ_indices.θ_estNames, parameterInfo)
+                                return computePriors(θ_est, θ_estT, θ_indices.θ_estNames, priorInfo)
+                            end
+    hessian .+= ForwardDiff.hessian(_evalPriors, θ)                                
+end
