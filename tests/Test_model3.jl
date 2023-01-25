@@ -124,11 +124,10 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         prob = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 9.7), peTabModel.paramMap, jac=true)
         prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
         θ_est = getFileODEvalues(peTabModel)
-        changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCondEst!(pVec, u0Vec, expID, θ_est, peTabModel, θ_indices)
+        changeExperimentalCondition! = (pVec, u0Vec, expID) -> _changeExperimentalCondition!(pVec, u0Vec, expID, θ_est, peTabModel, θ_indices)
         
-        # Solve ODE system with steady state simulation 
-        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
-
+        # Solve ODE system 
+        solArray, success = solveODEAllExperimentalConditions(prob, changeExperimentalCondition!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
         # Solve ODE system with algebraic intial values 
         solArrayAlg = getSolAlgebraicSS(peTabModel, solver, tol, a, b, c, d)
         

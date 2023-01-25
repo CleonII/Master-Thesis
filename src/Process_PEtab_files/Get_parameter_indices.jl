@@ -19,11 +19,11 @@ function computeIndicesθ(parameterInfo::ParametersInfo,
     θ_estNames::Vector{Symbol} = Symbol.(vcat(θ_dynamicNames, iθ_notOdeSystemNames))
 
     # Indices for each parameter in the big θ_est vector 
-    iθ_dynamic::Array{Int64, 1} = [findfirst(x -> x == θ_dynamicNames[i],  θ_estNames) for i in eachindex(θ_dynamicNames)]
-    iθ_sd::Array{Int64, 1} = [findfirst(x -> x == θ_sdNames[i],  θ_estNames) for i in eachindex(θ_sdNames)]
-    iθ_observable::Array{Int64, 1} = [findfirst(x -> x == θ_observableNames[i],  θ_estNames) for i in eachindex(θ_observableNames)]
-    iθ_nonDynamic::Array{Int64, 1} = [findfirst(x -> x == θ_nonDynamicNames[i],  θ_estNames) for i in eachindex(θ_nonDynamicNames)]
-    iθ_notOdeSystem::Array{Int64, 1} = [findfirst(x -> x == iθ_notOdeSystemNames[i],  θ_estNames) for i in eachindex(iθ_notOdeSystemNames)]
+    iθ_dynamic::Vector{Int64} = [findfirst(x -> x == θ_dynamicNames[i],  θ_estNames) for i in eachindex(θ_dynamicNames)]
+    iθ_sd::Vector{Int64} = [findfirst(x -> x == θ_sdNames[i],  θ_estNames) for i in eachindex(θ_sdNames)]
+    iθ_observable::Vector{Int64} = [findfirst(x -> x == θ_observableNames[i],  θ_estNames) for i in eachindex(θ_observableNames)]
+    iθ_nonDynamic::Vector{Int64} = [findfirst(x -> x == θ_nonDynamicNames[i],  θ_estNames) for i in eachindex(θ_nonDynamicNames)]
+    iθ_notOdeSystem::Vector{Int64} = [findfirst(x -> x == iθ_notOdeSystemNames[i],  θ_estNames) for i in eachindex(iθ_notOdeSystemNames)]
     
     # When extracting observable or sd parameter for computing the cost we use a pre-computed map to efficently 
     # extract correct parameters 

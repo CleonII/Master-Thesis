@@ -86,10 +86,10 @@ function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
         prob = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true)
         prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
         θ_est = getFileODEvalues(peTabModel)
-        changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCondEst!(pVec, u0Vec, expID, θ_est, peTabModel, θ_indices)
+        changeExperimentalCondition! = (pVec, u0Vec, expID) -> _changeExperimentalCondition!(pVec, u0Vec, expID, θ_est, peTabModel, θ_indices)
         
         # Solve ODE system 
-        solArray, success = solveOdeModelAllExperimentalCond(prob, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
+        solArray, success = solveODEAllExperimentalConditions(prob, changeExperimentalCondition!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
         solNumeric = solArray[simulationInfo.experimentalConditionId[1]]
         
         # Compare against analytical solution 

@@ -253,3 +253,18 @@ function computeHessianPrior!(hessian::AbstractVector,
                             end
     hessian .+= ForwardDiff.hessian(_evalPriors, θ)                                
 end
+
+
+function getFileODEvalues(peTabModel::PeTabModel)
+  
+    # Change model parameters 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(peTabModel.dirModel, readObservables=true)
+    parameterInfo = processParameters(parameterDataFile)
+    measurementInfo = processMeasurements(measurementDataFile, observablesDataFile) 
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, peTabModel.odeSystem, experimentalConditionsFile)
+
+    θ_estNames = θ_indices.θ_estNames
+    θ_est = parameterInfo.nominalValue[findall(x -> x ∈ θ_estNames, parameterInfo.parameterId)]
+
+    return θ_est[θ_indices.iθ_dynamic]
+end

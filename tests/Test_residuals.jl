@@ -17,11 +17,10 @@ function checkGradientResiduals(peTabModel::PeTabModel, solver, tol; verbose::Bo
     odeProb = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=false)
     odeProb = remake(odeProb, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
     # Functions to map experimental conditions and parameters correctly to the ODE model 
-    changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
-    changeToExperimentalCondSenseEqUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEstSenseEq!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
+    changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> _changeExperimentalCondition!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
     changeModelParamUse! = (pVec, u0Vec, paramEst) -> changeODEProblemParameters!(pVec, u0Vec, paramEst, paramEstIndices, peTabModel)
-    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
-    solveOdeModelAllCondGuassNewtonForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)                                           
+    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveODEAllExperimentalConditions!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=expIDSolveArg)
+    solveOdeModelAllCondGuassNewtonForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveODEAllExperimentalConditions!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=expIDSolveArg)                                           
     evalResiduals = (paramVecEst) -> computeCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, computeResiduals=true)
     evalJacResiduals = (out, paramVecEst) -> computeGaussNewtonHessianApproximation!(out, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementData, parameterData, changeModelParamUse!, solveOdeModelAllCondGuassNewtonForwardEq!, priorInfo, returnJacobian=true)      
 

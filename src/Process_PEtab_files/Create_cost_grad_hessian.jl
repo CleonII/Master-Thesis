@@ -14,6 +14,8 @@ include(joinpath(pwd(), "src", "Derivatives", "Gauss_newton.jl"))
 include(joinpath(pwd(), "src", "Derivatives", "Common.jl"))
 
 # Files related to solving the ODE-system 
+include(joinpath(pwd(), "src", "Solve_ODE", "Change_experimental_condition.jl"))
+include(joinpath(pwd(), "src", "Solve_ODE", "Solve_ode_Zygote.jl"))
 include(joinpath(pwd(), "src", "Solve_ODE", "Solve_ode_model.jl"))
 
 # Files related to distributed computing 
@@ -222,22 +224,22 @@ function setUpCostGradHess(peTabModel::PeTabModel,
     end
 
     # Functions to map experimental conditions and parameters correctly to the ODE model 
-    changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
-    changeToExperimentalCondSenseEqUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices, computeForwardSensitivites=true)
-    changeToExperimentalCondUse = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
+    changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> _changeExperimentalCondition!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
+    changeToExperimentalCondSenseEqUse! = (pVec, u0Vec, expID, dynParamEst) -> _changeExperimentalCondition!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices, computeForwardSensitivites=true)
+    changeToExperimentalCondUse = (pVec, u0Vec, expID, dynParamEst) -> _changeExperimentalCondition(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
     changeModelParamUse! = (pVec, u0Vec, paramEst) -> changeODEProblemParameters!(pVec, u0Vec, paramEst, paramEstIndices, peTabModel)
     changeModelParamUse = (pVec, paramEst) -> changeODEProblemParameters(pVec, paramEst, paramEstIndices, peTabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
-    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
-    solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, denseSol=true, expIDSolve=expIDSolveArg, trackCallback=true)
+    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveODEAllExperimentalConditions!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=expIDSolveArg)
+    solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveODEAllExperimentalConditions!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, denseSolution=true, expIDSolve=expIDSolveArg, trackCallback=true)
     solveOdeModelAtCondZygoteUse = (odeProbArg, conditionId, dynParamEst, t_max) -> solveOdeModelAtExperimentalCondZygote(odeProbArg, conditionId, dynParamEst, t_max, changeToExperimentalCondUse, measurementInfo, simulationInfo, solver, tol, tol, sensealg, peTabModel.getTStops)
     if sensealgForward == :AutoDiffForward
-        solveOdeModelAllCondForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)                                           
+        solveOdeModelAllCondForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveODEAllExperimentalConditions!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=expIDSolveArg)                                           
     else
-        solveOdeModelAllCondForwardEq! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondSenseEqUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
+        solveOdeModelAllCondForwardEq! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveODEAllExperimentalConditions!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondSenseEqUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=expIDSolveArg)
     end
-    solveOdeModelAllCondGuassNewtonForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)                                           
+    solveOdeModelAllCondGuassNewtonForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveODEAllExperimentalConditions!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, solverForward, tol, tol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=expIDSolveArg)                                           
 
     if nProcs > 1 && nprocs() != nProcs
         println("Error : PEtab importer was set to build the cost, grad and hessian with $nProcs processes, 
