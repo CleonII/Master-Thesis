@@ -32,3 +32,36 @@ function setParamToFileValues!(paramMap, stateMap, paramData::ParamData)
     end
 
 end
+
+
+function getRandomODEParameters(peTabModel::PeTabModel, 
+                                solver::SciMLAlgorithm, 
+                                iCube;
+                                nParamCube=20,
+                                costGradHess::Bool=false,
+                                tol::Float64=1e-8)
+  
+    # Generate Cube if lacking and choose one parameter vector 
+    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
+    if costGradHess == true
+        pathCube = peTabModel.dirModel * "Cube_cost_grad_hess.csv"
+    else
+        pathCube = peTabModel.dirModel * "Cube_ode_solve.csv"
+    end
+    createCube(pathCube, peTabOpt, nParamCube, seed=123, verbose=true)
+    cube = Matrix(CSV.read(pathCube, DataFrame))
+    paramEst = cube[iCube, :]
+
+    # Change model parameters 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
+    parameterData = processParameterData(parameterDataFile)
+    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
+    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
+
+    if costGradHess == false
+        transformParamVec!(paramEst, paramEstIndices.namesParamEst, parameterData)
+        return paramEst[paramEstIndices.iDynParam]
+    else
+        return paramEst
+    end
+end

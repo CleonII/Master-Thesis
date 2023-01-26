@@ -16,6 +16,7 @@ using Plots
 using SciMLSensitivity
 using BenchmarkTools
 using Zygote
+BLAS.set_num_threads(1)
 
 
 # Relevant PeTab structs for compuations 
@@ -35,44 +36,6 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
-
-function getRandomODEParameters(peTabModel::PeTabModel, 
-                                solver::SciMLAlgorithm, 
-                                iCube;
-                                nParamCube=20,
-                                tol::Float64=1e-8)
-  
-    # Generate Cube if lacking and choose one parameter vector 
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
-    pathCube = peTabModel.dirModel * "Cube_ode_solve.csv"
-    createCube(pathCube, peTabOpt, nParamCube, seed=123, verbose=true)
-    cube = Matrix(CSV.read(pathCube, DataFrame))
-    paramEst = cube[iCube, :]
-
-    # Change model parameters 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    parameterData = processParameterData(parameterDataFile)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
-    transformParamVec!(paramEst, paramEstIndices.namesParamEst, parameterData)
-
-    return paramEst[paramEstIndices.iDynParam]
-end
-
-
-function getFileODEvalues(peTabModel::PeTabModel)
-  
-    # Change model parameters 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    parameterData = processParameterData(parameterDataFile)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
-
-    namesParamEst = paramEstIndices.namesParamEst
-    paramVecNominal = [parameterData.paramVal[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)]
-
-    return paramVecNominal[paramEstIndices.iDynParam]
-end
 
 
 function getSolverInfo(sparseList::Bool, solversCheck)
@@ -214,7 +177,7 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
     # Process PeTab files into type-stable Julia structs 
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
     parameterData = processParameterData(parameterDataFile)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
+    measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
     simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
     paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
      

@@ -168,3 +168,64 @@ if(file.exists(str_c(dir_result, "computation_times.csv"))){
   p_save = ggpubr::ggarrange(p1, p2, ncol=2, common.legend = T, legend="bottom")
   ggsave("Compare_grad_cost_AMICI.png", width = BASE_WIDTH*3.0, height = BASE_HEIGHT)
 }
+
+
+# -------------------------------------------------------------------------------------------------------------
+# Bachman gradient scaling 
+# -------------------------------------------------------------------------------------------------------------
+dir_result <- "../Intermediate/Benchmarks/Cost_grad_hess/"
+data  <- read_csv(str_c(dir_result, "Bachman_fix_param.csv"), col_types = cols()) |> 
+  filter(!is.infinite(Time)) |> 
+  mutate(N_param_est = 28 - N_param_fixed) 
+
+#ForEq_AutoDiff
+data_plot <- data |> 
+  filter(solver == "QNDF") |> 
+  filter(Method_info == "ForwardDiff")
+
+p = ggplot(data_plot, aes(N_param_est, Time, color = chunk_size, fill = chunk_size))  +
+  geom_point() + 
+  geom_smooth() + 
+  scale_fill_manual(values = cbPalette[-1], name = "Chunk size") + 
+  scale_color_manual(values = cbPalette[-1], name = "Chunk size") + 
+  scale_x_continuous(breaks = seq(from = 2, by = 2, to  = 28)) +
+  labs(x = "Number of parameter to take gradient on", y = "Time [s]", 
+       title = "Bachman model", 
+       subtitle = "Chunking is the secret sauce behind the performance of Julia gradients") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = "bottom")
+ggsave("Bachman_gradient_time.png", p, width = BASE_WIDTH*1.5, height = BASE_HEIGHT*1.5)
+
+data_median = data_plot |> 
+  filter(N_param_fixed == 3) |> 
+  filter(chunk_size == "Default") |> 
+  group_by(Method_info) |> 
+  summarise(median = median(Time)) |> 
+  pull(median)
+
+# See effect of different chunks 
+data_chunks  <- read_csv(str_c(dir_result, "Bachman_test_chunks.csv"), col_types = cols()) |> 
+  filter(!is.infinite(Time)) |> 
+  mutate(N_param_est = as.factor(28 - N_param_fixed))
+data_plot = data_chunks |> 
+  filter(solver == "QNDF") |> 
+  filter(Method_info == "ForwardDiff") |> 
+  filter(N_param_fixed != 0)
+
+p = ggplot(data_plot, aes(chunk_size, Time, color = N_param_est, fill = N_param_est)) + 
+  geom_point() + 
+  geom_hline(yintercept = data_median) +   
+  geom_smooth(method = "loess", formula = y ~ x, span=0.3) + 
+  scale_fill_manual(values = cbPalette[-1], name = "Number of parameter to estimate") + 
+  scale_color_manual(values = cbPalette[-1], name = "Number of parameter to estimate") + 
+  scale_x_continuous(breaks = seq(from = 1, by = 2, to  = 22)) +
+  annotate("text", x = 17, y = 1.3, label = "Run time default chunking (1.38s)", size=5.0) +
+  annotate("text", x = 6, y = 1.0, label = "Best chunk size (1.07s)", size=5.0) +
+  labs(x = "Number of chunks", y = "Run time [s]", title = "Testing the effect of different chunks for Bachman model", 
+       subtitle = "The default value is slower than a tuned value") +
+  ylim(0, 3.5) + 
+  theme_bw(base_size = 16) + 
+  theme(legend.position = "bottom")
+ggsave("Bachman_gradient_chunks.png", p, width = BASE_WIDTH*1.5, height = BASE_HEIGHT*1.5)
+
+

@@ -16,215 +16,22 @@ BASE_HEIGHT <- 5
 BASE_WIDTH <- 7.0
 
 
-get_solver_info <- function(solver_name)
-{
-  solver_list_short <- c("Vern6", 
-                         "Vern7", 
-                         "Vern8", 
-                         "Tsit5", 
-                         "DP5", 
-                         "DP8", 
-                         "Feagin14", 
-                         "VCABM", 
-                         "Rosenbrock23", 
-                         "TRBDF2", 
-                         "Rodas4", 
-                         "Rodas4P", 
-                         "Rodas4P2", 
-                         "Rodas5", 
-                         "QNDF", 
-                         "FBDF", 
-                         "Trapezoid", 
-                         "ARKODE", 
-                         "Kvaerno5", 
-                         "RadauIIA3", 
-                         "RadauIIA5", 
-                         "Tsit5_Rosenbrock23", 
-                         "Vern7_Rodas5", 
-                         "Vern9_Rodas4P", 
-                         "Vern9_Rodas5", 
-                         "lsoda", 
-                         "CVODE_BDF_N", # Dense
-                         "CVODE_BDF_L", 
-                         "CVODE_BDF_G", 
-                         "CVODE_Admas_D", 
-                         "CVODE_Admas_L", 
-                         "ARKODE_E4", 
-                         "ARKODE_E8", 
-                         "ARKODE_I3", 
-                         "ARKODE_I5",
-                         "dopri5", 
-                         "dop853", 
-                         "radau", 
-                         "radau5", 
-                         "rodas", 
-                         "auto", 
-                         "nonstiff", 
-                         "stiff")
-  
-  solver_type <- c("nonstiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", 
-                   "stiff", "stiff", "stiff", "stiff", "stiff", "stiff", "stiff", "stiff","stiff", "stiff", "stiff", 
-                   "stiff", "stiff", "composite", "composite", "composite", "composite", "composite", "stiff", "stiff", 
-                   "stiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", "stiff", "stiff", "nonstiff", "nonstiff", 
-                   "stiff", "stiff", "stiff", "hint", "hint", "hint")
-  solver_library <- c("OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "LSODA.jl", "Sundials", "Sundials", "Sundials", "Sundials", "Sundials", "Sundials", "Sundials", 
-                      "Sundials", "Sundials", "ODEInterface", "ODEInterface", "ODEInterface", "ODEInterface", 
-                      "ODEInterface", "DifferentialEquations", "DifferentialEquations", "DifferentialEquations")
-  
-  i_solver <- which(solver_name == solver_list_short)[1]
-  return(c(solver_type[i_solver], solver_library[i_solver]))
-}
-
-
 read_data <- function(path_file)
 {
 
   
   data_raw <- read_csv(path_file, col_types = cols()) 
-
-  
-  solver_list <- unique(data_raw$solver)
-  solver_list_short <- c("Vern6", 
-                         "Vern7", 
-                         "Vern8", 
-                         "Tsit5", 
-                         "DP5", 
-                         "DP8", 
-                         "Feagin14", 
-                         "VCABM", 
-                         "Rosenbrock23", 
-                         "TRBDF2", 
-                         "Rodas4", 
-                         "Rodas4P", 
-                         "Rodas4P2", 
-                         "Rodas5", 
-                         "QNDF", 
-                         "FBDF", 
-                         "Trapezoid", 
-                         "ARKODE", 
-                         "Kvaerno5", 
-                         "RadauIIA3", 
-                         "RadauIIA5", 
-                         "Tsit5_Rosenbrock23", 
-                         "Vern7_Rodas5", 
-                         "Vern9_Rodas4P", 
-                         "Vern9_Rodas5", 
-                         "lsoda", 
-                         "CVODE_BDF_N", 
-                         "CVODE_BDF_L", 
-                         "CVODE_BDF_G", 
-                         "CVODE_Admas_D", 
-                         "CVODE_Admas_L", 
-                         "ARKODE_E4", 
-                         "ARKODE_E8", 
-                         "ARKODE_I3", 
-                         "ARKODE_I5",
-                         "dopri5", 
-                         "dop853", 
-                         "radau", 
-                         "radau5", 
-                         "rodas", 
-                         "auto", 
-                         "nonstiff", 
-                         "stiff")
-  
-  model_list <- c("model_Alkan_SciSignal2018.jl", "model_Bachmann_MSB2011.jl",
-                "model_Beer_MolBioSystems2014.jl", "model_Bertozzi_PNAS2020.jl",
-                "model_Blasi_CellSystems2016.jl", "model_Boehm_JProteomeRes2014.jl",
-                "model_Borghans_BiophysChem1997.jl", "model_Brannmark_JBC2010.jl",
-                "model_Bruno_JExpBot2016.jl", "model_Chen_MSB2009.jl", 
-                "model_Crauste_CellSystems2017.jl", "model_Elowitz_Nature2000.jl", 
-                "model_Fiedler_BMC2016.jl", "model_Fujita_SciSignal2010.jl",
-                "model_Giordano_Nature2020.jl", "model_Isensee_JCB2018.jl",
-                "model_Laske_PLOSComputBiol2019.jl", "model_Lucarelli_CellSystems2018.jl",
-                "model_Okuonghae_ChaosSolitonsFractals2020.jl", "model_Oliveira_NatCommun2021.jl",
-                "model_Perelson_Science1996.jl", "model_Rahman_MBS2016.jl",
-                "model_Raimundez_PCB2020.jl", "model_SalazarCavazos_MBoC2020.jl",
-                "model_Schwen_PONE2014.jl", "model_Sneyd_PNAS2002.jl",
-                "model_Weber_BMC2015.jl", "model_Zhao_QuantBiol2020.jl",
-                "model_Zheng_PNAS2012.jl")
-  
-  n_states <- c(36, 25, 4,  3, 16, 8,  3,  9,  7, 500,  5,  8,  6,  9, 13, 25, 41,  33,  9,  9, 4,  7,  22, 75, 11,  6,  7,  5, 15)
-  n_params <- c(52, 37, 8, 21, 34, 9, 20, 20, 17, 196, 12, 18, 18, 20, 72, 69, 90, 106, 17, 33, 5, 24, 101, 50, 14, 19, 38, 37, 47) 
-  model_list_sort <- model_list[order(n_states)]
-  model_list_sort_param <- model_list[order(n_params)]
-  
-  solver_type <- c("nonstiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", 
-                   "stiff", "stiff", "stiff", "stiff", "stiff", "stiff", "stiff", "stiff","stiff", "stiff", "stiff", 
-                   "stiff", "stiff", "composite", "composite", "composite", "composite", "composite", "stiff", "stiff", 
-                   "stiff", "nonstiff", "nonstiff", "nonstiff", "nonstiff", "stiff", "stiff", "nonstiff", "nonstiff", 
-                   "stiff", "stiff", "stiff", "hint", "hint", "hint")
-  solver_library <- c("OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", "OrdinaryDiffEq", 
-                      "LSODA.jl", "Sundials", "Sundials", "Sundials", "Sundials", "Sundials", "Sundials", "Sundials", 
-                      "Sundials", "Sundials", "ODEInterface", "ODEInterface", "ODEInterface", "ODEInterface", 
-                      "ODEInterface", "DifferentialEquations", "DifferentialEquations", "DifferentialEquations")
-  
-  
-  n_rows <- dim(data_raw)[1]
-  data_raw <- data_raw %>%
-    mutate(solver_type = "c", solver_lib = "c", n_param=0, n_states=0, model_short="c", model_short_param="p")
-  for(i in 1:n_rows){
-    i_solver <- which(data_raw$solver[i] == solver_list)
-    i_model <- which(data_raw$model[i] == model_list)
-    i_mod_sorted <- which(data_raw$model[i] == model_list_sort)
-    i_param_sorted <- which(data_raw$model[i] == model_list_sort_param)
-    data_raw$solver[i] <- solver_list_short[i_solver] 
-    data_raw$solver_type[i] <- solver_type[i_solver]
-    data_raw$solver_lib[i] <- solver_library[i_solver]
-    data_raw$n_param[i] <- n_params[i_model]
-    data_raw$n_states[i] <- n_states[i_model]
-    data_raw$model_short[i] <- str_c("M", as.character(i_mod_sorted))
-    data_raw$model_short_param[i] <- str_c("P", as.character(i_param_sorted))
+  model_short = rep("", nrow(data_raw))
+  for(i in 1:length(model_short)){
+    iUse = str_locate(data_raw$model[i], "_[:alpha:]+_")
+    model_short[i] = str_c(str_sub(data_raw$model[i], start=iUse[1]+1, end=iUse[2]-1), str_sub(data_raw$model[i], start=-4))
   }
-  
+  data_raw$model_short = model_short
+
   return(data_raw)
 }
 
 
-calc_winner <- function(data, tol=1e-6)
-{
-
-  data_winner <- tibble()
-  data <- data %>% filter(abstol == tol)
-  model_list <- unique(data$model)
-  
-  for(i in 1:length(model_list)){
-    
-    
-    data_mod_i <- data %>%
-      filter(model == model_list[i]) %>%
-      mutate(solver = as.factor(solver)) %>%
-      group_by(solver) %>%
-      summarise(median_time = median(runTime, na.rm = T), 
-                median_sq = median(sqDiff, na.rm = T), 
-                solver_type = median(solver_type), 
-                solver_lib = median(solver_lib), 
-                n_param = median(n_param), 
-                n_states = median(n_states), 
-                model_short = median(model_short), 
-                model_short_param = median(model_short_param))
-    # Add order
-    data_mod_i <- data_mod_i[sort(data_mod_i$median_time, na.last = T, index.return=T, method="radix")$ix, ]
-    data_mod_i <- data_mod_i %>% mutate(rank_time = 1:length(median_time))
-    data_mod_i <- data_mod_i[sort(data_mod_i$median_sq, na.last = T, index.return=T, method="radix")$ix, ]
-    data_mod_i <- data_mod_i %>% mutate(rank_sq = 1:length(median_time))
-    data_mod_i <- data_mod_i %>% mutate(model = model_list[i])
-    
-    data_winner <- data_winner %>%
-      bind_rows(data_mod_i)
-  }
-  
-  return(data_winner)
-}
 
 
 calc_winner_category <- function(data, tol=1e-6, sq_res=F)
@@ -262,92 +69,6 @@ calc_winner_category <- function(data, tol=1e-6, sq_res=F)
   }
   
   return(data_winner)
-}
-
-
-calc_score <- function(data, crit="scale", exclude_fail=FALSE, tol=1e-6)
-{
-  model_list <- unique(data$model)
-  data <- data %>%
-    filter(abstol == tol)
-  
-  if(crit == "scale"){
-    data_use <- data %>%
-      group_by(model) %>%
-      summarise(mean_time = mean(runTime, na.rm = T), 
-                mean_sq = mean(sqDiff, na.rm = T), 
-                sd_time = sd(runTime, na.rm = T),
-                sd_sq = sd(sqDiff, na.rm = T),
-                max_time = max(runTime, na.rm = T),
-                max_sq = max(sqDiff, na.rm = T))
-  }else if(crit == "mad"){
-    data_use <- data %>%
-      group_by(model) %>%
-      summarise(mean_time = median(runTime, na.rm = T), 
-                mean_sq = median(sqDiff, na.rm = T), 
-                sd_time = mad(runTime, na.rm = T, constant = 1),
-                sd_sq = mad(sqDiff, na.rm = T, constant = 1),
-                max_time = max(runTime, na.rm = T),
-                max_sq = max(sqDiff, na.rm = T))
-  }
-  
-  data_rel_score <- data %>%
-    inner_join(data_use, by = "model") %>%
-    mutate(rel_time = (runTime - mean_time) / sd_time, rel_sq = (sqDiff - mean_sq) / (sd_sq+1e-9), 
-           max_time = (max_time - mean_time) / sd_time, max_sq = (max_sq - mean_sq) / sd_sq)
-  
-  if(exclude_fail == FALSE){
-    data_rel_score$rel_sq[is.nan(data_rel_score$rel_sq)] <- data_rel_score$max_sq[is.nan(data_rel_score$rel_sq)]
-    data_rel_score$rel_time[is.nan(data_rel_score$rel_time)] <- data_rel_score$max_time[is.nan(data_rel_score$rel_time)]
-  }else{
-    data_rel_score <- data_rel_score %>%
-      drop_na()
-  }
-  
-  data_rel_score_tmp <- data_rel_score %>%
-    group_by(solver, solver_type, solver_lib) %>%
-    summarise(rel_time = mean(rel_time, na.rm = T), 
-              rel_sq = mean(rel_sq, na.rm = T)) %>%
-    mutate(crit = crit, 
-           exclude_fail = as.character(exclude_fail))
-  
-  data_rel_score_tmp <- data_rel_score_tmp[sort(data_rel_score_tmp$rel_time, na.last = T, index.return=T, method="radix")$ix, ]
-  data_rel_score_tmp$rank_time <- 1:length(data_rel_score_tmp$rel_time)
-  
-  return(data_rel_score_tmp)
-}
-
-
-calc_fail <- function(data, tol=1e-6)
-{
-
-  model_list <- unique(data$model)
-  solver_list <- unique(data$solver)
-  data_fail <- tibble()
-  data_tol <- data %>% filter(abstol == tol)
-  for(i in 1:length(model_list)){
-    mod_short <- (data %>% filter(model == model_list[i]))$model_short[1]
-    for(j in 1:length(solver_list)){
-      data_mod <- (data_tol %>%
-                     filter(model == model_list[i] & solver == solver_list[j]))[1, ]
-      
-      if(is.na(data_mod$success) || is.nan(data_mod$sqDiff[1]) | data_mod$success == "FALSE"){
-        
-        solver_info <- get_solver_info(solver_list[j])
-        data_tmp <- tibble(model = model_list[i], 
-                           solver = solver_list[j],
-                           n_param = data_mod$n_param, 
-                           n_states = data_mod$n_states,
-                           tol = tol, 
-                           solver_type = solver_info[1], 
-                           solver_lib = solver_info[2])
-        data_fail <- data_fail %>% bind_rows(data_tmp)
-        
-      }
-    }
-  }
-  
-  return(data_fail)
 }
 
 
@@ -499,59 +220,15 @@ plot_winner <- function(data, tol, sq_res=F)
 }
 
 
-plot_fail <- function(data, tol)
-{
-  
-  data_fail <- calc_fail(data, tol) 
-  
-  p_fail <- ggplot(data_fail, aes(model, fill = solver_type)) + 
-    geom_bar(position = position_dodge2(preserve = "single")) + 
-    scale_fill_manual(values = cbPalette[-1], name = "Solver type") + 
-    coord_flip() + 
-    labs(y = "Count", x = "Model (short)", title = "Integration failures") + 
-    my_minimal
-  
-  dir_save <- str_c("../Results/ODE_solvers/", as.character(tol), "/")
-  if(!dir.exists(dir_save)) dir.create(dir_save, recursive = T)
-  ggsave(str_c(dir_save, "Solvers_fail.svg"), p_fail, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
-  
-}
-
-
-plot_score <- function(data, tol)
-{
-
-  data_score_mean <- calc_score(data, crit = "scale", tol=tol) %>%
-    filter(rel_time < 1.5 && rel_sq < 1.5)
-  data_score_mean_no_fail <- calc_score(data, crit = "scale", tol=tol, exclude_fail = T) %>%
-    filter(rel_time < 1.5 && rel_sq < 1.5)
-  p1 <- ggplot(data_score_mean, aes(rel_time, rel_sq, color = solver_lib, shape = solver_type)) + 
-    geom_point(size = 6.0) + 
-    scale_color_manual(values = cbPalette[-c(1, 5)], name = "Solver library") + 
-    labs(x = "Relative time", y = "Relative squared error", title = "Mean normalisation") +
-    my_minimal
-  p2 <- ggplot(data_score_mean_no_fail, aes(rel_time, rel_sq, color = solver_lib, shape = solver_type)) + 
-    geom_point(size = 6.0) + 
-    scale_color_manual(values = cbPalette[-c(1, 5)], name = "Solver library") + 
-    labs(x = "Relative time", y = "Relative squared error", title = "Mean normalisation (exclude fail)") +
-    my_minimal
-  
-  dir_save <- str_c("../Results/ODE_solvers/", as.character(tol), "/")
-  if(!dir.exists(dir_save)) dir.create(dir_save, recursive = T)
-  ggsave(str_c(dir_save, "Score.svg"), p1, width = BASE_WIDTH*1, height = BASE_HEIGHT*1)
-  ggsave(str_c(dir_save, "Score_exclude.svg"), p2, width = BASE_WIDTH*1, height = BASE_HEIGHT*1)
-  
-}
-
 
 plot_rank <- function(data, tol=1e-6, solver_type="all", sq_err=F)
 {
 
   if(solver_type == "stiff"){
     data <- data %>%
-      filter(solver_type == "stiff")
+      filter(solverType == "stiff")
     name_save = "Position_stiff"
-  }else if(solver_type == "not_stiff"){
+  }else if(solver_type == "nonstiff"){
     data <- data %>%
       filter(solver_type != "stiff")
     name_save = "Position_not_stiff"
@@ -560,138 +237,171 @@ plot_rank <- function(data, tol=1e-6, solver_type="all", sq_err=F)
     name_save = "Position"
   }
   
-  data_low_tol <- calc_winner(data, tol=1e-6) %>%
-    group_by(solver) %>%
-    summarise(mean_time = mean(rank_time, na.rm = T))
-  solver_order <- data_low_tol$solver[order(data_low_tol$mean_time)]
-  
-  data_winner <- calc_winner(data, tol=tol) %>%
-    mutate(model_short = factor(model_short, levels = c("M1", "M2", "M3", "M4", "M5", 
-                                                        "M6", "M7", "M8", "M9", "M10", 
-                                                        "M11", "M12", "M13", "M14", "M15", 
-                                                        "M16", "M17", "M18", "M19", "M20", 
-                                                        "M21", "M22", "M23", "M24", "M25", 
-                                                        "M26", "M27", "M28")), 
-           solver = factor(solver, levels = rev(solver_order)))
+  data_winner = calc_winner(data, tol)
   
   if(sq_err == T){
-    data_winner <- data_winner %>%
+    data_winner <- data_winner |> 
       rename("rank_plot" = "rank_sq") 
     ylab = "Ranking squared error"
     name_save <- str_c(name_save, "_sq")
-     dir_save <- str_c("../Results/ODE_solvers/", as.character(tol), "/Sq_res/")
+    dir_save <- str_c("../Results/ODE_solvers/", as.character(tol), "/Sq_res/")
   }else if(sq_err == "Comb"){
-    data_winner <- data_winner %>%
+    data_winner <- data_winner |> 
       mutate(rank_plot = (rank_sq + rank_time)*0.5)
-    ylab = "Ranking squared error"
+    ylab = "Ranking averaged time and error"
     name_save <- str_c(name_save, "_comb")
     dir_save <- str_c("../Results/ODE_solvers/", as.character(tol), "/Res_comb/")
   }else{
-    data_winner <- data_winner %>%
-      rename("rank_plot" = "rank_time")
+    data_winner <- data_winner |> 
+      mutate(rank_plot = rank_time)
     ylab = "Ranking squared error"
     name_save <- str_c(name_save, "_time")
     dir_save <- str_c("../Results/ODE_solvers/", as.character(tol), "/Time/")
   }
   
-  p1 <- ggplot(data_winner, aes(x=model_short, y=solver)) + 
+  posx = unique(data_winner$model_short[order(data_winner$n_states)])
+  posy = data_winner |> group_by(solver) |> summarise(rank = median(rank_time))
+  posy = posy$solver[order(posy$rank)]
+  p1 = ggplot(data_winner, aes(model_short, solver)) + 
     geom_raster(aes(fill = rank_plot)) + 
-    labs(x = "Model (increasing size ->)", y = ylab) + 
-    scale_fill_viridis_c(direction = -1) + 
-    theme_minimal()
+    scale_fill_viridis_c(direction = -1) +
+    scale_x_discrete(limits = posx) + 
+    scale_y_discrete(limits = rev(posy)) + 
+    labs(x = "Model (increasing size ->)", y = ylab, title = "Rank time") + 
+    my_minimal +
+    theme(plot.background = element_rect(fill = "white"), 
+          axis.text.x = element_text(angle=90))
   
   print(dir_save)
   if(!dir.exists(dir_save)) dir.create(dir_save, recursive = T)
-  ggsave(str_c(dir_save, name_save, ".svg"), p1, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
+  ggsave(str_c(dir_save, name_save, ".svg"), p1, width = BASE_WIDTH*2.5, height = BASE_HEIGHT*3.0)
 }
 
 
-plot_all_tol <- function(data)
+calc_fail <- function(data, tol=1e-8)
+{
+
+  model_list <- unique(data$model)
+  solver_list <- unique(data$solver)
+  data_use <- data |> filter(abstol == tol)
+  
+  data_fail = data_use |> 
+    group_by(solver, model_short, solverType, solverLib) |> 
+    summarise(nFail = sum(is.nan(runTime) / 3)) |> 
+    filter(nFail != 0)
+    
+  return(data_fail)
+}
+
+
+plot_fail <- function(data, tol)
 {
   
-  data_tot_stiff <- data %>%
-    filter(solver_type == "stiff") %>%
-    mutate(reltol = as.factor(reltol)) %>%
-    group_by(reltol, model_short) %>%
-    summarise(time = median(runTime, na.rm = T), 
-              res_sq = median(sqDiff, na.rm = T)) %>%
-    mutate(model_number = as.numeric(str_extract(model_short, "\\d+")))
-  data_tot_not_stiff <- data %>%
-    filter(solver_type != "stiff") %>%
-    mutate(reltol = as.factor(reltol)) %>%
-    group_by(reltol, model_short) %>%
-    summarise(time = median(runTime, na.rm = T), 
-              res_sq = median(sqDiff, na.rm = T)) %>%
-    mutate(model_number = as.numeric(str_extract(model_short, "\\d+")))
+  data_fail <- calc_fail(data, tol) 
+  data1 = data_fail |> 
+    group_by(model_short, solverType) |> 
+    summarise(nFail = as.integer(sum(nFail)))
+  data2 = data_fail |> 
+    group_by(solver, solverType) |> 
+    summarise(nFail = as.integer(sum(nFail)))
   
-  data_ref_stiff <- data_tot_stiff %>% filter(reltol == 1e-12) %>%
-    select(model_short, time, res_sq) %>%
-    rename("time_ref" = "time", "res_sq_ref" = "res_sq", "reltol_tmp" = "reltol")
-  data_tot_stiff <- data_tot_stiff %>%
-    inner_join(data_ref_stiff) %>%
-    mutate(time_rel = time / time_ref, 
-           res_sq_rel = (res_sq + 1e-100) / (res_sq_ref + 1e-100))
+  data1$solverType = factor(data1$solverType, levels = rev(c("nonstiff", "stiff", "hint", "composite")))
+  pos1 = data1 |> group_by(model_short) |> summarise(nFail=sum(nFail)) 
+  pos1 = pos1$model_short[order(pos1$nFail)]
+  p1 = ggplot(data1, aes(model_short, nFail, fill = solverType)) + 
+    geom_col(position=position_dodge(preserve = 'single')) + 
+    scale_fill_manual(values = cbPalette[-1], name = "Solver type") + 
+    scale_x_discrete(limits=pos1) + 
+    scale_y_continuous(breaks = seq(from=1, by=2, to=max(data1$nFail))) +
+    coord_flip() + 
+    labs(y = "Number of integration failures", x = "", title = "Number of integration failures per model") + 
+    my_minimal +
+    theme(legend.position = "bottom")
   
-  data_ref_not_stiff <- data_tot_not_stiff %>% filter(reltol == 1e-12) %>%
-    select(model_short, time, res_sq) %>%
-    rename("time_ref" = "time", "res_sq_ref" = "res_sq", "reltol_tmp" = "reltol")
-  data_tot_not_stiff <- data_tot_not_stiff %>%
-    inner_join(data_ref_not_stiff) %>%
-    mutate(time_rel = time / time_ref, 
-           res_sq_rel = (res_sq + 1e-100) / (res_sq_ref + 1e-100))
+  pos2 = unique(data2$solver[order(data2$nFail)])
+  p2 = ggplot(data2, aes(solver, nFail, fill = solverType)) + 
+    geom_bar(stat="identity", position="dodge") + 
+    scale_fill_manual(values = cbPalette[-1], name = "Solver type") + 
+    scale_x_discrete(limits = pos2) +
+    scale_y_continuous(breaks = seq(from=1, by=2, to=max(data2$nFail))) +
+    coord_flip() + 
+    labs(y = "Number of integration failures", x = "", title = "Number of integration failures (total of 27 models)") + 
+    my_minimal + 
+    theme(legend.position = "bottom")
   
-  
-  p1 <- ggplot(data_tot_stiff, aes(model_number, time_rel, color = reltol)) + 
-    geom_line(size = 2.0) + 
-    geom_point(size = 5.0) + 
-    scale_color_manual(values = cbPalette[-1]) + 
-    my_theme
-  p2 <- ggplot(data_tot_stiff, aes(model_number, res_sq_rel, color = reltol)) + 
-    geom_line(size = 2.0) + 
-    geom_point(size = 5.0) + 
-    scale_y_log10() + 
-    scale_color_manual(values = cbPalette[-1]) + 
-    my_theme
-  
-  p3 <- ggplot(data_tot_not_stiff, aes(model_number, time_rel, color = reltol)) + 
-    geom_line(size = 2.0) + 
-    geom_point(size = 5.0) + 
-    scale_color_manual(values = cbPalette[-1]) + 
-    my_theme
-  p4 <- ggplot(data_tot_not_stiff, aes(model_number, res_sq_rel, color = reltol)) + 
-    geom_line(size = 2.0) + 
-    geom_point(size = 5.0) + 
-    scale_y_log10() + 
-    scale_color_manual(values = cbPalette[-1]) + 
-    my_theme
-  
-  p5 <- ggplot(data_tot_not_stiff, aes(model_number, res_sq, color = reltol)) + 
-    geom_line(size = 2.0) + 
-    geom_point(size = 5.0) + 
-    scale_y_log10() + 
-    scale_color_manual(values = cbPalette[-1]) + 
-    my_theme
-  p6 <- ggplot(data_tot_stiff, aes(model_number, res_sq, color = reltol)) + 
-    geom_line(size = 2.0) + 
-    geom_point(size = 5.0) + 
-    scale_y_log10() + 
-    scale_color_manual(values = cbPalette[-1]) + 
-    my_theme
-  
-  dir_save <- str_c("../Results/ODE_solvers/All_tol/")
+  dir_save <- str_c("../Results/ODE_solvers/", as.character(tol), "/")
   if(!dir.exists(dir_save)) dir.create(dir_save, recursive = T)
-  ggsave(str_c(dir_save, "Stiff_time_rel.svg"), p1, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
-  ggsave(str_c(dir_save, "Stiff_sq_rel.svg"), p2, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
-  ggsave(str_c(dir_save, "Not_stiff_time_rel.svg"), p3, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
-  ggsave(str_c(dir_save, "Not_stiff_sq_rel.svg"), p4, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
-  ggsave(str_c(dir_save, "Not_stiff_sq.svg"), p5, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
-  ggsave(str_c(dir_save, "Stiff_sq.svg"), p6, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
+  ggsave(str_c(dir_save, "Solvers_fail_solver.svg"), p1, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
+  ggsave(str_c(dir_save, "Solvers_fail_model.svg"), p2, width = BASE_WIDTH*2, height = BASE_HEIGHT*2)
+}
+
+
+calc_winner <- function(data, tol=1e-6)
+{
+  
+  return_first = function(value) return(value[1])
+  
+  data_winner <- tibble()
+  data_use <- data |>  
+    filter(abstol == tol) 
+  model_list <- unique(data$model_short)
+  n_solvers = length(unique(data$solver))
+  
+  for(i in 1:length(model_list)){
+    
+    data_model_i <- data_use |> 
+      filter(model_short == model_list[i]) |> 
+      group_by(solver, model_short) |> 
+      summarise(median_time = median(runTime, na.rm = T), 
+                median_sq = median(sqDiff, na.rm = T), 
+                solver_type = return_first(solverType), 
+                solver_lib = return_first(solverLib), 
+                n_param = median(nParam), 
+                n_states = median(nStates))
+    # Add ranked index on time or sq-error
+    data_model_i <- data_model_i[order(data_model_i$median_time), ]
+    data_model_i$rank_time <- 1:nrow(data_model_i)
+    data_model_i <- data_model_i[order(data_model_i$median_sq), ]
+    data_model_i$rank_sq <- 1:nrow(data_model_i)
+    
+    # Account for integration failures     
+    data_model_i$rank_time[is.na(data_model_i$median_time)] = n_solvers
+    data_model_i$rank_sq[is.na(data_model_i$median_sq)] = n_solvers
+    
+    data_winner <- bind_rows(data_winner, data_model_i)
+  }
+  
+  return(data_winner)
 }
 
 
 
+data <- read_data("../Intermediate/Benchmarks/ODE_solvers/Sparse_not_linsolvers_new.csv") |> 
+  mutate(solverType =  case_when(solverType == "nonStiff" ~ "nonstiff", 
+                                 T ~ solverType)) |> 
+  filter(solverLib != "ODEInterface") |> 
+  filter(solver != "lsoda")
+tol = 1e-8
 
-data <- read_data("../Pipeline_ModelSolver/IntermediaryResults/benchmark_5.csv")
+
+
+plot_fail(data, tol)
+plot_rank(data, tol, solver_type = "all", sq_err = F)
+plot_rank(data, tol, solver_type = "stiff", sq_err = F)
+plot_rank(data, tol, solver_type = "nonstiff", sq_err = F)
+plot_rank(data, tol, solver_type = "all", sq_err = T)
+plot_rank(data, tol, solver_type = "stiff", sq_err = T)
+plot_rank(data, tol, solver_type = "nonstiff", sq_err = T)
+
+
+
+ggplot(data_winner, aes(model_short, solver)) + 
+  geom_raster(aes(fill = rank_sq)) + 
+  scale_fill_viridis_c(direction = -1) +
+  scale_x_discrete(limits = posx) + 
+  scale_y_discrete(limits = rev(posy)) + 
+  labs(x = "Model (increasing size ->)", y = "", title = "Rank squared error") + 
+  my_minimal
 
 
 tol_list <- unique(data$abstol)
@@ -712,65 +422,42 @@ for(tol in tol_list){
 }
 
 
-plot_all_tol(data)
+# -----------------------------------------------------------------------------------------------------------------
+# Random parameters 
+# -----------------------------------------------------------------------------------------------------------------
+dir_data = "../Intermediate/Benchmarks/ODE_solvers/"
+data_random_parameters = read_data(str_c(dir_data, "Random_parameters.csv")) |> 
+  mutate(solverType = case_when(solverType == "nonStiff" ~ "nonstiff", 
+                                T ~ solverType))
 
+data_plot = data_random_parameters |> 
+  filter(abstol == 1e-8) |> 
+  mutate(solver = case_when(solver == "CVODE_BDF_default" ~ "CVODE_BDF", 
+                            T ~ solver))
 
-tol <- 1e-9
-data_tmp <- data %>%
-  filter(solver_type == "stiff")
-data_low_tol <- calc_winner(data_tmp, tol=1e-6) %>%
-  group_by(solver) %>%
-  summarise(mean_time = mean(rank_time, na.rm = T))
-solver_order <- data_low_tol$solver[order(data_low_tol$mean_time)]
+p1 = ggplot(data_plot, aes(solver, runTime, fill = solverType)) + 
+  geom_violin(draw_quantiles = 0.5, linewidth=1.0) +
+  geom_jitter(width = 0.1, size=0.2) + 
+  facet_wrap(~model_short, scales="free_y") + 
+  scale_y_log10() +
+  labs(x = "", y = "Run time [s]", title = "Run time for 100 random paramter vectors", 
+       subtitle = "On average stiff solvers have less variabillity") + 
+  scale_fill_manual(values = cbPalette[-1], name = "Solver type") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = "bottom")
 
-data_winner <- calc_winner(filter(data, solver_type == "stiff"), tol=tol) %>%
-  mutate(model_short_param = factor(model_short_param, levels = c("P1", "P2", "P3", "P4", "P5", 
-                                                                  "P6", "P7", "P8", "P9", "P10", 
-                                                                  "P11", "P12", "P13", "P14", "P15", 
-                                                                  "P16", "P17", "P18", "P19", "P20", 
-                                                                  "P21", "P22", "P23", "P24", "P25", 
-                                                                  "P26", "P27", "P28")), 
-         solver = factor(solver, levels = rev(solver_order)))
+data_fail = data_plot |> 
+  group_by(solver, model_short, solverType) |> 
+  summarise(n_fail = sum(is.nan(runTime)))
+p2 = ggplot(data_fail, aes(solver, n_fail, fill = solverType)) + 
+  geom_bar(stat="identity", position="dodge") + 
+  facet_wrap(~model_short) + 
+  ylim(0, 100) + 
+  labs(x = "", y = "Percentage integration failures", title = "Percentage integration failure for 100 random parameter vectors", 
+       subtitle = "On average nonstiff solvers have more integration failures") + 
+  scale_fill_manual(values = cbPalette[-1], name = "Solver type") +
+  theme_bw(base_size = 16) + 
+  theme(legend.position = "bottom")
 
-
-ggplot(data_winner, aes(x=model_short_param, y=solver)) + 
-  geom_raster(aes(fill = rank_time)) + 
-  labs(x = "Model (increasing param ->)", y = "Solver") + 
-  scale_fill_viridis_c(direction = -1) + 
-  theme_minimal()
-
-
-data_plot1 <- tibble(P_vec = seq(0.0, 250), 
-                     gamma = 1.0, 
-                     D = 1.0 / (1.0 + P_vec*gamma), 
-                     push = P_vec * gamma)
-data_plot2 <- tibble(P_vec = seq(0.0, 250), 
-                     gamma = 0.25, 
-                     D = 1.0 / (1.0 + P_vec*gamma), 
-                     push = P_vec * gamma)
-data_plot3 <- tibble(P_vec = seq(0.0, 250), 
-                     gamma = 0.1, 
-                     D = 1.0 / (1.0 + P_vec*gamma), 
-                     push = P_vec * gamma)
-data_plot4 <- tibble(P_vec = seq(0.0, 250), 
-                     gamma = 0.01, 
-                     D = 1.0 / (1.0 + P_vec*gamma), 
-                     push = P_vec * gamma)
-data_plot <- data_plot1 %>% 
-  bind_rows(data_plot2, data_plot3, data_plot4) %>%
-  mutate(gamma = factor(gamma))
-ggplot(data_plot, aes(P_vec, D, color = gamma)) + 
-  geom_line(size = 2.0) + 
-  geom_hline(yintercept = 0.05) + 
-  scale_y_log10() + 
-  geom_vline(xintercept = 90) + 
-  scale_color_manual(values = cbPalette[-1]) + 
-  my_theme
-    
-ggplot(data_plot, aes(P_vec, push, color = gamma)) + 
-  geom_line(size = 2.0) + 
-  geom_hline(yintercept = 10) + 
-  scale_color_manual(values = cbPalette[-1]) + 
-  my_theme
-  
-
+ggsave("Random_parameter_run_time.png", p1, width = BASE_WIDTH*3.5, height = BASE_HEIGHT*2.5, dpi=300)
+ggsave("Random_parameter_fail.png", p2, width = BASE_WIDTH*3.5, height = BASE_HEIGHT*2.5, dpi=300)

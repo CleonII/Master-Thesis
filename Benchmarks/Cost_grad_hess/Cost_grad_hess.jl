@@ -60,7 +60,7 @@ function getPEtabOpt(peTabModel, gradMethod, sensealg, solverUse, tol, sparseJac
 end
 
 
-function benchmarkCostGrad(peTabModel, modelName::String, gradInfo, solversCheck, pathFileSave, tol; nIter=10, checkHess::Bool=false, checkCost::Bool=false, checkGrad::Bool=false, sparseJac::Bool=false, nParamFixed=nothing, nRepeat=1, chunkSize=nothing)
+function benchmarkCostGrad(peTabModel, modelName::String, gradInfo, solversCheck, pathFileSave, tol; iRandomParameter=0, nIter=10, checkHess::Bool=false, checkCost::Bool=false, checkGrad::Bool=false, sparseJac::Bool=false, nParamFixed=nothing, nRepeat=1, chunkSize=nothing)
 
     println("Running model $modelName")
     if isnothing(chunkSize)
@@ -82,13 +82,18 @@ function benchmarkCostGrad(peTabModel, modelName::String, gradInfo, solversCheck
 
             # Use nominal parameter vector 
             println("Precompiling the code")
-            paramVec = peTabOpt.paramVecTransformed
+            if iRandomParameter == 0
+                paramVec = peTabOpt.paramVecTransformed
+            else
+                paramVec = getRandomODEParameters(peTabModel, solverUse, iRandomParameter, nParamCube=100, costGradHess=true)
+            end
             grad = zeros(length(paramVec))
             # Zygote have problems with SensitivityAdjoint from time-to-time
             if modelName ∈ ["model_Isensee_JCB2018", "model_Brannmark_JBC2010", "model_Weber_BMC2015"] && gradMethod == :Zyogte
                 return
             end
             local canEval = true
+            evalGradF(grad, peTabOpt.paramVecTransformed)
             try 
                 evalGradF(grad, peTabOpt.paramVecTransformed)
             catch 
@@ -110,7 +115,11 @@ function benchmarkCostGrad(peTabModel, modelName::String, gradInfo, solversCheck
             what_calc = "Cost"
             methodInfo = "Standard"
             peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sparseJac=sparseJac)
-            paramVec = peTabOpt.paramVecTransformed
+            if iRandomParameter == 0
+                paramVec = peTabOpt.paramVecTransformed
+            else
+                paramVec = getRandomODEParameters(peTabModel, solverUse, iRandomParameter, nParamCube=100, costGradHess=true)
+            end
             println("Precompiling the code")
             peTabOpt.evalF(paramVec)
             for j in 1:nIter
@@ -140,7 +149,8 @@ function benchmarkCostGrad(peTabModel, modelName::String, gradInfo, solversCheck
                                 model = modelName, 
                                 tol = tol, 
                                 chunk_size = chunkSizeWrite,
-                                solver = solverStr)
+                                solver = solverStr, 
+                                i_random_parameter = iRandomParameter)
         else
             dataSave = DataFrame(Time = runTime, 
                                 What_calc=what_calc,
@@ -149,7 +159,8 @@ function benchmarkCostGrad(peTabModel, modelName::String, gradInfo, solversCheck
                                 tol = tol, 
                                 solver = solverStr, 
                                 N_param_fixed=nParamFixed, 
-                                chunk_size = chunkSizeWrite,)
+                                chunk_size = chunkSizeWrite,
+                                i_random_parameter = iRandomParameter)
         end
 
         if isfile(pathFileSave)
@@ -394,6 +405,41 @@ if ARGS[1] == "Bachman_test_chunks"
                 rm(peTabModelFewerParam.dirModel, recursive=true)
             end
         end
+    end
+end
+
+
+if ARGS[1] == "Bachman_test_chunks_random_p"
+
+    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
+    pathSave = dirSave * "Bachman_test_chunks_random_p.csv"
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+
+    Random.seed!(123)
+    solversCheck = [[QNDF(), "QNDF"]]
+    sensealgInfoTot = [[:ForwardDiff, nothing, "ForwardDiff"], 
+                       [:ForwardSenseEq, :AutoDiffForward, "ForEq_AutoDiff"]]
+
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
+    peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel, forceBuildJlFile=false)
+    nDynParam = getNDynParam(peTabModel)
+    chunkList = 1:(nDynParam-1)
+    peTabModelFewerParam = getPEtabModelNparamFixed(peTabModel, 0)            
+    tol = 1e-8
+    for nChunks in chunkList
+        # Check Gradient 
+        for sensealgInfo in sensealgInfoTot
+            for i in 1:20
+                benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
+                                pathSave, tol, checkGrad=true, nIter=10, nParamFixed=nothing, nRepeat=10, chunkSize=nChunks, 
+                                iRandomParameter=i)
+            end
+        end
+    end
+    if isdir(peTabModelFewerParam.dirModel)
+        rm(peTabModelFewerParam.dirModel, recursive=true)
     end
 end
 
