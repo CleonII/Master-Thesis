@@ -256,7 +256,7 @@ elseif diffZygote > 1e-3
 end
 
 
-# Isensee model - Extremly strange as it works without priors (must double check)
+# Isensee model 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Isensee_JCB2018/"
 peTabModel = setUpPeTabModel("model_Isensee_JCB2018", dirModel, verbose=false, forceBuildJlFile=true)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
@@ -273,7 +273,7 @@ elseif diffZygote > 1e-2
 end
 
 
-# Lucarelli - Breaks code by the same reason as above 
+# Lucarelli 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Lucarelli_CellSystems2018/"
 peTabModel = setUpPeTabModel("model_Lucarelli_CellSystems2018", dirModel, verbose=false, forceBuildJlFile=true)
 peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)

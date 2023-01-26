@@ -24,7 +24,7 @@ function _changeExperimentalCondition!(pODEProblem::AbstractVector,
 
     # Given changes in parameters initial values might have to be re-evaluated 
     nModelStates = length(peTabModel.stateNames)
-    peTabModel.evalU0!((@view u0[1:nModelStates]), pODEProblem) 
+    peTabModel.compute_u0!((@view u0[1:nModelStates]), pODEProblem) 
 
     # Account for any potential events (callbacks) which are active at time zero
     for f! in peTabModel.checkCallbackActive
@@ -40,7 +40,7 @@ function _changeExperimentalCondition!(pODEProblem::AbstractVector,
     # by computing the jacobian at t0
     if computeForwardSensitivites == true
         St0::Matrix{Float64} = Matrix{Float64}(undef, (nModelStates, length(pODEProblem)))
-        ForwardDiff.jacobian!(St0, peTabModel.evalU0, pODEProblem)
+        ForwardDiff.jacobian!(St0, peTabModel.compute_u0, pODEProblem)
         u0[(nModelStates+1):end] .= vec(St0)
     end
 
@@ -75,7 +75,7 @@ function _changeExperimentalCondition(pODEProblem::AbstractVector,
     __pODEProblem = [i ∈ mapConditionId.iODEProblemθDynamic ? θ_dynamic[iParametersEst(i)] : _pODEProblem[i] for i in eachindex(_pODEProblem)]    
     
     # When using AD as Zygote we must use the non-mutating version of evalU0
-    _u0 = peTabModel.evalU0(__pODEProblem) 
+    _u0 = peTabModel.compute_u0(__pODEProblem) 
 
     # In case an experimental condition maps directly to the initial value of a state. 
     # Very rare, will fix if ever needed for slow Zygote 

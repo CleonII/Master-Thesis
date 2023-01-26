@@ -61,7 +61,7 @@ function computeσ(u::AbstractVector,
     if mapθ_sd.isSingleConstant == true
         σ = mapθ_sd.constantValues[1]
     else
-        σ = peTabModel.evalSd!(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_sd)
+        σ = peTabModel.compute_σ(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_sd)
     end
 
     return σ
@@ -81,7 +81,7 @@ function computehTransformed(u::AbstractVector,
                              parameterInfo::ParametersInfo)::Real
 
     mapθ_observable = θ_indices.mapθ_observable[iMeasurement]
-    h = peTabModel.evalYmod(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_observable) 
+    h = peTabModel.compute_h(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_observable) 
     # Transform yMod is necessary
     hTransformed = transformMeasurementOrH(h, measurementInfo.measurementTransformation[iMeasurement])
 
@@ -217,7 +217,7 @@ function changeODEProblemParameters!(pODEProblem::AbstractVector,
 
     mapODEProblem = θ_indices.mapODEProblem
     pODEProblem[mapODEProblem.iODEProblemθDynamic] .= θ[mapODEProblem.iθDynamic]
-    peTabModel.evalU0!(u0, pODEProblem) 
+    peTabModel.compute_u0!(u0, pODEProblem) 
     
     return nothing
 end
@@ -236,7 +236,7 @@ function changeODEProblemParameters(pODEProblem::AbstractVector,
 
     mapODEProblem = θ_indices.mapODEProblem
     outpODEProblem = [i ∈ mapODEProblem.iODEProblemθDynamic ? θ[mapParamToEst(i, mapODEProblem)] : pODEProblem[i] for i in eachindex(pODEProblem)]
-    outu0 = peTabModel.evalU0(outpODEProblem) 
+    outu0 = peTabModel.compute_u0(outpODEProblem) 
     
     return outpODEProblem, outu0
 end

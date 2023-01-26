@@ -58,11 +58,11 @@ function compute∂G∂_(∂G∂_,
         mapθ_sd = θ_indices.mapθ_sd[iMeasurementData]
         mapθ_observable = θ_indices.mapθ_observable[iMeasurementData]
         if compute∂G∂U == true
-            peTabModel.evalDYmodDu(u, t, p, θ_observable, θ_nonDynamic, measurementInfo.observableId[iMeasurementData], mapθ_observable, ∂h∂_)
-            peTabModel.evalDSdDu!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurementData], mapθ_sd, ∂σ∂_)
+            peTabModel.compute_∂h∂u!(u, t, p, θ_observable, θ_nonDynamic, measurementInfo.observableId[iMeasurementData], mapθ_observable, ∂h∂_)
+            peTabModel.compute_∂σ∂u!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurementData], mapθ_sd, ∂σ∂_)
         else
-            peTabModel.evalDYmodDp(u, t, p, θ_observable, θ_nonDynamic, measurementInfo.observableId[iMeasurementData], mapθ_observable, ∂h∂_)
-            peTabModel.evalDSdDp!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurementData], mapθ_sd, ∂σ∂_)
+            peTabModel.compute_∂h∂p!(u, t, p, θ_observable, θ_nonDynamic, measurementInfo.observableId[iMeasurementData], mapθ_observable, ∂h∂_)
+            peTabModel.compute_∂σ∂p!(u, t, θ_sd, p, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurementData], mapθ_sd, ∂σ∂_)
         end
 
         if measurementInfo.measurementTransformation[iMeasurementData] == :log10

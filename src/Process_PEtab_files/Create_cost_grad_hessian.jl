@@ -28,9 +28,9 @@ include(joinpath(pwd(), "src", "Process_PEtab_files", "Get_simulation_info.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Get_parameter_indices.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Process_measurements.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Process_parameters.jl"))
-include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_obs_u0_sd_common.jl"))
-include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_obs_u0_sd_functions.jl"))
-include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_obs_u0_sd_derivatives.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Observables", "Common.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Observables", "Create_h_sigma_derivatives.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Observables", "Create_u0_h_sigma.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Process_PeTab_files.jl"))
 include(joinpath(pwd(), "src", "Common.jl"))
 
@@ -52,6 +52,7 @@ include(joinpath(pwd(), "src", "Common.jl"))
     TODO : Example  
 """
 function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::Bool=false, verbose::Bool=true, ifElseToEvent=true, jlFile=false)::PeTabModel
+    
     if jlFile == false
         # Sanity check user input 
         modelFileXml = dirModel * modelName * ".xml"
@@ -90,6 +91,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
         modelDict, modelFileJl = JLToModellingToolkit(modelName, dirModel, ifElseToEvent=ifElseToEvent)
 
     end
+
     # Extract ODE-system and mapping of maps of how to map parameters to states and model parmaeters 
     include(modelFileJl)
     expr = Expr(:call, Symbol("getODEModel_" * modelName))
@@ -107,27 +109,27 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
     pathObservables = checkForPeTabFile("observables", dirModel)
 
     # Build functions for observables, sd and u0 if does not exist and include
-    pathObsSdU0 = dirModel * modelName * "ObsSdU0.jl"
-    pathDObsSdU0 = dirModel * modelName * "DObsSdU0.jl"
-    if !isfile(pathObsSdU0) || forceBuildJlFile == true
+    path_u0_h_sigma = dirModel * modelName * "_h_sd_u0.jl"
+    path_D_h_sd = dirModel * modelName * "_D_h_sd.jl"
+    if !isfile(path_u0_h_sigma) || !isfile(path_D_h_sd) || forceBuildJlFile == true
         if verbose && forceBuildJlFile == false
-            @printf("File for yMod, U0 and Sd does not exist - building it\n")
+            @printf("File for h, u0 and σ does not exist - building it\n")
         end
         if verbose && forceBuildJlFile == true
-            @printf("By user option will rebuild Ymod, Sd and u0\n")
+            @printf("By user option will rebuild h, σ and u0\n")
         end
         if !@isdefined(modelDict)
             modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
-        createFileYmodSdU0(modelName, dirModel, odeSysUse, stateMap, modelDict)
-        createFileDYmodSdU0(modelName, dirModel, odeSysUse, stateMap, modelDict)
+        create_σ_h_u0_File(modelName, dirModel, odeSysUse, stateMap, modelDict)
+        createDerivative_σ_h_File(modelName, dirModel, odeSysUse, modelDict)
     else
         if verbose
-            @printf("File for yMod, U0 and Sd does exist - will not rebuild it\n")
+            @printf("File for h, u0 and σ exists - will not rebuild it\n")
         end
     end
-    include(pathObsSdU0)
-    include(pathDObsSdU0)    
+    include(path_u0_h_sigma)
+    include(path_D_h_sd)    
 
     pathCallback = dirModel * "/" * modelName * "Callbacks_time_piecewise.jl"
     if !isfile(pathCallback) || forceBuildJlFile == true
@@ -147,14 +149,14 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
     cbSet::CallbackSet, checkCbActive::Vector{Function} = eval(exprCallback)    
 
     peTabModel = PeTabModel(modelName,
-                            evalYmod,
-                            evalU0!,
-                            evalU0,
-                            evalSd!,
-                            evalDYmodDu,
-                            evalDSdDu!,
-                            evalDYmodDp,
-                            evalDSdDp!,
+                            compute_h,
+                            compute_u0!,
+                            compute_u0,
+                            compute_σ,
+                            compute_∂h∂u!,
+                            compute_∂σ∂σu!,
+                            compute_∂h∂p!,
+                            compute_∂σ∂σp!,
                             getTstops,
                             odeSysUse,
                             paramMap,

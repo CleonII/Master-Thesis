@@ -72,16 +72,6 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
-        hessJulia = zeros(nParam,nParam); peTabOptAlt.evalHessGaussNewton(hessJulia, paramVec)
-        hessJulia = hessJulia[:]
-        hessPython = collect(hessPythonMat[i, :])
-        sqDiffHess = sum((hessJulia - hessPython).^2)
-        if sqDiffHess > 1e-5
-            @printf("sqDiffHess = %.3e\n", sqDiffHess)
-            @printf("Does not pass test on hessian\n")
-            return false
-        end
-
         costZygote = peTabOpt.evalFZygote(paramVec)
         sqDiffZygote = (costZygote - costPython[i])^2
         if sqDiffZygote > 1e-5
@@ -97,6 +87,16 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
         if sqDiffGradZygote > 1e-5
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
             @printf("Does not pass test on gradient from Zygote\n")
+            return false
+        end
+
+        # Evaluate lower level adjoint sensitivity interfance gradient 
+        gradAdj = zeros(nParam)
+        peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
+        sqDiffGradAdjoint = sum((gradAdj - gradPython).^2)
+        if sqDiffGradAdjoint > 1e-4
+            @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
+            @printf("Does not pass test on adjoint gradient gradient\n")
             return false
         end
 
@@ -121,13 +121,13 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
-        # Evaluate lower level adjoint sensitivity interfance gradient 
-        gradAdj = zeros(nParam)
-        peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
-        sqDiffGradAdjoint = sum((gradAdj - gradPython).^2)
-        if sqDiffGradAdjoint > 1e-4
-            @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
-            @printf("Does not pass test on adjoint gradient gradient\n")
+        hessJulia = zeros(nParam,nParam); peTabOptAlt.evalHessGaussNewton(hessJulia, paramVec)
+        hessJulia = hessJulia[:]
+        hessPython = collect(hessPythonMat[i, :])
+        sqDiffHess = sum((hessJulia - hessPython).^2)
+        if sqDiffHess > 1e-5
+            @printf("sqDiffHess = %.3e\n", sqDiffHess)
+            @printf("Does not pass test on hessian\n")
             return false
         end
 

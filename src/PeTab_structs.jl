@@ -38,14 +38,14 @@ struct PeTabModel{F1<:Function,
                   C <: SciMLBase.DECallback,
                   FA<:Vector{<:Function}}
     modelName::String
-    evalYmod::F1
-    evalU0!::F2
-    evalU0::F3
-    evalSd!::F4
-    evalDYmodDu::F5
-    evalDSdDu!::F6
-    evalDYmodDp::F7
-    evalDSdDp!::F8
+    compute_h::F1
+    compute_u0!::F2
+    compute_u0::F3
+    compute_σ::F4
+    compute_∂h∂u!::F5
+    compute_∂σ∂u!::F6
+    compute_∂h∂p!::F7
+    compute_∂σ∂p!::F8
     getTStops::F9
     odeSystem::S
     paramMap::T1

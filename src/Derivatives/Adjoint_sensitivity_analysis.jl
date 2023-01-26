@@ -235,7 +235,7 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
         # In case we do not simulate the ODE for a steady state first we can compute 
         # the initial sensitivites easily via automatic differantitatiom
         St0::Matrix{Float64} = Matrix{Float64}(undef, (length(sol.prob.u0), length(sol.prob.p)))
-        ForwardDiff.jacobian!(St0, peTabModel.evalU0, sol.prob.p)
+        ForwardDiff.jacobian!(St0, peTabModel.compute_u0, sol.prob.p)
         _gradient = dp .+ du'*St0
 
     else

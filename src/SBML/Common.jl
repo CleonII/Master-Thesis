@@ -452,27 +452,3 @@ function getSignExpression(str::String)
     end
 end
 
-
-#=
-getSignExpression("-1")
-getSignExpression("1*2*3")
-getSignExpression("1*2*-a")
-getSignExpression("1*-2*a")
-getSignExpression("a*b*c-c*-d*e")
-getSignExpression("a*b*c-e")
-getSignExpression("a*b*c-(e*d*e)")
-getSignExpression("a*b*c-(e*-d*e)")
-getSignExpression(replace("a*b*c - (e*d*e - 1)", " " => ""))
-getSignExpression(replace("a*b*c - (e*d*e + 1)", " " => ""))
-getSignExpression(replace("a*b*c + (e*d*e + 1)", " " => ""))
-getSignExpression(replace("-a*b*c - (e*d*e + 1)", " " => ""))
-getSignExpression(replace("-a*b*c - (e*d*e + 1)*-1", " " => ""))
-
-checkForTime("-a*b*c - (e*d*e + 1)")
-checkForTime("-a*b*c - (e*d*e + 1 + t)")
-checkSignTime("-a*b*c - (e*d*e + 1 + t)*-1")
-checkSignTime("-a*b*c - (e*d*e + 1 + t)")
-checkSignTime("-a*b*c - (e*d*e + 1 + t)")
-checkSignTime("-a*b*c*(e*d*e + 1 + t)")
-checkSignTime("1*b*c*(e*d*e + 1 + t)")
-=#
