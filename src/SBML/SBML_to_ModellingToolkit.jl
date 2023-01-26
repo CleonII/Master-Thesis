@@ -36,6 +36,115 @@ function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::Str
 end
 
 
+
+"""
+    JLToModellingToolkit(modelName::String, dirModel::String)
+
+    Checks and fixes a Julia ModelingToolkit file and store 
+    the fixed file in dirModel with name modelName_fix.jl. 
+
+"""
+function JLToModellingToolkit(modelName::String, dirModel::String; ifElseToEvent::Bool=true)
+
+    # Some parts of the modelDict are needed to create the other julia files for the model.
+    modelDict = Dict()
+    modelDict["boolVariables"] = Dict()
+    modelDict["modelRuleFunctions"] = Dict()
+    modelDict["inputFunctions"] = Dict()
+    modelDict["parameters"] = Dict()
+    modelDict["states"] = Dict()
+
+    modelFileJlSrc = dirModel * "/" * modelName * ".jl"
+    modelFileJl = dirModel * "/" * modelName * "_fix.jl"
+
+    # Read modelFile to work with it
+    include(modelFileJlSrc)
+    expr = Expr(:call, Symbol("getODEModel_" * modelName))
+    odeSys, stateMap, paramMap = eval(expr)
+
+    for eq in odeSys.eqs
+        key = replace(string(eq.lhs),"(t)" => "")
+        if !occursin("Differential", key)
+            modelDict["inputFunctions"][key] = key * "~" * string(eq.rhs)
+        end
+    end
+
+    for par in paramMap
+        modelDict["parameters"][string(par.first)] = string(par.second)
+    end
+
+    for stat in stateMap
+        modelDict["states"][string(stat.first)] = string(stat.second)
+    end
+
+    # Rewrite any time-dependent ifelse to boolean statements such that we can express these as events. 
+    # This is recomended, as it often increases the stabillity when solving the ODE, and decreases run-time
+    if ifElseToEvent == true
+        timeDependentIfElseToBool!(modelDict)
+    end
+
+    listOfBoolVariables = collect(keys(modelDict["boolVariables"]))
+
+    # Make changes in a temporary file
+    (tmpPath, tmpIO) = mktemp()
+    open(modelFileJlSrc) do io
+        for line in eachline(io, keep=true)
+
+            # Adds boolVariables to the start of ModelingToolkit.@parameters
+            searchStr = Regex("(ModelingToolkit.@parameters\\s*)")
+            if occursin(searchStr, line)
+                tmpLine = ""
+                for key in listOfBoolVariables
+                    tmpLine *= key * " "
+                end
+                line = replace(line, searchStr => SubstitutionString("\\1" * tmpLine ))
+            end
+
+            # Adds boolVariables to the start of parameterArray
+            searchStr = Regex("(parameterArray\\s*=\\s*\\[)")
+            if occursin(searchStr, line)
+                tmpLine = ""
+                for key in listOfBoolVariables
+                    tmpLine *= key * ", "
+                end
+                line = replace(line, searchStr => SubstitutionString("\\1" * tmpLine ))
+            end
+
+            # Fixes equations containing ifelse
+            if occursin("ifelse", line)
+                for key in keys(modelDict["inputFunctions"])
+                    if occursin(Regex(key * "\\s*~"), line)
+                        tmpLine = "    " * modelDict["inputFunctions"][key] * ",\n"
+                        # Removes comma if the last line in the list doesn't end with one. Looks nicer.
+                        if !occursin(Regex(",\\s*\n"), line)
+                            tmpLine = tmpLine[1:end-2] * "\n"
+                        end
+                    line = tmpLine
+                    end
+                end
+            end
+            
+            # Adds boolVariables to the start of trueParameterValues
+            searchStr = Regex("(trueParameterValues\\s*=\\s*\\[)")
+            if occursin(searchStr, line)
+                tmpLine = ""
+                for key in listOfBoolVariables
+                    tmpLine *= key * " => 0.0, "
+                end
+                line = replace(line, searchStr => SubstitutionString("\\1" * tmpLine ))
+            end
+            write(tmpIO, line)
+        end
+    end
+    close(tmpIO)
+    # Store the temporary file as in dirModel with the suffix _fix
+    mv(tmpPath, modelFileJl, force=true)
+
+    return modelDict, modelFileJl
+
+end
+
+
 # Rewrites triggers in events to propper form for ModelingToolkit
 function asTrigger(triggerFormula)
     if "geq" == triggerFormula[1:3]

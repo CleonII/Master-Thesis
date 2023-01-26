@@ -1,13 +1,12 @@
 
 """
-    peTabFormulaToJulia(formula::String, stateNames, paramData::ParametersInfo, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1}, namesExplicitRules::Array{String, 1})::String
+    peTabFormulaToJulia(formula::String, stateNames, paramData::ParametersInfo, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1})::String
     Translate a peTab formula (e.g for observable or for sd-parameter) into Julia syntax and output the result 
     as a string.
 
     State-names, namesParamDyn and paramData are all required to correctly identify states and parameters in the formula.
-    namesExplicitRules is optional and is only set if there are any explicit rules in the SBML-file.
 """
-function peTabFormulaToJulia(formula::String, stateNames, paramData::ParametersInfo, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1}, namesExplicitRules::Array{String, 1})::String
+function peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1})::String
 
     # Characters directly translate to Julia and characters that also are assumed to terminate a word (e.g state and parameter)
     charDirectTranslate = ['(', ')', '+', '-', '/', '*', '^'] 
@@ -25,7 +24,7 @@ function peTabFormulaToJulia(formula::String, stateNames, paramData::ParametersI
             # Get word (e.g param, state, math-operation or number)
             word, iNew = getWord(formula, i, charDirectTranslate)
             # Translate word to Julia syntax 
-            formulaJulia *= wordToJuliaSyntax(word, stateNames, paramData, namesParamDyn, namesNonDynParam, namesExplicitRules)
+            formulaJulia *= wordToJuliaSyntax(word, stateNames, paramData, namesParamDyn, namesNonDynParam)
             i = iNew
 
             # Special case where we have multiplication
@@ -95,21 +94,18 @@ end
 """"
     wordToJuliaSyntax(wordTranslate::String, 
                            stateNames,
-                           paramData::ParametersInfo, 
-                           namesParamDyn::Array{String, 1},
-                           namesExplicitRules::Array{String, 1})::String
+                           paramData::ParamData, 
+                           namesParamDyn::Array{String, 1})::String
 
     Translate a word (state, parameter, math-expression or number) into Julia syntax 
     when building Ymod, U0 and Sd functions.
-    namesExplicitRules is optional and is only set if there are any explicit rules in the SBML-file.
 
 """
 function wordToJuliaSyntax(wordTranslate::String, 
                            stateNames,
                            paramData::ParametersInfo, 
                            namesParamDyn::Array{String, 1}, 
-                           namesNonDynParam::Array{String, 1},
-                           namesExplicitRules::Array{String, 1})::String
+                           namesNonDynParam::Array{String, 1})::String
 
     # List of mathemathical operations that are accpeted and will be translated 
     # into Julia syntax (t is assumed to be time)
@@ -130,10 +126,6 @@ function wordToJuliaSyntax(wordTranslate::String,
     end
 
     if wordTranslate in namesNonDynParam
-        wordJuliaSyntax *= wordTranslate
-    end
-
-    if wordTranslate in namesExplicitRules
         wordJuliaSyntax *= wordTranslate
     end
 
@@ -211,3 +203,63 @@ function getNoiseParamStr(sdFormula::String)::String
 
     return sdWordStr
 end
+
+
+"""
+    replaceVariablesWithArrayIndex(formula,stateNames,parameterNames,namesNonDynParam,paramData)::String
+
+    Replaces any state or parameter from formula with their corresponding index in the ODE system 
+    Symbolics can return strings without multiplication sign, e.g. 100.0STAT5 instead of 100.0*STAT5 
+    so replaceWholeWord cannot be used here
+"""
+function replaceVariablesWithArrayIndex(formula,stateNames,parameterNames,namesNonDynParam,paramData)::String
+    stateNamesStr = replace.(string.(stateNames), "(t)" => "")
+    
+    for i in eachindex(stateNamesStr)
+        formula=replaceWholeWordWithNumberPrefix(formula, stateNamesStr[i], "u["*string(i)*"]")
+    end
+    for i in eachindex(parameterNames)
+        formula=replaceWholeWordWithNumberPrefix(formula, parameterNames[i], "dynPar["*string(i)*"]")
+    end
+    for i in eachindex(namesNonDynParam)
+        formula=replaceWholeWordWithNumberPrefix(formula, namesNonDynParam[i], "nonDynParam["*string(i)*"]")
+    end
+    for i in eachindex(paramData.parameterID)
+        if paramData.shouldEst[i] == false
+            formula=replaceWholeWordWithNumberPrefix(formula, paramData.parameterID[i]*"_C", "paramData.paramVal[" * string(i) *"]")
+        end
+    end
+    return formula
+end
+
+
+
+"""
+    replaceExplicitVariableWithRule(formula,stateNames,parameterNames,namesNonDynParam,paramData)::String
+
+    Replace the explicit rule variable with the explicit rule
+"""
+function replaceExplicitVariableWithRule(formula, modelDict)::String
+    for (key,value) in modelDict["modelRuleFunctions"]            
+        formula = replaceWholeWord(formula, key, "(" * value[2] * ")")
+    end
+    return formula
+end
+
+
+"""
+replaceWholeWordWithNumberPrefix(formula,from,to)::String
+    Replaces variables that can be prefixed with numbers.
+    e.g., replaceWholeWordWithNumberPrefix("4STAT5 + 100.0STAT5 + RE*STAT5 + STAT5","STAT5","u[1]") gives
+    4u[1] + 100.0u[1] + RE*u[1] + u[1]   
+"""
+function replaceWholeWordWithNumberPrefix(oldString, replaceFrom, replaceTo)
+    replaceFromRegex = Regex("\\b(\\d+\\.?\\d*)*(" * replaceFrom * ")\\b")
+    replaceToRegex = SubstitutionString("\\1" * replaceTo )
+    newString = replace(oldString, replaceFromRegex => replaceToRegex)
+    return newString
+
+end
+
+
+

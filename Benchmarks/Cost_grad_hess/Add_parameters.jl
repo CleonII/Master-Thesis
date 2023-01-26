@@ -31,8 +31,8 @@ function getPEtabModelNparamFixed(peTabModel::PeTabModel, nParamFixate::Integer)
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
     paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
 
-    paramFixate = sample(paramEstIndices.namesDynParam, nParamFixate)
-    for i in ncol(parameterDataFile)
+    paramFixate = sample(paramEstIndices.namesDynParam, nParamFixate, replace=false)
+    for i in 1:nrow(parameterDataFile)
         if parameterDataFile[i, :parameterId] ∈ paramFixate
             parameterDataFile[i, :estimate] = 0
         end

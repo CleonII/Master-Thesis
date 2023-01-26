@@ -92,7 +92,7 @@ function evalAutoDiffHess(p,
                           hessMat::Matrix{Float64})
     hessMat .= 0
     evalHess!(hessMat, p)
-    return hessMat
+    return hessMat[:, :]
 end
 
 
@@ -100,8 +100,9 @@ end
 function evalAutoDiffGrad(p, 
                           evelGrad!::Function, 
                           gradient::Vector{Float64})
+    gradient .= 0.0
     evelGrad!(gradient, p)
-    return gradient
+    return gradient[:]
 end
 
 
