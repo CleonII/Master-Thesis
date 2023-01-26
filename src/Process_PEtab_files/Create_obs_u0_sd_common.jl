@@ -6,7 +6,7 @@
 
     State-names, namesParamDyn and paramData are all required to correctly identify states and parameters in the formula.
 """
-function peTabFormulaToJulia(formula::String, stateNames, paramData::ParamData, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1})::String
+function peTabFormulaToJulia(formula::String, stateNames, paramData::ParametersInfo, namesParamDyn::Array{String, 1}, namesNonDynParam::Array{String, 1})::String
 
     # Characters directly translate to Julia and characters that also are assumed to terminate a word (e.g state and parameter)
     charDirectTranslate = ['(', ')', '+', '-', '/', '*', '^'] 
@@ -94,7 +94,7 @@ end
 """"
     wordToJuliaSyntax(wordTranslate::String, 
                            stateNames,
-                           paramData::ParamData, 
+                           paramData::ParametersInfo, 
                            namesParamDyn::Array{String, 1})::String
 
     Translate a word (state, parameter, math-expression or number) into Julia syntax 
@@ -224,9 +224,9 @@ function replaceVariablesWithArrayIndex(formula,stateNames,parameterNames,namesN
     for i in eachindex(namesNonDynParam)
         formula=replaceWholeWordWithNumberPrefix(formula, namesNonDynParam[i], "nonDynParam["*string(i)*"]")
     end
-    for i in eachindex(paramData.parameterID)
-        if paramData.shouldEst[i] == false
-            formula=replaceWholeWordWithNumberPrefix(formula, paramData.parameterID[i]*"_C", "paramData.paramVal[" * string(i) *"]")
+    for i in eachindex(paramData.parameterId)
+        if paramData.estimate[i] == false
+            formula=replaceWholeWordWithNumberPrefix(formula, string(paramData.parameterId[i]) * "_C", "paramData.nominalValue[" * string(i) *"]")
         end
     end
     return formula

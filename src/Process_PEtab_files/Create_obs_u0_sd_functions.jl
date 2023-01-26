@@ -95,9 +95,9 @@ function createTopOfFun(stateNames,
     # Extract constant parameters. To avoid cluttering the function only constant parameters that are used to 
     # to compute yMod are written to file.
     paramConstStr = ""
-    for i in eachindex(paramData.parameterID)
-        if paramData.shouldEst[i] == false
-            paramConstStr *= "#paramData.paramVal[" * string(i) *"] = " * paramData.parameterID[i] * "_C \n"
+    for i in eachindex(paramData.parameterId)
+        if paramData.estimate[i] == false
+            paramConstStr *= "#paramData.nominalValue[" * string(i) *"] = " * string(paramData.parameterId[i]) * "_C \n"
         end
     end
     paramConstStr *= "\n"

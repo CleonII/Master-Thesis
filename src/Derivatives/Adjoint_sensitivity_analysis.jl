@@ -32,7 +32,7 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
     end
 
     # In case of PreEq-critera we need to compute the pullback function at tSS to compute the VJP between 
-    # λ_t0 and the sensitivites at t_ss
+    # λ_t0 and the sensitivites at steady state time
     if simulationInfo.haspreEquilibrationConditionId == true
         evalVJPSSVec = generateVJPSSFunction(simulationInfo, sensealgSS, odeSolver, tolerance, expIDSolve)
     end
