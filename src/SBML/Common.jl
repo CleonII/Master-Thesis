@@ -251,6 +251,8 @@ function checkSignTime(str::String)
 
     # Easy special case with single term 
     strNoWhitespace = replace(str, " " => "")
+    strNoWhitespace = replace(strNoWhitespace, "(" => "")
+    strNoWhitespace = replace(strNoWhitespace, ")" => "")
     if strNoWhitespace == "t"
         return 1
     end

@@ -14,41 +14,45 @@
 
     TODO : Example  
 """
-function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::Bool=false, verbose::Bool=true, ifElseToEvent=true)::PeTabModel
+function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::Bool=false, verbose::Bool=true, ifElseToEvent=true, jlFile=false)::PeTabModel
+    if jlFile == false
+        # Sanity check user input 
+        modelFileXml = dirModel * modelName * ".xml"
+        modelFileJl = dirModel * modelName * ".jl"
+        if !isdir(dirModel)
+            if verbose
+                @printf("Model directory %s does not exist\n", dirModel)
+            end
+        end
+        if !isfile(modelFileXml)
+            if verbose
+                @printf("Model directory does not contain xml-file with name %s\n", modelName * "xml")
+            end
+        end
+        # If Julia model file does exists build it 
+        if !isfile(modelFileJl) && forceBuildJlFile == false
+            if verbose
+                @printf("Julia model file does not exist - will build it\n")
+            end
+            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, ifElseToEvent=ifElseToEvent)
+        elseif isfile(modelFileJl) && forceBuildJlFile == false
+            if verbose
+                @printf("Julia model file exists at %s - will not rebuild it\n", modelFileJl)
+            end
+        elseif forceBuildJlFile == true
+            if verbose
+                @printf("By user option rebuilds Julia model file\n")
+            end
+            if isfile(modelFileJl)
+                rm(modelFileJl)
+            end
+            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, ifElseToEvent=ifElseToEvent)
+        end
+    else
 
-    # Sanity check user input 
-    modelFileXml = dirModel * modelName * ".xml"
-    modelFileJl = dirModel * modelName * ".jl"
-    if !isdir(dirModel)
-        if verbose
-            @printf("Model directory %s does not exist\n", dirModel)
-        end
-    end
-    if !isfile(modelFileXml)
-        if verbose
-            @printf("Model directory does not contain xml-file with name %s\n", modelName * "xml")
-        end
-    end
-    # If Julia model file does exists build it 
-    if !isfile(modelFileJl) && forceBuildJlFile == false
-        if verbose
-            @printf("Julia model file does not exist - will build it\n")
-        end
-        modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, ifElseToEvent=ifElseToEvent)
-    elseif isfile(modelFileJl) && forceBuildJlFile == false
-        if verbose
-            @printf("Julia model file exists at %s - will not rebuild it\n", modelFileJl)
-        end
-    elseif forceBuildJlFile == true
-        if verbose
-            @printf("By user option rebuilds Julia model file\n")
-        end
-        if isfile(modelFileJl)
-            rm(modelFileJl)
-        end
-        modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, ifElseToEvent=ifElseToEvent)
-    end
+        modelDict, modelFileJl = JLToModellingToolkit(modelName, dirModel, ifElseToEvent=ifElseToEvent)
 
+    end
     # Extract ODE-system and mapping of maps of how to map parameters to states and model parmaeters 
     include(modelFileJl)
     expr = Expr(:call, Symbol("getODEModel_" * modelName))

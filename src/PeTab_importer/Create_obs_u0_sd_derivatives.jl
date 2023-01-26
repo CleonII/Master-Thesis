@@ -54,39 +54,36 @@ function createTopOfDFun(stateNames,
                         observablesData::DataFrame)
 
     variablesStr = "@variables "
-    parameterArray = namesParamODEProb
-    statesArray = Array{String, 1}(undef,length(stateNames))
 
     # Extract names of model states 
     stateNamesShort = replace.(string.(stateNames), "(t)" => "")
-    stateStr = "\n\t"
+    stateStr = "#"
     for i in eachindex(stateNamesShort)
-        stateStr *= stateNamesShort[i] * ", "
+        stateStr *= "u[" * string(i) * "] = " * stateNamesShort[i] * ", "
         variablesStr *= stateNamesShort[i] * ", "
-        statesArray[i] = stateNamesShort[i]
     end
     stateStr = stateStr[1:end-2]
-    stateStr *= "= u \n"
+    stateStr *= "\n"
     
     # Extract name of dynamic parameter 
-    paramDynStr = "\t"
+    paramDynStr = "#"
     for i in eachindex(namesParamODEProb)
-        paramDynStr *= namesParamODEProb[i] * ", "
+        paramDynStr *= "dynPar[" * string(i) * "] = " * namesParamODEProb[i] * ", "
         variablesStr *= namesParamODEProb[i] * ", "
     end
     paramDynStr = paramDynStr[1:end-2]
-    paramDynStr *= " = p \n"
+    paramDynStr *= "\n"
 
     paramNonDynStr = ""
     # Extract name of non-dynamic parameter
     if !isempty(namesNonDynParam)
-        paramNonDynStr = "\t"
+        paramNonDynStr = "#"
         for i in eachindex(namesNonDynParam)
-            paramNonDynStr *= namesNonDynParam[i] * ", "
+            paramNonDynStr *= "nonDynParam[" * string(i)* "] = " * namesNonDynParam[i] * ", "
             variablesStr *= namesNonDynParam[i] * ", "
         end
         paramNonDynStr = paramNonDynStr[1:end-2]
-        paramNonDynStr *= " = nonDynParam \n"
+        paramNonDynStr *= "\n"
     end
 
     # Extracts all observable- and noise-parameters    
@@ -113,7 +110,7 @@ function createTopOfDFun(stateNames,
     variablesStr = variablesStr[1:end-2]
     eval(Meta.parse(variablesStr))
 
-    return stateStr, paramDynStr, paramNonDynStr, statesArray, parameterArray
+    return stateStr, paramDynStr, paramNonDynStr
 end
 
 
@@ -137,8 +134,9 @@ function createDYmodFunction(modelName::String,
                             modelDict::Dict)
 
     io = open(dirModel * "/" * modelName * "DObsSdU0.jl", "w")
-    stateStr, paramDynStr, paramNonDynStr, statesArray, parameterArray = createTopOfDFun(stateNames, namesParamDyn, namesNonDynParam, observablesData)
-  
+    stateStr, paramDynStr, paramNonDynStr = createTopOfDFun(stateNames, namesParamDyn, namesNonDynParam, observablesData)
+    statesArray = replace.(string.(stateNames), "(t)" => "")
+
     # Store the formula of each observable in string
     observableIDs = String.(observablesData[!, "observableId"])
     strObservebleU = ""
@@ -148,14 +146,10 @@ function createDYmodFunction(modelName::String,
         strObservebleU *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
         strObservebleX *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
         tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
+        tmpFormula = replaceExplicitVariableWithRule(tmpFormula, modelDict)
 
-
-        # Replace the explicit rule variable with the explicit rule
-        for (key,value) in modelDict["modelRuleFunctions"]            
-            tmpFormula = replace(tmpFormula, key => "(" * value[2] * ")")
-        end
         # Translate the formula for the observable to Julia syntax 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
         
         printInd = 0
 
@@ -171,13 +165,16 @@ function createDYmodFunction(modelName::String,
                 juliaFormulaSym =  eval(Meta.parse(juliaFormula))
                 tmpVar = eval(Meta.parse(statesArray[stateInd]))
                 dYdu = Symbolics.derivative(juliaFormulaSym, tmpVar; simplify=true)
-                strObservebleU *= "\t\tout[" * string(stateInd) * "] = " * string(dYdu) * "\n"
+                dYdu = string(dYdu)
+                dYdu = replaceVariablesWithArrayIndex(dYdu, stateNames, namesParamDyn, namesNonDynParam, paramData)
+
+                strObservebleU *= "\t\tout[" * string(stateInd) * "] = " * dYdu * "\n"
             end
         end
 
         printInd = 0
-        for paramInd in eachindex(parameterArray)
-            if occursin(Regex("\\b" * parameterArray[paramInd] * "\\b"), juliaFormula)
+        for paramInd in eachindex(namesParamDyn)
+            if occursin(Regex("\\b" * namesParamDyn[paramInd] * "\\b"), juliaFormula)
                 # Extract observable parameters 
                 obsParam = getObsParamStr(tmpFormula)
                 if !isempty(obsParam) && printInd == 0
@@ -186,9 +183,11 @@ function createDYmodFunction(modelName::String,
                 end 
         
                 juliaFormulaSym =  eval(Meta.parse(juliaFormula))
-                tmpVar = eval(Meta.parse(parameterArray[paramInd]))
+                tmpVar = eval(Meta.parse(namesParamDyn[paramInd]))
                 dYdp = Symbolics.derivative(juliaFormulaSym, tmpVar; simplify=true)
-                strObservebleX *= "\t\tout[" * string(paramInd) * "] = " * string(dYdp) * "\n"
+                dYdp = string(dYdp)
+                dYdp = replaceVariablesWithArrayIndex(dYdp, stateNames, namesParamDyn, namesNonDynParam, paramData)
+                strObservebleX *= "\t\tout[" * string(paramInd) * "] = " * dYdp * "\n"
             end
         end
         
@@ -199,18 +198,16 @@ function createDYmodFunction(modelName::String,
     end
     
 
-    write(io, "function evalDYmodDu(u, t, p, obsPar, nonDynParam, observableId, mapObsParam, out) \n")
     write(io, stateStr)
     write(io, paramDynStr)
     write(io, paramNonDynStr)
+    write(io, "\n")
+    write(io, "function evalDYmodDu(u, t, dynPar, obsPar, nonDynParam, observableId, mapObsParam, out) \n")
     write(io, strObservebleU)
     strClose = "end\n\n"
     write(io, strClose)
 
-    write(io, "function evalDYmodDp(u, t, p, obsPar, nonDynParam, observableId, mapObsParam, out) \n")
-    write(io, stateStr)
-    write(io, paramDynStr)
-    write(io, paramNonDynStr)
+    write(io, "function evalDYmodDp(u, t, dynPar, obsPar, nonDynParam, observableId, mapObsParam, out) \n")
     write(io, strObservebleX)
     strClose = "end\n\n"
     write(io, strClose)
@@ -243,8 +240,9 @@ function createDSdFunction(modelName::String,
 
     io = open(dirModel * "/" * modelName * "DObsSdU0.jl", "a")
     
-    stateStr, paramDynStr, paramNonDynStr, statesArray, parameterArray = createTopOfDFun(stateNames, namesParamDyn, namesNonDynParam, observablesData)
-    
+    statesArray = replace.(string.(stateNames), "(t)" => "")
+
+
     # Store the formula for standard deviations in string
     observableIDs = String.(observablesData[!, "observableId"])
     strObservebleU = ""
@@ -254,13 +252,10 @@ function createDSdFunction(modelName::String,
         strObservebleU *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
         strObservebleX *= "\tif observableId == " * "\"" * observableIDs[i] * "\"" * " \n"
         tmpFormula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
+        tmpFormula = replaceExplicitVariableWithRule(tmpFormula, modelDict)
 
-        # Replace the explicit rule variable with the explicit rule
-        for (key,value) in modelDict["modelRuleFunctions"]            
-            tmpFormula = replace(tmpFormula, key => "(" * value[2] * ")")
-        end
         # Translate the formula for the noise to Julia syntax 
-        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam, String[])
+        juliaFormula = peTabFormulaToJulia(tmpFormula, stateNames, paramData, namesParamDyn, namesNonDynParam)
 
         printInd = 0
 
@@ -276,13 +271,15 @@ function createDSdFunction(modelName::String,
                 juliaFormulaSym =  eval(Meta.parse(juliaFormula))
                 tmpVar = eval(Meta.parse(statesArray[stateInd]))
                 dYdu = Symbolics.derivative(juliaFormulaSym, tmpVar; simplify=true)
-                strObservebleU *= "\t\tout[" * string(stateInd) * "] = " * string(dYdu) * "\n"
+                dYdu = string(dYdu)
+                dYdu = replaceVariablesWithArrayIndex(dYdu, stateNames, namesParamDyn, namesNonDynParam, paramData)
+                strObservebleU *= "\t\tout[" * string(stateInd) * "] = " * dYdu * "\n"
             end
         end
 
         printInd = 0
-        for paramInd in eachindex(parameterArray)
-            if occursin(Regex("\\b" * parameterArray[paramInd] * "\\b"), juliaFormula)
+        for paramInd in eachindex(namesParamDyn)
+            if occursin(Regex("\\b" * namesParamDyn[paramInd] * "\\b"), juliaFormula)
                 juliaFormulaSym =  eval(Meta.parse(juliaFormula))
                 # Extract noise parameters 
                 noiseParam = getNoiseParamStr(tmpFormula)
@@ -291,9 +288,11 @@ function createDSdFunction(modelName::String,
                     printInd = 1
                 end 
                 
-                tmpVar = eval(Meta.parse(parameterArray[paramInd]))
+                tmpVar = eval(Meta.parse(namesParamDyn[paramInd]))
                 dYdp = Symbolics.derivative(juliaFormulaSym, tmpVar; simplify=true)
-                strObservebleX *= "\t\tout[" * string(paramInd) * "] = " * string(dYdp) * "\n"
+                dYdp = string(dYdp)
+                dYdp = replaceVariablesWithArrayIndex(dYdp, stateNames, namesParamDyn, namesNonDynParam, paramData)
+                strObservebleX *= "\t\tout[" * string(paramInd) * "] = " * dYdp * "\n"
             end
         end
 
@@ -303,18 +302,12 @@ function createDSdFunction(modelName::String,
         strObservebleX *= "\tend\n\n"
     end
 
-    write(io, "function evalDSdDu!(u, t, sdPar, p, nonDynParam, paramData, observableId, mapSdParam, out) \n")
-    write(io, stateStr)
-    write(io, paramDynStr)
-    write(io, paramNonDynStr)
+    write(io, "function evalDSdDu!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam, out) \n")
     write(io, strObservebleU)
     strClose = "end\n\n"
     write(io, strClose)
 
-    write(io, "function evalDSdDp!(u, t, sdPar, p, nonDynParam, paramData, observableId, mapSdParam, out) \n")
-    write(io, stateStr)
-    write(io, paramDynStr)
-    write(io, paramNonDynStr)
+    write(io, "function evalDSdDp!(u, t, sdPar, dynPar, nonDynParam, paramData, observableId, mapSdParam, out) \n")
     write(io, strObservebleX)
     strClose = "end\n\n"
     write(io, strClose)

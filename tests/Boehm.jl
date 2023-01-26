@@ -53,6 +53,9 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
     costPython = (CSV.read(pwd() * "/tests/Boehm/Cost.csv", DataFrame))[!, :Cost]
     gradPythonMat = CSV.read(pwd() * "/tests/Boehm/Grad.csv", DataFrame)
     gradPythonMat = gradPythonMat[!, Not([:Id, :ratio, :specC17])]
+    hessPythonMat = CSV.read(pwd() * "/tests/Boehm/Hess.csv", DataFrame)
+    hessPythonMat = hessPythonMat[!, Not([:Id, :Epo_degradation_BaF3ratio, :k_exp_heteroratio, :k_exp_homoratio, :k_imp_heteroratio, :k_imp_homoratio, :k_phosratio, :ratioEpo_degradation_BaF3, :ratiok_exp_hetero, :ratiok_exp_homo, :ratiok_imp_hetero, :ratiok_imp_homo, :ratiok_phos, :ratioratio, :ratiosd_pSTAT5A_rel, :ratiosd_pSTAT5B_rel, :ratiosd_rSTAT5A_rel, :ratiospecC17, :sd_pSTAT5A_relratio, :sd_pSTAT5B_relratio, :sd_rSTAT5A_relratio, :specC17ratio, :Epo_degradation_BaF3specC17, :k_exp_heterospecC17, :k_exp_homospecC17, :k_imp_heterospecC17, :k_imp_homospecC17, :k_phosspecC17, :sd_pSTAT5A_relspecC17, :sd_pSTAT5B_relspecC17, :sd_rSTAT5A_relspecC17, :specC17Epo_degradation_BaF3, :specC17k_exp_hetero, :specC17k_exp_homo, :specC17k_imp_hetero, :specC17k_imp_homo, :specC17k_phos, :specC17sd_pSTAT5A_rel, :specC17sd_pSTAT5B_rel, :specC17sd_rSTAT5A_rel, :specC17specC17])]
+
     for i in 1:nrow(paramMat)
         paramVec = collect(paramMat[i, :])
 
@@ -70,6 +73,16 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
         if sqDiffGrad > 1e-5
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
             @printf("Does not pass test on gradient\n")
+            return false
+        end
+
+        hessJulia = zeros(nParam,nParam); peTabOptAlt.evalHessGaussNewton(hessJulia, paramVec)
+        hessJulia = hessJulia[:]
+        hessPython = collect(hessPythonMat[i, :])
+        sqDiffHess = sum((hessJulia - hessPython).^2)
+        if sqDiffHess > 1e-5
+            @printf("sqDiffHess = %.3e\n", sqDiffHess)
+            @printf("Does not pass test on hessian\n")
             return false
         end
 
@@ -125,6 +138,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
         if printRes == true
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
             @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
+            @printf("sqDiffHess = %.3e\n", sqDiffHess)
             @printf("sqDiffCostZygote = %.3e\n", sqDiffZygote)
             @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
             @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
