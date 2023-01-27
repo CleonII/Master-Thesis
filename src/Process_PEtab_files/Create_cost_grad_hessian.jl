@@ -28,6 +28,7 @@ include(joinpath(pwd(), "src", "Process_PEtab_files", "Get_simulation_info.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Get_parameter_indices.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Process_measurements.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Process_parameters.jl"))
+include(joinpath(pwd(), "src", "Process_PEtab_files", "Process_callbacks.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Observables", "Common.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Observables", "Create_h_sigma_derivatives.jl"))
 include(joinpath(pwd(), "src", "Process_PEtab_files", "Observables", "Create_u0_h_sigma.jl"))
@@ -131,7 +132,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
     include(path_u0_h_sigma)
     include(path_D_h_sd)    
 
-    pathCallback = dirModel * "/" * modelName * "Callbacks_time_piecewise.jl"
+    pathCallback = dirModel * "/" * modelName * "_callbacks.jl"
     if !isfile(pathCallback) || forceBuildJlFile == true
         if verbose && forceBuildJlFile == false
             @printf("File for callback does not exist - building it\n")
@@ -142,7 +143,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
         if !@isdefined(modelDict)
             modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
-        getCallbacksForTimeDepedentPiecewise(odeSysUse, modelDict, modelName, dirModel)
+        createCallbacksForTimeDepedentPiecewise(odeSysUse, modelDict, modelName, dirModel)
     end
     include(pathCallback)
     exprCallback = Expr(:call, Symbol("getCallbacks_" * modelName))
@@ -157,7 +158,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
                             compute_∂σ∂σu!,
                             compute_∂h∂p!,
                             compute_∂σ∂σp!,
-                            getTstops,
+                            computeTstops,
                             odeSysUse,
                             paramMap,
                             stateMap,
