@@ -122,7 +122,8 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
                                           adjointODESolver::SciMLAlgorithm, 
                                           sensealg::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
                                           sensealgSS::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
-                                          tolerance::Float64,
+                                          solverAbsTol::Float64,
+                                          solverRelTol::Float64,
                                           odeProblem::ODEProblem,  
                                           peTabModel::PeTabModel,
                                           simulationInfo::SimulationInfo,
@@ -140,7 +141,7 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
     gradientDyanmicθ::Vector{Float64} = zeros(Float64, length(θ_dynamic))
     computeGradientAdjointDynamicθ(gradientDyanmicθ, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem, adjointODESolver, 
-                                   tolerance, sensealg, peTabModel, simulationInfo, θ_indices, measurementInfo, parameterInfo, 
+                                   solverAbsTol, solverRelTol, sensealg, peTabModel, simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                    changeODEProblemParameters!, solveOdeModelAllConditions!; expIDSolve=expIDSolve, 
                                    sensealgSS=sensealgSS)
     gradient[θ_indices.iθ_dynamic] .= gradientDyanmicθ

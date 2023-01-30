@@ -1,9 +1,9 @@
 """
-    createOptimProb(peTabOpt::PeTabOpt,
+    createOptimProb(petabProblem::PEtabODEProblem,
                     optimAlg;
                     hessianUse::Symbol=:blockAutoDiff)
 
-    For a PeTab model optimization struct (peTabOpt) create an Optim optmization (evalOptim) 
+    For a PeTab model optimization struct (petabProblem) create an Optim optmization (evalOptim) 
     function using as optimAlg IPNewton (interior point Newton) or LBFGS, BFGS, ConjugateGradient. 
 
     For IPNewton the hessian is computed via eiter autoDiff (:autoDiff), or approximated 
@@ -13,7 +13,7 @@
 
     To run the optimization just call evalOptim(paramVec, showTrace=true/false)
 """
-function createOptimProb(peTabOpt::PeTabOpt,
+function createOptimProb(petabProblem::PEtabODEProblem,
                          optimAlg;
                          hessianUse::Symbol=:blockAutoDiff, 
                          options=Optim.Options(iterations = 1000, 
@@ -25,9 +25,9 @@ function createOptimProb(peTabOpt::PeTabOpt,
                                                x_tol=0.0))
     
     if typeof(optimAlg) <: IPNewton
-        return createOptimInteriorNewton(peTabOpt, hessianUse=hessianUse, options=options)
+        return createOptimInteriorNewton(petabProblem, hessianUse=hessianUse, options=options)
     elseif typeof(optimAlg) <: LBFGS || typeof(optimAlg) <: BFGS || typeof(optimAlg) <: ConjugateGradient
-        return createOptimFminbox(peTabOpt, optimAlg, options)
+        return createOptimFminbox(petabProblem, optimAlg, options)
     else
         println("Error : optimAlg $optimAlg is not supported")
         println("Supported methods are IPNewton, ConjugateGradient, LBFGS and BFGS")
@@ -37,39 +37,39 @@ end
 
 
 """
-    createOptimInteriorNewton(peTabOpt::PeTabOpt;
+    createOptimInteriorNewton(petabProblem::PEtabODEProblem;
                               hessianUse::Symbol=:blockAutoDiff)
 
-    For a PeTab model optimization struct (peTabOpt) create an Optim interior point Newton 
+    For a PeTab model optimization struct (petabProblem) create an Optim interior point Newton 
     function struct where the hessian is computed via eiter autoDiff (:autoDiff), or approximated 
     with blockAutoDiff (:blockAutoDiff). 
 """
-function createOptimInteriorNewton(peTabOpt::PeTabOpt;
+function createOptimInteriorNewton(petabProblem::PEtabODEProblem;
                                    hessianUse::Symbol=:blockAutoDiff, 
                                    options)
                                    
-    lowerBounds = peTabOpt.lowerBounds
-    upperBounds = peTabOpt.upperBounds
+    lowerBounds = petabProblem.lowerBounds
+    upperBounds = petabProblem.upperBounds
 
     nParam = length(lowerBounds)
     if hessianUse == :autoDiff
-        evalHessian = peTabOpt.evalHess
+        evalHessian = petabProblem.computeHessian
     elseif hessianUse == :blockAutoDiff
-        evalHessian = peTabOpt.evalHessApprox
+        evalHessian = petabProblem.computeHessianBlock
     else
         println("Error : For optim interior point Newton availble hessianUse options are :autoDiff, :blockAutoDiff not $hessianUse")
     end
 
     x0 = zeros(Float64, nParam)
-    df = TwiceDifferentiable(peTabOpt.evalF, peTabOpt.evalGradF, evalHessian, x0)
+    df = TwiceDifferentiable(petabProblem.computeCost, petabProblem.computeGradientAutoDiff, evalHessian, x0)
     dfc = TwiceDifferentiableConstraints(lowerBounds, upperBounds)
 
     evalOptim = (p0; showTrace=false) -> begin 
                                                # Move points within bounds 
-                                               iBelow = p0 .<= peTabOpt.lowerBounds
-                                               iAbove = p0 .>= peTabOpt.upperBounds 
-                                               p0[iBelow] .= peTabOpt.lowerBounds[iBelow] .+ 0.001
-                                               p0[iAbove] .= peTabOpt.upperBounds[iAbove] .- 0.001
+                                               iBelow = p0 .<= petabProblem.lowerBounds
+                                               iAbove = p0 .>= petabProblem.upperBounds 
+                                               p0[iBelow] .= petabProblem.lowerBounds[iBelow] .+ 0.001
+                                               p0[iAbove] .= petabProblem.upperBounds[iAbove] .- 0.001
                                                df.f(p0)
                                                println("p0 = $p0")
                                                return Optim.optimize(df, 
@@ -84,21 +84,21 @@ end
 
 
 """
-    createOptimFminbox(peTabOpt::PeTabOpt;
+    createOptimFminbox(petabProblem::PEtabODEProblem;
                        lineSearch=LineSearches.HagerZhang())
 
-    For a PeTab model optimization struct (peTabOpt) create an Optim Fminbox optimizer where the 
+    For a PeTab model optimization struct (petabProblem) create an Optim Fminbox optimizer where the 
     inner optimizer is either LBFGS or BFGS using lineSearch. 
 """
-function createOptimFminbox(peTabOpt::PeTabOpt, 
+function createOptimFminbox(petabProblem::PEtabODEProblem, 
                             optimAlg, 
                             options)
 
-    lowerBounds = peTabOpt.lowerBounds
-    upperBounds = peTabOpt.upperBounds
+    lowerBounds = petabProblem.lowerBounds
+    upperBounds = petabProblem.upperBounds
 
-    evalOptim = (p0; showTrace=false) -> Optim.optimize(peTabOpt.evalF, 
-                                                        peTabOpt.evalGradF, 
+    evalOptim = (p0; showTrace=false) -> Optim.optimize(petabProblem.computeCost, 
+                                                        petabProblem.computeGradientAutoDiff, 
                                                         lowerBounds, 
                                                         upperBounds, 
                                                         p0, 

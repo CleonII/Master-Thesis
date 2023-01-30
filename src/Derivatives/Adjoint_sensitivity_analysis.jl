@@ -6,7 +6,8 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
                                         θ_nonDynamic::Vector{Float64},
                                         odeProblem::ODEProblem,
                                         odeSolver::SciMLAlgorithm, 
-                                        tolerance::Float64,
+                                        solverAbsTol::Float64,
+                                        solverRelTol::Float64,
                                         sensealg::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
                                         peTabModel::PeTabModel,
                                         simulationInfo::SimulationInfo,
@@ -34,7 +35,7 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
     # In case of PreEq-critera we need to compute the pullback function at tSS to compute the VJP between 
     # λ_t0 and the sensitivites at steady state time
     if simulationInfo.haspreEquilibrationConditionId == true
-        evalVJPSSVec = generateVJPSSFunction(simulationInfo, sensealgSS, odeSolver, tolerance, expIDSolve)
+        evalVJPSSVec = generateVJPSSFunction(simulationInfo, sensealgSS, odeSolver, solverAbsTol, solverRelTol, expIDSolve)
     end
 
     gradient .= 0.0
@@ -56,8 +57,8 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
         # In case the model is simulated first to a steady state we need to keep track of the post-equlibrium experimental 
         # condition Id to identify parameters specific to an experimental condition.
         sol = simulationInfo.odeSolutionsDerivatives[experimentalConditionId]
-        success = computeGradientAdjointExpCond!(gradient, sol, sensealg, tolerance, odeSolver, θ_dynamicT,
-                                                 θ_sdT, θ_observableT, θ_nonDynamicT, experimentalConditionId, 
+        success = computeGradientAdjointExpCond!(gradient, sol, sensealg, solverAbsTol, solverRelTol, odeSolver, 
+                                                 θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, experimentalConditionId, 
                                                  simulationConditionId, simulationInfo,
                                                  peTabModel, θ_indices, measurementInfo, parameterInfo, evalVJPSS)
 
@@ -73,7 +74,8 @@ end
 function generateVJPSSFunction(simulationInfo::SimulationInfo, 
                                sensealgSS::SteadyStateAdjoint, 
                                odeSolver::SciMLAlgorithm,
-                               tolerance::Float64,
+                               solverAbsTol::Float64, 
+                               solverRelTol::Float64,
                                expIDSolve::Vector{Symbol})::NamedTuple
 
     # Extract all unique Pre-equlibrium conditions. If the code is run in parallell 
@@ -94,8 +96,8 @@ function generateVJPSSFunction(simulationInfo::SimulationInfo,
         ySS, _evalVJPSSi = Zygote.pullback((p) ->    (
                                                       solve(ssOdeProblem, 
                                                             DynamicSS(odeSolver, abstol=simulationInfo.absTolSS, reltol=simulationInfo.relTolSS), 
-                                                            abstol=tolerance, 
-                                                            reltol=tolerance, 
+                                                            abstol=solverAbsTol, 
+                                                            reltol=solverRelTol, 
                                                             p=p, 
                                                             sensealg=sensealgSS)[:]), odeProblem.p)
                                                 
@@ -108,7 +110,8 @@ end
 function generateVJPSSFunction(simulationInfo::SimulationInfo, 
                                sensealgSS::Union{QuadratureAdjoint, InterpolatingAdjoint}, 
                                odeSolver::SciMLAlgorithm,
-                               tolerance::Float64,
+                               solverAbsTol::Float64, 
+                               solverRelTol::Float64,
                                expIDSolve::Vector{Symbol})::NamedTuple
 
     # Extract all unique Pre-equlibrium conditions. If the code is run in parallell 
@@ -128,7 +131,7 @@ function generateVJPSSFunction(simulationInfo::SimulationInfo,
         # build a problem where we simulate exactly to said steady state.
         preEqulibriumOdeSolution = simulationInfo.odePreEqulibriumSolutions[preEquilibrationConditionId[i]]
         odeProblemPullback = remake(preEqulibriumOdeSolution.prob, tspan=(0.0, preEqulibriumOdeSolution.t[end]))
-        ySS, _evalVJPSSi = Zygote.pullback((p) -> solve(odeProblemPullback, odeSolver, p=p, abstol=tolerance, reltol=tolerance, sensealg=sensealgSS)[:, end], preEqulibriumOdeSolution.prob.p)
+        ySS, _evalVJPSSi = Zygote.pullback((p) -> solve(odeProblemPullback, odeSolver, p=p, abstol=solverAbsTol, reltol=solverRelTol, sensealg=sensealgSS)[:, end], preEqulibriumOdeSolution.prob.p)
                                                 
         _evalVJPSS[i] = _evalVJPSSi
     end
@@ -144,7 +147,8 @@ end
 function computeGradientAdjointExpCond!(gradient::Vector{Float64},
                                         sol::ODESolution,
                                         sensealg::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
-                                        tolerance::Float64,
+                                        solverAbsTol::Float64, 
+                                        solverRelTol::Float64,
                                         odeSolver::SciMLAlgorithm, 
                                         θ_dynamic::Vector{Float64},
                                         θ_sd::Vector{Float64}, 
@@ -203,8 +207,8 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
                                            callback=callback,
                                            t=timeObserved, 
                                            sensealg=sensealg, 
-                                           abstol=tolerance, 
-                                           reltol=tolerance)
+                                           abstol=solverAbsTol, 
+                                           reltol=solverRelTol)
             catch
                 redirect_stderr(stderrOld)
                 return false

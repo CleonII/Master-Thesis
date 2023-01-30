@@ -35,12 +35,14 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 """
 function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
 
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol, sensealg = ForwardDiffSensitivity(), 
-                                 sensealgForward = ForwardSensitivity(), solverForward=CVODE_BDF(),
-                                 adjSolver=solver, adjTol=tol, 
-                                 adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
-    peTabOptAlt = setUpCostGradHess(peTabModel, solver, tol, 
-                                    sensealgForward = :AutoDiffForward, solverForward=solver)                                 
+    petabProblem1 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                         sensealgZygote=ForwardDiffSensitivity(), 
+                                         odeSolverForwardEquations=CVODE_BDF(), sensealgForwardEquations = ForwardSensitivity(), 
+                                         odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
+                                         sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
+
+    petabProblem2 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                         sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver)
 
     paramVals = CSV.read(pwd() * "/tests/Boehm/Params.csv", DataFrame)
     paramMat = paramVals[!, Not([:Id, :ratio, :specC17])]
@@ -55,7 +57,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
     for i in 1:nrow(paramMat)
         paramVec = collect(paramMat[i, :])
 
-        costJulia = peTabOpt.evalF(paramVec)
+        costJulia = petabProblem1.computeCost(paramVec)
         sqDiffCost = (costJulia - costPython[i])^2
         if sqDiffCost > 1e-5
             @printf("sqDiffCost = %.3e\n", sqDiffCost)
@@ -63,7 +65,8 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
-        gradJulia = zeros(nParam); peTabOpt.evalGradF(gradJulia, paramVec)
+        gradJulia = zeros(nParam)
+        petabProblem1.computeGradientAutoDiff(gradJulia, paramVec)
         gradPython = collect(gradPythonMat[i, :])
         sqDiffGrad = sum((gradJulia - gradPython).^2)
         if sqDiffGrad > 1e-5
@@ -72,7 +75,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
-        costZygote = peTabOpt.evalFZygote(paramVec)
+        costZygote = petabProblem1.computeCostZygote(paramVec)
         sqDiffZygote = (costZygote - costPython[i])^2
         if sqDiffZygote > 1e-5
             @printf("sqDiffCostZygote = %.3e\n", sqDiffZygote)
@@ -81,7 +84,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
         end
 
         gradZygote = zeros(nParam)
-        peTabOpt.evalGradFZygote(gradZygote, paramVec)
+        petabProblem1.computeGradientZygote(gradZygote, paramVec)
         gradPython = collect(gradPythonMat[i, :])
         sqDiffGradZygote = sum((gradZygote - gradPython).^2)
         if sqDiffGradZygote > 1e-5
@@ -92,7 +95,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
 
         # Evaluate lower level adjoint sensitivity interfance gradient 
         gradAdj = zeros(nParam)
-        peTabOpt.evalGradFAdjoint(gradAdj, paramVec)
+        petabProblem1.computeGradientAdjoint(gradAdj, paramVec)
         sqDiffGradAdjoint = sum((gradAdj - gradPython).^2)
         if sqDiffGradAdjoint > 1e-4
             @printf("sqDiffGradAdjoint = %.3e\n", sqDiffGradAdjoint)
@@ -102,7 +105,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
 
         # Forward sensitivity equations using autodiff 
         gradForwardEqAuto = zeros(nParam)
-        peTabOptAlt.evalGradFForwardEq(gradForwardEqAuto, paramVec)
+        petabProblem1.computeGradientForwardEquations(gradForwardEqAuto, paramVec)
         sqDiffGradForwardEqAuto = sum((gradForwardEqAuto - gradPython).^2)
         if sqDiffGradForwardEqAuto > 1e-5
             @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
@@ -112,7 +115,7 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
 
         # Forward sensitivity equations gradient 
         gradForwardEq = zeros(nParam)
-        peTabOpt.evalGradFForwardEq(gradForwardEq, paramVec)
+        petabProblem2.computeGradientForwardEquations(gradForwardEq, paramVec)
         gradPython = collect(gradPythonMat[i, :])
         sqDiffGradForwardEq = sum((gradForwardEq - gradPython).^2)
         if sqDiffGradForwardEq > 1e-5
@@ -121,7 +124,8 @@ function compareAgainstPyPesto(peTabModel::PeTabModel, solver, tol; printRes::Bo
             return false
         end
 
-        hessJulia = zeros(nParam,nParam); peTabOptAlt.evalHessGaussNewton(hessJulia, paramVec)
+        hessJulia = zeros(nParam,nParam)
+        petabProblem2.computeHessianGN(hessJulia, paramVec)
         hessJulia = hessJulia[:]
         hessPython = collect(hessPythonMat[i, :])
         sqDiffHess = sum((hessJulia - hessPython).^2)

@@ -1,13 +1,13 @@
 """
-    createNLoptProb(peTabOpt::PeTabOpt,
+    createNLoptProb(petabProblem::PEtabODEProblem,
                     NLoptAlg::Symbol; 
                     maxeval=5000)
     
-    For a PeTab model optimization struct (peTabOpt) create a NLopt optimization
+    For a PeTab model optimization struct (petabProblem) create a NLopt optimization
     struct where the optmization is performed using NLoptAlg. In principle any 
     NLopt-alg is supported.
 """
-function createNLoptProb(peTabOpt::PeTabOpt, NLoptAlg::Symbol; maxeval::Integer=2000, verbose::Bool=false)
+function createNLoptProb(petabProblem::PEtabODEProblem, NLoptAlg::Symbol; maxeval::Integer=2000, verbose::Bool=false)
 
     algSupport = [:LD_TNEWTON_PRECOND_RESTART, :LD_LBFGS]
     if !(NLoptAlg in algSupport)
@@ -16,13 +16,13 @@ function createNLoptProb(peTabOpt::PeTabOpt, NLoptAlg::Symbol; maxeval::Integer=
         return 
     end
 
-    NLoptObj = NLopt.Opt(NLoptAlg, peTabOpt.nParamEst)
-    NLoptObj.lower_bounds = peTabOpt.lowerBounds .- 1e-9
-    NLoptObj.upper_bounds = peTabOpt.upperBounds .+ 1e-9
+    NLoptObj = NLopt.Opt(NLoptAlg, petabProblem.nParametersToEstimate)
+    NLoptObj.lower_bounds = petabProblem.lowerBounds .- 1e-9
+    NLoptObj.upper_bounds = petabProblem.upperBounds .+ 1e-9
     NLoptObj.ftol_rel = 1e-3
     NLoptObj.xtol_rel = 1e-3
     NLoptObj.maxeval = maxeval # Prevent never ending optmization
-    NLoptObj.min_objective = (x, grad) -> NLoptF(x, grad, peTabOpt.evalF, peTabOpt.evalGradF, verbose=verbose)
+    NLoptObj.min_objective = (x, grad) -> NLoptF(x, grad, petabProblem.computeCost, petabProblem.computeGradientAutoDiff, verbose=verbose)
 
     return NLoptObj
 end

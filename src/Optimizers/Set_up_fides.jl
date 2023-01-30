@@ -2,7 +2,7 @@ using PyCall
 import Pkg
 
 
-function setUpFides(peTabOpt::PeTabOpt,
+function setUpFides(petabProblem::PEtabODEProblem,
                     autoDiffHess::Symbol; 
                     fidesHessApprox=py"None"o, 
                     verbose::Integer=1,
@@ -10,15 +10,15 @@ function setUpFides(peTabOpt::PeTabOpt,
                     funargs=py"None"o,
                     resfun::Bool=false)
 
-    nParam = length(peTabOpt.lowerBounds)
+    nParam = length(petabProblem.lowerBounds)
     if autoDiffHess == :autoDiff
         useHessApprox = false
         hessMat = zeros(Float64, (nParam, nParam))
-        evalHessian = (pVec) -> evalAutoDiffHess(pVec, peTabOpt.evalHess, hessMat)
+        evalHessian = (pVec) -> evalAutoDiffHess(pVec, petabProblem.computeHessian, hessMat)
     elseif autoDiffHess == :blockAutoDiff
         useHessApprox = false
         hessMat = zeros(Float64, (nParam, nParam))
-        evalHessian = (pVec) -> evalAutoDiffHess(pVec, peTabOpt.evalHessApprox, hessMat)        
+        evalHessian = (pVec) -> evalAutoDiffHess(pVec, petabProblem.computeHessianBlock, hessMat)        
     elseif autoDiffHess == :None
         useHessApprox = true
     else
@@ -32,16 +32,16 @@ function setUpFides(peTabOpt::PeTabOpt,
     end 
 
     gradient = zeros(Float64, nParam)
-    evalGradF = (pVec) -> evalAutoDiffGrad(pVec, peTabOpt.evalGradF, gradient)
+    evalGradF = (pVec) -> evalAutoDiffGrad(pVec, petabProblem.computeGradientAutoDiff, gradient)
 
     # Runnable fides function 
     if useHessApprox == false
-        fidesFunc = (pVec) -> fidesObjHess(pVec, peTabOpt.evalF, evalGradF, evalHessian)
+        fidesFunc = (pVec) -> fidesObjHess(pVec, petabProblem.computeCost, evalGradF, evalHessian)
     else
-        fidesFunc = (pVec) -> fidesObjApprox(pVec, peTabOpt.evalF, evalGradF)
+        fidesFunc = (pVec) -> fidesObjApprox(pVec, petabProblem.computeCost, evalGradF)
     end
 
-    fidesObj = setUpFidesClass(fidesFunc, peTabOpt.upperBounds, peTabOpt.lowerBounds, 
+    fidesObj = setUpFidesClass(fidesFunc, petabProblem.upperBounds, petabProblem.lowerBounds, 
                                verbose, 
                                options, 
                                funargs, 

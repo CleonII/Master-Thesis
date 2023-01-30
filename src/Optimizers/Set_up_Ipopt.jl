@@ -1,22 +1,22 @@
 """
-    createIpoptProb(peTabOpt::PeTabOpt,
+    createIpoptProb(petabProblem::PEtabODEProblem,
                     hessianUse::Symbol)
     
-    For a PeTab model optimization struct (peTabOpt) create an Ipopt optimization
+    For a PeTab model optimization struct (petabProblem) create an Ipopt optimization
     struct where the hessian is computed via eiter autoDiff (:autoDiff), approximated 
     with blockAutoDiff (:blockAutoDiff) or a LBFGS approximation (:LBFGS). 
 """
-function createIpoptProb(peTabOpt::PeTabOpt;
+function createIpoptProb(petabProblem::PEtabODEProblem;
                          hessianUse::Symbol=:LBFGS)
 
-    lowerBounds = peTabOpt.lowerBounds
-    upperBounds = peTabOpt.upperBounds
+    lowerBounds = petabProblem.lowerBounds
+    upperBounds = petabProblem.upperBounds
 
     nParam = length(lowerBounds)
     if hessianUse == :autoDiff
-        evalHessian = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, peTabOpt.evalHess)
+        evalHessian = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, petabProblem.computeHessian)
     elseif hessianUse == :blockAutoDiff
-        evalHessian = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, peTabOpt.evalHessApprox)
+        evalHessian = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, petabProblem.computeHessianBlock)
     elseif hessianUse == :LBFGS
         evalHessian = eval_h_empty
     else
@@ -24,7 +24,7 @@ function createIpoptProb(peTabOpt::PeTabOpt;
     end
 
     # Of course Ipopt and Optim accept the gradient in different order 
-    evalGradFUse = (xArg, grad) -> peTabOpt.evalGradF(grad, xArg)
+    evalGradFUse = (xArg, grad) -> petabProblem.computeGradientAutoDiff(grad, xArg)
 
     # Ipopt does not allow the iteration count to be stored directly. Thus the iteration is stored in an arrary which 
     # is sent into the Ipopt callback function. 
@@ -44,7 +44,7 @@ function createIpoptProb(peTabOpt::PeTabOpt;
                                     g_U, # No constraints
                                     0, # No constraints
                                     nParamHess, 
-                                    peTabOpt.evalF, 
+                                    petabProblem.computeCost, 
                                     eval_g, # No constraints 
                                     evalGradFUse,
                                     eval_jac_g, 

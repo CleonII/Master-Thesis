@@ -62,29 +62,29 @@ struct PeTabModel{F1<:Function,
 end
 
 
-struct PeTabOpt{F1<:Function, 
-                F2<:Function, 
-                F3<:Function,
-                F4<:Function, 
-                F5<:Function, 
-                F6<:Function, 
-                F7<:Function, 
-                F8<:Function, 
-                F9<:Function}
+struct PEtabODEProblem{F1<:Function, 
+                       F2<:Function, 
+                       F3<:Function,
+                       F4<:Function, 
+                       F5<:Function, 
+                       F6<:Function, 
+                       F7<:Function, 
+                       F8<:Function, 
+                       F9<:Function}
 
-    evalF::F1
-    evalFZygote::F2
-    evalGradF::F3
-    evalGradFZygote::F4
-    evalGradFAdjoint::F5
-    evalGradFForwardEq::F6
-    evalHess::F7
-    evalHessApprox::F8
-    evalHessGaussNewton::F9
-    nParamEst::Int64
-    namesParam::Vector{Symbol}
-    paramVecNotTransformed::Vector{Float64}
-    paramVecTransformed::Vector{Float64}
+    computeCost::F1
+    computeCostZygote::F2
+    computeGradientAutoDiff::F3
+    computeGradientZygote::F4
+    computeGradientAdjoint::F5
+    computeGradientForwardEquations::F6
+    computeHessian::F7
+    computeHessianBlock::F8
+    computeHessianGN::F9
+    nParametersToEstimate::Int64
+    θ_estNames::Vector{Symbol}
+    θ_nominal::Vector{Float64}
+    θ_nominalT::Vector{Float64}
     lowerBounds::Vector{Float64}
     upperBounds::Vector{Float64}
     pathCube::String

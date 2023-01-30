@@ -4,7 +4,7 @@
 =#
 
 
-function computeHessian(hessian::Matrix{Float64}, 
+function computeHessian!(hessian::Matrix{Float64}, 
                         θ_est::Vector{Float64},
                         odeProblem::ODEProblem,  
                         peTabModel::PeTabModel,
