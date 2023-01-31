@@ -57,13 +57,14 @@ function testGradientFiniteDifferences(petabModel::PEtabModel, solver, tol::Floa
                                        checkForwardEquations::Bool=false, 
                                        testTol::Float64=1e-3, 
                                        sensealgSS=SteadyStateAdjoint(), 
+                                       sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
                                        solverSSRelTol=1e-8, solverSSAbsTol=1e-10)
 
     # Testing the gradient via finite differences 
     petabProblem1 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
                                          sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver, 
                                          odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
-                                         sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), 
+                                         sensealgAdjoint=sensealgAdjoint, 
                                          solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol,
                                          sensealgAdjointSS=sensealgSS)
     petabProblem2 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
@@ -117,7 +118,7 @@ end
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Brannmark_JBC2010/"
     petabModel = readPEtabModel("model_Brannmark_JBC2010", dirModel, verbose=false, forceBuildJlFile=true)
     testLogLikelihoodValue(petabModel, 141.889113770537, Rodas4P())
-    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-10, checkAdjoint=true, checkForwardEquations=true, testTol=1e-2, sensealgSS=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8, checkAdjoint=true, checkForwardEquations=true, testTol=1e-2, sensealgSS=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
 
     # Bruno model. Has conditions-specific parameters, hence we test all gradients 
     dirModel = pwd() * "/Intermediate/PeTab_models/model_Bruno_JExpBot2016/"
