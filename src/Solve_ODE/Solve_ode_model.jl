@@ -18,6 +18,12 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                             denseSolution::Bool=true, 
                                             trackCallback::Bool=false)::Bool # Required for adjoint sensitivity analysis 
 
+    # We only have continious callbacks if one the parameters we have to estimate triggers said callback. In these 
+    # cases we need to convert time time-span of the ODE problem to dual numbers to accurately compute gradients 
+    if SciMLSensitivity.has_continuous_callback(simulationInfo.callbacks[simulationInfo.experimentalConditionId[1]])
+        odeProblem = remake(odeProblem, tspan=convert.(eltype(odeProblem.p), odeProblem.tspan))
+    end
+
     local sucess::Bool = true
     # In case the model is first simulated to a steady state 
     if simulationInfo.haspreEquilibrationConditionId == true

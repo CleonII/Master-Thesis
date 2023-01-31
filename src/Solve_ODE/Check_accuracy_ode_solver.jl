@@ -212,26 +212,26 @@ end
 
 
 """
-    createBigFloatODEProblem(peTabModel::PeTabModel)::ODEProblem
+    createBigFloatODEProblem(petabModel::PEtabModel)::ODEProblem
 
     From a PeTab model create its corresponding ODE-problem with 
     BigFloat (long double). 
 """
-function createBigFloatODEProblem(peTabModel::PeTabModel)::ODEProblem
+function createBigFloatODEProblem(petabModel::PEtabModel)::ODEProblem
     
-    paramMapUse = convert(Vector{Pair{Num, BigFloat}}, peTabModel.paramMap)
+    parameterMapUse = convert(Vector{Pair{Num, BigFloat}}, petabModel.parameterMap)
 
-    if typeof(peTabModel.stateMap) == Vector{Pair{Num, Num}}
+    if typeof(petabModel.stateMap) == Vector{Pair{Num, Num}}
         # This means that u0 has some initializations that depend on par, 
         # since the values of par is BigFloat, u0 will be BigFloat
-        stateMapUse = peTabModel.stateMap
-    elseif typeof(peTabModel.stateMap) == Vector{Pair{Num, Float64}}
-        stateMapUse = convert(Vector{Pair{Num, BigFloat}}, peTabModel.stateMap)
+        stateMapUse = petabModel.stateMap
+    elseif typeof(petabModel.stateMap) == Vector{Pair{Num, Float64}}
+        stateMapUse = convert(Vector{Pair{Num, BigFloat}}, petabModel.stateMap)
     else
         println("Error: Could not parse PeTab model into BigFloat problem")
     end
 
-    prob = ODEProblem(peTabModel.odeSystem, stateMapUse, (0.0, 1e8), paramMapUse, jac=true)
+    prob = ODEProblem(petabModel.odeSystem, stateMapUse, (0.0, 1e8), parameterMapUse, jac=true)
     return prob
 end
 """

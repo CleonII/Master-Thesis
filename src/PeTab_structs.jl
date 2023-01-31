@@ -1,5 +1,5 @@
 """
-    PeTabModel
+    PEtabModel
 
     Struct storing information about a PeTab-model. Create by the `setUpCostFunc` function.
 
@@ -21,7 +21,7 @@
 
     See also: [`setUpCostFunc`]
 """
-struct PeTabModel{F1<:Function, 
+struct PEtabModel{F1<:Function, 
                   F2<:Function, 
                   F3<:Function,
                   F4<:Function,
@@ -35,7 +35,7 @@ struct PeTabModel{F1<:Function,
                   T2<:Vector{<:Pair{Num, <:Union{AbstractFloat, Num}}}, 
                   T3<:Vector{<:Any}, 
                   T4<:Vector{<:Any}, 
-                  C <: SciMLBase.DECallback,
+                  C<:SciMLBase.DECallback,
                   FA<:Vector{<:Function}}
     modelName::String
     compute_h::F1
@@ -46,19 +46,19 @@ struct PeTabModel{F1<:Function,
     compute_∂σ∂u!::F6
     compute_∂h∂p!::F7
     compute_∂σ∂p!::F8
-    getTStops::F9
+    computeTStops::F9
     odeSystem::S
-    paramMap::T1
+    parameterMap::T1
     stateMap::T2
-    paramNames::T3
+    parameterNames::T3
     stateNames::T4
     dirModel::String
     pathMeasurementData::String
-    pathExperimentalConditions::String
-    pathObservables::String
-    pathParameters::String
-    callbackSet::C
-    checkCallbackActive::FA
+    pathExperimentalConditionsData::String
+    pathObservablesData::String
+    pathParametersData::String
+    modelCallbackSet::C
+    checkIfCallbackIsActive::FA
 end
 
 
@@ -70,7 +70,8 @@ struct PEtabODEProblem{F1<:Function,
                        F6<:Function, 
                        F7<:Function, 
                        F8<:Function, 
-                       F9<:Function}
+                       F9<:Function, 
+                       T1<:PEtabModel}
 
     computeCost::F1
     computeCostZygote::F2
@@ -88,7 +89,7 @@ struct PEtabODEProblem{F1<:Function,
     lowerBounds::Vector{Float64}
     upperBounds::Vector{Float64}
     pathCube::String
-    peTabModel::PeTabModel
+    petabModel::T1
 end
 
 

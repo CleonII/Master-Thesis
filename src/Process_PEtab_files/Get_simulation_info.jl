@@ -5,7 +5,7 @@
 =#
 
 
-function processSimulationInfo(peTabModel::PeTabModel,
+function processSimulationInfo(petabModel::PEtabModel,
                                measurementInfo::MeasurementsInfo;
                                absTolSS::Float64=1e-8,
                                relTolSS::Float64=1e-6,
@@ -82,7 +82,7 @@ function processSimulationInfo(peTabModel::PeTabModel,
     # sensitivity analysis we need to track these callbacks, hence they must be stored in simulationInfo.
     callbacks = Dict{Symbol, SciMLBase.DECallback}()
     for name in experimentalConditionId
-        callbacks[name] = deepcopy(peTabModel.callbackSet)
+        callbacks[name] = deepcopy(petabModel.modelCallbackSet)
     end
 
     simulationInfo = SimulationInfo(preEquilibrationConditionId, 

@@ -21,6 +21,7 @@ using Printf
 using Zygote
 using SciMLSensitivity
 using Sundials
+using Test
 
 
 # Relevant PeTab structs for compuations 
@@ -35,8 +36,7 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
-# For testing residuals
-include(joinpath(pwd(), "tests", "Test_residuals.jl"))
+include(joinpath(pwd(), "tests", "Common.jl"))
 
 
 """
@@ -66,74 +66,7 @@ function solveOde2x2Lin(t, u0, α, β, γ, δ)
 end
 
 
-"""
-    testOdeSol(solver, tol; printRes=false)
-
-    Compare analytical vs numeric ODE solver using a provided solver with 
-    tolerance tol for the Test_model1.
-    Returns true if passes test (sqDiff less than 1e-8) else returns false. 
-"""
-function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
-
-    # Set values to PeTab file values 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(peTabModel.dirModel, readObservables=true)
-    measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
-    paramData = processParameters(parameterDataFile) 
-    setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
-    θ_indices = computeIndicesθ(paramData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
-    
-    # Extract experimental conditions for simulations 
-    simulationInfo = processSimulationInfo(peTabModel, measurementData)
-    
-    # Parameter values where to teast accuracy. Each column is a α, β, γ and δ
-    u0 = [8.0, 4.0]
-    paramMat = reshape([2.0, 3.0, 3.0, 5.0, 
-                        1.0, 2.0, 3.0, 3.0,
-                        1.0, 0.4, 0.3, 0.5,
-                        4.0, 3.0, 2.0, 1.0,
-                        0.01, 0.02, 0.03, 0.04], (4, 5))
-
-    for i in 1:5
-
-        α, β, γ, δ = paramMat[:, i]
-        
-        # Set parameter values for ODE
-        peTabModel.paramMap[2] = Pair(peTabModel.paramMap[2].first, α)
-        peTabModel.paramMap[4] = Pair(peTabModel.paramMap[4].first, γ)
-        peTabModel.paramMap[5] = Pair(peTabModel.paramMap[5].first, δ)
-        peTabModel.paramMap[6] = Pair(peTabModel.paramMap[6].first, β)
-        prob = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true)
-        prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
-        θ_est = getFileODEvalues(peTabModel)
-        changeExperimentalCondition! = (pVec, u0Vec, expID) -> _changeExperimentalCondition!(pVec, u0Vec, expID, θ_est, peTabModel, θ_indices)
-        
-        # Solve ODE system 
-        odeSolutions, success = solveODEAllExperimentalConditions(prob, changeExperimentalCondition!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
-        solNumeric = odeSolutions[simulationInfo.experimentalConditionId[1]]
-        
-        # Compare against analytical solution 
-        sqDiff = 0.0
-        for t in solNumeric.t
-            solAnalytic = solveOde2x2Lin(t, u0, α*0.5, β, γ, δ)
-            sqDiff += sum((solNumeric(t)[1:2] - solAnalytic).^2)
-        end
-
-        if sqDiff > 1e-8
-            @printf("sqDiff = %.3e\n", sqDiff)
-            @printf("Does not pass test\n")
-            return false
-        end
-
-        if printRes == true
-            @printf("sqDiff = %.3e\n", sqDiff)
-        end
-    end
-
-    return true
-end
-
-
-function calcCostAnalytic(paramVec)
+function computeCostAnalytic(paramVec)
 
     u0 = [8.0, 4.0]
     α, β, γ, δ = paramVec[1:4]
@@ -178,233 +111,147 @@ function calcCostAnalytic(paramVec)
 end
 
 
-"""
-    testCostGradHess(solver, tol; printRes::Bool=false)
+function testODESolverTestModel1(petabModel::PEtabModel, solver, tol)
 
-    Compare cost, gradient and hessian computed via the analytical solution 
-    vs the PeTab importer functions (to check PeTab importer) for five random 
-    parameter vectors for Test_model1. For the analytical solution the gradient 
-    and hessian are computed via ForwardDiff.
-"""
-function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
+    # Set values to PeTab file values 
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel.dirModel, readObservables=true)
+    measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
+    paramData = processParameters(parameterDataFile) 
+    setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, paramData)
+    θ_indices = computeIndicesθ(paramData, measurementData, petabModel.odeSystem, experimentalConditionsFile)
+    
+    # Extract experimental conditions for simulations 
+    simulationInfo = processSimulationInfo(petabModel, measurementData)
+    
+    # Parameter values where to test accuracy. Each column is a α, β, γ and δ
+    u0 = [8.0, 4.0]
+    parametersTest = reshape([2.0, 3.0, 3.0, 5.0, 
+                              1.0, 2.0, 3.0, 3.0,
+                              1.0, 0.4, 0.3, 0.5,
+                              4.0, 3.0, 2.0, 1.0,
+                              0.01, 0.02, 0.03, 0.04], (4, 5))
 
-    petabProblem1 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+    for i in 1:5
+
+        α, β, γ, δ = parametersTest[:, i]
+        
+        # Set parameter values for the ODE-model 
+        petabModel.parameterMap[2] = Pair(petabModel.parameterMap[2].first, α)
+        petabModel.parameterMap[4] = Pair(petabModel.parameterMap[4].first, γ)
+        petabModel.parameterMap[5] = Pair(petabModel.parameterMap[5].first, δ)
+        petabModel.parameterMap[6] = Pair(petabModel.parameterMap[6].first, β)
+        prob = ODEProblem(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true)
+        prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
+        
+        # Solve the ODE-model using the PEtab solver 
+        θ_est = getFileODEvalues(petabModel)
+        changeExperimentalCondition! = (pVec, u0Vec, expID) -> _changeExperimentalCondition!(pVec, u0Vec, expID, θ_est, petabModel, θ_indices)
+        odeSolutions, success = solveODEAllExperimentalConditions(prob, changeExperimentalCondition!, simulationInfo, solver, tol, tol, petabModel.computeTStops)
+        odeSolution = odeSolutions[simulationInfo.experimentalConditionId[1]]
+        
+        # Compare against analytical solution 
+        sqDiff = 0.0
+        for t in odeSolution.t
+            solutionAnalytic = solveOde2x2Lin(t, u0, α*0.5, β, γ, δ)
+            sqDiff += sum((odeSolution(t)[1:2] - solutionAnalytic).^2)
+        end
+
+        @test sqDiff ≤ 1e-8
+    end
+end
+
+
+function testCostGradientOrHessianTestModel1(petabModel::PEtabModel, solver, tol)
+
+    petabProblem1 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
                                          sensealgZygote = ForwardDiffSensitivity(), 
                                          odeSolverForwardEquations=Vern9(), sensealgForwardEquations = ForwardDiffSensitivity(), 
                                          odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
                                          sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
 
-    petabProblem2 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+    petabProblem2 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
                                          sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=Vern9())
     
                      
     Random.seed!(123)
     createCube(petabProblem1, 5)
     cube = Matrix(CSV.read(petabProblem1.pathCube, DataFrame))
-    nParam = size(cube)[2]
 
     for i in 1:5
 
-        paramVec = cube[i, :]
+        p = cube[i, :]
+        referenceCost = computeCostAnalytic(p)
+        referenceGradient = ForwardDiff.gradient(computeCostAnalytic, p)
+        referenceHessian = ForwardDiff.hessian(computeCostAnalytic, p)
 
-        # Evaluate cost 
-        costPeTab = petabProblem1.computeCost(paramVec)
-        costAnalytic = calcCostAnalytic(paramVec)
-        sqDiffCost = (costPeTab - costAnalytic)^2
-        if sqDiffCost > 1e-6
-            @printf("sqDiffCost = %.3e\n", sqDiffCost)
-            @printf("Does not pass test on cost\n")
-            return false
-        end
+        # Test both the standard and Zygote approach to compute the cost 
+        cost = _testCostGradientOrHessian(petabProblem1, p, cost=true)
+        @test cost ≈ referenceCost atol=1e-4
+        costZygote = _testCostGradientOrHessian(petabProblem1, p, costZygote=true)
+        @test costZygote ≈ referenceCost atol=1e-4
 
-        # Evalute Zygote cost function 
-        costPeTab = petabProblem1.computeCostZygote(paramVec)
-        sqDiffCostZygote = (costPeTab - costAnalytic)^2
-        if sqDiffCostZygote > 1e-6
-            @printf("sqDiffCost = %.3e\n", sqDiffCost)
-            @printf("Does not pass test on cost for Zygote cost function\n")
-            return false
-        end
+        # Test all gradient combinations. Note we test sensitivity equations with and without autodiff 
+        gradientAutoDiff = _testCostGradientOrHessian(petabProblem1, p, gradientAutoDiff=true)
+        @test norm(gradientAutoDiff - referenceGradient) ≤ 1e-4
+        gradientZygote = _testCostGradientOrHessian(petabProblem1, p, gradientZygote=true)
+        @test norm(gradientZygote - referenceGradient) ≤ 1e-4
+        gradientAdjoint = _testCostGradientOrHessian(petabProblem1, p, gradientAdjoint=true)
+        @test norm(normalize(gradientAdjoint) - normalize((referenceGradient))) ≤ 1e-4
+        gradientForwardEquations1 = _testCostGradientOrHessian(petabProblem1, p, gradientForwardEquations=true)
+        @test norm(gradientForwardEquations1 - referenceGradient) ≤ 1e-4
+        gradientForwardEquations2 = _testCostGradientOrHessian(petabProblem2, p, gradientForwardEquations=true)
+        @test norm(gradientForwardEquations2 - referenceGradient) ≤ 1e-4
 
-        # Evaluate gradient 
-        gradAnalytic = ForwardDiff.gradient(calcCostAnalytic, paramVec)
-        gradNumeric = zeros(nParam); petabProblem1.computeGradientAutoDiff(gradNumeric, paramVec)
-        sqDiffGrad = sum((gradAnalytic - gradNumeric).^2)
-        if sqDiffGrad > 1e-6
-            @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-            @printf("Does not pass test on gradient\n")
-            return false
-        end
-
-        # Evalute gradient obtained via Zygote and sensealg 
-        gradZygoteSensealg = Zygote.gradient(petabProblem1.computeCostZygote, paramVec)[1]
-        sqDiffGradZygote = sum((gradAnalytic - gradZygoteSensealg).^2)
-        if sqDiffGradZygote > 1e-6
-            @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-            @printf("Does not pass test on gradient with Zygote\n")
-            return false
-        end
-
-        # Forward sensitivity equations gradient
-        gradForwardEq = zeros(nParam)
-        petabProblem1.computeGradientForwardEquations(gradForwardEq, paramVec)
-        sqDiffGradForwardEq = sum((gradForwardEq - gradAnalytic).^2)
-        if sqDiffGradForwardEq > 1e-5
-            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
-            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
-            return false
-        end
-
-        # Forward sensitivity equations using autodiff 
-        gradForwardEqAuto = zeros(nParam)
-        petabProblem2.computeGradientForwardEquations(gradForwardEqAuto, paramVec)
-        sqDiffGradForwardEqAuto = sum((gradForwardEq - gradAnalytic).^2)
-        if sqDiffGradForwardEqAuto > 1e-5
-            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
-            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
-            return false
-        end
-        
-        # Evaluate hessian 
-        hessAnalytic = ForwardDiff.hessian(calcCostAnalytic, paramVec)
-        hessNumeric = zeros(nParam, nParam); petabProblem1.computeHessian(hessNumeric, paramVec)
-        sqDiffHess = sum((hessAnalytic - hessNumeric).^2)
-        if sqDiffHess > 1e-4
-            @printf("sqDiffHess = %.3e\n", sqDiffHess)
-            @printf("Does not pass test on hessian\n")
-            return false
-        end
-
-        # Here we normalise the gradients (as the gradients are typically huge here 1e8, so without any form 
-        # of normalisation we do not pass the test)
-        gradAdj = zeros(nParam)
-        petabProblem1.computeGradientAdjoint(gradAdj, paramVec)
-        sqDiffGradAdjoint1 = sum((gradAnalytic ./ norm(gradAnalytic) - gradAdj / norm(gradAdj)).^2)
-        if sqDiffGradAdjoint1 > 1e-4
-            @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
-            @printf("Does not pass test on adjoint gradient gradient\n")
-            return false
-        end
-                
-        if printRes == true
-            @printf("sqDiffCost = %.3e\n", sqDiffCost)
-            @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-            @printf("sqDiffHess = %.3e\n", sqDiffHess)
-            @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
-            @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
-            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
-            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
-            @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
-        end
+        # Testing "exact" hessian via autodiff 
+        hessian = _testCostGradientOrHessian(petabProblem1, p, hessian=true)
+        @test norm(hessian - referenceHessian) ≤ 1e-3
     end
-
-    return true
 end
 
 
 # Test different adjoint approaches 
-function testDifferentAdjoints(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
+function testZYgoteAdjointsTestModel1(petabModel::PEtabModel, solver, tol)
 
-    petabProblem1 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = ForwardDiffSensitivity())
-    petabProblem2 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = QuadratureAdjoint())
-    petabProblem3 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))
-    petabProblem4 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = BacksolveAdjoint())
-    petabProblem5 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = ReverseDiffAdjoint())
+    petabProblem1 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = ForwardDiffSensitivity())
+    petabProblem2 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = QuadratureAdjoint())
+    petabProblem3 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = InterpolatingAdjoint(autojacvec=ReverseDiffVJP()))
+    petabProblem4 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = BacksolveAdjoint())
+    petabProblem5 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, sensealgZygote = ReverseDiffAdjoint())
 
     Random.seed!(123)
     createCube(petabProblem1, 5)
     cube = Matrix(CSV.read(petabProblem1.pathCube, DataFrame))
 
-    paramVec = cube[1, :]
-    gradAnalytic = ForwardDiff.gradient(calcCostAnalytic, paramVec)
+    p = cube[1, :]
+    referenceGradient = ForwardDiff.gradient(computeCostAnalytic, p)
 
-    gradZygoteSensealg = Zygote.gradient(petabProblem1.computeCostZygote, paramVec)[1]
-    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
-    if sqDiffGrad > 1e-6
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Does not pass test on gradient with ForwardDiffSensitivity\n")
-        return false
-    elseif printRes == true
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Pass test on gradient with ForwardDiffSensitivity\n")
-    end
-
-    gradZygoteSensealg = Zygote.gradient(petabProblem2.computeCostZygote, paramVec)[1]
-    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
-    if sqDiffGrad > 1e-6
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Does not pass test on gradient with QuadratureAdjoint\n")
-        return false
-    elseif printRes == true
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Pass test on gradient with QuadratureAdjoint\n")
-    end
-
-    gradZygoteSensealg = Zygote.gradient(petabProblem3.computeCostZygote, paramVec)[1]
-    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
-    if sqDiffGrad > 1e-6
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Does not pass test on gradient with InterpolatingAdjoint(autojacvec=ReverseDiffVJP())\n")
-        return false
-    elseif printRes == true
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Pass test on gradient with InterpolatingAdjoint(autojacvec=ReverseDiffVJP())\n")
-    end
-
-    gradZygoteSensealg = Zygote.gradient(petabProblem4.computeCostZygote, paramVec)[1]
-    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
-    if sqDiffGrad > 1e-6
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Does not pass test on gradient with BacksolveAdjoint\n")
-        return false
-    elseif printRes == true
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Pass test on gradient with BacksolveAdjoint\n")
-    end
-
-    # Currently breaks because ReverseDiff procues an array as output (will have to fix)
-    #=
-    gradZygoteSensealg = Zygote.gradient(petabProblem5.computeCostZygote, paramVec)[1]
-    sqDiffGrad = sum((gradAnalytic - gradZygoteSensealg).^2)
-    if sqDiffGrad > 1e-6
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Does not pass test on gradient with ReverseDiffAdjoint\n")
-        return false
-    elseif printRes == true
-        @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-        @printf("Pass test on gradient with ReverseDiffAdjoint\n")
-    end
-    =#
-
-    return true
+    gradient1 = _testCostGradientOrHessian(petabProblem1, p, gradientZygote=true)
+    @test norm(gradient1 - referenceGradient) ≤ 1e-4
+    gradient2 = _testCostGradientOrHessian(petabProblem2, p, gradientZygote=true)
+    @test norm(gradient2 - referenceGradient) ≤ 1e-3
+    gradient3 = _testCostGradientOrHessian(petabProblem3, p, gradientZygote=true)
+    @test norm(gradient3 - referenceGradient) ≤ 1e-3
+    gradient4 = _testCostGradientOrHessian(petabProblem4, p, gradientZygote=true)
+    @test norm(gradient4 - referenceGradient) ≤ 1e-3
 end
 
 
-peTabModel = setUpPeTabModel("Test_model1", pwd() * "/tests/Test_model1/", forceBuildJlFile=true)
-passTest = testOdeSol(peTabModel, Vern9(), 1e-9, printRes=true)
-if passTest == true
-    @printf("Passed test for ODE solution\n")
-else
-    @printf("Did not pass test for ODE solution\n")
-end
+petabModel = readPEtabModel("Test_model1", pwd() * "/tests/Test_model1/", forceBuildJlFile=true)
 
-passTest = testCostGradHess(peTabModel, Vern9(), 1e-12, printRes=true)
-if passTest == true
-    @printf("Passed test for cost, gradient and hessian\n")
-else
-    @printf("Did not pass test for cost, gradient and hessian\n")
-end
+@testset verbose = true "Test model 1" begin
+    @testset "Test model1 : ODE solver" begin 
+        testODESolverTestModel1(petabModel, Vern9(), 1e-9)
+    end
 
-passTest = testDifferentAdjoints(peTabModel, Vern9(), 1e-12, printRes=true)
-if passTest == true
-    @printf("Passed test for different adjoints\n")
-else
-    @printf("Did not pass test for different adjoints\n")
-end
+    @testset "Test model1 : Cost gradient and hessian" begin 
+        testCostGradientOrHessianTestModel1(petabModel, Vern9(), 1e-12)
+    end
 
-passTest = checkGradientResiduals(peTabModel, Rodas5(), 1e-9)
-if passTest == true
-    @printf("Passed test for gradient for residuals\n")
-else
-    @printf("Did not pass test for gradient for residuals\n")
+    @testset "Test model 1 : Zygote adjoints" begin
+        testZYgoteAdjointsTestModel1(petabModel, Vern9(), 1e-12)
+    end
+
+    @testset "Test model 1 : Gradient of residuals" begin
+        checkGradientResiduals(petabModel, Rodas5(), 1e-9)
+    end
 end

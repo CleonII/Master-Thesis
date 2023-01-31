@@ -20,6 +20,7 @@ using SciMLSensitivity
 using Zygote
 using Symbolics
 using Sundials
+using FiniteDifferences
 using Test
 
 
@@ -37,93 +38,151 @@ include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
 
 # Used to test cost-value at the nominal parameter value 
-function testLogLikelihoodValue(peTabModel::PeTabModel, 
+function testLogLikelihoodValue(petabModel::PEtabModel, 
                                 referenceValue::Float64, 
                                 solver; absTol=1e-12, relTol=1e-12, atol=1e-3)
 
-    petabProblem = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=absTol, solverRelTol=relTol)
+    petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=absTol, solverRelTol=relTol)
     cost = petabProblem.computeCost(petabProblem.θ_nominalT)
     costZygote = petabProblem.computeCostZygote(petabProblem.θ_nominalT)
-    println("Model : ", peTabModel.modelName)
+    println("Model : ", petabModel.modelName)
     @test cost ≈ referenceValue atol=atol    
     @test costZygote ≈ referenceValue atol=atol    
 end
 
-@testset "Lok likelihood values benchmark collection" begin
 
-# Bachman model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
-peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, -418.40573341425295, Rodas4P())
+function testGradientFiniteDifferences(petabModel::PEtabModel, solver, tol::Float64; 
+                                       checkAdjoint::Bool=false, 
+                                       solverForwardEq=CVODE_BDF(),
+                                       checkForwardEquations::Bool=false, 
+                                       testTol::Float64=1e-3, 
+                                       sensealgSS=SteadyStateAdjoint(), 
+                                       solverSSRelTol=1e-8, solverSSAbsTol=1e-10)
 
-# Beer model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Beer_MolBioSystems2014/"
-peTabModel = setUpPeTabModel("model_Beer_MolBioSystems2014", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, -58622.9145631413, Rodas4P())
+    # Testing the gradient via finite differences 
+    petabProblem1 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                         sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver, 
+                                         odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
+                                         sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), 
+                                         solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol,
+                                         sensealgAdjointSS=sensealgSS)
+    petabProblem2 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                         solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol,
+                                         sensealgForwardEquations=ForwardSensitivity(), odeSolverForwardEquations=solverForwardEq)                                        
+    θ_use = petabProblem1.θ_nominalT
 
-# Boehm model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Boehm_JProteomeRes2014/"
-peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, 138.22199693517703, Rodas4P())
+    gradientFinite = FiniteDifferences.grad(central_fdm(5, 1), petabProblem1.computeCost, θ_use)[1]
+    gradientForward = zeros(length(θ_use))
+    petabProblem1.computeGradientAutoDiff(gradientForward, θ_use)                                       
+    @test norm(gradientFinite - gradientForward) ≤ testTol
 
-# Brännmark model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Brannmark_JBC2010/"
-peTabModel = setUpPeTabModel("model_Brannmark_JBC2010", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, 141.889113770537, Rodas4P())
+    if checkForwardEquations == true
+        gradientForwardEquations1 = zeros(length(θ_use))
+        gradientForwardEquations2 = zeros(length(θ_use))
+        petabProblem1.computeGradientForwardEquations(gradientForwardEquations1, θ_use)
+        petabProblem2.computeGradientForwardEquations(gradientForwardEquations2, θ_use)
+        @test norm(gradientFinite - gradientForwardEquations1) ≤ testTol
+        @test norm(gradientFinite - gradientForwardEquations2) ≤ testTol
+    end
 
-# Bruno model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Bruno_JExpBot2016/"
-peTabModel = setUpPeTabModel("model_Bruno_JExpBot2016", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, -46.688176988431806, Rodas4P())
+    if checkAdjoint == true
+        gradientAdjoint = zeros(length(θ_use))
+        petabProblem1.computeGradientAdjoint(gradientAdjoint, θ_use)
+        @test norm(gradientFinite - gradientAdjoint) ≤ testTol
+    end
+end
 
-# Crauste model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Crauste_CellSystems2017/"
-peTabModel = setUpPeTabModel("model_Crauste_CellSystems2017", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, 190.96521897435176, Rodas4P(), atol=1e-2)
 
-# Elowitz model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Elowitz_Nature2000/"
-peTabModel = setUpPeTabModel("model_Elowitz_Nature2000", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, -63.20279991419332, Rodas4P())
+@testset "Log likelihood values and gradients for benchmark collection" begin
 
-# Fiedler model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Fiedler_BMC2016/"
-peTabModel = setUpPeTabModel("model_Fiedler_BMC2016", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, -58.58390161681, Rodas4(), absTol=1e-11, relTol=1e-11)
+    # Bachman model 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
+    petabModel = readPEtabModel("model_Bachmann_MSB2011", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, -418.40573341425295, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas5(), 1e-8)
 
-# Fujita model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Fujita_SciSignal2010/"
-peTabModel = setUpPeTabModel("model_Fujita_SciSignal2010", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, -53.08377736998929, Rodas4P())
+    # Beer model - Numerically challenging gradient as we have callback rootfinding
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Beer_MolBioSystems2014/"
+    petabModel = readPEtabModel("model_Beer_MolBioSystems2014", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, -58622.9145631413, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8, testTol=1e-1)           
+    
+    # Boehm model 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Boehm_JProteomeRes2014/"
+    petabModel = readPEtabModel("model_Boehm_JProteomeRes2014", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, 138.22199693517703, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8)
 
-# Isensee model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Isensee_JCB2018/"
-peTabModel = setUpPeTabModel("model_Isensee_JCB2018", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, 3949.375966548649-4.45299970460275, Rodas4P(), atol=1e-2)
+    # Brännmark model. Model has pre-equlibration criteria so here we test all gradients. Challenging to compute gradients.
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Brannmark_JBC2010/"
+    petabModel = readPEtabModel("model_Brannmark_JBC2010", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, 141.889113770537, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-10, checkAdjoint=true, checkForwardEquations=true, testTol=1e-2, sensealgSS=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
 
-# Lucarelli 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Lucarelli_CellSystems2018/"
-peTabModel = setUpPeTabModel("model_Lucarelli_CellSystems2018", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, 1681.6059879426584, Rodas4P())
+    # Bruno model. Has conditions-specific parameters, hence we test all gradients 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Bruno_JExpBot2016/"
+    petabModel = readPEtabModel("model_Bruno_JExpBot2016", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, -46.688176988431806, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-9, checkAdjoint=true, checkForwardEquations=true)
 
-# Schwen model
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Schwen_PONE2014/"
-peTabModel = setUpPeTabModel("model_Schwen_PONE2014", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, 943.9992988598723-12.519137073132825, Rodas4P())
+    # Crauste model. The model is numerically challanging and computing a gradient via Finite-differences is not 
+    # possible 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Crauste_CellSystems2017/"
+    petabModel = readPEtabModel("model_Crauste_CellSystems2017", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, 190.96521897435176, Rodas4P(), atol=1e-2)
 
-# Sneyd model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Sneyd_PNAS2002/"
-peTabModel = setUpPeTabModel("model_Sneyd_PNAS2002", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, -319.79177818768756, Rodas4P())
+    # Elowitz model 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Elowitz_Nature2000/"
+    petabModel = readPEtabModel("model_Elowitz_Nature2000", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, -63.20279991419332, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8)
 
-# Weber model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Weber_BMC2015/"
-peTabModel = setUpPeTabModel("model_Weber_BMC2015", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, 296.2017922646865, Rodas4P())
+    # Fiedler model 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Fiedler_BMC2016/"
+    petabModel = readPEtabModel("model_Fiedler_BMC2016", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, -58.58390161681, Rodas4(), absTol=1e-11, relTol=1e-11)
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-9)
 
-# Zheng model 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Zheng_PNAS2012/"
-peTabModel = setUpPeTabModel("model_Zheng_PNAS2012", dirModel, verbose=false, forceBuildJlFile=true)
-testLogLikelihoodValue(peTabModel, -278.33353271001477, Rodas4P())
+    # Fujita model. Challangeing to compute accurate gradients  
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Fujita_SciSignal2010/"
+    petabModel = readPEtabModel("model_Fujita_SciSignal2010", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, -53.08377736998929, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-12, testTol=1e-2)
+
+    # Isensee model. Accurate gradients are computed (but the code takes ages to run with low tolerances)
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Isensee_JCB2018/"
+    petabModel = readPEtabModel("model_Isensee_JCB2018", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, 3949.375966548649-4.45299970460275, Rodas4P(), atol=1e-2)
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8, testTol=1e-2)
+
+    # Lucarelli 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Lucarelli_CellSystems2018/"
+    petabModel = readPEtabModel("model_Lucarelli_CellSystems2018", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, 1681.6059879426584, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-9)
+
+    # Schwen model. Model has priors so here we want to test all gradients
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Schwen_PONE2014/"
+    petabModel = readPEtabModel("model_Schwen_PONE2014", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, 943.9992988598723-12.519137073132825, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8, checkAdjoint=true, checkForwardEquations=true)
+
+    # Sneyd model 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Sneyd_PNAS2002/"
+    petabModel = readPEtabModel("model_Sneyd_PNAS2002", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, -319.79177818768756, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8)
+
+    # Weber model. Challanging as it sensitivity to steady state tolerances 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Weber_BMC2015/"
+    petabModel = readPEtabModel("model_Weber_BMC2015", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, 296.2017922646865, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-12, testTol=1e-2, solverSSRelTol=1e-13, solverSSAbsTol=1e-15)
+
+    # Zheng model 
+    dirModel = pwd() * "/Intermediate/PeTab_models/model_Zheng_PNAS2012/"
+    petabModel = readPEtabModel("model_Zheng_PNAS2012", dirModel, verbose=false, forceBuildJlFile=true)
+    testLogLikelihoodValue(petabModel, -278.33353271001477, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8)
 
 end

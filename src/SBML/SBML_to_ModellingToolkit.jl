@@ -363,7 +363,6 @@ function buildODEModelDictionary(libsbml, model, ifElseToEvent::Bool)
 
     # Extract model rules. Each rule-type is processed differently.
     for rule in model[:getListOfRules]()
-        println("RuleType = ", rule[:getElementName]())
         ruleType = rule[:getElementName]() 
         
         if ruleType == "assignmentRule"

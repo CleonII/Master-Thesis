@@ -3,7 +3,7 @@
 
 function computeCostZygote(θ_est,
                            odeProblem::ODEProblem,  
-                           peTabModel::PeTabModel,
+                           petabModel::PEtabModel,
                            simulationInfo::SimulationInfo,
                            θ_indices::ParameterIndices,
                            measurementInfo::MeasurementsInfo,
@@ -15,7 +15,7 @@ function computeCostZygote(θ_est,
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices)                     
 
     cost = _computeCostZygote(θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem,
-                              peTabModel, simulationInfo, θ_indices, measurementInfo,
+                              petabModel, simulationInfo, θ_indices, measurementInfo,
                               parameterInfo, changeODEProblemParameters, solveOdeModelAllConditions)
 
     if priorInfo.hasPriors == true
@@ -33,7 +33,7 @@ function _computeCostZygote(θ_dynamic,
                             θ_observable,
                             θ_nonDynamic,
                             odeProblem::ODEProblem,  
-                            peTabModel::PeTabModel,
+                            petabModel::PEtabModel,
                             simulationInfo::SimulationInfo,
                             θ_indices::ParameterIndices,
                             measurementInfo::MeasurementsInfo,
@@ -60,7 +60,7 @@ function _computeCostZygote(θ_dynamic,
             return Inf
         end
 
-        cost += computeCostExpCond(odeSolution, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, 
+        cost += computeCostExpCond(odeSolution, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, petabModel, 
                                    experimentalConditionId, θ_indices, measurementInfo, parameterInfo, simulationInfo)
 
         if isinf(cost)

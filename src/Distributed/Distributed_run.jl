@@ -5,7 +5,7 @@ function runProcess(jobs, results)
     put!(results, tuple(:Done))
 
     # Import structs needed to compute the cost, gradient, and hessian
-    peTabModel::PeTabModel = take!(jobs)[1]
+    petabModel::PEtabModel = take!(jobs)[1]
     put!(results, tuple(:Done))
     parameterData::ParametersInfo = take!(jobs)[1]
     put!(results, tuple(:Done))
@@ -30,12 +30,12 @@ function runProcess(jobs, results)
     expIDs::Array{String, 1} = take!(jobs)[1]
 
     # Set up cost, gradient, and hessian functions 
-    changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, peTabModel, paramEstIndices)
-    changeModelParamUse! = (pVec, u0Vec, paramEst) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstIndices, peTabModel)
+    changeToExperimentalCondUse! = (pVec, u0Vec, expID, dynParamEst) -> changeExperimentalCondEst!(pVec, u0Vec, expID, dynParamEst, petabModel, paramEstIndices)
+    changeModelParamUse! = (pVec, u0Vec, paramEst) -> changeModelParam!(pVec, u0Vec, paramEst, paramEstIndices, petabModel)
 
     # Set up function which solves the ODE model for all conditions and stores result 
-    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
-    solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, peTabModel.getTStops, denseSol=true, expIDSolve=expIDSolveArg, trackCallback=true)
+    solveOdeModelAllCondUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, petabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
+    solveOdeModelAllCondAdjUse! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondUse!, simulationInfo, solver, tol, tol, petabModel.getTStops, denseSol=true, expIDSolve=expIDSolveArg, trackCallback=true)
     if sensealgForward == :AutoDiffForward
         odeProbSenseEq = deepcopy(odeProb)
     else
@@ -43,19 +43,19 @@ function runProcess(jobs, results)
                                                       sensealg=sensealgForward)
     end
     if sensealgForward == :AutoDiffForward
-        solveOdeModelAllCondForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, forwardSolver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)                                           
+        solveOdeModelAllCondForwardEq! = (solArrayArg, SMat, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, SMat, odeProbArg, dynParamEst, changeToExperimentalCondUse!, changeModelParamUse!, simulationInfo, forwardSolver, tol, tol, petabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)                                           
     else
-        solveOdeModelAllCondForwardEq! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondSenseEqUse!, simulationInfo, forwardSolver, tol, tol, peTabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
+        solveOdeModelAllCondForwardEq! = (solArrayArg, odeProbArg, dynParamEst, expIDSolveArg) -> solveOdeModelAllExperimentalCond!(solArrayArg, odeProbArg, dynParamEst, changeToExperimentalCondSenseEqUse!, simulationInfo, forwardSolver, tol, tol, petabModel.getTStops, onlySaveAtTobs=true, expIDSolve=expIDSolveArg)
     end
     
-    evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
-    evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
-    evalGradFAdjoint = (grad, paramVecEst) -> calcGradCostAdj!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo, expIDSolve=expIDs) 
-    evalGradFForwardEq = (grad, paramVecEst) -> calcGradForwardEq!(grad, paramVecEst, peTabModel, odeProbSenseEq, sensealgForward, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondForwardEq!, priorInfo, expIDSolve=expIDs) 
+    evalF = (paramVecEst) -> calcCost(paramVecEst, odeProb, petabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
+    evalGradF = (grad, paramVecEst) -> calcGradCost!(grad, paramVecEst, odeProb, petabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
+    evalGradFAdjoint = (grad, paramVecEst) -> calcGradCostAdj!(grad, paramVecEst, adjSolver, adjSensealg, adjSensealgSS, adjTol, odeProb, petabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondAdjUse!, priorInfo, expIDSolve=expIDs) 
+    evalGradFForwardEq = (grad, paramVecEst) -> calcGradForwardEq!(grad, paramVecEst, petabModel, odeProbSenseEq, sensealgForward, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondForwardEq!, priorInfo, expIDSolve=expIDs) 
 
-    evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
+    evalHessApprox = (hessianMat, paramVecEst) -> calcHessianApprox!(hessianMat, paramVecEst, odeProb, petabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, expIDSolve=expIDs)
     
-    _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, peTabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessian=true, expIDSolve=expIDs)
+    _evalHess = (paramVecEst) -> calcCost(paramVecEst, odeProb, petabModel, simulationInfo, paramEstIndices, measurementInfo, parameterData, changeModelParamUse!, solveOdeModelAllCondUse!, priorInfo, calcHessian=true, expIDSolve=expIDs)
     evalHess = (hessianMat, paramVec) ->    begin 
                                                 computeH = true
                                                 @inbounds for i in eachindex(simulationInfo.solArray)

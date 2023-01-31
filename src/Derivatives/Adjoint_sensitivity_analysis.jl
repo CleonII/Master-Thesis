@@ -9,7 +9,7 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
                                         solverAbsTol::Float64,
                                         solverRelTol::Float64,
                                         sensealg::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
-                                        peTabModel::PeTabModel,
+                                        petabModel::PEtabModel,
                                         simulationInfo::SimulationInfo,
                                         θ_indices::ParameterIndices,
                                         measurementInfo ::MeasurementsInfo, 
@@ -60,7 +60,7 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
         success = computeGradientAdjointExpCond!(gradient, sol, sensealg, solverAbsTol, solverRelTol, odeSolver, 
                                                  θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, experimentalConditionId, 
                                                  simulationConditionId, simulationInfo,
-                                                 peTabModel, θ_indices, measurementInfo, parameterInfo, evalVJPSS)
+                                                 petabModel, θ_indices, measurementInfo, parameterInfo, evalVJPSS)
 
         if success == false
             gradient .= 1e8
@@ -157,7 +157,7 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
                                         experimentalConditionId::Symbol,
                                         simulationConditionId::Symbol,
                                         simulationInfo::SimulationInfo,
-                                        peTabModel::PeTabModel,
+                                        petabModel::PEtabModel,
                                         θ_indices::ParameterIndices,
                                         measurementInfo::MeasurementsInfo, 
                                         parameterInfo::ParametersInfo, 
@@ -170,17 +170,17 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
     callback = simulationInfo.callbacks[experimentalConditionId]
 
     # Pre allcoate vectors needed for computations 
-    ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, peTabModel) 
+    ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, petabModel) 
     
     compute∂G∂u = (out, u, p, t, i) -> begin compute∂G∂_(out, u, p, t, i, iPerTimePoint, 
                                                          measurementInfo, parameterInfo, 
-                                                         θ_indices, peTabModel, 
+                                                         θ_indices, petabModel, 
                                                          θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
                                                          ∂h∂u, ∂σ∂u, compute∂G∂U=true)
                                             end
     compute∂G∂p = (out, u, p, t, i) -> begin compute∂G∂_(out, u, p, t, i, iPerTimePoint, 
                                                          measurementInfo, parameterInfo, 
-                                                         θ_indices, peTabModel, 
+                                                         θ_indices, petabModel, 
                                                          θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
                                                          ∂h∂p, ∂σ∂p, compute∂G∂U=false)
                                         end                                        
@@ -239,7 +239,7 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
         # In case we do not simulate the ODE for a steady state first we can compute 
         # the initial sensitivites easily via automatic differantitatiom
         St0::Matrix{Float64} = Matrix{Float64}(undef, (length(sol.prob.u0), length(sol.prob.p)))
-        ForwardDiff.jacobian!(St0, peTabModel.compute_u0, sol.prob.p)
+        ForwardDiff.jacobian!(St0, petabModel.compute_u0, sol.prob.p)
         _gradient = dp .+ du'*St0
 
     else

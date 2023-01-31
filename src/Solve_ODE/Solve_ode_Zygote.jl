@@ -107,7 +107,7 @@ function solveOdeModelAtExperimentalCondZygote(odeProblem::ODEProblem,
         
         sol = solveCall(probUse)
 
-        Zygote.@ignore simulationInfo.odeSolutionsDerivatives[experimentalId] = sol
+        Zygote.@ignore simulationInfo.odeSolutions[experimentalId] = sol
 
         if typeof(sol) <: ODESolution && !(sol.retcode == :Success || sol.retcode == :Terminated)
             sucess = false

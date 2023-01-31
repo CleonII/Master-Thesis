@@ -37,10 +37,10 @@ include(joinpath(pwd(), "src", "Common.jl"))
 
 
 """
-    setUpPeTabModel(modelName::String, dirModel::String)::PeTabModel
+    setUpPeTabModel(modelName::String, dirModel::String)::PEtabModel
 
     Given a model directory (dirModel) containing the PeTab files and a 
-    xml-file on format modelName.xml will return a PeTabModel struct holding 
+    xml-file on format modelName.xml will return a PEtabModel struct holding 
     paths to PeTab files, ode-system in ModellingToolkit format, functions for 
     evaluating yMod, u0 and standard deviations, and a parameter and state maps 
     for how parameters and states are mapped in the ModellingToolkit ODE system
@@ -52,7 +52,12 @@ include(joinpath(pwd(), "src", "Common.jl"))
 
     TODO : Example  
 """
-function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::Bool=false, verbose::Bool=true, ifElseToEvent=true, jlFile=false)::PeTabModel
+function readPEtabModel(modelName::String, 
+                        dirModel::String; 
+                        forceBuildJlFile::Bool=false, 
+                        verbose::Bool=true, 
+                        ifElseToEvent=true, 
+                        jlFile=false)::PEtabModel
     
     if jlFile == false
         # Sanity check user input 
@@ -96,7 +101,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
     # Extract ODE-system and mapping of maps of how to map parameters to states and model parmaeters 
     include(modelFileJl)
     expr = Expr(:call, Symbol("getODEModel_" * modelName))
-    odeSys, stateMap, paramMap = eval(expr)
+    odeSys, stateMap, parameterMap = eval(expr)
     #odeSysUse = ode_order_lowering(odeSys)
     odeSysUse = structural_simplify(odeSys)
     # Parameter and state names for ODE-system 
@@ -122,8 +127,8 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
         if !@isdefined(modelDict)
             modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
-        create_σ_h_u0_File(modelName, dirModel, odeSysUse, stateMap, modelDict)
-        createDerivative_σ_h_File(modelName, dirModel, odeSysUse, modelDict)
+        create_σ_h_u0_File(modelName, dirModel, odeSysUse, stateMap, modelDict, verbose=verbose)
+        createDerivative_σ_h_File(modelName, dirModel, odeSysUse, modelDict, verbose=verbose)
     else
         if verbose
             @printf("File for h, u0 and σ exists - will not rebuild it\n")
@@ -149,7 +154,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
     exprCallback = Expr(:call, Symbol("getCallbacks_" * modelName))
     cbSet::CallbackSet, checkCbActive::Vector{Function} = eval(exprCallback)    
 
-    peTabModel = PeTabModel(modelName,
+    petabModel = PEtabModel(modelName,
                             compute_h,
                             compute_u0!,
                             compute_u0,
@@ -160,7 +165,7 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
                             compute_∂σ∂σp!,
                             computeTstops,
                             odeSysUse,
-                            paramMap,
+                            parameterMap,
                             stateMap,
                             parameterNames, 
                             stateNames,
@@ -172,12 +177,12 @@ function setUpPeTabModel(modelName::String, dirModel::String; forceBuildJlFile::
                             cbSet, 
                             checkCbActive)
 
-    return peTabModel
+    return petabModel
 end
 
 
 """
-    setUpCostGradHess(peTabModel::PeTabModel, solver, tol::Float64)
+    setUpCostGradHess(petabModel::PEtabModel, solver, tol::Float64)
 
     For a PeTab-model set up functions for computing i) the likelihood, ii) likelhood gradient, 
     and iii) likelhood Hessian block approximation. The functions are stored in PeTabOpt-struct 
@@ -187,7 +192,7 @@ end
     and ReverseDiff is used for observable and sd parameters. The hessian approximation assumes the 
     interaction betweeen dynamic and (observable, sd) parameters is zero.
 """
-function setUpPEtabODEProblem(peTabModel::PeTabModel, 
+function setUpPEtabODEProblem(petabModel::PEtabModel, 
                               odeSolver::SciMLAlgorithm;
                               solverAbsTol::Float64=1e-8,
                               solverRelTol::Float64=1e-8,
@@ -208,54 +213,54 @@ function setUpPEtabODEProblem(peTabModel::PeTabModel,
         println("If you are using adjoint sensitivity analysis for a model with PreEq-criteria the most the most efficient adjSensealgSS is usually SteadyStateAdjoint. The algorithm you have provided, ", sensealgAdjointSS, "might not work (as there are some bugs here). In case it does not work, and SteadyStateAdjoint fails (because a dependancy on time or a singular Jacobian) a good choice might be QuadratureAdjoint(autodiff=false, autojacvec=false)")
     end
 
-    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(peTabModel.dirModel, readObservables=true)
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel.dirModel, readObservables=true)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    simulationInfo = processSimulationInfo(peTabModel, measurementInfo, sensealg=sensealgAdjoint, absTolSS=solverSSAbsTol, relTolSS=solverSSRelTol)
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, peTabModel.odeSystem, experimentalConditions)
+    simulationInfo = processSimulationInfo(petabModel, measurementInfo, sensealg=sensealgAdjoint, absTolSS=solverSSAbsTol, relTolSS=solverSSRelTol)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
     
     # Set up potential prior for the parameters to estimate 
     priorInfo = processPriors(θ_indices, parametersData)
 
     # Set model parameter values to those in the PeTab parameter to ensure correct value for constant parameters  
-    setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterInfo)
+    setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, parameterInfo)
 
     # The time-span 5e3 is overwritten when performing forward simulations. As we solve an expanded system with the forward 
     # equations, we need a seperate problem for it 
-    _odeProblem = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=sparseJacobian)
+    _odeProblem = ODEProblem(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true, sparse=sparseJacobian)
     odeProblem = remake(_odeProblem, p = convert.(Float64, _odeProblem.p), u0 = convert.(Float64, _odeProblem.u0))
     odeProblemForwardEquations = getODEProblemForwardEquations(odeProblem, sensealgForwardEquations)
 
     # The cost (likelihood) can either be computed in the standard way or the Zygote way. The second consumes more 
     # memory as in-place mutations are not compatible with Zygote 
     expIdSolve = [:all]
-    computeCost = setUpCost(:Standard, odeProblem, odeSolver, solverAbsTol, solverRelTol, peTabModel, 
+    computeCost = setUpCost(:Standard, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, 
                             simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, expIdSolve)
     computeCostZygote = setUpCost(:Zygote, odeProblem, odeSolver, solverAbsTol, solverRelTol, 
-                                  peTabModel, simulationInfo, θ_indices, measurementInfo, parameterInfo, 
+                                  petabModel, simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                   priorInfo, expIdSolve, sensealgZygote=sensealgZygote)          
                                          
     # The gradient can either be computed via autodiff, forward sensitivity equations, adjoint sensitivity equations 
     # and Zygote 
-    computeGradientAutoDiff = setUpGradient(:AutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, peTabModel, 
+    computeGradientAutoDiff = setUpGradient(:AutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, 
                                             simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, expIdSolve)
     computeGradientForwardEquations = setUpGradient(:ForwardEquations, odeProblemForwardEquations, odeSolverForwardEquations, solverAbsTol, 
-                                                    solverRelTol, peTabModel, simulationInfo, θ_indices, measurementInfo, 
+                                                    solverRelTol, petabModel, simulationInfo, θ_indices, measurementInfo, 
                                                     parameterInfo, priorInfo, expIdSolve, sensealg=sensealgForwardEquations)                                                   
     computeGradientAdjoint = setUpGradient(:Adjoint, odeProblem, odeSolverAdjoint, solverAdjointAbsTol, solverAdjointRelTol, 
-                                           peTabModel, simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, 
+                                           petabModel, simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, 
                                            expIdSolve, sensealg=sensealgAdjoint, sensealgSS=sensealgAdjointSS)   
-    computeGradientZygote = setUpGradient(:Zygote, odeProblem, odeSolver, solverAbsTol, solverRelTol, peTabModel, 
+    computeGradientZygote = setUpGradient(:Zygote, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, 
                                           simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, 
                                           expIdSolve, sensealg=sensealgZygote)                 
             
     # The Hessian can either be computed via automatic differentation, or approximated via a block approximation or the 
     # Gauss Newton method                                       
-    computeHessian = setUpHessian(:AutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, peTabModel, simulationInfo,
+    computeHessian = setUpHessian(:AutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
                                   θ_indices, measurementInfo, parameterInfo, priorInfo, expIdSolve)
-    computeHessianBlock = setUpHessian(:BlockAutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, peTabModel, simulationInfo,
+    computeHessianBlock = setUpHessian(:BlockAutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
                                         θ_indices, measurementInfo, parameterInfo, priorInfo, expIdSolve)                                  
-    computeHessianGN = setUpHessian(:GaussNewton, odeProblem, odeSolver, solverAbsTol, solverRelTol, peTabModel, simulationInfo,
+    computeHessianGN = setUpHessian(:GaussNewton, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
                                     θ_indices, measurementInfo, parameterInfo, priorInfo, expIdSolve)                                                                          
 
     # Extract nominal parameter vector and parameter bounds. If needed transform parameters
@@ -282,8 +287,8 @@ function setUpPEtabODEProblem(peTabModel::PeTabModel,
                                    θ_nominalT, 
                                    lowerBounds, 
                                    upperBounds, 
-                                   peTabModel.dirModel * "Cube" * peTabModel.modelName * ".csv",
-                                   peTabModel)
+                                   petabModel.dirModel * "Cube" * petabModel.modelName * ".csv",
+                                   petabModel)
     return petabProblem
 end
 
@@ -293,7 +298,7 @@ function setUpCost(whichMethod::Symbol,
                    odeSolver::SciMLAlgorithm, 
                    solverAbsTol::Float64, 
                    solverRelTol::Float64,
-                   peTabModel::PeTabModel,
+                   petabModel::PEtabModel,
                    simulationInfo::SimulationInfo,
                    θ_indices::ParameterIndices,
                    measurementInfo::MeasurementsInfo,
@@ -304,12 +309,12 @@ function setUpCost(whichMethod::Symbol,
 
     # Functions needed for mapping θ_est to the ODE problem, and then for solving said ODE-system                           
     if whichMethod == :Standard
-        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, peTabModel)                          
-        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, peTabModel, θ_indices)
-        _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
+        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)                          
+        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
+        _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
         __computeCost = (θ_est) -> computeCost(θ_est, 
                                             odeProblem, 
-                                            peTabModel, 
+                                            petabModel, 
                                             simulationInfo, 
                                             θ_indices, 
                                             measurementInfo, 
@@ -320,12 +325,12 @@ function setUpCost(whichMethod::Symbol,
                                             expIDSolve=expIDSolveArg)
                                             
     elseif whichMethod == :Zygote
-        changeExperimentalCondition = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition(pODEProblem, u0, conditionId, θ_dynamic, peTabModel, θ_indices)
-        _changeODEProblemParameters = (pODEProblem, θ_est) -> changeODEProblemParameters(pODEProblem, θ_est, θ_indices, peTabModel)
-        solveODEExperimentalCondition = (odeProblem, conditionId, θ_dynamic, tMax) -> solveOdeModelAtExperimentalCondZygote(odeProblem, conditionId, θ_dynamic, tMax, changeExperimentalCondition, measurementInfo, simulationInfo, odeSolver, solverAbsTol, solverRelTol, sensealgZygote, peTabModel.getTStops)
+        changeExperimentalCondition = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
+        _changeODEProblemParameters = (pODEProblem, θ_est) -> changeODEProblemParameters(pODEProblem, θ_est, θ_indices, petabModel)
+        solveODEExperimentalCondition = (odeProblem, conditionId, θ_dynamic, tMax) -> solveOdeModelAtExperimentalCondZygote(odeProblem, conditionId, θ_dynamic, tMax, changeExperimentalCondition, measurementInfo, simulationInfo, odeSolver, solverAbsTol, solverRelTol, sensealgZygote, petabModel.computeTStops)
         __computeCost = (θ_est) -> computeCostZygote(θ_est, 
                                                    odeProblem, 
-                                                   peTabModel, 
+                                                   petabModel, 
                                                    simulationInfo, 
                                                    θ_indices, 
                                                    measurementInfo, 
@@ -345,7 +350,7 @@ function setUpGradient(whichMethod::Symbol,
                        odeSolver::SciMLAlgorithm, 
                        solverAbsTol::Float64, 
                        solverRelTol::Float64,
-                       peTabModel::PeTabModel,
+                       petabModel::PEtabModel,
                        simulationInfo::SimulationInfo,
                        θ_indices::ParameterIndices,
                        measurementInfo::MeasurementsInfo,
@@ -357,13 +362,13 @@ function setUpGradient(whichMethod::Symbol,
 
     # Functions needed for mapping θ_est to the ODE problem, and then for solving said ODE-system                           
     if whichMethod == :AutoDiff
-        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, peTabModel)                          
-        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, peTabModel, θ_indices)
-        _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
+        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)                          
+        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
+        _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
         _computeGradient! = (gradient, θ_est) -> computeGradientAutoDiff!(gradient, 
                                                                          θ_est, 
                                                                          odeProblem, 
-                                                                         peTabModel, 
+                                                                         petabModel, 
                                                                          simulationInfo, 
                                                                          θ_indices, 
                                                                          measurementInfo, 
@@ -374,18 +379,18 @@ function setUpGradient(whichMethod::Symbol,
                                                                          expIDSolve=expIDSolve)    
                                             
     elseif whichMethod == :ForwardEquations
-        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, peTabModel)
+        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)
         if sensealg == :AutoDiffForward            
-            changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, peTabModel, θ_indices)
-            _solveODEAllExperimentalConditions! = (odeSolutions, S, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, S, odeProblem, θ_dynamic, changeExperimentalCondition!, _changeODEProblemParameters!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)                                           
+            changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
+            _solveODEAllExperimentalConditions! = (odeSolutions, S, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, S, odeProblem, θ_dynamic, changeExperimentalCondition!, _changeODEProblemParameters!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)                                           
         
         else
-            changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, peTabModel, θ_indices, computeForwardSensitivites=true)
-            _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
+            changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices, computeForwardSensitivites=true)
+            _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
         end
         _computeGradient! = (gradient, θ_est) -> computeGradientForwardEquations!(gradient, 
                                                                                  θ_est, 
-                                                                                 peTabModel, 
+                                                                                 petabModel, 
                                                                                  odeProblem, 
                                                                                  sensealg, 
                                                                                  simulationInfo, 
@@ -398,9 +403,9 @@ function setUpGradient(whichMethod::Symbol,
                                                                                  expIDSolve=expIDSolve) 
 
     elseif whichMethod == :Adjoint                                                                                 
-        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, peTabModel)                          
-        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, peTabModel, θ_indices)
-        _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, peTabModel.getTStops, denseSolution=true, expIDSolve=_expIDSolve, trackCallback=true)
+        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)                          
+        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
+        _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, denseSolution=true, expIDSolve=_expIDSolve, trackCallback=true)
         _computeGradient! = (gradient, θ_est) -> computeGradientAdjointEquations!(gradient, 
                                                                                  θ_est, 
                                                                                  odeSolver, 
@@ -409,7 +414,7 @@ function setUpGradient(whichMethod::Symbol,
                                                                                  solverAbsTol, 
                                                                                  solverRelTol, 
                                                                                  odeProblem, 
-                                                                                 peTabModel, 
+                                                                                 petabModel, 
                                                                                  simulationInfo, 
                                                                                  θ_indices, 
                                                                                  measurementInfo, 
@@ -421,13 +426,13 @@ function setUpGradient(whichMethod::Symbol,
 
     elseif whichMethod == :Zygote
 
-        changeExperimentalCondition = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition(pODEProblem, u0, conditionId, θ_dynamic, peTabModel, θ_indices)
-        _changeODEProblemParameters = (pODEProblem, θ_est) -> changeODEProblemParameters(pODEProblem, θ_est, θ_indices, peTabModel)
-        solveODEExperimentalCondition = (odeProblem, conditionId, θ_dynamic, tMax) -> solveOdeModelAtExperimentalCondZygote(odeProblem, conditionId, θ_dynamic, tMax, changeExperimentalCondition, measurementInfo, simulationInfo, odeSolver, solverAbsTol, solverRelTol, sensealg, peTabModel.getTStops)
+        changeExperimentalCondition = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
+        _changeODEProblemParameters = (pODEProblem, θ_est) -> changeODEProblemParameters(pODEProblem, θ_est, θ_indices, petabModel)
+        solveODEExperimentalCondition = (odeProblem, conditionId, θ_dynamic, tMax) -> solveOdeModelAtExperimentalCondZygote(odeProblem, conditionId, θ_dynamic, tMax, changeExperimentalCondition, measurementInfo, simulationInfo, odeSolver, solverAbsTol, solverRelTol, sensealg, petabModel.computeTStops)
         _computeGradient! = (gradient, θ_est) -> computeGradientZygote(gradient, 
                                                                       θ_est, 
                                                                       odeProblem, 
-                                                                      peTabModel, 
+                                                                      petabModel, 
                                                                       simulationInfo, 
                                                                       θ_indices, 
                                                                       measurementInfo, 
@@ -446,7 +451,7 @@ function setUpHessian(whichMethod::Symbol,
                       odeSolver::SciMLAlgorithm, 
                       solverAbsTol::Float64, 
                       solverRelTol::Float64,
-                      peTabModel::PeTabModel,
+                      petabModel::PEtabModel,
                       simulationInfo::SimulationInfo,
                       θ_indices::ParameterIndices,
                       measurementInfo::MeasurementsInfo,
@@ -456,15 +461,15 @@ function setUpHessian(whichMethod::Symbol,
 
     # Functions needed for mapping θ_est to the ODE problem, and then for solving said ODE-system                           
     if whichMethod == :AutoDiff || whichMethod == :BlockAutoDiff
-        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, peTabModel)                          
-        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, peTabModel, θ_indices)
-        _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
+        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)                          
+        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
+        _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
 
         if whichMethod == :AutoDiff
             _computeHessian = (hessian, θ_est) -> computeHessian!(hessian, 
                                                                 θ_est, 
                                                                 odeProblem, 
-                                                                peTabModel, 
+                                                                petabModel, 
                                                                 simulationInfo, 
                                                                 θ_indices, 
                                                                 measurementInfo, 
@@ -477,7 +482,7 @@ function setUpHessian(whichMethod::Symbol,
             _computeHessian = (hessian, θ_est) -> computeHessianBlockApproximation!(hessian, 
                                                                                   θ_est, 
                                                                                   odeProblem, 
-                                                                                  peTabModel, 
+                                                                                  petabModel, 
                                                                                   simulationInfo, 
                                                                                   θ_indices, 
                                                                                   measurementInfo, 
@@ -489,13 +494,13 @@ function setUpHessian(whichMethod::Symbol,
         end
                                             
     elseif whichMethod == :GaussNewton
-        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, peTabModel)
-        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, peTabModel, θ_indices)
-        _solveODEAllExperimentalConditions! = (odeSolutions, S, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, S, odeProblem, θ_dynamic, changeExperimentalCondition!, _changeODEProblemParameters!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, peTabModel.getTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)                                           
+        _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)
+        changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
+        _solveODEAllExperimentalConditions! = (odeSolutions, S, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, S, odeProblem, θ_dynamic, changeExperimentalCondition!, _changeODEProblemParameters!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)                                           
         _computeHessian = (hessian, θ_est) -> computeGaussNewtonHessianApproximation!(hessian, 
                                                                                     θ_est, 
                                                                                     odeProblem, 
-                                                                                    peTabModel, 
+                                                                                    petabModel, 
                                                                                     simulationInfo, 
                                                                                     θ_indices, 
                                                                                     measurementInfo, 

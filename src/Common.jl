@@ -50,7 +50,7 @@ function computeσ(u::AbstractVector,
                   θ_dynamic::AbstractVector,
                   θ_sd::AbstractVector, 
                   θ_nonDynamic::AbstractVector,
-                  peTabModel::PeTabModel,
+                  petabModel::PEtabModel,
                   iMeasurement::Int64, 
                   measurementInfo::MeasurementsInfo,
                   θ_indices::ParameterIndices, 
@@ -61,7 +61,7 @@ function computeσ(u::AbstractVector,
     if mapθ_sd.isSingleConstant == true
         σ = mapθ_sd.constantValues[1]
     else
-        σ = peTabModel.compute_σ(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_sd)
+        σ = petabModel.compute_σ(u, t, θ_sd, θ_dynamic, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_sd)
     end
 
     return σ
@@ -74,14 +74,14 @@ function computehTransformed(u::AbstractVector,
                              θ_dynamic::AbstractVector,
                              θ_observable::AbstractVector, 
                              θ_nonDynamic::AbstractVector,
-                             peTabModel::PeTabModel,
+                             petabModel::PEtabModel,
                              iMeasurement::Int64, 
                              measurementInfo::MeasurementsInfo,
                              θ_indices::ParameterIndices, 
                              parameterInfo::ParametersInfo)::Real
 
     mapθ_observable = θ_indices.mapθ_observable[iMeasurement]
-    h = peTabModel.compute_h(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_observable) 
+    h = petabModel.compute_h(u, t, θ_dynamic, θ_observable, θ_nonDynamic, parameterInfo, measurementInfo.observableId[iMeasurement], mapθ_observable) 
     # Transform yMod is necessary
     hTransformed = transformMeasurementOrH(h, measurementInfo.measurementTransformation[iMeasurement])
 
@@ -213,11 +213,11 @@ function changeODEProblemParameters!(pODEProblem::AbstractVector,
                                      u0::AbstractVector,
                                      θ::AbstractVector,
                                      θ_indices::ParameterIndices,
-                                     peTabModel::PeTabModel)
+                                     petabModel::PEtabModel)
 
     mapODEProblem = θ_indices.mapODEProblem
     pODEProblem[mapODEProblem.iODEProblemθDynamic] .= θ[mapODEProblem.iθDynamic]
-    peTabModel.compute_u0!(u0, pODEProblem) 
+    petabModel.compute_u0!(u0, pODEProblem) 
     
     return nothing
 end
@@ -226,7 +226,7 @@ end
 function changeODEProblemParameters(pODEProblem::AbstractVector, 
                                     θ::AbstractVector,
                                     θ_indices::ParameterIndices,
-                                    peTabModel::PeTabModel)
+                                    petabModel::PEtabModel)
 
     # Helper function to not-inplace map parameters 
     function mapParamToEst(j::Integer, mapDynParam::MapODEProblem)
@@ -236,7 +236,7 @@ function changeODEProblemParameters(pODEProblem::AbstractVector,
 
     mapODEProblem = θ_indices.mapODEProblem
     outpODEProblem = [i ∈ mapODEProblem.iODEProblemθDynamic ? θ[mapParamToEst(i, mapODEProblem)] : pODEProblem[i] for i in eachindex(pODEProblem)]
-    outu0 = peTabModel.compute_u0(outpODEProblem) 
+    outu0 = petabModel.compute_u0(outpODEProblem) 
     
     return outpODEProblem, outu0
 end
@@ -258,13 +258,13 @@ function dualToFloat(x::AbstractFloat)::AbstractFloat
 end
 
 
-function getFileODEvalues(peTabModel::PeTabModel)
+function getFileODEvalues(petabModel::PEtabModel)
   
     # Change model parameters 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(peTabModel.dirModel, readObservables=true)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel.dirModel, readObservables=true)
     parameterInfo = processParameters(parameterDataFile)
     measurementInfo = processMeasurements(measurementDataFile, observablesDataFile) 
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, peTabModel.odeSystem, experimentalConditionsFile)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditionsFile)
 
     θ_estNames = θ_indices.θ_estNames
     θ_est = parameterInfo.nominalValue[findall(x -> x ∈ θ_estNames, parameterInfo.parameterId)]

@@ -4,7 +4,7 @@ function computeJacobianResidualsDynamicθ!(jacobian::Union{Matrix{Float64}, Sub
                                            θ_observable::Vector{Float64},
                                            θ_nonDynamic::Vector{Float64},
                                            S::Matrix{Float64},
-                                           peTabModel::PeTabModel,
+                                           petabModel::PEtabModel,
                                            odeProblem::ODEProblem,
                                            simulationInfo::SimulationInfo,
                                            θ_indices::ParameterIndices,
@@ -20,7 +20,7 @@ function computeJacobianResidualsDynamicθ!(jacobian::Union{Matrix{Float64}, Sub
     θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
 
     # Solve the expanded ODE system for the sensitivites
-    success = solveForSensitivites(S, odeProblem, simulationInfo, peTabModel, :AutoDiff, θ_dynamicT, 
+    success = solveForSensitivites(S, odeProblem, simulationInfo, petabModel, :AutoDiff, θ_dynamicT, 
                                    solveOdeModelAllConditions!, changeODEProblemParameters!, expIDSolve)
     if success != true
         println("Failed to solve sensitivity equations")
@@ -42,7 +42,7 @@ function computeJacobianResidualsDynamicθ!(jacobian::Union{Matrix{Float64}, Sub
 
         # If we have a callback it needs to be properly handled 
         computeJacobianResidualsExpCond!(jacobian, sol, S, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT,
-                                         experimentalConditionId, simulationConditionId, simulationInfo, peTabModel, θ_indices, 
+                                         experimentalConditionId, simulationConditionId, simulationInfo, petabModel, θ_indices, 
                                          measurementInfo, parameterInfo)
     end
 end
@@ -58,7 +58,7 @@ function computeJacobianResidualsExpCond!(jacobian::AbstractMatrix,
                                           experimentalConditionId::Symbol,
                                           simulationConditionId::Symbol,
                                           simulationInfo::SimulationInfo,
-                                          peTabModel::PeTabModel,
+                                          petabModel::PEtabModel,
                                           θ_indices::ParameterIndices,
                                           measurementInfo::MeasurementsInfo, 
                                           parameterInfo::ParametersInfo)
@@ -68,19 +68,19 @@ function computeJacobianResidualsExpCond!(jacobian::AbstractMatrix,
     timePositionInODESolutions = simulationInfo.timePositionInODESolutions[experimentalConditionId]                                                                                                                    
 
     # Pre allcoate vectors needed for computations 
-    ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, peTabModel) 
+    ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, petabModel) 
     
     # To compute 
     compute∂G∂u = (out, u, p, t, i, it) -> begin compute∂G∂_(out, u, p, t, i, it, 
                                                              measurementInfo, parameterInfo, 
-                                                             θ_indices, peTabModel, 
+                                                             θ_indices, petabModel, 
                                                              θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
                                                              ∂h∂u, ∂σ∂u, compute∂G∂U=true, 
                                                              computeResiduals=true)
                                             end
     compute∂G∂p = (out, u, p, t, i, it) -> begin compute∂G∂_(out, u, p, t, i, it, 
                                                              measurementInfo, parameterInfo, 
-                                                             θ_indices, peTabModel, 
+                                                             θ_indices, petabModel, 
                                                              θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, 
                                                              ∂h∂p, ∂σ∂p, compute∂G∂U=false, 
                                                              computeResiduals=true)
@@ -91,7 +91,7 @@ function computeJacobianResidualsExpCond!(jacobian::AbstractMatrix,
     iθ_experimentalCondition = vcat(θ_indices.mapODEProblem.iθDynamic, mapConditionId.iθDynamic)                                                                     
 
     # Loop through solution and extract sensitivites                                                 
-    nModelStates = length(peTabModel.stateNames)
+    nModelStates = length(petabModel.stateNames)
     p = dualToFloat.(sol.prob.p)
     ∂G∂p = zeros(Float64, length(sol.prob.p))    
     ∂G∂u = zeros(Float64, nModelStates)
@@ -120,7 +120,7 @@ function computeResidualsNotSolveODE(θ_dynamic::Vector{Float64},
                                      θ_sd::AbstractVector, 
                                      θ_observable::AbstractVector, 
                                      θ_nonDynamic::AbstractVector,
-                                     peTabModel::PeTabModel,
+                                     petabModel::PEtabModel,
                                      simulationInfo::SimulationInfo,
                                      θ_indices::ParameterIndices,
                                      measurementInfo::MeasurementsInfo,
@@ -146,7 +146,7 @@ function computeResidualsNotSolveODE(θ_dynamic::Vector{Float64},
 
         odeSolution = odeSolutions[experimentalConditionId]
         sucess = computeResidualsExpCond!(residuals, odeSolution, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT,
-                                          peTabModel, experimentalConditionId, simulationInfo, θ_indices, measurementInfo, 
+                                          petabModel, experimentalConditionId, simulationInfo, θ_indices, measurementInfo, 
                                           parameterInfo)
         if sucess == false
             residuals .= Inf
@@ -165,7 +165,7 @@ function computeResidualsExpCond!(residuals::AbstractVector,
                                   θ_sd::AbstractVector, 
                                   θ_observable::AbstractVector, 
                                   θ_nonDynamic::AbstractVector,
-                                  peTabModel::PeTabModel,
+                                  petabModel::PEtabModel,
                                   experimentalConditionId::Symbol,
                                   simulationInfo::SimulationInfo,
                                   θ_indices::ParameterIndices,
@@ -177,13 +177,13 @@ function computeResidualsExpCond!(residuals::AbstractVector,
     end
 
     # Compute yMod and sd for all observations having id conditionID 
-    nModelStates = length(peTabModel.stateNames)
+    nModelStates = length(petabModel.stateNames)
     for iMeasurement in simulationInfo.iMeasurements[experimentalConditionId]
         
         t = measurementInfo.time[iMeasurement]
         u = dualToFloat.(odeSolution[1:nModelStates, simulationInfo.iTimeODESolution[iMeasurement]])
-        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
-        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
+        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
+        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
             
         # By default a positive ODE solution is not enforced (even though the user can provide it as option).
         # In case with transformations on the data the code can crash, hence Inf is returned in case the 

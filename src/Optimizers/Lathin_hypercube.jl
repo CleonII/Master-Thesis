@@ -6,7 +6,7 @@ using Distributions
     createCube(pathSave::String, petabProblem::PEtabODEProblem, nSamples::Integer; seed=123, verbose::Bool=false)
 
     For a PeTab-optimization struct create a Lathin-hypercube of nSamples parameter vectors which 
-    is stored at pathSave (default in peTabModel.dirModel). 
+    is stored at pathSave (default in petabModel.dirModel). 
 """
 function createCube(pathSave::String, petabProblem::PEtabODEProblem, nSamples::Integer; seed=123, verbose::Bool=false)
     _createCube(pathSave, petabProblem, nSamples, seed=seed, verbose=verbose)
@@ -15,7 +15,7 @@ end
     createCube(petabProblem::PEtabODEProblem, nSamples::Integer; seed=123, verbose::Bool=false)
 
     For a PeTab-optimization struct create a Lathin-hypercube of nSamples parameter vectors which 
-    is stored at petabProblem.pathCube (which by default is in peTabModel.dirModel). 
+    is stored at petabProblem.pathCube (which by default is in petabModel.dirModel). 
 """
 function createCube(petabProblem::PEtabODEProblem, nSamples::Integer; seed=123, verbose::Bool=false)
     _createCube(petabProblem.pathCube, petabProblem, nSamples, seed=seed, verbose=verbose)

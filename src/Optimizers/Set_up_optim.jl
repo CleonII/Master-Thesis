@@ -71,7 +71,6 @@ function createOptimInteriorNewton(petabProblem::PEtabODEProblem;
                                                p0[iBelow] .= petabProblem.lowerBounds[iBelow] .+ 0.001
                                                p0[iAbove] .= petabProblem.upperBounds[iAbove] .- 0.001
                                                df.f(p0)
-                                               println("p0 = $p0")
                                                return Optim.optimize(df, 
                                                                      dfc, 
                                                                      p0, 

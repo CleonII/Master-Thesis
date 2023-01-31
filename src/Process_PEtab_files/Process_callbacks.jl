@@ -35,7 +35,7 @@ function createCallbacksForTimeDepedentPiecewise(odeSystem::ODESystem,
         callbackNames = prod(["cb_" * key * ", " for key in keys(SBMLDict["boolVariables"])])[1:end-2]
         checkIfActivatedT0Names = prod(["isActiveAtTime0_" * key * "!, " for key in keys(SBMLDict["boolVariables"])])[1:end-2]
 
-        stringWriteTstops *= "\t return " * createFuncionForTstops(SBMLDict, modelStateNames, pODEProblemNames) * "\nend"
+        stringWriteTstops *= "\t return " * createFuncionForTstops(SBMLDict, modelStateNames, pODEProblemNames, θ_indices) * "\nend"
     end
 
     stringWriteCallbacks *= "\treturn CallbackSet(" * callbackNames * "), [" * checkIfActivatedT0Names * "]\nend"
@@ -119,7 +119,7 @@ end
 
 # Function computing t-stops (time for events) for piecewise expressions using the symbolics package 
 # to symboically solve for where the condition is zero
-function createFuncionForTstops(SBMLDict::Dict, modelStateNames::Vector{String}, pODEProblemNames::Vector{String})
+function createFuncionForTstops(SBMLDict::Dict, modelStateNames::Vector{String}, pODEProblemNames::Vector{String}, θ_indices::ParameterIndices)
 
     tstopsStr = Vector{String}(undef, length(keys(SBMLDict["boolVariables"])))
     i = 1
@@ -128,7 +128,8 @@ function createFuncionForTstops(SBMLDict::Dict, modelStateNames::Vector{String},
         conditionFormula = SBMLDict["boolVariables"][key][1]
         # In case the activation formula contains a state we cannot precompute the t-stop time as it depends on 
         # the actual ODE solution.
-        if conditionHasStates(conditionFormula, modelStateNames) == true
+        if conditionHasStates(conditionFormula, modelStateNames) || conditionHasParametersToEstimate(conditionFormula, pODEProblemNames, θ_indices)
+            tstopsStr[i] = ""
             i += 1
             continue
         end
@@ -162,7 +163,7 @@ function createFuncionForTstops(SBMLDict::Dict, modelStateNames::Vector{String},
         i += 1
     end
 
-    return "[" * prod([str * ", " for str in tstopsStr])[1:end-2] * "]"
+    return "Float64[" * prod([isempty(tstopsStr[i]) ? "" : tstopsStr[i] * ", " for i in eachindex(tstopsStr)])[1:end-2] * "]"
 end
 
 

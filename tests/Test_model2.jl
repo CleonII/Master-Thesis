@@ -1,10 +1,12 @@
-# Check the accruacy of the PeTab importer for a simple linear ODE;
-#   s' = alpha*s; s(0) = 8.0 -> s(t) = 8.0 * exp(alpha*t)
-#   d' = beta*d;  d(0) = 4.0 -> d(t) = 4.0 * exp(beta*t)
-# This ODE is solved analytically, and using the analytical solution the accuracy of 
-# the ODE solver, cost function, gradient and hessian of the PeTab importer is checked.
-# The accuracy of the optimizers is further checked.
-# The measurment data is avaible in tests/Test_model2/
+#= 
+    Check the accruacy of the PeTab importer for a simple linear ODE;
+        s' = alpha*s; s(0) = 8.0 -> s(t) = 8.0 * exp(alpha*t)
+        d' = beta*d;  d(0) = 4.0 -> d(t) = 4.0 * exp(beta*t)
+    This ODE is solved analytically, and using the analytical solution the accuracy of 
+    the ODE solver, cost function, gradient and hessian of the PeTab importer is checked.
+    The accuracy of the optimizers is further checked.
+    The measurment data is avaible in tests/Test_model2/
+ =#
 
 
 using ModelingToolkit 
@@ -25,6 +27,7 @@ using Sundials
 using Ipopt
 using Optim
 using NLopt
+using Test
 
 
 # Relevant PeTab structs for compuations 
@@ -39,15 +42,14 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
-# For testing residuals
-include(joinpath(pwd(), "tests", "Test_residuals.jl"))
-
 # Optimizers 
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_Ipopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_optim.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_NLopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_fides.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_forward_gradient.jl"))
+
+include(joinpath(pwd(), "tests", "Common.jl"))
 
 
 """
@@ -57,64 +59,52 @@ include(joinpath(pwd(), "src", "Optimizers", "Set_up_forward_gradient.jl"))
     tolerance tol for the Test_model2.
     Returns true if passes test (sqDiff less than 1e-8) else returns false. 
 """
-function testOdeSol(peTabModel::PeTabModel, solver, tol; printRes=false)
+function testODESolverTestModel2(petabModel::PEtabModel, solver, tol)
    
     # Set values to PeTab file values 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(peTabModel.dirModel, readObservables=true)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel.dirModel, readObservables=true)
     measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
     paramData = processParameters(parameterDataFile) 
-    setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, paramData)
-    θ_indices = computeIndicesθ(paramData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
-    
-    # Extract experimental conditions for simulations 
-    simulationInfo = processSimulationInfo(peTabModel, measurementData)
+    θ_indices = computeIndicesθ(paramData, measurementData, petabModel.odeSystem, experimentalConditionsFile)
+    simulationInfo = processSimulationInfo(petabModel, measurementData)
+    setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, paramData)
 
     # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
     u0 = [8.0, 4.0]
-    paramMat = reshape([2.0, 3.0,
-                        1.0, 2.0,
-                        1.0, 0.4,
-                        4.0, 3.0,
-                        0.01, 0.02], (2, 5))
+    parametersTest = reshape([2.0, 3.0,
+                              1.0, 2.0,
+                              1.0, 0.4,
+                              4.0, 3.0,
+                              0.01, 0.02], (2, 5))
 
     for i in 1:5
 
-        alpha, beta = paramMat[:, i]        
+        alpha, beta = parametersTest[:, i]        
         # Set parameter values for ODE
-        peTabModel.paramMap[2] = Pair(peTabModel.paramMap[2].first, alpha)
-        peTabModel.paramMap[3] = Pair(peTabModel.paramMap[3].first, beta)
-        prob = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true)
+        petabModel.parameterMap[2] = Pair(petabModel.parameterMap[2].first, alpha)
+        petabModel.parameterMap[3] = Pair(petabModel.parameterMap[3].first, beta)
+        prob = ODEProblem(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true)
         prob = remake(prob, p = convert.(Float64, prob.p), u0 = convert.(Float64, prob.u0))
-        θ_est = getFileODEvalues(peTabModel)
-        changeExperimentalCondition! = (pVec, u0Vec, expID) -> _changeExperimentalCondition!(pVec, u0Vec, expID, θ_est, peTabModel, θ_indices)
+        θ_est = getFileODEvalues(petabModel)
+        changeExperimentalCondition! = (pVec, u0Vec, expID) -> _changeExperimentalCondition!(pVec, u0Vec, expID, θ_est, petabModel, θ_indices)
         
         # Solve ODE system 
-        solArray, success = solveODEAllExperimentalConditions(prob, changeExperimentalCondition!, simulationInfo, solver, tol, tol, peTabModel.getTStops)
-        solNumeric = solArray[simulationInfo.experimentalConditionId[1]]
+        odeSolutions, success = solveODEAllExperimentalConditions(prob, changeExperimentalCondition!, simulationInfo, solver, tol, tol, petabModel.computeTStops)
+        odeSolution = odeSolutions[simulationInfo.experimentalConditionId[1]]
         
         # Compare against analytical solution 
         sqDiff = 0.0
-        for t in solNumeric.t
+        for t in odeSolution.t
             solAnalytic = [u0[1]*exp(alpha*t), u0[2]*exp(beta*t)]
-            sqDiff += sum((solNumeric(t)[1:2] - solAnalytic).^2)
+            sqDiff += sum((odeSolution(t)[1:2] - solAnalytic).^2)
         end
 
-        if sqDiff > 1e-8
-            @printf("sqDiff = %.3e\n", sqDiff)
-            @printf("Does not pass test\n")
-            return false
-        end
-
-        if printRes == true
-            @printf("sqDiff = %.3e\n", sqDiff)
-        end
+        @test sqDiff ≤ 1e-6
     end
-
-    return true
 end
 
 
-function calcCostAnalytic(paramVec)
+function computeCostAnalyticTestModel2(paramVec)
 
     u0 = [8.0, 4.0]
     alpha, beta = paramVec[1:2]
@@ -151,127 +141,58 @@ end
 
 
 """
-    testCostGradHess(solver, tol; printRes::Bool=false)
+    testCostGradientOrHessianTestModel2(solver, tol; printRes::Bool=false)
 
     Compare cost, gradient and hessian computed via the analytical solution 
     vs the PeTab importer functions (to check PeTab importer) for five random 
     parameter vectors for Test_model2. For the analytical solution the gradient 
     and hessian are computed via ForwardDiff.
 """
-function testCostGradHess(peTabModel::PeTabModel, solver, tol; printRes::Bool=false)
+function testCostGradientOrHessianTestModel2(petabModel::PEtabModel, solver, tol)
     
-    petabProblem1 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+    petabProblem1 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
                                          sensealgZygote = ForwardDiffSensitivity(), 
                                          odeSolverForwardEquations=Vern9(), sensealgForwardEquations = ForwardDiffSensitivity(), 
                                          odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
                                          sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
 
-    petabProblem2 = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+    petabProblem2 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
                                          sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=Vern9())
     
 
     Random.seed!(123)
     createCube(petabProblem1, 5)
     cube = Matrix(CSV.read(petabProblem1.pathCube, DataFrame))
-    nParam = size(cube)[2]
 
     for i in 1:5
 
-        paramVec = cube[i, :]
+        p = cube[i, :]
+        referenceCost = computeCostAnalyticTestModel2(p)
+        referenceGradient = ForwardDiff.gradient(computeCostAnalyticTestModel2, p)
+        referenceHessian = ForwardDiff.hessian(computeCostAnalyticTestModel2, p)
 
-        # Evaluate cost 
-        costPeTab = petabProblem1.computeCost(paramVec)
-        costAnalytic = calcCostAnalytic(paramVec)
-        sqDiffCost = (costPeTab - costAnalytic)^2
-        if sqDiffCost > 1e-6
-            @printf("sqDiffCost = %.3e\n", sqDiffCost)
-            @printf("Does not pass test on cost\n")
-            return false
-        end
+        # Test both the standard and Zygote approach to compute the cost 
+        cost = _testCostGradientOrHessian(petabProblem1, p, cost=true)
+        @test cost ≈ referenceCost atol=1e-3
+        costZygote = _testCostGradientOrHessian(petabProblem1, p, costZygote=true)
+        @test costZygote ≈ referenceCost atol=1e-3
 
-        # Evaluate gradient 
-        gradAnalytic = ForwardDiff.gradient(calcCostAnalytic, paramVec)
-        gradNumeric = zeros(nParam) 
-        petabProblem1.computeGradientAutoDiff(gradNumeric, paramVec)
-        sqDiffGrad = sum((gradAnalytic - gradNumeric).^2)
-        if sqDiffGrad > 1e-4
-            @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-            @printf("Does not pass test on gradient\n")
-            return false
-        end
+        # Test all gradient combinations. Note we test sensitivity equations with and without autodiff 
+        gradientAutoDiff = _testCostGradientOrHessian(petabProblem1, p, gradientAutoDiff=true)
+        @test norm(gradientAutoDiff - referenceGradient) ≤ 1e-2
+        gradientZygote = _testCostGradientOrHessian(petabProblem1, p, gradientZygote=true)
+        @test norm(gradientZygote - referenceGradient) ≤ 1e-2
+        gradientAdjoint = _testCostGradientOrHessian(petabProblem1, p, gradientAdjoint=true)
+        @test norm(normalize(gradientAdjoint) - normalize((referenceGradient))) ≤ 1e-2
+        gradientForwardEquations1 = _testCostGradientOrHessian(petabProblem1, p, gradientForwardEquations=true)
+        @test norm(gradientForwardEquations1 - referenceGradient) ≤ 1e-2
+        gradientForwardEquations2 = _testCostGradientOrHessian(petabProblem2, p, gradientForwardEquations=true)
+        @test norm(gradientForwardEquations2 - referenceGradient) ≤ 1e-2
 
-        # Evalute Zygote cost function 
-        costPeTab = petabProblem1.computeCostZygote(paramVec)
-        sqDiffCostZygote = (costPeTab - costAnalytic)^2
-        if sqDiffCostZygote > 1e-6
-            @printf("sqDiffCost = %.3e\n", sqDiffCost)
-            @printf("Does not pass test on cost for Zygote cost function\n")
-            return false
-        end
-
-        # Evalute gradient obtained via Zygote and sensealg 
-        gradZygoteSensealg = Zygote.gradient(petabProblem1.computeCostZygote, paramVec)[1]
-        sqDiffGradZygote = sum((gradAnalytic - gradZygoteSensealg).^2)
-        if sqDiffGradZygote > 1e-6
-            @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-            @printf("Does not pass test on gradient with Zygote\n")
-            return false
-        end
-
-        # Forward sensitivity equations gradient
-        gradForwardEq = zeros(nParam)
-        petabProblem1.computeGradientForwardEquations(gradForwardEq, paramVec)
-        sqDiffGradForwardEq = sum((gradForwardEq - gradAnalytic).^2)
-        if sqDiffGradForwardEq > 1e-5
-            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
-            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
-            return false
-        end
-
-        # Forward sensitivity equations using autodiff 
-        gradForwardEqAuto = zeros(nParam)
-        petabProblem2.computeGradientForwardEquations(gradForwardEqAuto, paramVec)
-        sqDiffGradForwardEqAuto = sum((gradForwardEq - gradAnalytic).^2)
-        if sqDiffGradForwardEqAuto > 1e-5
-            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
-            @printf("Does not pass test on gradient from Forward sensitivity equations\n")
-            return false
-        end
-
-        # Evaluate lower level adjoint sensitivity interfance gradient 
-        gradAdj = zeros(nParam)
-        petabProblem1.computeGradientAdjoint(gradAdj, paramVec)
-        sqDiffGradAdjoint1 = sum((gradAdj ./ norm(gradAdj) - gradAnalytic ./ norm(gradAnalytic)).^2)
-        if sqDiffGradAdjoint1 > 1e-4
-            @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
-            @printf("Does not pass test on adjoint gradient gradient\n")
-            return false
-        end
-
-        # Evaluate hessian 
-        hessAnalytic = ForwardDiff.hessian(calcCostAnalytic, paramVec)
-        hessNumeric = zeros(nParam, nParam); 
-        petabProblem1.computeHessian(hessNumeric, paramVec)
-        sqDiffHess = sum((hessAnalytic - hessNumeric).^2)
-        if sqDiffHess > 1e-3
-            @printf("sqDiffHess = %.3e\n", sqDiffHess)
-            @printf("Does not pass test on hessian\n")
-            return false
-        end
-                
-        if printRes == true
-            @printf("sqDiffCost = %.3e\n", sqDiffCost)
-            @printf("sqDiffGrad = %.3e\n", sqDiffGrad)
-            @printf("sqDiffHess = %.3e\n", sqDiffHess)
-            @printf("sqDiffCostZygote = %.3e\n", sqDiffCostZygote)
-            @printf("sqDiffGradZygote = %.3e\n", sqDiffGradZygote)
-            @printf("sqDiffGradForwardEq = %.3e\n", sqDiffGradForwardEq)
-            @printf("sqDiffGradForwardEqAuto = %.3e\n", sqDiffGradForwardEqAuto)
-            @printf("sqDiffGradAdjointOpt1 = %.3e\n", sqDiffGradAdjoint1)
-        end
+        # Testing "exact" hessian via autodiff 
+        hessian = _testCostGradientOrHessian(petabProblem1, p, hessian=true)
+        @test norm(hessian - referenceHessian) ≤ 1e-3
     end
-
-    return true
 end
 
 
@@ -282,9 +203,9 @@ end
     from a random starting point. Convergence assumed if sum((p_est - p_true).^2) is 
     smaller than 1e-3.
 """
-function testOptimizer(peTabModel::PeTabModel, solver, tol)
+function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
 
-    petabProblem = setUpPEtabODEProblem(peTabModel, solver, solverAbsTol=tol, solverRelTol=tol)
+    petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol)
 
     Random.seed!(123)
     createCube(petabProblem, 5)
@@ -301,6 +222,9 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
                               options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
     runFidesHessBlock = setUpFides(petabProblem, :blockAutoDiff; verbose=0, 
                                    options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
+    runFidesHessBFGS = setUpFides(petabProblem, :None; verbose=0, 
+                                  fidesHessApprox=py"fides.hessian_approximation.BFGS()"o, 
+                                  options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)                                   
 
     # Optim optimizers 
     optimProbHessApprox = createOptimProb(petabProblem, IPNewton(), hessianUse=:blockAutoDiff)
@@ -325,132 +249,72 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     NLoptTNewton.maxeval = 5000
 
     p0 = cube[1, :]
+
+    # Ipopt AutoDiffHessian 
+    ipoptProbAutoHess.x = deepcopy(p0)
+    ipoptProbAutoHess.eval_f(p0)
+    sol_opt = Ipopt.IpoptSolve(ipoptProbAutoHess)
+    sqDiffIpoptHessian = sum((ipoptProbAutoHess.x - petabProblem.θ_nominal).^2)
+    @test sqDiffIpoptHessian ≤ 1e-3
+
     # Ipopt Hessian approximation
     ipoptProbHessApprox.x = deepcopy(p0)
     ipoptProbHessApprox.eval_f(p0) # Needed to avoid segfault, must write a wrapper for this 
     sol_opt = Ipopt.IpoptSolve(ipoptProbHessApprox)
-    sqDiff = sum((ipoptProbHessApprox.x - petabProblem.θ_nominal).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
-        @printf("Failed on optimization for Ipopt hessian approximation\n")
-        return false
-    else
-        @printf("Passed test for Ipopt hess approx\n")
-    end
-    
-    # Ipopt AutoHessian 
-    ipoptProbAutoHess.x = deepcopy(p0)
-    ipoptProbAutoHess.eval_f(p0)
-    sol_opt = Ipopt.IpoptSolve(ipoptProbAutoHess)
-    sqDiff = sum((ipoptProbAutoHess.x - petabProblem.θ_nominal).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
-        @printf("Failed on optimization for Ipopt auto hessian\n")
-        return false
-    else
-        @printf("Passed test for Ipopt hess autodiff\n")
-    end
+    sqDiffIpoptBlockHessian = sum((ipoptProbHessApprox.x - petabProblem.θ_nominal).^2)
+    @test sqDiffIpoptBlockHessian ≤ 1e-3
 
     # Ipopt BFGS 
     ipoptProbBfgs.x = deepcopy(p0)
     ipoptProbBfgs.eval_f(p0)
     sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
-    sqDiff = sum((ipoptProbBfgs.x - petabProblem.θ_nominal).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
-        @printf("Failed on optimization for Ipopt BFGS\n")
-        return false
-    else
-        @printf("Passed test for Ipopt LBFGS\n")
-    end
+    sqDiffIpoptBFGS = sum((ipoptProbBfgs.x - petabProblem.θ_nominal).^2)
+    @test sqDiffIpoptBFGS ≤ 1e-3
 
-    # Fides autoDiff hessian 
+    # Fides AutoDiff hessian
     res, niter, converged = runFidesHess(p0)
-    sqDiff = sum((res[2] - petabProblem.θ_nominal).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
-        @printf("Failed on optimization for Fides hessian autodiff\n")
-        return false
-    else
-        @printf("Passed test for Fides hessian autodiff\n")
-    end
+    sqDiffFidesHessian = sum((res[2] - petabProblem.θ_nominal).^2)
+    @test sqDiffFidesHessian ≤ 1e-3
 
-    # Fides block auto diff hessian 
+    # Fides BlockAutoDiff hessian  
     res, niter, converged = runFidesHessBlock(p0)
-    sqDiff = sum((res[2] - petabProblem.θ_nominal).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
-        @printf("Failed on optimization for Fides hessian block autodiff\n")
-        return false
-    else
-        @printf("Passed test for Fides hessian block autodiff\n")
-    end
+    sqDiffFidesBlockHessian = sum((res[2] - petabProblem.θ_nominal).^2)
+    @test sqDiffFidesBlockHessian ≤ 1e-3
 
-    # Optim HessApprox 
-    res = optimProbHessApprox(p0, showTrace=false)
-    sqDiff = sum((res.minimizer - petabProblem.θ_nominal).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
-        @printf("Failed on optimization for HessApprox\n")
-        return false
-    else
-        @printf("Passed test for Optim interior point newton hessian approximation\n")
-    end
+    # Fides BFGS 
+    res, niter, converged = runFidesHessBFGS(p0)
+    sqDiffFidesBFGS = sum((res[2] - petabProblem.θ_nominal).^2)
+    @test sqDiffFidesBFGS ≤ 1e-3
 
     # Optim AutoHess 
     res = optimProbAutoHess(p0, showTrace=false)
-    sqDiff = sum((res.minimizer - petabProblem.θ_nominal).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffHessApprox = %.3e\n", sqDiff)
-        @printf("Failed on optimization for Optim AutoHess\n")
-        return false
-    else
-        @printf("Passed test for Optim interior point newton hessian autoDiff\n")
-    end
+    sqDiffOptimHessian = sum((res.minimizer - petabProblem.θ_nominal).^2)
+    @test sqDiffOptimHessian ≤ 1e-3
+
+    # Optim block hessian 
+    res = optimProbHessApprox(p0, showTrace=false)
+    sqDiffOptimBlockHessian = sum((res.minimizer - petabProblem.θ_nominal).^2)
+    @test sqDiffOptimBlockHessian ≤ 1e-3
 
     # Optim BFGS
     res = optimProbBFGS(p0, showTrace=false)
-    sqDiff = sum((res.minimizer - petabProblem.θ_nominal).^2)
-    if sqDiff > 1.0
-        @printf("sqDiffBFGS = %.3e\n", sqDiff)
-        @printf("Failed on optimization for Optim BFGS\n")
-        return false
-    else
-        @printf("Passed test for Optim BFGS\n")
-    end
+    sqDiffOptimBFGS = sum((res.minimizer - petabProblem.θ_nominal).^2)
+    @test sqDiffOptimBFGS ≤ 1e-3
 
-    # Optim BFGS
+    # Optim LBFGS
     res = optimProbLBFGS(p0, showTrace=false)
-    sqDiff = sum((res.minimizer - petabProblem.θ_nominal).^2)
-    if sqDiff > 1.0
-        @printf("sqDiffLBFGS = %.3e\n", sqDiff)
-        @printf("Failed on optimization for Optim LBFGS\n")
-        return false
-    else
-        @printf("Passed test for Optim LBFGS\n")
-    end
+    sqDiffOptimLBFGS = sum((res.minimizer - petabProblem.θ_nominal).^2)
+    @test sqDiffOptimLBFGS ≤ 1e-3
 
     # NLopt LBFGS
     minf, minx, ret = NLopt.optimize(NLoptLBFGS, p0)
-    sqDiff = sum((minx - petabProblem.θ_nominal).^2)
-    if sqDiff > 1.0
-        @printf("sqDiffLBFGS = %.3e\n", sqDiff)
-        @printf("Failed on optimization for NLopt LBFGS\n")
-        return false
-    else
-        @printf("Passed test for NLopt LBFGS\n")
-    end
+    sqDiffNLoptLBFGS = sum((minx - petabProblem.θ_nominal).^2)
+    @test sqDiffNLoptLBFGS ≤ 1e-3
 
     # NLopt truncated Newton with preconditioner 
     minf, minx, ret = NLopt.optimize(NLoptTNewton, p0)
-    sqDiff = sum((minx - petabProblem.θ_nominal).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffLBFGS = %.3e\n", sqDiff)
-        @printf("Failed on optimization for NLopt Newton with preconditioner \n")
-        return false
-    else
-        @printf("Passed test for NLopt Newton with preconditioner \n")
-    end
+    sqDiffNLoptTNewtonPre = sum((minx - petabProblem.θ_nominal).^2)
+    @test sqDiffNLoptTNewtonPre ≤ 1e-3
 
     p0 = petabProblem.θ_nominal .+ 0.1
     stepLengths = log10.(LinRange(exp10(1e-2),exp10(1e-4), 10000))
@@ -458,47 +322,28 @@ function testOptimizer(peTabModel::PeTabModel, solver, tol)
     minCost, minParams, costVal, paramVal = runAdam(p0, forwardGradOpt, verbose=false, seed=14)
     # The dynamic parameters are easily estimated, but sd-parameter often fail so do not 
     # include them into the tests.
-    sqDiff = sum((minParams[1:2] - petabProblem.θ_nominal[1:2]).^2)
-    if sqDiff > 1e-3
-        @printf("sqDiffForwardGradient = %.3e\n", sqDiff)
-        @printf("Failed optimization for forward gradient\n")
-        return false
-    else
-        @printf("Passed test for optimization forward gradient\n")
+    sqDiffForwardGradient = sum((minParams[1:2] - petabProblem.θ_nominal[1:2]).^2)
+    @test sqDiffForwardGradient ≤ 1e-3
+end
+
+
+petabModel = readPEtabModel("Test_model2", pwd() * "/tests/Test_model2/", forceBuildJlFile=true)
+loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
+
+@testset verbose=true "Test model 2" begin
+    @testset "Test model2 : ODE solver" begin 
+        testODESolverTestModel2(petabModel, Vern9(), 1e-9)
     end
 
-    return true
-end
+    @testset "Test model2 : Cost gradient and hessian" begin 
+        testCostGradientOrHessianTestModel2(petabModel, Vern9(), 1e-15)
+    end
 
+    @testset "Test model 2 : Optimizers" begin
+        testOptimizersTestModel2(petabModel, Rodas4P(), 1e-9)
+    end
 
-peTabModel = setUpPeTabModel("Test_model2", pwd() * "/tests/Test_model2/", forceBuildJlFile=true)
-
-passTest = testOdeSol(peTabModel, Vern9(), 1e-9, printRes=true)
-if passTest == true
-    @printf("Passed test for ODE solution\n")
-else
-    @printf("Did not pass test for ODE solution\n")
-end
-
-passTest = testCostGradHess(peTabModel, Vern9(), 1e-15, printRes=true)
-if passTest == true
-    @printf("Passed test for cost, gradient and hessian\n")
-else
-    @printf("Did not pass test for cost, gradient and hessian\n")
-end
-
-# Will have to change parameters 
-loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
-passTest = testOptimizer(peTabModel, Rodas4P(), 1e-9)
-if passTest == true
-    @printf("Passed test for checking optimizers\n")
-else
-    @printf("Did not pass test for checking optimizers\n")
-end
-
-passTest = checkGradientResiduals(peTabModel, Rodas5(), 1e-9)
-if passTest == true
-    @printf("Passed test for gradient for residuals\n")
-else
-    @printf("Did not pass test for gradient for residuals\n")
+    @testset "Test model 2 : Gradient of residuals" begin
+        checkGradientResiduals(petabModel, Rodas5(), 1e-9)
+    end
 end

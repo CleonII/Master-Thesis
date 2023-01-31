@@ -1,7 +1,7 @@
 using Distributed
 
 
-function setUpPEtabOptDistributed(peTabModel::PeTabModel,
+function setUpPEtabOptDistributed(petabModel::PEtabModel,
                                   solver::SciMLAlgorithm, 
                                   tol::Float64,
                                   adjSolver::SciMLAlgorithm,
@@ -22,7 +22,7 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
     # Make functions, structs and packages aware for each process 
     loadPackages()
     loadFunctionsAndStructs()
-    loadYmodSdU0(peTabModel)
+    loadYmodSdU0(petabModel)
     
     nProcs = nprocs()                                  
     if nProcs > length(simulationInfo.conditionIdSol)
@@ -48,7 +48,7 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
 
     # Send required PEtab structs to processes 
     for i in 1:nProcs
-        sendPEtabStruct(peTabModel, jobs[i], results[i], "PEtab model", procs()[i])
+        sendPEtabStruct(petabModel, jobs[i], results[i], "PEtab model", procs()[i])
         sendPEtabStruct(parameterData, jobs[i], results[i], "Parameter data", procs()[i])
         sendPEtabStruct(measurementInfo, jobs[i], results[i], "Measurement data", procs()[i])
         sendPEtabStruct(simulationInfo, jobs[i], results[i], "Simulation info", procs()[i])
@@ -181,7 +181,7 @@ function setUpPEtabOptDistributed(peTabModel::PeTabModel,
 end
 
 
-function sendPEtabStruct(structSend::Union{PeTabModel, ParametersInfo, MeasurementsInfo, SimulationInfo, ParameterIndices, PriorInfo}, 
+function sendPEtabStruct(structSend::Union{PEtabModel, ParametersInfo, MeasurementsInfo, SimulationInfo, ParameterIndices, PriorInfo}, 
                          job::RemoteChannel, 
                          result::RemoteChannel, 
                          strSend::String, 
@@ -248,11 +248,11 @@ function loadFunctionsAndStructs()
 end
  
 
-function loadYmodSdU0(peTabModel::PeTabModel)
+function loadYmodSdU0(petabModel::PEtabModel)
     println("Loading yMod, SD and u0 functions")
-    pathObsSdU0 = peTabModel.dirModel * peTabModel.modelName * "ObsSdU0.jl"
-    pathDObsSdU0 = peTabModel.dirModel * peTabModel.modelName * "DObsSdU0.jl"
-    pathCallbacks = peTabModel.dirModel * peTabModel.modelName * "Callbacks_time_piecewise.jl"
+    pathObsSdU0 = petabModel.dirModel * petabModel.modelName * "ObsSdU0.jl"
+    pathDObsSdU0 = petabModel.dirModel * petabModel.modelName * "DObsSdU0.jl"
+    pathCallbacks = petabModel.dirModel * petabModel.modelName * "Callbacks_time_piecewise.jl"
     @eval @everywhere include($pathObsSdU0)
     @eval @everywhere include($pathDObsSdU0)
     @eval @everywhere include($pathCallbacks)

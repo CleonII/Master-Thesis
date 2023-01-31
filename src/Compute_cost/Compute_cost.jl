@@ -1,6 +1,6 @@
 function computeCost(θ_est::AbstractVector,
                      odeProblem::ODEProblem,  
-                     peTabModel::PeTabModel,
+                     petabModel::PEtabModel,
                      simulationInfo::SimulationInfo,
                      θ_indices::ParameterIndices,
                      measurementInfo::MeasurementsInfo,
@@ -14,7 +14,7 @@ function computeCost(θ_est::AbstractVector,
 
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
 
-    cost = computeCostSolveODE(θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem, peTabModel, simulationInfo, 
+    cost = computeCostSolveODE(θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem, petabModel, simulationInfo, 
                                θ_indices, measurementInfo, parameterInfo, changeODEProblemParameters!, solveOdeModelAllConditions!, 
                                computeHessian=computeHessian, computeResiduals=computeResiduals, expIDSolve=expIDSolve)
 
@@ -32,7 +32,7 @@ function computeCostSolveODE(θ_dynamic::AbstractVector,
                              θ_observable::AbstractVector,
                              θ_nonDynamic::AbstractVector,
                              odeProblem::ODEProblem,
-                             peTabModel::PeTabModel,
+                             petabModel::PEtabModel,
                              simulationInfo::SimulationInfo,
                              θ_indices::ParameterIndices,
                              measurementInfo::MeasurementsInfo,
@@ -64,7 +64,7 @@ function computeCostSolveODE(θ_dynamic::AbstractVector,
         return Inf
     end
 
-    cost = _computeCost(θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, simulationInfo, θ_indices, measurementInfo, 
+    cost = _computeCost(θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, petabModel, simulationInfo, θ_indices, measurementInfo, 
                         parameterInfo, expIDSolve, 
                         computeHessian=computeHessian, 
                         computeGradientDynamicθ=computeGradientDynamicθ, 
@@ -78,7 +78,7 @@ function computeCostNotSolveODE(θ_dynamic::Vector{Float64},
                                 θ_sd::AbstractVector,
                                 θ_observable::AbstractVector,
                                 θ_nonDynamic::AbstractVector,
-                                peTabModel::PeTabModel,
+                                petabModel::PEtabModel,
                                 simulationInfo::SimulationInfo,
                                 θ_indices::ParameterIndices,
                                 measurementInfo::MeasurementsInfo,
@@ -95,7 +95,7 @@ function computeCostNotSolveODE(θ_dynamic::Vector{Float64},
     θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
     θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
 
-    cost = _computeCost(θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, peTabModel, simulationInfo, θ_indices, 
+    cost = _computeCost(θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, petabModel, simulationInfo, θ_indices, 
                         measurementInfo, parameterInfo, expIDSolve, 
                         computeGradientNotSolveAutoDiff=computeGradientNotSolveAutoDiff, 
                         computeGradientNotSolveAdjoint=computeGradientNotSolveAdjoint, 
@@ -109,7 +109,7 @@ function _computeCost(θ_dynamic::AbstractVector,
                       θ_sd::AbstractVector, 
                       θ_observable::AbstractVector, 
                       θ_nonDynamic::AbstractVector,
-                      peTabModel::PeTabModel,
+                      petabModel::PEtabModel,
                       simulationInfo::SimulationInfo,
                       θ_indices::ParameterIndices,
                       measurementInfo::MeasurementsInfo, 
@@ -137,7 +137,7 @@ function _computeCost(θ_dynamic::AbstractVector,
 
         # Extract the ODE-solution for specific condition ID
         odeSolution = odeSolutions[experimentalConditionId]  
-        cost += computeCostExpCond(odeSolution, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, peTabModel, 
+        cost += computeCostExpCond(odeSolution, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, petabModel, 
                                    experimentalConditionId, θ_indices, measurementInfo, parameterInfo, simulationInfo,
                                    computeResiduals=computeResiduals,
                                    computeGradientNotSolveAdjoint=computeGradientNotSolveAdjoint, 
@@ -158,7 +158,7 @@ function computeCostExpCond(odeSolution::Union{ODESolution, OrdinaryDiffEq.ODECo
                             θ_sd::AbstractVector, 
                             θ_observable::AbstractVector, 
                             θ_nonDynamic::AbstractVector,
-                            peTabModel::PeTabModel,
+                            petabModel::PEtabModel,
                             experimentalConditionId::Symbol,
                             θ_indices::ParameterIndices,
                             measurementInfo::MeasurementsInfo,
@@ -181,7 +181,7 @@ function computeCostExpCond(odeSolution::Union{ODESolution, OrdinaryDiffEq.ODECo
         # In these cases we only save the ODE at observed time-points and we do not want 
         # to extract Dual ODE solution 
         if computeGradientNotSolveForward == true || computeGradientNotSolveAutoDiff == true
-            nModelStates = length(peTabModel.stateNames)
+            nModelStates = length(petabModel.stateNames)
             u = dualToFloat.(odeSolution[1:nModelStates, simulationInfo.iTimeODESolution[iMeasurement]]) 
         # For adjoint sensitivity analysis we have a dense-ode solution 
         elseif computeGradientNotSolveAdjoint == true
@@ -192,8 +192,8 @@ function computeCostExpCond(odeSolution::Union{ODESolution, OrdinaryDiffEq.ODECo
             u = odeSolution[:, simulationInfo.iTimeODESolution[iMeasurement]]
         end
 
-        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, peTabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
-        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, peTabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
+        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
+        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
             
         # By default a positive ODE solution is not enforced (even though the user can provide it as option).
         # In case with transformations on the data the code can crash, hence Inf is returned in case the 
