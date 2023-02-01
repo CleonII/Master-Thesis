@@ -22,6 +22,7 @@ using Zygote
 using SciMLSensitivity
 using Sundials
 using Test
+using YAML
 
 
 # Relevant PeTab structs for compuations 
@@ -114,7 +115,7 @@ end
 function testODESolverTestModel1(petabModel::PEtabModel, solver, tol)
 
     # Set values to PeTab file values 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel.dirModel, readObservables=true)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel)
     measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
     paramData = processParameters(parameterDataFile) 
     setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, paramData)
@@ -236,7 +237,7 @@ function testZYgoteAdjointsTestModel1(petabModel::PEtabModel, solver, tol)
 end
 
 
-petabModel = readPEtabModel("Test_model1", pwd() * "/tests/Test_model1/", forceBuildJlFile=true)
+petabModel = readPEtabModel(joinpath(@__DIR__, "Test_model1", "Test_model1.yaml"), forceBuildJuliaFiles=true)
 
 @testset verbose = true "Test model 1" begin
     @testset "Test model1 : ODE solver" begin 

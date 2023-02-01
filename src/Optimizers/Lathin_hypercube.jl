@@ -94,7 +94,7 @@ function _createCube(pathSave::String, petabProblem::PEtabODEProblem, nSamples::
     end
 
     dataSave = DataFrame(paramSave, :auto)
-    rename!(dataSave, petabProblem.namesParam)
+    rename!(dataSave, petabProblem.θ_estNames)
     CSV.write(pathSave, dataSave)
 
     println("Cube saved at $pathSave")

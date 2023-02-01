@@ -18,8 +18,9 @@
     Note - The produced Julia file will go via the JIT-compiler. The SBML-dict is needed as 
     sometimes variables are encoded via explicit-SBML rules.
 """
-function create_σ_h_u0_File(modelName::String, 
-                            dirModel::String, 
+function create_σ_h_u0_File(modelName::String,
+                            pathYAMl::String, 
+                            dirJulia::String, 
                             odeSystem::ODESystem, 
                             stateMap,
                             SBMLDict::Dict;
@@ -28,24 +29,24 @@ function create_σ_h_u0_File(modelName::String,
     pODEProblemNames = string.(parameters(odeSystem))
     modelStateNames = replace.(string.(states(odeSystem)), "(t)" => "")
     
-    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(dirModel, readObservables=true)
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAMl)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
     
     # Indices for keeping track of parameters in θ
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, odeSystem, experimentalConditions)
     
-    create_h_Function(modelName, dirModel, modelStateNames, parameterInfo, string.(θ_indices.θ_dynamicNames), 
+    create_h_Function(modelName, dirJulia, modelStateNames, parameterInfo, string.(θ_indices.θ_dynamicNames), 
                       string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
     verbose == true && @printf("Done with h function\n")
     
-    create_u0_Function(modelName, dirModel, parameterInfo, pODEProblemNames, stateMap, inPlace=true)
+    create_u0_Function(modelName, dirJulia, parameterInfo, pODEProblemNames, stateMap, inPlace=true)
     verbose == true && @printf("Done with u0 in-place function\n")
     
-    create_u0_Function(modelName, dirModel, parameterInfo, pODEProblemNames, stateMap, inPlace=false)
+    create_u0_Function(modelName, dirJulia, parameterInfo, pODEProblemNames, stateMap, inPlace=false)
     verbose == true && @printf("Done with u0 not in-place function\n")
 
-    create_σ_Function(modelName, dirModel, parameterInfo, modelStateNames, string.(θ_indices.θ_dynamicNames), string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
+    create_σ_Function(modelName, dirJulia, parameterInfo, modelStateNames, string.(θ_indices.θ_dynamicNames), string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
     verbose == true && @printf("Done with σ function\n")
 end
 

@@ -53,10 +53,11 @@ struct PEtabModel{F1<:Function,
     parameterNames::T3
     stateNames::T4
     dirModel::String
-    pathMeasurementData::String
-    pathExperimentalConditionsData::String
-    pathObservablesData::String
-    pathParametersData::String
+    dirJulia::String
+    pathMeasurements::String
+    pathConditions::String
+    pathObservables::String
+    pathParameters::String
     modelCallbackSet::C
     checkIfCallbackIsActive::FA
 end

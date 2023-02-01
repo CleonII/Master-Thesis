@@ -261,7 +261,7 @@ end
 function getFileODEvalues(petabModel::PEtabModel)
   
     # Change model parameters 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel.dirModel, readObservables=true)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parameterDataFile)
     measurementInfo = processMeasurements(measurementDataFile, observablesDataFile) 
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditionsFile)

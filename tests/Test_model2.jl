@@ -27,6 +27,7 @@ using Sundials
 using Ipopt
 using Optim
 using NLopt
+using YAML
 using Test
 
 
@@ -62,7 +63,7 @@ include(joinpath(pwd(), "tests", "Common.jl"))
 function testODESolverTestModel2(petabModel::PEtabModel, solver, tol)
    
     # Set values to PeTab file values 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel.dirModel, readObservables=true)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel)
     measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
     paramData = processParameters(parameterDataFile) 
     θ_indices = computeIndicesθ(paramData, measurementData, petabModel.odeSystem, experimentalConditionsFile)
@@ -327,7 +328,7 @@ function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
 end
 
 
-petabModel = readPEtabModel("Test_model2", pwd() * "/tests/Test_model2/", forceBuildJlFile=true)
+petabModel = readPEtabModel(joinpath(@__DIR__, "Test_model2", "Test_model2.yaml"), forceBuildJuliaFiles=true)
 loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
 
 @testset verbose=true "Test model 2" begin

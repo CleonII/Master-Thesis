@@ -13,8 +13,9 @@
     observables PeTab file.
     Note - The produced Julia file will go via the JIT-compiler.
 """
-function createDerivative_σ_h_File(modelName::String, 
-                                   dirModel::String, 
+function createDerivative_σ_h_File(modelName::String,
+                                   pathYAMl::String, 
+                                   dirJulia::String, 
                                    odeSystem::ODESystem, 
                                    SBMLDict::Dict;
                                    verbose::Bool=true)
@@ -22,17 +23,17 @@ function createDerivative_σ_h_File(modelName::String,
     pODEProblemNames = string.(parameters(odeSystem))
     modelStateNames = replace.(string.(states(odeSystem)), "(t)" => "")
 
-    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(dirModel, readObservables=true)
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAMl)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
     
     # Indices for keeping track of parameters in θ
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, odeSystem, experimentalConditions)
     
-    create∂h∂_Function(modelName, dirModel, modelStateNames, parameterInfo, pODEProblemNames, string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
+    create∂h∂_Function(modelName, dirJulia, modelStateNames, parameterInfo, pODEProblemNames, string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
     verbose == true && @printf("Done with ∂h∂u and ∂h∂p functions\n")
     
-    create∂σ∂_Function(modelName, dirModel, parameterInfo, modelStateNames, pODEProblemNames, string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
+    create∂σ∂_Function(modelName, dirJulia, parameterInfo, modelStateNames, pODEProblemNames, string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
     verbose == true && @printf("Done with ∂σ∂u and ∂σ∂p functions\n")
 end
 

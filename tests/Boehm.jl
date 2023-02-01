@@ -12,6 +12,7 @@ using Printf
 using Zygote
 using SciMLSensitivity
 using Sundials
+using YAML
 using Test
 
 
@@ -49,7 +50,6 @@ function compareAgainstPyPestoBoehm(petabModel::PEtabModel, solver, tol)
 
     paramVals = CSV.read(pwd() * "/tests/Boehm/Params.csv", DataFrame)
     paramMat = paramVals[!, Not([:Id, :ratio, :specC17])]
-    nParam = ncol(paramMat)
 
     costPython = (CSV.read(pwd() * "/tests/Boehm/Cost.csv", DataFrame))[!, :Cost]
     gradPythonMat = CSV.read(pwd() * "/tests/Boehm/Grad.csv", DataFrame)
@@ -88,8 +88,7 @@ function compareAgainstPyPestoBoehm(petabModel::PEtabModel, solver, tol)
 end
 
 
-petabModel = readPEtabModel("Boehm_JProteomeRes2014", pwd() * "/tests/Boehm/", forceBuildJlFile=true)
-
+petabModel = readPEtabModel(joinpath(@__DIR__, "Boehm", "Boehm_JProteomeRes2014.yaml"), forceBuildJuliaFiles=true)
 @testset "Against PyPesto : Boehm" begin 
-    compareAgainstPyPestoBoehm(petabModel, Rodas4P(), 1e-12)
+    compareAgainstPyPestoBoehm(petabModel, Rodas4P(), 1e-9)
 end

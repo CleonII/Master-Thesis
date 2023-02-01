@@ -31,6 +31,8 @@ using Printf
 using Zygote
 using SciMLSensitivity
 using Sundials
+using YAML
+using Test
 
 
 # Relevant PeTab structs for compuations 
@@ -73,7 +75,7 @@ function computeCostAlgebraic(paramVec, petabModel, solver, tol)
     
     a, b, c, d = paramVec
 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel.dirModel, readObservables=true)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel)
     measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
 
     solArrayAlg = getSolAlgebraicSS(petabModel, solver, tol, a, b, c, d)
@@ -97,7 +99,7 @@ end
 function testODESolverTestModel3(petabModel::PEtabModel, solver, tol)
    
     # Set values to PeTab file values 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel.dirModel, readObservables=true)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel)
     measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
     paramData = processParameters(parameterDataFile) 
     setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, paramData)
@@ -202,7 +204,7 @@ function testCostGradientOrHessianTestModel3(petabModel::PEtabModel, solver, tol
 end
 
 
-petabModel = readPEtabModel("Test_model3", pwd() * "/tests/Test_model3/", forceBuildJlFile=true)
+petabModel = readPEtabModel(joinpath(@__DIR__, "Test_model3", "Test_model3.yaml"), forceBuildJuliaFiles=true)
 
 @testset verbose=true "Test model3" begin
     @testset "Test model3 : ODE solver" begin 

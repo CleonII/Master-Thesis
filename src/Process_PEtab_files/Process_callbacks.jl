@@ -3,14 +3,15 @@
 function createCallbacksForTimeDepedentPiecewise(odeSystem::ODESystem, 
                                                  SBMLDict::Dict, 
                                                  modelName::String, 
-                                                 dirModel::String)
+                                                 pathYAML::String, 
+                                                 dirJulia::String)
 
     pODEProblemNames = string.(parameters(odeSystem))
     modelStateNames = replace.(string.(states(odeSystem)), "(t)" => "")
     
     # Compute indices tracking parameters (needed as down the line we need to know if a parameter should be estimated 
     # or not, as if such a parameter triggers a callback we must let it be a continious callback)
-    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(dirModel, readObservables=true)
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAML)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, odeSystem, experimentalConditions)                                                  
@@ -39,7 +40,7 @@ function createCallbacksForTimeDepedentPiecewise(odeSystem::ODESystem,
     end
 
     stringWriteCallbacks *= "\treturn CallbackSet(" * callbackNames * "), [" * checkIfActivatedT0Names * "]\nend"
-    fileWrite = dirModel * "/" * modelName * "_callbacks.jl"
+    fileWrite = dirJulia * "/" * modelName * "_callbacks.jl"
     if isfile(fileWrite)
         rm(fileWrite)
     end

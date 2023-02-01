@@ -1,26 +1,22 @@
-"""
-    readDataFiles(dirModel::String; readObs::Bool=false)
+function readPEtabFiles(pathYAML::String)
 
-    Given a directory for a model, e.g ./Beer_MolBioSystems2014, read the associated PeTab files 
-    for the measurements, parameters, experimental conditions and (if true) the observables.
-"""
-function readPEtabFiles(dirModel::String; readObservables::Bool=false)
+    pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName = readPEtabYamlFile(pathYAML)
 
-    # Check if PeTab files exist and get their path 
-    pathMeasurements = checkForPeTabFile("measurementData", dirModel)
-    pathExperimentalCondidtions = checkForPeTabFile("experimentalCondition", dirModel)
-    pathParameters = checkForPeTabFile("parameters", dirModel)
-
-    experimentalConditions = CSV.read(pathExperimentalCondidtions, DataFrame)
+    experimentalConditions = CSV.read(pathConditions, DataFrame)
     measurementsData = CSV.read(pathMeasurements, DataFrame)
     parametersData = CSV.read(pathParameters, DataFrame)
-    if readObservables == true
-        pathObservables = checkForPeTabFile("observables", dirModel)
-        observablesData = CSV.read(pathObservables, DataFrame)
-        return experimentalConditions, measurementsData, parametersData, observablesData
-    else
-        return experimentalConditions, measurementsData, parametersData
-    end
+    observablesData = CSV.read(pathObservables, DataFrame)
+    
+    return experimentalConditions, measurementsData, parametersData, observablesData
+end
+function readPEtabFiles(petabModel::PEtabModel)
+
+    experimentalConditions = CSV.read(petabModel.pathConditions, DataFrame)
+    measurementsData = CSV.read(petabModel.pathMeasurements, DataFrame)
+    parametersData = CSV.read(petabModel.pathParameters, DataFrame)
+    observablesData = CSV.read(petabModel.pathObservables, DataFrame)
+    
+    return experimentalConditions, measurementsData, parametersData, observablesData
 end
 
 

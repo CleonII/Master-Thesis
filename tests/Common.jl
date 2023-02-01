@@ -58,7 +58,7 @@ end
 function checkGradientResiduals(petabModel::PEtabModel, solver, tol; verbose::Bool=true)
 
     # Process PeTab files into type-stable Julia structs 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel.dirModel, readObservables=true)
+    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel)
     parameterData = processParameters(parameterDataFile)
     measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
     simulationInfo = processSimulationInfo(petabModel, measurementData)

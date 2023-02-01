@@ -52,103 +52,71 @@ include(joinpath(pwd(), "src", "Common.jl"))
 
     TODO : Example  
 """
-function readPEtabModel(modelName::String, 
-                        dirModel::String; 
-                        forceBuildJlFile::Bool=false, 
+function readPEtabModel(pathYAML::String; 
+                        forceBuildJuliaFiles::Bool=false, 
                         verbose::Bool=true, 
-                        ifElseToEvent=true, 
+                        ifElseToEvent::Bool=true, 
                         jlFile=false)::PEtabModel
+
+    pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName = readPEtabYamlFile(pathYAML)                    
     
     if jlFile == false
-        # Sanity check user input 
-        modelFileXml = dirModel * modelName * ".xml"
-        modelFileJl = dirModel * modelName * ".jl"
-        if !isdir(dirModel)
-            if verbose
-                @printf("Model directory %s does not exist\n", dirModel)
-            end
+        
+        pathModelJlFile = joinpath(dirJulia, modelName * ".jl")
+        
+        if !isfile(pathModelJlFile) && forceBuildJuliaFiles == false
+            verbose == true && @printf("Julia model file does not exist, will build it\n")
+            modelDict = XmlToModellingToolkit(pathSBML, pathModelJlFile, modelName, ifElseToEvent=ifElseToEvent)
+
+        elseif isfile(pathModelJlFile) && forceBuildJuliaFiles == false
+            verbose == true && @printf("Julia model file exists at %s - will not rebuilt\n", pathModelJlFile)
+            
+        elseif forceBuildJuliaFiles == true
+            verbose == true && @printf("By user option will rebuild Julia model file\n")
+            isfile(pathModelJlFile) == true && rm(pathModelJlFile)
+            modelDict = XmlToModellingToolkit(pathSBML, pathModelJlFile, modelName, ifElseToEvent=ifElseToEvent)
         end
-        if !isfile(modelFileXml)
-            if verbose
-                @printf("Model directory does not contain xml-file with name %s\n", modelName * "xml")
-            end
-        end
-        # If Julia model file does exists build it 
-        if !isfile(modelFileJl) && forceBuildJlFile == false
-            if verbose
-                @printf("Julia model file does not exist - will build it\n")
-            end
-            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, ifElseToEvent=ifElseToEvent)
-        elseif isfile(modelFileJl) && forceBuildJlFile == false
-            if verbose
-                @printf("Julia model file exists at %s - will not rebuild it\n", modelFileJl)
-            end
-        elseif forceBuildJlFile == true
-            if verbose
-                @printf("By user option rebuilds Julia model file\n")
-            end
-            if isfile(modelFileJl)
-                rm(modelFileJl)
-            end
-            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, ifElseToEvent=ifElseToEvent)
-        end
+
     else
-
         modelDict, modelFileJl = JLToModellingToolkit(modelName, dirModel, ifElseToEvent=ifElseToEvent)
-
     end
 
-    # Extract ODE-system and mapping of maps of how to map parameters to states and model parmaeters 
-    include(modelFileJl)
+    # Load model ODE-system
+    include(pathModelJlFile)
     expr = Expr(:call, Symbol("getODEModel_" * modelName))
-    odeSys, stateMap, parameterMap = eval(expr)
-    #odeSysUse = ode_order_lowering(odeSys)
-    odeSysUse = structural_simplify(odeSys)
-    # Parameter and state names for ODE-system 
-    parameterNames = parameters(odeSysUse)
-    stateNames = states(odeSysUse)
-
-    # Sanity check for presence of all PeTab-files 
-    pathMeasurementData = checkForPeTabFile("measurementData", dirModel)
-    pathExperimentalCond = checkForPeTabFile("experimentalCondition", dirModel)
-    pathParameters = checkForPeTabFile("parameters", dirModel)
-    pathObservables = checkForPeTabFile("observables", dirModel)
+    _odeSystem, stateMap, parameterMap = eval(expr)
+    odeSystem = structural_simplify(_odeSystem)
+    # TODO : Make these to strings here to save conversions
+    parameterNames = parameters(odeSystem)
+    stateNames = states(odeSystem)
 
     # Build functions for observables, sd and u0 if does not exist and include
-    path_u0_h_sigma = dirModel * modelName * "_h_sd_u0.jl"
-    path_D_h_sd = dirModel * modelName * "_D_h_sd.jl"
-    if !isfile(path_u0_h_sigma) || !isfile(path_D_h_sd) || forceBuildJlFile == true
-        if verbose && forceBuildJlFile == false
-            @printf("File for h, u0 and σ does not exist - building it\n")
-        end
-        if verbose && forceBuildJlFile == true
-            @printf("By user option will rebuild h, σ and u0\n")
-        end
+    path_u0_h_sigma = joinpath(dirJulia, modelName * "_h_sd_u0.jl")
+    path_D_h_sd = joinpath(dirJulia, modelName * "_D_h_sd.jl")
+    if !isfile(path_u0_h_sigma) || !isfile(path_D_h_sd) || forceBuildJuliaFiles == true
+        verbose && forceBuildJuliaFiles == false && @printf("File for h, u0 and σ does not exist will build it\n")
+        verbose && forceBuildJuliaFiles == true && @printf("By user option will rebuild h, σ and u0\n")
+            
         if !@isdefined(modelDict)
-            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, writeToFile=false, ifElseToEvent=ifElseToEvent)
+            modelDict = XmlToModellingToolkit(modelFileXml, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
-        create_σ_h_u0_File(modelName, dirModel, odeSysUse, stateMap, modelDict, verbose=verbose)
-        createDerivative_σ_h_File(modelName, dirModel, odeSysUse, modelDict, verbose=verbose)
+        create_σ_h_u0_File(modelName, pathYAML, dirJulia, odeSystem, stateMap, modelDict, verbose=verbose)
+        createDerivative_σ_h_File(modelName, pathYAML, dirJulia, odeSystem, modelDict, verbose=verbose)
     else
-        if verbose
-            @printf("File for h, u0 and σ exists - will not rebuild it\n")
-        end
+        verbose == true && @printf("File for h, u0 and σ exists will not rebuild it\n")
     end
     include(path_u0_h_sigma)
     include(path_D_h_sd)    
 
-    pathCallback = dirModel * "/" * modelName * "_callbacks.jl"
-    if !isfile(pathCallback) || forceBuildJlFile == true
-        if verbose && forceBuildJlFile == false
-            @printf("File for callback does not exist - building it\n")
-        end
-        if verbose && forceBuildJlFile == true
-            @printf("By user option will rebuild callback file\n")
-        end
+    pathCallback = joinpath(dirJulia, modelName * "_callbacks.jl")
+    if !isfile(pathCallback) || forceBuildJuliaFiles == true
+        verbose && forceBuildJuliaFiles == false && @printf("File for callback does not exist will build it\n")
+        verbose && forceBuildJuliaFiles == true && @printf("By user option will rebuild callback file\n")
+        
         if !@isdefined(modelDict)
-            modelDict = XmlToModellingToolkit(modelFileXml, modelName, dirModel, writeToFile=false, ifElseToEvent=ifElseToEvent)
+            modelDict = XmlToModellingToolkit(modelFileXml, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
-        createCallbacksForTimeDepedentPiecewise(odeSysUse, modelDict, modelName, dirModel)
+        createCallbacksForTimeDepedentPiecewise(odeSystem, modelDict, modelName, pathYAML, dirJulia)
     end
     include(pathCallback)
     exprCallback = Expr(:call, Symbol("getCallbacks_" * modelName))
@@ -164,20 +132,66 @@ function readPEtabModel(modelName::String,
                             compute_∂h∂p!,
                             compute_∂σ∂σp!,
                             computeTstops,
-                            odeSysUse,
+                            odeSystem,
                             parameterMap,
                             stateMap,
                             parameterNames, 
                             stateNames,
                             dirModel,
-                            pathMeasurementData,
-                            pathExperimentalCond,
+                            dirJulia,
+                            pathMeasurements,
+                            pathConditions,
                             pathObservables, 
                             pathParameters, 
                             cbSet, 
                             checkCbActive)
 
     return petabModel
+end
+
+
+function readPEtabYamlFile(pathYAML::AbstractString)
+
+    if !isfile(pathYAML)
+        throw(PEtabFileError("Model YAML file does not exist in the model directory"))
+    end
+    fileYAML = YAML.load_file(pathYAML)
+
+    dirModel = dirname(pathYAML)
+
+    pathSBML = joinpath(dirModel, fileYAML["problems"][1]["sbml_files"][1])
+    if !isfile(pathSBML)
+        throw(PEtabFileError("SBML file does not exist in the model directory"))
+    end
+
+    pathMeasurements = joinpath(dirModel, fileYAML["problems"][1]["measurement_files"][1])
+    if !isfile(pathMeasurements)
+        throw(PEtabFileError("Measurements file does not exist in the model directory"))
+    end
+
+    pathObservables = joinpath(dirModel, fileYAML["problems"][1]["observable_files"][1])
+    if !isfile(pathObservables)
+        throw(PEtabFileError("Observables file does not exist in the models directory"))
+    end
+
+    pathConditions = joinpath(dirModel, fileYAML["problems"][1]["condition_files"][1])
+    if !isfile(pathConditions)
+        throw(PEtabFileError("Conditions file does not exist in the models directory"))
+    end
+
+    pathParameters = joinpath(dirModel, fileYAML["parameter_file"])
+    if !isfile(pathParameters)
+        throw(PEtabFileError("Parameter file does not exist in the models directory"))
+    end
+
+    # Extract YAML directory and use directory name as model name and build directory for Julia files
+    dirJulia = joinpath(dirModel, "Julia_model_files") 
+    modelName = splitdir(dirModel)[end]
+    if !isdir(dirJulia)
+        mkdir(dirJulia)
+    end
+
+    return pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName
 end
 
 
@@ -213,7 +227,7 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
         println("If you are using adjoint sensitivity analysis for a model with PreEq-criteria the most the most efficient adjSensealgSS is usually SteadyStateAdjoint. The algorithm you have provided, ", sensealgAdjointSS, "might not work (as there are some bugs here). In case it does not work, and SteadyStateAdjoint fails (because a dependancy on time or a singular Jacobian) a good choice might be QuadratureAdjoint(autodiff=false, autojacvec=false)")
     end
 
-    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel.dirModel, readObservables=true)
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
     simulationInfo = processSimulationInfo(petabModel, measurementInfo, sensealg=sensealgAdjoint, absTolSS=solverSSAbsTol, relTolSS=solverSSRelTol)
@@ -287,7 +301,7 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
                                    θ_nominalT, 
                                    lowerBounds, 
                                    upperBounds, 
-                                   petabModel.dirModel * "Cube" * petabModel.modelName * ".csv",
+                                   joinpath(petabModel.dirJulia, "Cube" * petabModel.modelName * ".csv"),
                                    petabModel)
     return petabProblem
 end
