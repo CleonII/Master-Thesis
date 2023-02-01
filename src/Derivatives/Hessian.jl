@@ -14,18 +14,26 @@ function computeHessian!(hessian::Matrix{Float64},
                         parameterInfo::ParametersInfo, 
                         changeODEProblemParameters!::Function,
                         solveOdeModelAllConditions!::Function, 
-                        priorInfo::PriorInfo; 
+                        priorInfo::PriorInfo, 
+                        chunkSize::Union{Nothing, Int64}; 
                         expIDSolve::Vector{Symbol} = [:all])
 
     _evalHessian = (θ_est) -> computeCost(θ_est, odeProblem, petabModel, simulationInfo, θ_indices, 
                                           measurementInfo, parameterInfo, changeODEProblemParameters!, 
                                           solveOdeModelAllConditions!, priorInfo, computeHessian=true, 
                                           expIDSolve=expIDSolve)
+
+    if !isnothing(chunkSize)                                          
+        cfg = ForwardDiff.HessianConfig(_evalHessian, θ_est, ForwardDiff.Chunk(chunkSize))
+    else
+        cfg = ForwardDiff.HessianConfig(_evalHessian, θ_est, ForwardDiff.Chunk(θ_est))
+    end
     
     # Only try to compute hessian if we could compute the cost 
     if all([simulationInfo.odeSolutions[id].retcode == :Success for id in simulationInfo.experimentalConditionId])
         try 
-            hessian .= Symmetric(ForwardDiff.hessian(_evalHessian, θ_est))
+            ForwardDiff.hessian!(hessian, _evalHessian, θ_est, cfg)
+            hessian .= Symmetric(hessian)
         catch
             hessian .= 0.0
         end
@@ -49,7 +57,8 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
                                            parameterInfo::ParametersInfo, 
                                            changeODEProblemParameters!::Function,
                                            solveOdeModelAllConditions!::Function, 
-                                           priorInfo::PriorInfo; 
+                                           priorInfo::PriorInfo, 
+                                           chunkSize::Union{Nothing, Int64}; 
                                            expIDSolve::Vector{Symbol} = [:all]) 
 
     # Avoid incorrect non-zero values 
@@ -63,8 +72,15 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
                                                      changeODEProblemParameters!, solveOdeModelAllConditions!, 
                                                      computeHessian=true, 
                                                      expIDSolve=expIDSolve)
+
+    if !isnothing(chunkSize)                                          
+        cfg = ForwardDiff.HessianConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(chunkSize))
+    else
+        cfg = ForwardDiff.HessianConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(θ_dynamic))
+    end
+
     try 
-        @views ForwardDiff.hessian!(hessian[θ_indices.iθ_dynamic, θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic)
+        @views ForwardDiff.hessian!(hessian[θ_indices.iθ_dynamic, θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic, cfg)        
     catch
         hessian .= 0.0
         return 

@@ -29,7 +29,7 @@ using YAML
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
 # PeTab importer to get cost, grad etc 
-include(joinpath(pwd(), "src", "Process_PEtab_files", "Create_cost_grad_hessian.jl"))
+include(joinpath(pwd(), "src", "Create_PEtab_model.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))

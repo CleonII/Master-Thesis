@@ -198,14 +198,16 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                             solver::Union{SciMLAlgorithm, Vector{Symbol}},
                                             absTol::Float64,
                                             relTol::Float64, 
-                                            computeTStops::Function;
+                                            computeTStops::Function, 
+                                            odeSolutionValues::Matrix{Float64};
                                             expIDSolve::Vector{Symbol} = [:all],
                                             nTimePointsSave::Int64=0, 
                                             onlySaveAtObservedTimes::Bool=false,
                                             denseSolution::Bool=true, 
-                                            trackCallback::Bool=false)::Bool
+                                            trackCallback::Bool=false, 
+                                            chunkSize::Union{Nothing, Int64}=nothing)::Bool
 
-    function computeSensitivityMatrix(θ::AbstractVector)::AbstractArray
+    function computeSensitivityMatrix!(odeSolutionValues::AbstractMatrix, θ::AbstractVector)
 
         _odeProblem = remake(odeProblem, p = convert.(eltype(θ), odeProblem.p), u0 = convert.(eltype(θ), odeProblem.u0))
         
@@ -228,11 +230,9 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
 
         # Effectively we return a big-array with the ODE-solutions accross all experimental conditions, where 
         # each column is a time-point.                                                    
-        nTimePointsSaveAt = sum(length(simulationInfo.timeObserved[experimentalConditionId]) for experimentalConditionId in simulationInfo.experimentalConditionId)                                                    
-        nModelStates = length(odeProblem.u0)                                                                                                      
-        odeSolutionValues = zeros(eltype(θ), nModelStates, nTimePointsSaveAt)
         if sucess != true
-            return odeSolutionValues
+            odeSolutionValues .= 0.0
+            return 
         end
         
         # iStart and iEnd tracks which entries in odeSolutionValues we store a specific experimental condition
@@ -245,11 +245,14 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
             end
             iStart = iEnd + 1
         end
-
-        return odeSolutionValues
     end
     # Compute sensitivity matrix via forward mode automatic differentation 
-    ForwardDiff.jacobian!(S, computeSensitivityMatrix, θ_dynamic)
+    if !isnothing(chunkSize)
+        cfg = ForwardDiff.JacobianConfig(computeSensitivityMatrix!, odeSolutionValues, θ_dynamic, ForwardDiff.Chunk(chunkSize))
+    else
+        cfg = ForwardDiff.JacobianConfig(computeSensitivityMatrix!, odeSolutionValues, θ_dynamic, ForwardDiff.Chunk(θ_dynamic))
+    end
+    ForwardDiff.jacobian!(S, computeSensitivityMatrix!, odeSolutionValues, θ_dynamic, cfg)
 
     # Check retcode of sensitivity matrix ODE solutions 
     sucess = true

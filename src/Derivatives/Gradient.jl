@@ -17,7 +17,8 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
                                   parameterInfo::ParametersInfo, 
                                   changeODEProblemParameters!::Function,
                                   solveOdeModelAllConditions!::Function, 
-                                  priorInfo::PriorInfo;
+                                  priorInfo::PriorInfo, 
+                                  chunkSize::Union{Nothing, Int64};
                                   expIDSolve::Vector{Symbol} = [:all])     
 
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
@@ -26,8 +27,15 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
                                                      simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                                      changeODEProblemParameters!, solveOdeModelAllConditions!, 
                                                      computeGradientDynamicθ=true, expIDSolve=expIDSolve)
+
+    if !isnothing(chunkSize)                                                     
+        cfg = ForwardDiff.GradientConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(chunkSize))
+    else
+        cfg = ForwardDiff.GradientConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(θ_dynamic))
+    end
+
     try 
-        gradient[θ_indices.iθ_dynamic] .= ForwardDiff.gradient(computeCostDynamicθ, θ_dynamic)::Vector{Float64}
+        @views ForwardDiff.gradient!(gradient[θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic, cfg)
     catch
         gradient .= 1e8
         return
