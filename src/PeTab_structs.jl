@@ -58,6 +58,8 @@ struct PEtabModel{F1<:Function,
     pathConditions::String
     pathObservables::String
     pathParameters::String
+    pathSBML::String
+    pathYAML::String
     modelCallbackSet::C
     checkIfCallbackIsActive::FA
 end

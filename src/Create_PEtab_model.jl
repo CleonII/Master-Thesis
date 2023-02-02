@@ -147,6 +147,8 @@ function readPEtabModel(pathYAML::String;
                             pathConditions,
                             pathObservables, 
                             pathParameters, 
+                            pathSBML, 
+                            pathYAML,
                             cbSet, 
                             checkCbActive)
 

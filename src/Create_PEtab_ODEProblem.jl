@@ -1,6 +1,3 @@
-
-
-
 function setUpPEtabODEProblem(petabModel::PEtabModel, 
                               odeSolver::SciMLAlgorithm;
                               solverAbsTol::Float64=1e-8,

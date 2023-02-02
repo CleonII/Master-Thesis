@@ -6,27 +6,24 @@ using ForwardDiff
 using ReverseDiff
 using StatsBase
 using Random
-using Printf
-using BenchmarkTools
-using Zygote
-using SciMLSensitivity
-using BenchmarkTools
-using SparseDiffTools
 using LinearAlgebra
+using Distributions
+using Printf
+using SciMLSensitivity
+using Zygote
+using Symbolics
 using Sundials
+using YAML
 
 
-# Avoid having BLAS threads mess up timings 
 BLAS.set_num_threads(1)
 
-# Relevant PeTab structs for computations 
+
+# Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
-# Functions for solving ODE system 
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
-
 # PeTab importer to get cost, grad etc 
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
+include(joinpath(pwd(), "src", "Create_PEtab_model.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
@@ -34,123 +31,146 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
-# For converting to SBML 
-include(joinpath(pwd(), "Benchmarks", "Cost_grad_hess", "Add_parameters.jl"))
+include(joinpath(@__DIR__, "..", "Common.jl"))
 
 
-function getPEtabOpt(peTabModel, gradMethod, sensealg, solverUse, tol, sparseJac::Bool, chunkSize)
+function getPEtabProblem(petabModel::PEtabModel, 
+                         gradientMethod::Symbol, 
+                         sensealg, 
+                         odeSolver, 
+                         absTol::Float64,
+                         relTol::Float64, 
+                         sparseJacobian::Bool, 
+                         chunkSize::Union{Int64, Nothing})
 
-    if gradMethod == :ForwardSenseEq
-        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sensealgForward = sensealg, solverForward=solverUse, sparseJac=sparseJac, chunkSize=chunkSize)
-        evalGradF = peTabOpt.evalGradFForwardEq
-        return peTabOpt, evalGradF
-    elseif gradMethod == :Zygote
-        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sensealg = sensealg, sparseJac=sparseJac, chunkSize=chunkSize)
-        evalGradF = peTabOpt.evalGradFZygote
-        return peTabOpt, evalGradF
-    elseif gradMethod == :Adjoint
-        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, adjSolver=solverUse, adjSensealg=sensealg, adjTol=tol, sparseJac=sparseJac, chunkSize=chunkSize)
-        evalGradF = peTabOpt.evalGradFAdjoint
-        return peTabOpt, evalGradF
-    elseif gradMethod == :ForwardDiff
-        peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sparseJac=sparseJac, chunkSize=chunkSize)
-        evalGradF = peTabOpt.evalGradF
-        return peTabOpt, evalGradF
+    if gradientMethod == :ForwardEquations
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sensealgForwardEquations = sensealg, odeSolverForwardEquations=odeSolver, sparseJacobian=sparseJacobian, chunkSize=chunkSize)
+        computeGradient = petabProblem.computeGradientForwardEquations
+        return petabProblem, computeGradient
+    elseif gradientMethod == :Zygote
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sensealgZygote=sensealg, sparseJacobian=sparseJacobian)
+        computeGradient = petabProblem.computeGradientZygote
+        return petabProblem, computeGradient
+    elseif gradientMethod == :Adjoint
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, sensealgAdjoint=sensealg, odeSolverAdjoint=odeSolver, solverAdjointAbsTol=absTol, solverAdjointRelTol=relTol, sparseJacobian=sparseJacobian)
+        computeGradient = petabProblem.computeGradientAdjoint
+        return petabProblem, computeGradient
+    elseif gradientMethod == :ForwardDiff
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sparseJacobian=sparseJacobian, chunkSize=chunkSize)
+        computeGradient = petabProblem.computeGradientAutoDiff
+        return petabProblem, computeGradient
     end
 end
 
 
-function benchmarkCostGrad(peTabModel, modelName::String, gradInfo, solversCheck, pathFileSave, tol; nIter=10, checkHess::Bool=false, checkCost::Bool=false, checkGrad::Bool=false, sparseJac::Bool=false, nParamFixed=nothing, nRepeat=1, chunkSize=nothing)
+function benchmarkCostGrad(petabModel::PEtabModel, 
+                           gradientInfo, 
+                           solversCheck, 
+                           pathFileSave, 
+                           absTol::Float64, 
+                           relTol::Float64; 
+                           checkCost::Bool=false, 
+                           checkGradient::Bool=false, 
+                           checkHessian::Bool=false, 
+                           sparseJacobian::Bool=false, 
+                           nParamFixed=nothing, 
+                           nRepeat=5, 
+                           chunkSize=nothing, 
+                           iParameter=0,
+                           _θ_est=nothing)
 
-    println("Running model $modelName")
+    println("Running model ", petabModel.modelName)
     if isnothing(chunkSize)
         chunkSizeWrite = "Default"
     else
         chunkSizeWrite = chunkSize
     end
+
+    # Get parameter vector 
+    if isnothing(_θ_est)
+        θ_est = getNominalθ(petabModel)
+    else
+        θ_est = _θ_est
+    end
     
     for i in eachindex(solversCheck)
 
-        solverUse = solversCheck[i][1]
-        solverStr = solversCheck[i][2]
-        runTime = Array{Float64, 1}(undef, nIter)
+        odeSolver = solversCheck[i][1]
+        odeSolverName = solversCheck[i][2]
+        runTime = Vector{Float64}(undef, nRepeat)
 
-        if checkGrad == true
-            what_calc = "Gradient"
-            gradMethod, sensealg, methodInfo = gradInfo
-            peTabOpt, evalGradF = getPEtabOpt(peTabModel, gradMethod, sensealg, solverUse, tol, sparseJac, chunkSize)
+        if checkGradient == true
+            whatCompute = "Gradient"
+            gradientMethod, sensealg, methodInfo = gradientInfo
+            petabProblem, computeGradient = getPEtabProblem(petabModel, gradientMethod, sensealg, odeSolver, absTol, relTol, sparseJacobian, chunkSize)
 
             # Use nominal parameter vector 
             println("Precompiling the code")
-            paramVec = peTabOpt.paramVecTransformed
-            grad = zeros(length(paramVec))
-            # Zygote have problems with SensitivityAdjoint from time-to-time
-            if modelName ∈ ["model_Isensee_JCB2018", "model_Brannmark_JBC2010", "model_Weber_BMC2015"] && gradMethod == :Zyogte
+            gradient = zeros(length(θ_est))
+            # Zygote have problems with Steady-state models 
+            if petabModel.modelName ∈ ["model_Isensee_JCB2018", "model_Brannmark_JBC2010", "model_Weber_BMC2015"] && gradientMethod == :Zyogte
                 return
             end
             local canEval = true
             try 
-                evalGradF(grad, peTabOpt.paramVecTransformed)
+                computeGradient(gradient, θ_est)
             catch 
                 canEval = false
             end
-            if all(grad .== 1e8) || canEval == false
+            if all(gradient .== 1e8) || canEval == false
                 runTime .= Inf
             else
-                for j in 1:nIter
-                    bGrad = 0
-                    for k in 1:nRepeat
-                        bGrad += @elapsed evalGradF(grad, paramVec)
-                    end
-                    runTime[j] = bGrad / nRepeat
+                for j in 1:nRepeat
+                    bGrad = @elapsed computeGradient(gradient, θ_est)
+                    runTime[j] = bGrad 
                 end
             end
 
         elseif checkCost == true
-            what_calc = "Cost"
+            
+            whatCompute = "Cost"
             methodInfo = "Standard"
-            peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sparseJac=sparseJac)
-            paramVec = peTabOpt.paramVecTransformed
+            petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sparseJacobian=sparseJacobian)
+            
             println("Precompiling the code")
-            peTabOpt.evalF(paramVec)
-            for j in 1:nIter
-                bCost = 0
-                for k in 1:nRepeat
-                    bCost += @elapsed cost = peTabOpt.evalF(paramVec) 
+            cost = petabProblem.computeCost(θ_est)
+            if !isinf(cost)
+                for j in 1:nRepeat
+                    bCost = @elapsed cost = petabProblem.computeCost(θ_est) 
+                    runTime[j] = bCost
                 end
-                runTime[j] = bCost / nRepeat
+            else
+                runTime .= Inf
             end
 
-        elseif checkHess == true
-            what_calc = "Hessian"
+        elseif checkHessian == true
+            
+            whatCompute = "Hessian"
             methodInfo = "ForwardDiff"
-            peTabOpt = setUpCostGradHess(peTabModel, solverUse, tol, sensealg = sensealg, sparseJac=sparseJac)
-            paramVec = peTabOpt.paramVecTransformed
-            hess = zeros(length(paramVec), length(paramVec))
-            for j in 1:nIter
-                bHess = @elapsed peTabOpt.evalHessApprox(hess, paramVec)
-                runTime[j] = bHess
+            petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, absTol=absTol, relTol=relTol, sparseJacobian=sparseJacobian)
+            hessian = zeros(length(θ_est), length(θ_est))
+            cost = petabProblem.computeCost(θ_est)
+            if !isinf(cost)
+                for j in 1:nIter
+                    bHess = @elapsed petabProblem.computeHessian(hessian, θ_est)
+                    runTime[j] = bHess
+                end
+            else
+                runTime .= Inf
             end
         end
 
-        if isnothing(nParamFixed)
-            dataSave = DataFrame(Time = runTime, 
-                                What_calc=what_calc,
-                                Method_info=methodInfo,
-                                model = modelName, 
-                                tol = tol, 
-                                chunk_size = chunkSizeWrite,
-                                solver = solverStr)
-        else
-            dataSave = DataFrame(Time = runTime, 
-                                What_calc=what_calc,
-                                Method_info=methodInfo,
-                                model = modelName, 
-                                tol = tol, 
-                                solver = solverStr, 
-                                N_param_fixed=nParamFixed, 
-                                chunk_size = chunkSizeWrite,)
-        end
+        writeParamFixed = isnothing(nParamFixed) ? 0 : nParamFixed
+        dataSave = DataFrame(Time = runTime, 
+                             What_calc=whatCompute,
+                             Method_info=methodInfo,
+                             Model = petabModel.modelName, 
+                             absTol = absTol, 
+                             relTol = relTol,
+                             N_param_fixed=writeParamFixed,
+                             I_parameter=iParameter,
+                             chunk_size = chunkSizeWrite,
+                             solver = odeSolverName)
 
         if isfile(pathFileSave)
             CSV.write(pathFileSave, dataSave, append = true)
@@ -165,70 +185,58 @@ end
 
 if ARGS[1] == "No_pre_eq_models"
 
-    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
-    pathSave = dirSave * "Cost_grad.csv"
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
+    pathSave = joinpath(dirSave, "No_preequlibrium.csv")
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
-    modelListTry = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011", "model_Beer_MolBioSystems2014", 
-                    "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
-                    "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
-                    "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]
-    modelListTry = ["model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
-                    "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
-                    "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]                    
+    modelList = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011", "model_Beer_MolBioSystems2014", 
+                 "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
+                 "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
+                 "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]                  
 
     solversCheck = [[Rodas5(), "Rodas5"], 
                     [Rodas5P(), "Rodas5P"], 
                     [QNDF(), "QNDF"]]
-    sensealgInfoTot = [[:ForwardDiff, nothing, "ForwardDiff"], 
-                       [:ForwardSenseEq, :AutoDiffForward, "ForEq_AutoDiff"],
-                       [:Zygote, ForwardDiffSensitivity(), "Zygote_ForwardDiffSensitivity"], 
-                       [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
-                       [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"], 
-                       [:Adjoint, QuadratureAdjoint(autodiff=false, autojacvec=false), "Adj_QuadratureAdjoint(autodiff=false, autojacvec=false)"]]
-
-    solverCheckForEq = [[Rodas5(autodiff=false), "Rodas5"], 
-                        [Rodas5P(autodiff=false), "Rodas5P"], 
-                        [QNDF(autodiff=false), "QNDF"]]
-    sensealgInfoForEq = [[:Adjoint, InterpolatingAdjoint(autodiff=false, autojacvec=false), "Adj_InterpolatingAdjoint(autodiff=false, autojacvec=false)"]]
+    sensealgsCheck = [[:ForwardDiff, nothing, "ForwardDiff"], 
+                      [:ForwardEquations, :AutoDiffForward, "ForEq_AutoDiff"],
+                      [:Zygote, ForwardDiffSensitivity(), "Zygote_ForwardDiffSensitivity"], 
+                      [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
+                      [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"], 
+                      [:Adjoint, QuadratureAdjoint(autodiff=false, autojacvec=false), "Adj_QuadratureAdjoint(autodiff=false, autojacvec=false)"]]
                     
-    for i in eachindex(modelListTry)
-        modelName = modelListTry[i]
-        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
-        peTabModel = setUpPeTabModel(modelName, dirModel)
-        tol = 1e-8
+    for i in eachindex(modelList)
+        
+        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+        pathYML = getPathYmlFile(dirModel)
+        petabModel = readPEtabModel(pathYML)
+        absTol, relTol = 1e-8, 1e-8
 
         # Check cost 
-        benchmarkCostGrad(peTabModel, modelName, nothing, solversCheck, pathSave, tol, checkCost=true, nIter=5)
+        benchmarkCostGrad(petabModel, nothing, solversCheck, pathSave, absTol, relTol, checkCost=true, nRepeat=5)
 
         # Check Gradient 
-        for sensealgInfo in sensealgInfoTot
-            benchmarkCostGrad(peTabModel, modelName, sensealgInfo, solversCheck, pathSave, tol, checkGrad=true, nIter=5)
-        end
-
-        # Check gradient for sensitivity equations 
-        for sensealgInfo in sensealgInfoForEq
-            benchmarkCostGrad(peTabModel, modelName, sensealgInfo, solverCheckForEq, pathSave, tol, checkGrad=true, nIter=5)
+        for sensealgInfo in sensealgsCheck
+            benchmarkCostGrad(petabModel, sensealgInfo, solversCheck, pathSave, absTol, relTol, checkGradient=true, nRepeat=5)
         end
 
         # For fun Check CVODE_BDF
-        benchmarkCostGrad(peTabModel, modelName, [:ForwardSenseEq, ForwardSensitivity(), "ForEq_ForwardSensitivity"], 
-                          [[CVODE_BDF(), "CVODE_BDF"]], pathSave, tol, checkGrad=true, nIter=5)
+        benchmarkCostGrad(petabModel, [:ForwardEquations, ForwardSensitivity(), "ForEq_ForwardSensitivity"], 
+                          [[CVODE_BDF(), "CVODE_BDF"]], pathSave, absTol, relTol, checkGradient=true, nRepeat=5)
     end
 end
 
 
 if ARGS[1] == "Chen_model"
 
-    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
-    pathSave = dirSave * "Cost_grad_Chen.csv"
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
+    pathSave = joinpath(dirSave, "Chen_model.csv")
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
-    modelListTry = ["model_Chen_MSB2009"]
+    modelList = ["model_Chen_MSB2009"]
 
     solversCheckCost = [[QNDF(), "QNDF"], 
                         [Rodas5(), "Rodas5"], 
@@ -244,157 +252,111 @@ if ARGS[1] == "Chen_model"
     solversCheckGradS = [[QNDF(), "QNDFS"], 
                          [KenCarp4(), "KenCarp4S"]]                                                 
 
-    senseAlgInfoGrad = [[:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
-                        [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"],
-                        [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP(true)), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true))"],
-                        [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP(true))"]]                          
+    sensealgsTry = [[:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
+                    [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"]]                          
 
-    for i in eachindex(modelListTry)
-        modelName = modelListTry[i]
-        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
-        peTabModel = setUpPeTabModel(modelName, dirModel)
-        # Where we need higher abs- and reltol to solve the ODE 
-        tol = 1e-8
-        benchmarkCostGrad(peTabModel, modelName, nothing,
-                          solversCheckCost, pathSave, tol, checkCost=true, nIter=5)
-        benchmarkCostGrad(peTabModel, modelName, nothing,
-                          solversCheckCostS, pathSave, tol, checkCost=true, nIter=5, sparseJac=true)                          
+    dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[1])
+    pathYML = getPathYmlFile(dirModel)
+    petabModel = readPEtabModel(pathYML)
 
-        for sensealgInfo in senseAlgInfoGrad                          
-            benchmarkCostGrad(peTabModel, modelName, sensealgInfo,
-                            solversCheckGrad, pathSave, tol, checkGrad=true, nIter=2)
-            benchmarkCostGrad(peTabModel, modelName, sensealgInfo,
-                            solversCheckGradS, pathSave, tol, checkGrad=true, nIter=2, sparseJac=true)                          
-        end
+    absTol, relTol = 1e-8, 1e-8
+    benchmarkCostGrad(petabModel, nothing, solversCheckCost, pathSave, absTol, relTol, checkCost=true, nRepeat=5)
+    benchmarkCostGrad(petabModel, nothing, solversCheckCostS, pathSave, absTol, relTol, checkCost=true, nRepeat=5, sparseJacobian=true)                          
+
+    for sensealgInfo in sensealgsTry                          
+        benchmarkCostGrad(petabModel, sensealgInfo, solversCheckGradS, pathSave, absTol, relTol, checkGradient=true, nRepeat=5, sparseJacobian=true)                          
+        benchmarkCostGrad(petabModel, sensealgInfo, solversCheckGrad, pathSave, absTol, relTol, checkGradient=true, nRepeat=5)
     end
 end
 
 
-if ARGS[1] == "Bachman_fix_param"
+if ARGS[1] == "Fix_parameters"
 
-    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
-    pathSave = dirSave * "Bachman_fix_param.csv"
+    if length(ARGS) == 1
+        modelList = ["model_Bachmann_MSB2011", "model_Lucarelli_CellSystems2018"]
+    elseif ARGS[2] == "Bachman"
+        modelList = ["model_Bachmann_MSB2011"]
+    elseif ARGS[2] == "Lucarelli"
+        modelList = ["model_Lucarelli_CellSystems2018"]
+    else
+        println("ARGS must either be of length 2, or the second argument must be Bachman or Lucarelli not ", ARGS[2])
+        exit(1)
+    end
+
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
+    pathSave = joinpath(dirSave, "Fix_parameters.csv")
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
     Random.seed!(123)
     solversCheck = [[QNDF(), "QNDF"]]
-    sensealgInfoTot = [[:ForwardDiff, nothing, "ForwardDiff"], 
-                       [:ForwardSenseEq, :AutoDiffForward, "ForEq_AutoDiff"]]
+    sensealgInfo = [[:ForwardDiff, nothing, "ForwardDiff"]]
 
-    dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
-    peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel, forceBuildJlFile=false)
-    nDynParam = getNDynParam(peTabModel)
-    tol = 1e-8
-    for nParamFix in 1:(nDynParam-1)
-        for i in 1:10
-            peTabModelFewerParam = getPEtabModelNparamFixed(peTabModel, nParamFix)
-            # Check Gradient 
-            for sensealgInfo in sensealgInfoTot
-                benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
-                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=10)
-                benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
-                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=10, chunkSize=1)
-            end
-            if isdir(peTabModelFewerParam.dirModel)
-                rm(peTabModelFewerParam.dirModel, recursive=true)
-            end
-        end
-    end
-end
+    for i in eachindex(modelList)
 
+        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+        pathYML = getPathYmlFile(dirModel)
+        petabModel = readPEtabModel(pathYML)
+        absTol, relTol = 1e-8, 1e-8
+        nDynamicParameters = length(getNominalODEValues(petabModel))
 
-if ARGS[1] == "Lucarelli_fix_param"
+        for nParamFix in 1:(nDynamicParameters-1)
+            for j in 1:10
+                petabModelFewerParameters = getPEtabModelNparamFixed(petabModel, nParamFix)
 
-    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
-    pathSave = dirSave * "Lucarelli_fix_param.csv"
-    if !isdir(dirSave)
-        mkpath(dirSave)
-    end
-
-    Random.seed!(123)
-    solversCheck = [[QNDF(), "QNDF"]]
-    sensealgInfoTot = [[:ForwardDiff, nothing, "ForwardDiff"], 
-                       [:ForwardSenseEq, :AutoDiffForward, "ForEq_AutoDiff"]]
-
-    dirModel = pwd() * "/Intermediate/PeTab_models/model_Lucarelli_CellSystems2018/"
-    peTabModel = setUpPeTabModel("model_Lucarelli_CellSystems2018", dirModel, verbose=false, forceBuildJlFile=true)
-    nDynParam = getNDynParam(peTabModel)
-    tol = 1e-8
-    for nParamFix in 1:(nDynParam-1)
-        for i in 1:10
-            peTabModelFewerParam = getPEtabModelNparamFixed(peTabModel, nParamFix)
-            # Check Gradient 
-            for sensealgInfo in sensealgInfoTot
-                benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
-                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5)
-                benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
-                                  pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5, chunkSize=1)
-            end
-            if isdir(peTabModelFewerParam.dirModel)
-                rm(peTabModelFewerParam.dirModel, recursive=true)
-            end
-        end
-    end
-
-    # Testing effect of chunk-size
-    pathSave = dirSave * "Lucarelli_chunk_size.csv"
-    chunkList = 1:nDynParam
-    for nParamFix in [0]
-        for i in 1:10
-            peTabModelFewerParam = getPEtabModelNparamFixed(peTabModel, nParamFix)
-            benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
-                                    pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5)
-            for nChunks in chunkList
-                # Check Gradient 
-                for sensealgInfo in sensealgInfoTot
-                    benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
-                                    pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=5, chunkSize=nChunks)
+                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], solversCheck, pathSave, absTol, relTol, 
+                                  checkGradient=true, nParamFixed=nParamFix, nRepeat=10)
+                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], solversCheck, pathSave, absTol, relTol, 
+                                  checkGradient=true, nParamFixed=nParamFix, nRepeat=10, chunkSize=1)      
+                                  
+                if isdir(petabModelFewerParameters.dirModel) 
+                    rm(petabModelFewerParameters.dirModel, recursive=true)
                 end
             end
-            if isdir(peTabModelFewerParam.dirModel)
-                rm(peTabModelFewerParam.dirModel, recursive=true)
-            end
         end
+
     end
-    
 end
 
 
-if ARGS[1] == "Bachman_test_chunks"
+if ARGS[1] == "Test_chunks_random_p"
 
-    dirSave = pwd() * "/Intermediate/Benchmarks/Cost_grad_hess/"
-    pathSave = dirSave * "Bachman_test_chunks.csv"
+    if length(ARGS) == 1
+        modelList = ["model_Bachmann_MSB2011", "model_Lucarelli_CellSystems2018"]
+    elseif ARGS[2] == "Bachman"
+        modelList = ["model_Bachmann_MSB2011"]
+    elseif ARGS[2] == "Lucarelli"
+        modelList = ["model_Lucarelli_CellSystems2018"]
+    else
+        println("ARGS must either be of length 2, or the second argument must be Bachman or Lucarelli not ", ARGS[2])
+        exit(1)
+    end
+
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
+    pathSave = joinpath(dirSave, "Test_chunks.csv")
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
     Random.seed!(123)
     solversCheck = [[QNDF(), "QNDF"]]
-    sensealgInfoTot = [[:ForwardDiff, nothing, "ForwardDiff"], 
-                       [:ForwardSenseEq, :AutoDiffForward, "ForEq_AutoDiff"]]
+    sensealgInfo = [[:ForwardDiff, nothing, "ForwardDiff"]]
 
-    dirModel = pwd() * "/Intermediate/PeTab_models/model_Bachmann_MSB2011/"
-    peTabModel = setUpPeTabModel("model_Bachmann_MSB2011", dirModel, forceBuildJlFile=false)
-    nDynParam = getNDynParam(peTabModel)
-    chunkList = 1:(nDynParam-5)
-    tol = 1e-8
-    for nParamFix in [3, 4]
-        for i in 1:10
-            peTabModelFewerParam = getPEtabModelNparamFixed(peTabModel, nParamFix)
-            for nChunks in chunkList
-                # Check Gradient 
-                for sensealgInfo in sensealgInfoTot
-                    benchmarkCostGrad(peTabModelFewerParam, peTabModelFewerParam.modelName, sensealgInfo, solversCheck, 
-                                    pathSave, tol, checkGrad=true, nIter=1, nParamFixed=nParamFix, nRepeat=10, chunkSize=nChunks)
-                end
-            end
-            if isdir(peTabModelFewerParam.dirModel)
-                rm(peTabModelFewerParam.dirModel, recursive=true)
+    for i in eachindex(modelList)
+
+        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+        pathYML = getPathYmlFile(dirModel)
+        petabModel = readPEtabModel(pathYML)
+        absTol, relTol = 1e-8, 1e-8
+        nDynamicParameters = length(getNominalODEValues(petabModel))
+        chunkList = 1:nDynamicParameters
+        for j in 1:30
+            θ_est = getRandomModelParameters(petabModel, Rodas4P(), j, odeSolvers=false)
+            for k in eachindex(chunkList)
+                benchmarkCostGrad(petabModel, sensealgInfo[1], solversCheck, pathSave, absTol, relTol, 
+                                checkGradient=true, nRepeat=10, chunkSize=chunkList[k], iParameter=j, _θ_est=θ_est)
             end
         end
     end
 end
-
-
