@@ -15,9 +15,7 @@ using Symbolics
 using Sundials
 using YAML
 
-
 BLAS.set_num_threads(1)
-
 
 # Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))

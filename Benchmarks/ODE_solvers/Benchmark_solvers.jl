@@ -1,9 +1,3 @@
-#= 
-    Check the accruacy of the PeTab importer by checking the log-likelihood value against known values for several 
-    models.
-=#
-
-
 using ModelingToolkit 
 using DifferentialEquations
 using DataFrames
@@ -21,6 +15,8 @@ using Symbolics
 using Sundials
 using YAML
 
+
+BLAS.set_num_threads(1)
 
 # Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
@@ -308,7 +304,7 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
 end
 
 
-#if ARGS[1] == "Test_all"
+if ARGS[1] == "Test_all"
 
     dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers")
     pathFile = joinpath(dirSave, "All_models.csv")
@@ -337,7 +333,7 @@ end
         runBenchmarkOdeSolvers(petabModel, pathFileSparse, true, nTimesRepat=UInt(3), tolsCheck=tolsTry)
         GC.gc(); GC.gc();GC.gc()
     end
-#end
+end
 
 
 if ARGS[1] == "Large_models"
