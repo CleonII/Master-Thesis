@@ -18,7 +18,7 @@ include(pwd() * "/src/SBML/Process_rules.jl")
     The SBML importer goes via libsbml in Python and currently likelly only 
     works with SBML level 3. 
 """
-function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::String; writeToFile::Bool=true, ifElseToEvent::Bool=true)
+function XmlToModellingToolkit(pathXml::String, pathJlFile::AbstractString, modelName::AbstractString; writeToFile::Bool=true, ifElseToEvent::Bool=true)
 
     libsbml = pyimport("libsbml")
     reader = libsbml.SBMLReader()
@@ -28,7 +28,7 @@ function XmlToModellingToolkit(pathXml::String, modelName::String, dirModel::Str
     modelDict = buildODEModelDictionary(libsbml, model, ifElseToEvent)
 
     if writeToFile
-        writeODEModelToFile(modelDict, modelName, dirModel)
+        writeODEModelToFile(modelDict, pathJlFile, modelName)
     end
 
     return modelDict
@@ -363,7 +363,6 @@ function buildODEModelDictionary(libsbml, model, ifElseToEvent::Bool)
 
     # Extract model rules. Each rule-type is processed differently.
     for rule in model[:getListOfRules]()
-        println("RuleType = ", rule[:getElementName]())
         ruleType = rule[:getElementName]() 
         
         if ruleType == "assignmentRule"
@@ -441,9 +440,9 @@ end
     the resulting file in dirModel with name modelName.jl. 
 
 """
-function writeODEModelToFile(modelDict, modelName, dirModel)
+function writeODEModelToFile(modelDict, pathJlFile, modelName)
     ### Writing to file 
-    modelFile = open(dirModel * "/" * modelName * ".jl", "w")
+    modelFile = open(pathJlFile, "w")
 
     println(modelFile, "# Model name: " * modelName)
 

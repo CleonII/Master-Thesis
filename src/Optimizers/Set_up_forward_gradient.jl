@@ -32,12 +32,12 @@ end
 
 
 """
-    createFowardGradientProb(peTabOpt::PeTabOpt,
+    createFowardGradientProb(petabProblem::PEtabODEProblem,
                              stepLength, 
                              nIt; 
                              b1=0.99, b2=0.99)::Adam
 
-    For a PeTab-model in its optimization struct peTabOpt create an ADAM struct 
+    For a PeTab-model in its optimization struct petabProblem create an ADAM struct 
     where we have full batch optimisation where the gradient is computed via 
     forward gradient. For ADAM optmizer the stepLength (e.g 1e-3 or a vector with 
     the length of nIt) and nIt are further specified here. 
@@ -45,7 +45,7 @@ end
     The API with ADAM will be changed to not restrict the usage of ADAM to forward 
     gradient.
 """
-function createFowardGradientProb(peTabOpt::PeTabOpt,
+function createFowardGradientProb(petabProblem::PEtabODEProblem,
                                   stepLength, 
                                   nIt; 
                                   b1=0.99, b2=0.99)::Adam
@@ -63,12 +63,12 @@ function createFowardGradientProb(peTabOpt::PeTabOpt,
     end
 
     # Pre-allocate arrays to hold model parameters 
-    nParamEst = peTabOpt.nParamEst
+    nParamEst = petabProblem.nParametersToEstimate
     thetaOld::Array{Float64, 1} = Array{Float64, 1}(undef, nParamEst)
     theta::Array{Float64, 1} = Array{Float64, 1}(undef, nParamEst)
 
     # Function calculating unbiased gradient estimate 
-    evalGradF = (pVec) -> calcUnbiasedGrad(pVec, peTabOpt.evalF)
+    evalGradF = (pVec) -> calcUnbiasedGrad(pVec, petabProblem.computeCost)
     
     # ADAM optimizer parameters and arrays  
     loss = 0.0
@@ -82,10 +82,10 @@ function createFowardGradientProb(peTabOpt::PeTabOpt,
     r = 0.2
     c = 1.3
     fail = 0
-    lB = peTabOpt.lowerBounds
-    uB = peTabOpt.upperBounds
+    lB = petabProblem.lowerBounds
+    uB = petabProblem.upperBounds
 
-    return Adam(theta, thetaOld, lB, uB, evalGradF, loss, m, v, b1, b2, a, eps, it, β, r, c, fail, peTabOpt.evalF)
+    return Adam(theta, thetaOld, lB, uB, evalGradF, loss, m, v, b1, b2, a, eps, it, β, r, c, fail, petabProblem.computeCost)
 end
 function createFowardGradientProb(evalF::Function,
                                   stepLength, 
@@ -134,7 +134,7 @@ end
 """
     runAdam(p0::T1, optAdam::Adam; verbose::Bool=false, seed=123) where T1<:Array{<:AbstractFloat, 1}
 
-    For a function with gradient-(estimate) optAdam.evalGradF and cost function optAdam.evalF run ADAM 
+    For a function with gradient-(estimate) optAdam.evalGradF and cost function optAdam.computeCost run ADAM 
     using p0 as start guess for optAdam.nIt iterations using the options specified when creating optADAM 
     via createFowardGradientProb. 
 

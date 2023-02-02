@@ -240,7 +240,7 @@ function testRunBenchmark(peTabModel::PeTabModel, solver, tol::Float64, nProcs::
 end
 
 
-peTabModel = setUpPeTabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/")
+peTabModel = readPEtabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/")
 removeAllProcs()
 addprocs(1, exeflags="--project=.")
 passTest = testRunBenchmark(peTabModel, Rodas5(), 1e-9, 2)
@@ -250,7 +250,7 @@ end
 
 
 dirModel = pwd() * "/Intermediate/PeTab_models/model_Brannmark_JBC2010/"
-peTabModel = setUpPeTabModel("model_Brannmark_JBC2010", dirModel)
+peTabModel = readPEtabModel("model_Brannmark_JBC2010", dirModel)
 removeAllProcs()
 solver, tol = Rodas5(), 1e-9
 addprocs(1, exeflags="--project=.")

@@ -229,3 +229,95 @@ p = ggplot(data_plot, aes(chunk_size, Time, color = N_param_est, fill = N_param_
 ggsave("Bachman_gradient_chunks.png", p, width = BASE_WIDTH*1.5, height = BASE_HEIGHT*1.5)
 
 
+# Try effect of random parameters on chunking 
+data  <- read_csv(str_c(dir_result, "Bachman_test_chunks_random_p.csv"), col_types = cols()) |> 
+  filter(!is.infinite(Time)) |> 
+  filter(Method_info == "ForwardDiff") 
+
+data_ret = tibble()
+param_i = unique(data$i_random_parameter)
+for(i in 1:length(param_i)){
+  data_tmp = data |> filter(i_random_parameter == param_i[i])
+  data_tmp = data_tmp[order(data_tmp$Time), ]
+  data_tmp$rank = 1:nrow(data_tmp)
+  data_ret = bind_rows(data_ret, data_tmp)
+}
+data_plot = data_ret |> mutate(chunk_size = factor(chunk_size, levels = 1:26))
+
+ggplot(data_plot, aes(i_random_parameter, chunk_size, fill = rank)) + 
+  geom_tile() + 
+  scale_fill_viridis_c(direction = -1, name = "Rank") + 
+  scale_x_continuous(expand=c(0, 0), breaks=seq(from=0, to = 100, by = 5)) +
+  labs(x = "Index random parameter", y = "Chunk size", title = "Bachman - Run time ranking different chunk-sizes for random parameter vectors", 
+       subtitle = "A chunk size of 7 or 9 consistently are top-performing across parameters") +
+  my_theme
+
+data_plot1 = data_plot |> 
+  filter(chunk_size == 9 | chunk_size == 7)
+data_plot2 = data_plot |> 
+  filter(!(chunk_size == 9 | chunk_size == 7))
+
+ggplot(data_plot1, aes(i_random_parameter, Time)) + 
+  geom_point(data=data_plot2, mapping=aes(i_random_parameter, Time, group=chunk_size), color=cbPalette[1]) +
+  geom_line(data=data_plot2, mapping=aes(i_random_parameter, Time, group=chunk_size), color=cbPalette[1]) +
+  geom_point(aes(color = chunk_size), size=3.0) + 
+  geom_line(aes(color = chunk_size), linewidth=2.0) + 
+  scale_color_manual(values = cbPalette[-1], name = "Chunk size") +
+  scale_x_continuous(breaks=seq(from=0, to = 100, by = 5)) +
+  labs(x = "Index random parameter", y = "Run time [s]", title = "Bachman - Run time for different chunk-sizes", 
+       subtitle = "Chunk size 7 consistently performs best (grey lines chunk-sizes from 1 - 26)") +
+  my_theme
+
+ggsave("Bachman_chunk_random_p_heat.png", p1, width = BASE_WIDTH*1.5, height = BASE_HEIGHT*1.5)
+ggsave("Bachman_chunk_random_p_line.png", p2, width = BASE_WIDTH*1.5, height = BASE_HEIGHT*1.5)
+
+
+# -------------------------------------------------------------------------------------------------------------
+# Lucarelli gradient scaling 
+# -------------------------------------------------------------------------------------------------------------
+dir_result <- "../Intermediate/Benchmarks/Cost_grad_hess/"
+data  <- read_csv(str_c(dir_result, "Lucarelli_fix_param.csv"), col_types = cols()) |> 
+  filter(!is.infinite(Time)) |> 
+  mutate(N_param_est = max(N_param_fixed) + 1- N_param_fixed)  
+
+#ForEq_AutoDiff
+data_plot <- data |> 
+  filter(solver == "QNDF") |> 
+  filter(Method_info == "ForwardDiff")
+
+p = ggplot(data_plot, aes(N_param_est, Time, color = chunk_size, fill = chunk_size))  +
+  geom_point() + 
+  geom_smooth() + 
+  scale_fill_manual(values = cbPalette[-1], name = "Chunk size") + 
+  scale_color_manual(values = cbPalette[-1], name = "Chunk size") + 
+  scale_x_continuous(breaks = seq(from = 1, by = 2, to  = 71)) +
+  labs(x = "Number of parameter to take gradient on", y = "Time [s]", 
+       title = "Lucarelli model", 
+       subtitle = "Chunking is the secret sauce behind the performance of Julia gradients") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = "bottom")
+ggsave("Lucarelli_gradient_time.png", p, width = BASE_WIDTH*1.5, height = BASE_HEIGHT*1.5)
+
+
+# See effect of different chunks 
+data_chunks  <- read_csv(str_c(dir_result, "Lucarelli_chunk_size.csv"), col_types = cols()) |> 
+  filter(!is.infinite(Time)) 
+data_plot_ = data_chunks |> 
+  filter(solver == "QNDF") |> 
+  filter(Method_info == "ForwardDiff") |> 
+  filter(N_param_fixed == 0)
+data_plot = data_plot_ |> filter(chunk_size != "Default") |> mutate(chunk_size = as.integer(chunk_size))
+default_val = data_plot_ |> filter(chunk_size == "Default") |> pull(Time)
+
+p = ggplot(data_plot, aes(chunk_size, Time)) + 
+  geom_point() + 
+  geom_hline(yintercept = default_val) +   
+  geom_smooth(method = "loess", formula = y ~ x, span=0.3) + 
+  scale_x_continuous(breaks = seq(from = 1, by = 2, to  = 71)) +
+  #annotate("text", x = 17, y = 1.3, label = "Run time default chunking (1.38s)", size=5.0) +
+  #annotate("text", x = 6, y = 1.0, label = "Best chunk size (1.07s)", size=5.0) +
+  labs(x = "Number of chunks", y = "Run time [s]", title = "Testing the effect of different chunks for Lucarelli  model", 
+       subtitle = "The default value is slower than a tuned value, but we are not looking at a linear relationship") +
+  theme_bw(base_size = 16) + 
+  theme(legend.position = "bottom")
+ggsave("Lucarelli_gradient_chunks.png", p, width = BASE_WIDTH*1.5, height = BASE_HEIGHT*1.5)

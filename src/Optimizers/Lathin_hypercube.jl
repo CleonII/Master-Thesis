@@ -3,26 +3,26 @@ using Distributions
 
 
 """
-    createCube(pathSave::String, peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
+    createCube(pathSave::String, petabProblem::PEtabODEProblem, nSamples::Integer; seed=123, verbose::Bool=false)
 
     For a PeTab-optimization struct create a Lathin-hypercube of nSamples parameter vectors which 
-    is stored at pathSave (default in peTabModel.dirModel). 
+    is stored at pathSave (default in petabModel.dirModel). 
 """
-function createCube(pathSave::String, peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
-    _createCube(pathSave, peTabOpt, nSamples, seed=seed, verbose=verbose)
+function createCube(pathSave::String, petabProblem::PEtabODEProblem, nSamples::Integer; seed=123, verbose::Bool=false)
+    _createCube(pathSave, petabProblem, nSamples, seed=seed, verbose=verbose)
 end
 """
-    createCube(peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
+    createCube(petabProblem::PEtabODEProblem, nSamples::Integer; seed=123, verbose::Bool=false)
 
     For a PeTab-optimization struct create a Lathin-hypercube of nSamples parameter vectors which 
-    is stored at peTabOpt.pathCube (which by default is in peTabModel.dirModel). 
+    is stored at petabProblem.pathCube (which by default is in petabModel.dirModel). 
 """
-function createCube(peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
-    _createCube(peTabOpt.pathCube, peTabOpt, nSamples, seed=seed, verbose=verbose)
+function createCube(petabProblem::PEtabODEProblem, nSamples::Integer; seed=123, verbose::Bool=false)
+    _createCube(petabProblem.pathCube, petabProblem, nSamples, seed=seed, verbose=verbose)
 end
 
 
-function _createCube(pathSave::String, peTabOpt::PeTabOpt, nSamples::Integer; seed=123, verbose::Bool=false)
+function _createCube(pathSave::String, petabProblem::PEtabODEProblem, nSamples::Integer; seed=123, verbose::Bool=false)
 
     Random.seed!(seed)
 
@@ -32,7 +32,7 @@ function _createCube(pathSave::String, peTabOpt::PeTabOpt, nSamples::Integer; se
     end
     println("Cube does not exist - will build cube")
 
-    lowerBounds, upperBounds = peTabOpt.lowerBounds, peTabOpt.upperBounds
+    lowerBounds, upperBounds = petabProblem.lowerBounds, petabProblem.upperBounds
     nDims = length(lowerBounds)
     
     paramSave = zeros(Float64, (nSamples, nDims))
@@ -66,7 +66,7 @@ function _createCube(pathSave::String, peTabOpt::PeTabOpt, nSamples::Integer; se
 
             local cost
             try 
-                cost = peTabOpt.evalF(paramI)
+                cost = petabProblem.computeCost(paramI)
             catch
                 cost = Inf
             end
@@ -94,7 +94,7 @@ function _createCube(pathSave::String, peTabOpt::PeTabOpt, nSamples::Integer; se
     end
 
     dataSave = DataFrame(paramSave, :auto)
-    rename!(dataSave, peTabOpt.namesParam)
+    rename!(dataSave, petabProblem.θ_estNames)
     CSV.write(pathSave, dataSave)
 
     println("Cube saved at $pathSave")
