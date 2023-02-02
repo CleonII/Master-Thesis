@@ -83,6 +83,7 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
         end
 
         # Sanity check and process user input.
+        tMax = simulationInfo.timeMax[experimentalId]
         if length(tSave) != 0 && nTimePointsSave != 0
             println("Error : Can only provide tSave (vector to save at) or nTimePointsSave as saveat argument to solvers")
         elseif nTimePointsSave != 0
@@ -91,8 +92,6 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
         if !(isempty(tSave) && nTimePointsSave == 0) 
             denseSolution = false
         end          
-
-        tMax = simulationInfo.timeMax[experimentalId]
 
         # In case we have a simulation with PreEqulibrium
         if simulationInfo.preEquilibrationConditionId[i] != :None

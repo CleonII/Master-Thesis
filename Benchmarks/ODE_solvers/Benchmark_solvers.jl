@@ -1,8 +1,11 @@
+#= 
+    Check the accruacy of the PeTab importer by checking the log-likelihood value against known values for several 
+    models.
+=#
+
+
 using ModelingToolkit 
 using DifferentialEquations
-using ODEInterfaceDiffEq
-using Sundials
-using LSODA
 using DataFrames
 using CSV 
 using ForwardDiff
@@ -12,70 +15,32 @@ using Random
 using LinearAlgebra
 using Distributions
 using Printf
-using Plots
 using SciMLSensitivity
-using BenchmarkTools
 using Zygote
+using Symbolics
+using Sundials
+using YAML
 
 
 # Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
-# Functions for solving ODE system 
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Check_accuracy_ode_solver.jl"))
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_benchmark.jl"))
-
 # PeTab importer to get cost, grad etc 
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
+include(joinpath(pwd(), "src", "Create_PEtab_model.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 
+include(joinpath(pwd(), "src", "Solve_ODE", "Solve_ode_benchmark.jl"))
+include(joinpath(pwd(), "src", "Solve_ODE", "Check_accuracy_ode_solver.jl"))
+
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
-
-function getRandomODEParameters(peTabModel::PeTabModel, 
-                                solver::SciMLAlgorithm, 
-                                iCube;
-                                nParamCube=20,
-                                tol::Float64=1e-8)
-  
-    # Generate Cube if lacking and choose one parameter vector 
-    peTabOpt = setUpCostGradHess(peTabModel, solver, tol)
-    pathCube = peTabModel.dirModel * "Cube_ode_solve.csv"
-    createCube(pathCube, peTabOpt, nParamCube, seed=123, verbose=true)
-    cube = Matrix(CSV.read(pathCube, DataFrame))
-    paramEst = cube[iCube, :]
-
-    # Change model parameters 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    parameterData = processParameterData(parameterDataFile)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
-    transformParamVec!(paramEst, paramEstIndices.namesParamEst, parameterData)
-
-    return paramEst[paramEstIndices.iDynParam]
-end
+include(joinpath(@__DIR__, "..", "Common.jl"))
 
 
-function getFileODEvalues(peTabModel::PeTabModel)
-  
-    # Change model parameters 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    parameterData = processParameterData(parameterDataFile)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
-
-    namesParamEst = paramEstIndices.namesParamEst
-    paramVecNominal = [parameterData.paramVal[findfirst(x -> x == namesParamEst[i], parameterData.parameterID)] for i in eachindex(namesParamEst)]
-
-    return paramVecNominal[paramEstIndices.iDynParam]
-end
-
-
-function getSolverInfo(sparseList::Bool, solversCheck)
+function getSolverInfo(sparseJacobian::Bool, solversCheck)
 
     lSolver1 = RFLUFactorization()
     lSolver2 = FastLUFactorization()
@@ -108,24 +73,17 @@ function getSolverInfo(sparseList::Bool, solversCheck)
                   AutoVern7(Rodas5()), "Vern7Rodas5", "composite", "OrdinaryDiffEq", 
                   AutoVern7(Rodas4P()), "Vern7Rodas4P", "composite", "OrdinaryDiffEq", 
                   AutoVern9(Rodas4P()), "Vern9Rodas4P", "composite", "OrdinaryDiffEq", 
-                  lsoda(), "lsoda", "composite", "LSODA", 
                   CVODE_BDF(), "CVODE_BDF_default", "stiff", "Sundials",
                   CVODE_BDF(linear_solver=:Dense), "CVODE_BDF_Dense", "stiff", "Sundials", 
                   CVODE_BDF(linear_solver=:LapackDense), "CVODE_BDF_LapackDense", "stiff", "Sundials", 
                   CVODE_BDF(linear_solver=:GMRES), "CVODE_BDF_GMRES", "stiff", "Sundials", 
                   CVODE_Adams(linear_solver=:Dense), "CVODE_Adams_Dense", "nonStiff", "Sundials", 
                   CVODE_Adams(linear_solver=:LapackDense), "CVODE_Adams_LapackDense", "nonStiff", "Sundials", 
-                  # In Julia v1.8.1 these crash for several solvers as there is problem with ccall
-                  # Try out again for v.1.8.2
+                  # In Julia v1.8.1 these crash for problems solvers as there is problem with ccall
                   #ARKODE(Sundials.Explicit(), order=4), "ARKODE_Exp4", "nonStiff", "Sundials", 
                   #ARKODE(Sundials.Explicit(), order=8), "ARKODE_Exp8", "nonStiff", "Sundials", 
                   #ARKODE(Sundials.Implicit(), order=3), "ARKODE_Imp3", "stiff", "Sundials", 
                   #ARKODE(Sundials.Implicit(), order=5), "ARKODE_Imp5", "stiff", "Sundials",
-                  dopri5(), "dopri5", "nonStiff", "ODEInterface", 
-                  dop853(), "dop853", "nonStiff", "ODEInterface", 
-                  radau(), "radau", "stiff", "ODEInterface", 
-                  radau5(), "radau5", "stiff", "ODEInterface", 
-                  rodas(), "rodas", "stiff", "ODEInterface", 
                   [:auto], "autoHint", "hint", "OrdinaryDiffEq", 
                   [:nonstiff], "nonstiffHint", "hint", "OrdinaryDiffEq", 
                   [:stiff], "stiffHint", "hint", "OrdinaryDiffEq", 
@@ -173,151 +131,144 @@ function getSolverInfo(sparseList::Bool, solversCheck)
                         CVODE_BDF(linear_solver=:GMRES), "CVODE_BDF_GMRES_S", "stiff", "Sundials",
                         CVODE_BDF(linear_solver=:KLU), "CVODE_BDF_KLU_S", "stiff", "Sundials"]
                   
-    solverListMat = Array{Any, 2}(undef, (Int(length(solverList)/4), 4))
-    for i in 1:size(solverListMat)[1]
-        iStart = (i-1)*4 + 1
-        iEnd = i*4
-        solverListMat[i, :] .= solverList[iStart:iEnd]
-    end
-    solverListSparseMat = Array{Any, 2}(undef, (Int(length(solverListSparse)/4), 4))
-    for i in 1:size(solverListSparseMat)[1]
-        iStart = (i-1)*4 + 1
-        iEnd = i*4
-        solverListSparseMat[i, :] .= solverListSparse[iStart:iEnd]
-    end
-
-    if sparseList == true && solversCheck == "all"
+    nRow = Int(length(solverList) / 4)
+    solverList = reshape(solverList, (4, nRow))
+    nRow = Int(length(solverListSparse) / 4)
+    solverListSparse = reshape(solverListSparse, (4, nRow))
+    
+    if sparseJacobian == true && solversCheck == "all"
         return solverListSparseMat
-    elseif sparseList == true && solversCheck != "all"
-        iUse = [findfirst(x -> x == solversCheck[i], solverListSparseMat[:, 2]) for i in eachindex(solversCheck)]
-        return solverListSparseMat[iUse, :]
-    elseif sparseList == false && solversCheck == "all"
-        return solverListMat
+
+    elseif sparseJacobian == true && solversCheck != "all"
+        iUse = [findfirst(x -> x == solversCheck[i], solverListSparse[2, :]) for i in eachindex(solversCheck)]
+        return solverListSparse[iUse, :]
+
+    elseif sparseJacobian == false && solversCheck == "all"
+        return solverList
+
     else
-        iUse = [findfirst(x -> x == solversCheck[i], solverListMat[:, 2]) for i in eachindex(solversCheck)]
-        return solverListMat[iUse, :]
+        iUse = [findfirst(x -> x == solversCheck[i], solverList[2, :]) for i in eachindex(solversCheck)]
+        return solverList[iUse, :]
     end         
 end
 
 
-function runBenchmarkOdeSolvers(peTabModel::PeTabModel, 
+function runBenchmarkOdeSolvers(petabModel::PEtabModel, 
                                 pathFileSave::String,
-                                sparseLinSolvers::Bool;
+                                sparseJacobian::Bool;
                                 solversCheck="all",
                                 nTimesRepat::UInt=UInt(3), 
                                 tolsCheck=[(1e-6, 1e-6), (1e-9, 1e-9), (1e-12, 1e-12)], 
-                                paramVec=nothing,
+                                _θ_dynamic=nothing,
                                 checkAccuracy::Bool=true)
-  
-    println("Working with model ", peTabModel.modelName)
+
+    println("Working with model ", petabModel.modelName)
 
     # Process PeTab files into type-stable Julia structs 
-    experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readDataFiles(peTabModel.dirModel, readObs=true)
-    parameterData = processParameterData(parameterDataFile)
-    measurementData = processMeasurementData(measurementDataFile, observablesDataFile) 
-    simulationInfo = getSimulationInfo(peTabModel, measurementDataFile, measurementData)
-    paramEstIndices = getIndicesParam(parameterData, measurementData, peTabModel.odeSystem, experimentalConditionsFile)
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
+    parameterInfo = processParameters(parametersData) 
+    measurementInfo = processMeasurements(measurementsData, observablesData) 
+    simulationInfo = processSimulationInfo(petabModel, measurementInfo, absTolSS=1e-10, relTolSS=1e-8)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
      
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
-    setParamToFileValues!(peTabModel.paramMap, peTabModel.stateMap, parameterData)
+    setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, parameterInfo)
  
     # The time-span 5e3 is overwritten when performing actual forward simulations 
-    odeProb = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=sparseLinSolvers)
-    odeProb = remake(odeProb, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
+    _odeProblem = ODEProblem(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true, sparse=sparseJacobian)
+    odeProblem = remake(_odeProblem, p = convert.(Float64, _odeProblem.p), u0 = convert.(Float64, _odeProblem.u0))
     # In case we have provided a random start-guess
-    if isnothing(paramVec)
-        pDynParam = getFileODEvalues(peTabModel)
+    if isnothing(_θ_dynamic)
+        θ_dynamic = getFileODEvalues(petabModel)
     else
-        pDynParam = paramVec
+        θ_dynamic = _θ_dynamic
     end
     # Change to parameters specified by paramVec
-    changeModelParam!(odeProb.p, odeProb.u0, pDynParam, paramEstIndices, peTabModel)
-    println("odeProb.p = ", odeProb.p)
+    changeODEProblemParameters!(odeProblem.p, odeProblem.u0, θ_dynamic, θ_indices, petabModel)                          
 
-    # High accuracy ODE problem for check solver quality
-    odeProbHighAcc = ODEProblem(peTabModel.odeSystem, peTabModel.stateMap, (0.0, 5e3), peTabModel.paramMap, jac=true, sparse=false)
-    odeProbHighAcc = remake(odeProbHighAcc, p = convert.(Float64, odeProb.p), u0 = convert.(Float64, odeProb.u0))
+    # High accuracy ODE problem for check solver quality. BigFloats not compatible with sparse solvers 
+    _odeProblemAccuarcy = ODEProblem(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true, sparse=false)
+    odeProblemAccuarcy = remake(_odeProblemAccuarcy, p = convert.(Float64, odeProblem.p), u0 = convert.(Float64, odeProblem.u0))
 
     # Functions to map experimental conditions and parameters correctly to the ODE model 
-    changeToExperimentalCondUse! = (pVec, u0Vec, expID) -> changeExperimentalCondEst!(pVec, u0Vec, expID, pDynParam, peTabModel, paramEstIndices)
+    changeExperimentalCondition! = (pODEProblem, u0, conditionId) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
     
-    # High accruacy ODE solution. The Isensee model crashes any BigFloat solution, henc KenCarp58 is used with very low 
-    # tolerance.
+    # High accruacy ODE solution. Laske-model does not not solve with BigFloat 
     if checkAccuracy == true
         println("Computing high accuracy model")
-        if peTabModel.modelName != "model_Laske_PLOSComputBiol2019"
-            solArrayHighAcc, statusHighAcc = calcHighAccOdeSolution(odeProbHighAcc, changeToExperimentalCondUse!, simulationInfo, peTabModel.getTStops, absTol=1e-15, relTol=1e-15, )
+        if petabModel.modelName != "model_Laske_PLOSComputBiol2019"
+            highAccuracySolutions, statusAccuracy = computeHighAccuracyOdeSolution(odeProblemAccuarcy, changeExperimentalCondition!, simulationInfo, petabModel.computeTStops, absTol=1e-15, relTol=1e-15)
         else
-            solArrayHighAcc, tmp = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, simulationInfo, KenCarp58(), 1e-15, 1e-15, peTabModel.getTStops, nTSave=100)
-            statusHighAcc = true
+            highAccuracySolutions, tmp = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, KenCarp58(), 1e-15, 1e-15, petabModel.computeTStops, nTimePointsSave=100)
+            statusAccuracy = true
         end
-        println("Done with statusHighAcc = $statusHighAcc")
+        println("Done with high accuracy solution and status = $statusAccuracy")
     end
 
-    solverInfoMat = getSolverInfo(sparseLinSolvers, solversCheck)
+    solverInfo = getSolverInfo(sparseJacobian, solversCheck)
 
-    if checkAccuracy == true && statusHighAcc != true
+    if checkAccuracy == true && statusAccuracy != true
         # Log failure to disk 
-        println("High accuracy solver failed for ", peTabModel.modelName)
+        println("High accuracy solver failed for ", petabModel.modelName)
         open(joinpath(pwd(), "Benchmark", "ODE_solvers", "Log.txt"), "a+") do io
             println(io, "Failed with high accuracy solution for $modelFile")
         end
         return 
-    elseif checkAccuracy == true
-        println("Done with high accuracy solution")
     end
 
-    for i in 1:size(solverInfoMat)[1]
+    for i in 1:size(solverInfo)[2]
 
-        solver = solverInfoMat[i, 1]
-        solverNames = solverInfoMat[i, 2]
-        solverType = solverInfoMat[i, 3]
-        solverLib = solverInfoMat[i, 4]
+        solver = solverInfo[1, i]
+        solverName = solverInfo[2, i]
+        solverType = solverInfo[3, i]
+        solverLib = solverInfo[4, i]
 
-        println("Trying solver = ", solver)
+        println("Trying solver = ", solverName)
         # Crauste crashes as problem is to stiff 
-        if !((peTabModel.modelName == "model_Crauste_CellSystems2017") && solver == AutoTsit5(Rosenbrock23())) 
+        if !((petabModel.modelName == "model_Crauste_CellSystems2017") && solver == AutoTsit5(Rosenbrock23())) 
             for tol in tolsCheck
                 
-                absTol, relTol = tol            
-                benchRunTime = Vector{Float64}(undef, nTimesRepat)
+                absTol, relTol = tol
+                runTime = Vector{Float64}(undef, nTimesRepat)
 
                 # Check the accuracy of the ODE solver by comparing with high accuracy solution. In case the squared sum 
                 # error cannot be computed the solver crashed and run time is not profiled.
                 # If we do not check accuracy, check that we can solve the model using the provided solver.
                 local sqDiffSolver = Float64
+                _sol = computeAccuracyODESolver(odeProblem, highAccuracySolutions, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops)
                 if checkAccuracy == true
                     try
-                        sqDiffSolver = calcAccuracyOdeSolver(odeProb, solArrayHighAcc, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, peTabModel.getTStops)
+                        sqDiffSolver = computeAccuracyODESolver(odeProblem, highAccuracySolutions, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops)
                     catch 
                         sqDiffSolver = Inf
                     end
                     println("sqDiffSolver = ", sqDiffSolver)
-                    solverSuccess = isinf(sqDiffSolver) ? false : true
+                    canSolveModel = isinf(sqDiffSolver) ? false : true
                 else
-                    tmp, solverSuccess = solveOdeModelAllExperimentalCond(odeProb, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, peTabModel.getTStops, nTSave=100)
+                    # Here we need to solver the model for precompiliation purposes 
+                    tmp, canSolveModel = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops, onlySaveAtObservedTimes=true)
                     sqDiffSolver = 0.0
                 end
                     
-                if solverSuccess == true
+                if canSolveModel == true
                     for i in 1:nTimesRepat
-                        status, runTime = solveOdeModelAllExperimentalCondBench(odeProb, changeToExperimentalCondUse!, simulationInfo, solver, absTol, relTol, peTabModel.getTStops, onlySaveAtTobs=true, savePreEqTime=true) 
-                        benchRunTime[i] = runTime # nanosecond
+                        status, runTime = solveODEModelAllConditionsBenchmark(odeProblem, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, savePreEqTime=true) 
+                        runTime[i] = runTime # seconds-precision
                         GC.gc(); GC.gc();GC.gc()
                     end
                 else
-                    benchRunTime .= NaN
+                    runTime .= NaN
                 end
-                dataSave = DataFrame(model = peTabModel.modelName, 
-                                     solver = solverNames, 
+                dataSave = DataFrame(model = petabModel.modelName, 
+                                     solver = solverName, 
                                      solverType = solverType,
                                      solverLib = solverLib,
-                                     nStates = length(peTabModel.stateNames)-1,
-                                     nParam = length(peTabModel.paramNames),
+                                     nStates = length(petabModel.stateNames),
+                                     nParam = length(petabModel.parameterNames),
                                      reltol = relTol, 
                                      abstol = absTol, 
-                                     success = solverSuccess, 
-                                     runTime = benchRunTime, 
+                                     success = canSolveModel, 
+                                     runTime = runTime, 
                                      sqDiff = sqDiffSolver, 
                                      iteration = 1:nTimesRepat)
                 if isfile(pathFileSave)
@@ -331,12 +282,12 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
             for tol in tolsCheck
 
                 absTol, relTol = tol
-                dataSave = DataFrame(model = peTabModel.modelName, 
-                                     solver = solverNames, 
+                dataSave = DataFrame(model = petabModel.modelName, 
+                                     solver = solverName, 
                                      solverType = solverType,
                                      solverLib = solverLib,
-                                     nStates = length(peTabModel.stateNames)-1,
-                                     nParam = length(peTabModel.paramNames),
+                                     nStates = length(petabModel.stateNames)-1,
+                                     nParam = length(petabModel.paramNames),
                                      reltol = absTol, 
                                      abstol = relTol, 
                                      success = false, 
@@ -357,94 +308,66 @@ function runBenchmarkOdeSolvers(peTabModel::PeTabModel,
 end
 
 
-if ARGS[1] == "Test_all"
+#if ARGS[1] == "Test_all"
 
-    dirSave = pwd() * "/Intermediate/Benchmarks/ODE_solvers/"
-    pathFileSaveNotSparse = dirSave * "Sparse_not_linsolvers_test.csv"
-    pathFileSaveSparse = dirSave * "Sparse_linsolvers_test.csv"
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers")
+    pathFile = joinpath(dirSave, "All_models.csv")
+    pathFileSparse = joinpath(dirSave, "All_models_sparse_jacobian.csv")
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
-    modelListTry = ["model_Beer_MolBioSystems2014", "model_Blasi_CellSystems2016", "model_Weber_BMC2015", "model_Schwen_PONE2014", "model_Alkan_SciSignal2018", 
-                    "model_Bachmann_MSB2011", "model_Bertozzi_PNAS2020", "model_Boehm_JProteomeRes2014", 
-                    "model_Borghans_BiophysChem1997", "model_Brannmark_JBC2010", "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
-                    "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", "model_Giordano_Nature2020", 
-                    "model_Isensee_JCB2018", "model_Laske_PLOSComputBiol2019", "model_Lucarelli_CellSystems2018", "model_Okuonghae_ChaosSolitonsFractals2020", 
-                    "model_Oliveira_NatCommun2021", "model_Perelson_Science1996", "model_Rahman_MBS2016", 
-                    "model_SalazarCavazos_MBoC2020", "model_Sneyd_PNAS2002", "model_Zhao_QuantBiol2020", "model_Zheng_PNAS2012"]
+    modelList = ["model_Beer_MolBioSystems2014", "model_Blasi_CellSystems2016", "model_Weber_BMC2015", "model_Schwen_PONE2014", "model_Alkan_SciSignal2018", 
+                "model_Bachmann_MSB2011", "model_Bertozzi_PNAS2020", "model_Boehm_JProteomeRes2014", 
+                "model_Borghans_BiophysChem1997", "model_Brannmark_JBC2010", "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
+                "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", "model_Giordano_Nature2020", 
+                "model_Isensee_JCB2018", "model_Laske_PLOSComputBiol2019", "model_Lucarelli_CellSystems2018", "model_Okuonghae_ChaosSolitonsFractals2020", 
+                "model_Oliveira_NatCommun2021", "model_Perelson_Science1996", "model_Rahman_MBS2016", 
+                "model_SalazarCavazos_MBoC2020", "model_Sneyd_PNAS2002", "model_Zhao_QuantBiol2020", "model_Zheng_PNAS2012"]                    
 
     tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
-    for i in eachindex(modelListTry)
-        modelName = modelListTry[i]
-        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
-        peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathFileSaveNotSparse, false, nTimesRepat=UInt(3), tolsCheck=tolsTry)
+    tolsTry = [(1e-6, 1e-6)]            
+    for i in eachindex(modelList)
+        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+        pathYML = getPathYmlFile(dirModel)
+        petabModel = readPEtabModel(pathYML)
+
+        runBenchmarkOdeSolvers(petabModel, pathFile, false, nTimesRepat=UInt(3), tolsCheck=tolsTry)
         GC.gc(); GC.gc();GC.gc()
-        runBenchmarkOdeSolvers(peTabModel, pathFileSaveSparse, true, nTimesRepat=UInt(3))
+        runBenchmarkOdeSolvers(petabModel, pathFileSparse, true, nTimesRepat=UInt(3), tolsCheck=tolsTry)
         GC.gc(); GC.gc();GC.gc()
     end
-end
+#end
 
 
-if ARGS[1] == "compare_fabian"
+if ARGS[1] == "Large_models"
 
-    dirSave = pwd() * "/Intermediate/Benchmarks/ODE_solvers/"
-    pathSave = dirSave * "Compare_against_Fabian4.csv"
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers")
+    pathSave = joinpath(dirSave, "Large_models.csv") 
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
-    modelListTry = ["model_Borghans_BiophysChem1997", "model_Bruno_JExpBot2016", "model_Schwen_PONE2014", 
-                    "model_Crauste_CellSystems2017", "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", 
-                    "model_Boehm_JProteomeRes2014", "model_Sneyd_PNAS2002", "model_Lucarelli_CellSystems2018"]
-    tolsTry = [(1e-16, 1e-8)]            
-    solversCheck = ["KenCarp4", "FBDF", "QNDF", "Rosenbrock23", "TRBDF2", "RadauIIA5", "Rodas4", "CVODE_BDF_default", "Rodas5"]
-
-    for i in eachindex(modelListTry)
-        modelName = modelListTry[i]
-        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
-        peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(3), solversCheck=solversCheck, tolsCheck=tolsTry)    
-    end
-
-    # Now try with sparse Jacobian 
-    solversCheckSparse = ["KenCarp4_S", "FBDF_S", "QNDF_S", "Rosenbrock23_S", "TRBDF2_S", "RadauIIA5_S", "Rodas4_S", "CVODE_BDF_KLU_S", "Rodas5_S"]
-    for i in eachindex(modelListTry)
-        modelName = modelListTry[i]
-        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
-        peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathSave, true, nTimesRepat=UInt(3), solversCheck=solversCheckSparse, tolsCheck=tolsTry)    
-    end
-end
-
-
-if ARGS[1] == "large_models"
-
-    dirSave = pwd() * "/Intermediate/Benchmarks/ODE_solvers/"
-    pathSave = dirSave * "Large_models.csv"
-    if !isdir(dirSave)
-        mkpath(dirSave)
-    end
-
-    modelListTry = ["model_Chen_MSB2009"]
+    modelList = ["model_Chen_MSB2009"]
     tolsTry = [(1e-6, 1e-6)]            
     solversCheck = ["KenCarp4", "QNDF", "TRBDF2", "FBDF", "Rodas4P", "CVODE_BDF_default"]
 
-    for i in eachindex(modelListTry)
-        modelName = modelListTry[i]
-        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
-        peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(3), solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false)    
+    for i in eachindex(modelList)
+        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+        pathYML = getPathYmlFile(dirModel)
+        petabModel = readPEtabModel(pathYML)
+
+        runBenchmarkOdeSolvers(petabModel, pathSave, false, nTimesRepat=UInt(3), solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false)    
     end
 
     # Now try with sparse Jacobian 
     solversCheckSparse = ["KenCarp4_S", "QNDF_S", "TRBDF2_S", "FBDF_S", "Rodas4P_S", "CVODE_BDF_KLU_S"]
-    for i in eachindex(modelListTry)
-        modelName = modelListTry[i]
-        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
-        peTabModel = setUpPeTabModel(modelName, dirModel)
-        runBenchmarkOdeSolvers(peTabModel, pathSave, true, nTimesRepat=UInt(3), solversCheck=solversCheckSparse, tolsCheck=tolsTry, checkAccuracy=false)    
+    for i in eachindex(modelList)
+        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+        pathYML = getPathYmlFile(dirModel)
+        petabModel = readPEtabModel(pathYML)
+
+        runBenchmarkOdeSolvers(petabModel, pathSave, true, nTimesRepat=UInt(3), solversCheck=solversCheckSparse, tolsCheck=tolsTry, checkAccuracy=false)    
     end
 end
 
@@ -452,27 +375,32 @@ end
 # Test set of stiff and non-stiff solvers for random parameters values 
 if ARGS[1] == "Test_random_parameter"
 
-    dirSave = pwd() * "/Intermediate/Benchmarks/ODE_solvers/"
-    pathSave = dirSave * "Random_parameters.csv"
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers")
+    pathSave = joinpath(dirSave, "Random_parameters.csv")
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
-    modelListTry = ["model_Perelson_Science1996", "model_Zhao_QuantBiol2020", "model_Crauste_CellSystems2017", "model_Fiedler_BMC2016", 
-                    "model_Bruno_JExpBot2016", "model_Okuonghae_ChaosSolitonsFractals2020", "model_Schwen_PONE2014"]
+    modelList = ["model_Perelson_Science1996", "model_Zhao_QuantBiol2020", "model_Crauste_CellSystems2017", "model_Fiedler_BMC2016", 
+                 "model_Bruno_JExpBot2016", "model_Okuonghae_ChaosSolitonsFractals2020", "model_Schwen_PONE2014", 
+                 "model_Bachmann_MSB2011", "model_Brannmark_JBC2010", "model_Lucarelli_CellSystems2018", 
+                 "model_Isensee_JCB2018", "model_Weber_BMC2015"]
+
+
     solversCheck = ["Rodas5", "QNDF", "Rodas4P", "CVODE_BDF_default", "Vern7", "Tsit5", "Vern6", "Vern7Rodas4P"]
-    tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
-    for i in eachindex(modelListTry)
-        modelName = modelListTry[i]
-        dirModel = pwd() * "/Intermediate/PeTab_models/" * modelName * "/"
-        peTabModel = setUpPeTabModel(modelName, dirModel)
+    tolsTry = [(1e-8, 1e-8)]            
+    for i in eachindex(modelList)
+
+        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+        pathYML = getPathYmlFile(dirModel)
+        petabModel = readPEtabModel(pathYML)
         
-        # 10 random vector 
-        for j in 1:20
-            paramVec = getRandomODEParameters(peTabModel, Rodas4P(), j)
-            runBenchmarkOdeSolvers(peTabModel, pathSave, false, nTimesRepat=UInt(1), 
+        # 40 random vector 
+        for j in 1:40
+            θ_dynamic = getRandomModelParameters(petabModel, Rodas4P(), j)
+            runBenchmarkOdeSolvers(petabModel, pathSave, false, nTimesRepat=UInt(1), 
                                    solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false, 
-                                   paramVec=paramVec)    
+                                   _θ_dynamic=θ_dynamic)    
         end
     end
 end

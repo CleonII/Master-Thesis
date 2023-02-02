@@ -1,131 +1,108 @@
 # Solve the ODE models for all experimental condiditions and return the run-time for all solve-calls.
-function solveOdeModelAllExperimentalCondBench(prob::ODEProblem, 
-                                               changeToExperimentalCondUse!::Function, 
-                                               simulationInfo::SimulationInfo,
-                                               solver, 
-                                               absTol::Float64,
-                                               relTol::Float64, 
-                                               calcTStops::Function;
-                                               nTSave::Int64=0, 
-                                               onlySaveAtTobs::Bool=false,
-                                               denseSol::Bool=true, 
-                                               savePreEqTime::Bool=true)
-
-    
-    absTolSS, relTolSS = simulationInfo.absTolSS, simulationInfo.relTolSS
+function solveODEModelAllConditionsBenchmark(odeProblem::ODEProblem, 
+                                             changeExperimentalCondition!::Function, 
+                                             simulationInfo::SimulationInfo,
+                                             solver,
+                                             absTol::Float64, 
+                                             relTol::Float64, 
+                                             computeTStops::Function;
+                                             onlySaveAtObservedTimes::Bool=false,
+                                             savePreEqTime::Bool=true)
 
     bPreEq = 0.0
     bSim = 0.0
-    local sucess::Bool = true   
-    # In case the model is first simulated to a steady state 
-    if simulationInfo.simulateSS == true
+    success = true
 
-        preEqIds = unique(simulationInfo.firstExpIds)
-        # Arrays to store steady state (pre-eq) values 
-        uAtSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
-        u0PreSimSS = Matrix{eltype(prob.p)}(undef, (length(prob.u0), length(preEqIds)))
+    # We only compute accuracy for post-equlibrium models 
+    if simulationInfo.haspreEquilibrationConditionId == true
+    
+        # Arrays to store steady state (pre-eq) values.
+        preEquilibrationId = unique(simulationInfo.preEquilibrationConditionId)
+        uAtSS = Matrix{eltype(odeProblem.p)}(undef, (length(odeProblem.u0), length(preEquilibrationId)))
+        u0AtT0 = Matrix{eltype(odeProblem.p)}(undef, (length(odeProblem.u0), length(preEquilibrationId)))
 
-        for i in eachindex(preEqIds)
-            
-            uAtSSVec = @view uAtSS[:, i]
-            u0PreSimSS = @view u0PreSimSS[:, i]
+        for i in eachindex(preEquilibrationId)
+            _odeSolutions = simulationInfo.odePreEqulibriumSolutions
+            bPreEq += @elapsed _odeSolutions[preEquilibrationId[i]] = solveODEPreEqulibrium!((@view uAtSS[:, i]), 
+                                                                                             (@view u0AtT0[:, i]), 
+                                                                                             odeProblem, 
+                                                                                             changeExperimentalCondition!, 
+                                                                                             preEquilibrationId[i], 
+                                                                                             absTol, 
+                                                                                             relTol, 
+                                                                                             solver, 
+                                                                                             simulationInfo.absTolSS, 
+                                                                                             simulationInfo.relTolSS)
 
-            changeToExperimentalCondUse!(prob.p, prob.u0, preEqIds[i])
-            prob = remake(prob, tspan = (0.0, 1e8), p = prob.p[:], u0 = prob.u0[:])
-            u0PreSimSS .= prob.u0
-
-            # Terminate if a steady state was not reached in preequilibration simulations 
-            bPreEq += @elapsed sol_pre = getSolPreEq(prob, solver, absTol, relTol, absTolSS, relTolSS)
-            if sol_pre.retcode == :Terminated
-                uAtSSVec .= sol_pre.u[end]
-            else
-                return false, Inf
-            end
-        end
-
-        @inbounds for i in eachindex(simulationInfo.conditionIdSol)
-
-            whichPreEq = findfirst(x -> x == simulationInfo.preEqIdSol[i], preEqIds)
-            uAtSSVec = @view uAtSS[:, whichPreEq]
-            u0PreSimSSVec = @view u0PreSimSS[:, whichPreEq]
-
-            t_max_ss = simulationInfo.tMaxForwardSim[i]
-            # Sanity check input. Can only provide either nTsave (points to save solution at) or tSave (number of points to save)
-            if nTSave != 0
-                saveAtVec = collect(LinRange(0.0, t_max, nTSave))
-            else
-                saveAtVec = Float64[]
-            end
-            # Sanity check input. Both tSave and nTsave must be empty or zero in order to be able to output a dense solution.
-            if (isempty(saveAtVec) && nTSave == 0) && denseSol == true
-                dense = true
-            else
-                dense = false
-            end                                
-
-            changeToExperimentalCondUse!(prob.p, prob.u0, simulationInfo.postEqIdSol[i])
-            has_not_changed = (prob.u0 .== u0PreSimSSVec)
-            prob.u0[has_not_changed] .= uAtSSVec[has_not_changed]
-            probUse = remake(prob, tspan = (0.0, t_max_ss), u0=prob.u0[:], p=prob.p[:])     
-            tStops = calcTStops(probUse.u0, probUse.p)
-            callBackSet = getCallbackSet(probUse, simulationInfo, i, false)
-            bSim += @elapsed sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_ss, saveAtVec, dense, callBackSet, tStops)
-
-            if !(sol.retcode == :Success || sol.retcode == :Terminated)
-                sucess = false, Inf
-            end
-        end
-
-    # In case the model is not first simulated to a steady state 
-    elseif simulationInfo.simulateSS == false
-
-        @inbounds for i in eachindex(simulationInfo.firstExpIds)
-
-            # Whether or not we only want to save solution at observed time-points 
-            firstExpId = simulationInfo.firstExpIds[i]
-            if onlySaveAtTobs == true
-                nTSave = 0
-                # Extract t-save point for specific condition ID 
-                tSave = simulationInfo.tVecSave[firstExpId]
-            else
-                tSave=Float64[]
-            end
-
-            t_max = simulationInfo.tMaxForwardSim[i]
-            
-            # Sanity check input. Can only provide either nTsave (points to save solution at) or tSave (number of points to save)
-            if length(tSave) != 0 && nTSave != 0
-                println("Error : Can only provide tSave (vector to save at) or nTSave as saveat argument to solvers")
-            elseif nTSave != 0
-                saveAtVec = collect(LinRange(0.0, t_max, nTSave))
-            else
-                saveAtVec = tSave
-            end
-
-            # Sanity check input. Both tSave and nTsave must be empty or zero in order to be able to output a dense solution.
-            if (isempty(tSave) && nTSave == 0) && denseSol == true
-                dense = true
-            else
-                dense = false
-            end                                
-
-            # Change experimental condition 
-            t_max_use = isinf(t_max) ? 1e8 : t_max
-            changeToExperimentalCondUse!(prob.p, prob.u0, firstExpId)
-            probUse = remake(prob, tspan=(0.0, t_max_use), u0 = prob.u0[:], p = prob.p[:])
-            tStops = calcTStops(probUse.u0, probUse.p)
-            callBackSet = getCallbackSet(probUse, simulationInfo, i, false)
-            bSim += @elapsed sol = getSolSolveOdeNoSS(probUse, solver, absTol, relTol, absTolSS, relTolSS, t_max_use, saveAtVec, dense, callBackSet, tStops)
-
-            if !(sol.retcode == :Success || sol.retcode == :Terminated)
-                sucess = false, Inf
+            if _odeSolutions[preEquilibrationId[i]] != :Terminated                                                                                             
+                success = false
+                break
             end
         end
     end
 
+    if success == false
+        return success, Inf
+    end
+
+    for i in eachindex(simulationInfo.experimentalConditionId)
+        experimentalId = simulationInfo.experimentalConditionId[i]
+        highAccuracySolution = highAccuracySolutions[experimentalId]          
+        
+        if onlySaveAtObservedTimes == true
+            nTimePointsSave = 0
+            tSave = simulationInfo.timeObserved[experimentalId]
+        end
+
+        # Sanity check and process user input.
+        tMax = simulationInfo.timeMax[experimentalId]
+
+        # In case we have a simulation with PreEqulibrium
+        if simulationInfo.preEquilibrationConditionId[i] != :None
+            whichIndex = findfirst(x -> x == simulationInfo.preEquilibrationConditionId[i], preEquilibrationId)
+            bSim += @elapsed odeSolution = solveODEPostEqulibrium(odeProblem, 
+                                                                 (@view uAtSS[:, whichIndex]),
+                                                                 (@view u0AtT0[:, whichIndex]), 
+                                                                 changeExperimentalCondition!,
+                                                                 simulationInfo, 
+                                                                 simulationInfo.simulationConditionId[i],
+                                                                 experimentalId,
+                                                                 absTol,
+                                                                 relTol,
+                                                                 tMax,
+                                                                 solver,
+                                                                 computeTStops,
+                                                                 tSave=tSave, 
+                                                                 denseSolution=false)
+
+        # In case we have an ODE solution without Pre-equlibrium
+        else
+            bSim += @elapsed odeSolution = solveODENoPreEqulibrium!(odeProblem, 
+                                                                    changeExperimentalCondition!, 
+                                                                    simulationInfo,
+                                                                    simulationInfo.simulationConditionId[i], 
+                                                                    absTol,
+                                                                    relTol, 
+                                                                    solver, 
+                                                                    tMax, 
+                                                                    computeTStops,
+                                                                    tSave=tSave, 
+                                                                    denseSolution=false)
+                                                  
+        end
+
+        if !(odeSolution.retcode == :Success || odeSolution.retcode == :Terminated)
+            success = false
+            break
+        end
+    end
+
+    if success == false
+        return success, Inf
+    end
     if savePreEqTime == true
-        return sucess, bSim + bPreEq
+        return success, bSim + bPreEq
     else
-        return sucess, bSim 
+        return success, bSim 
     end
 end
