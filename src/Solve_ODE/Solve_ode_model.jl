@@ -55,8 +55,7 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                                                                absTol, 
                                                                                relTol, 
                                                                                solver, 
-                                                                               simulationInfo.absTolSS, 
-                                                                               simulationInfo.relTolSS)
+                                                                               simulationInfo.callbackSS)
                 if _odeSolutions[preEquilibrationId[i]].retcode != :Terminated
                     return false
                 end
@@ -309,8 +308,7 @@ function solveODEPreEqulibrium!(uAtSS::AbstractVector,
                                 absTol::Float64, 
                                 relTol::Float64, 
                                 solver::Union{SciMLAlgorithm, Vector{Symbol}},
-                                absTolSS::Float64, 
-                                relTolSS::Float64)::Union{ODESolution}
+                                callbackSS::SciMLBase.DECallback)::ODESolution
 
     # Change to parameters for the preequilibration simulations 
     changeExperimentalCondition!(odeProblem.p, odeProblem.u0, preEquilibrationId)
@@ -318,7 +316,7 @@ function solveODEPreEqulibrium!(uAtSS::AbstractVector,
     uAtT0 .= _odeProblem.u0
 
     # Terminate if a steady state was not reached in preequilibration simulations 
-    odeSolution = computeODEPreEqulibriumSolution(_odeProblem, solver, absTol, relTol, absTolSS, relTolSS)
+    odeSolution = computeODEPreEqulibriumSolution(_odeProblem, solver, absTol, relTol, callbackSS)
     if odeSolution.retcode == :Terminated
         uAtSS .= odeSolution.u[end]
     end
@@ -330,19 +328,17 @@ function computeODEPreEqulibriumSolution(odeProblem::ODEProblem,
                                          solver::Vector{Symbol},
                                          absTol::Float64, 
                                          relTol::Float64, 
-                                         absTolSS::Float64, 
-                                         relTolSS::Float64)::ODESolution
+                                         callbackSS::SciMLBase.DECallback)::ODESolution
     
-    return solve(odeProblem, alg_hints=solver, abstol=absTol, reltol=relTol, dense=false, callback=TerminateSteadyState(absTolSS, relTolSS))
+    return solve(odeProblem, alg_hints=solver, abstol=absTol, reltol=relTol, dense=false, callback=callbackSS)
 end
 function computeODEPreEqulibriumSolution(odeProblem::ODEProblem,
                                          solver::SciMLAlgorithm,
                                          absTol::Float64, 
                                          relTol::Float64, 
-                                         absTolSS::Float64, 
-                                         relTolSS::Float64)::ODESolution
+                                         callbackSS::SciMLBase.DECallback)::ODESolution
     
-    return solve(odeProblem, solver, abstol=absTol, reltol=relTol, dense=false, callback=TerminateSteadyState(absTolSS, relTolSS))
+    return solve(odeProblem, solver, abstol=absTol, reltol=relTol, dense=false, callback=callbackSS)
 end
 
 

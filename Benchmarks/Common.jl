@@ -72,20 +72,20 @@ end
 
 # For a PEtab model create a tempory directory where the PEtab files is changed such that nParamFixate are 
 # fixed (not considered to be gradient related parameters )
-function getPEtabModelNparamFixed(peTabModel::PEtabModel, nParamFixate::Integer)::PEtabModel
+function getPEtabModelNparamFixed(petabModel::PEtabModel, nParamFixate::Integer)::PEtabModel
     
-    dirNew = joinpath(peTabModel.dirModel, "Fewer_param")
+    dirNew = joinpath(petabModel.dirModel, "Fewer_param")
     if !isdir(dirNew)
         mkdir(dirNew)
     end
 
     # Copy PEtab files to new directory 
-    pathParameters = copyFileToDest(peTabModel.pathParameters, dirNew)
-    pathConditions = copyFileToDest(peTabModel.pathConditions, dirNew)
-    pathObservables = copyFileToDest(peTabModel.pathObservables, dirNew)
-    pathMeasurements = copyFileToDest(peTabModel.pathMeasurements, dirNew)
-    pathSBML = copyFileToDest(peTabModel.pathSBML, dirNew)
-    pathYAML = copyFileToDest(peTabModel.pathYAML, dirNew)
+    pathParameters = copyFileToDest(petabModel.pathParameters, dirNew)
+    pathConditions = copyFileToDest(petabModel.pathConditions, dirNew)
+    pathObservables = copyFileToDest(petabModel.pathObservables, dirNew)
+    pathMeasurements = copyFileToDest(petabModel.pathMeasurements, dirNew)
+    pathSBML = copyFileToDest(petabModel.pathSBML, dirNew)
+    pathYAML = copyFileToDest(petabModel.pathYAML, dirNew)
 
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAML)
 

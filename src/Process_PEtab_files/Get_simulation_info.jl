@@ -9,7 +9,8 @@ function processSimulationInfo(petabModel::PEtabModel,
                                measurementInfo::MeasurementsInfo;
                                absTolSS::Float64=1e-8,
                                relTolSS::Float64=1e-6,
-                               sensealg::Union{SciMLSensitivity.AbstractForwardSensitivityAlgorithm, SciMLSensitivity.AbstractAdjointSensitivityAlgorithm}=InterpolatingAdjoint())::SimulationInfo 
+                               sensealg::Union{SciMLSensitivity.AbstractForwardSensitivityAlgorithm, SciMLSensitivity.AbstractAdjointSensitivityAlgorithm}=InterpolatingAdjoint(),
+                               terminateSSMethod::Symbol=:Norm)::SimulationInfo 
 
     # An experimental Id is uniqely defined by a Pre-equlibrium- and Simulation-Id, where the former can be 
     # empty. For each experimental ID we store three indices, i) preEqulibriumId, ii) simulationId and iii) 
@@ -85,6 +86,13 @@ function processSimulationInfo(petabModel::PEtabModel,
         callbacks[name] = deepcopy(petabModel.modelCallbackSet)
     end
 
+    # Ger terminate SS callbacks 
+    if terminateSSMethod == :Norm
+        callbackSS = TerminateSteadyState(absTolSS, relTolSS)
+    elseif terminateSSMethod == :NewtonNorm
+        callbackSS = createSSTerminateSteadyState(petabModel.odeSystem, absTolSS, relTolSS, checkNewton=true)
+    end
+
     simulationInfo = SimulationInfo(preEquilibrationConditionId, 
                                     simulationConditionId, 
                                     experimentalConditionId,
@@ -101,7 +109,8 @@ function processSimulationInfo(petabModel::PEtabModel,
                                     absTolSS, 
                                     relTolSS, 
                                     callbacks, 
-                                    sensealg)
+                                    sensealg, 
+                                    callbackSS)
     return simulationInfo
 end
 
@@ -175,4 +184,41 @@ function getTimePositionInODESolutions(experimentalConditionId::Vector{Symbol},
 
     ___timePositionInODESolutions = Tuple(element for element in _timePositionInODESolutions)
     return NamedTuple{Tuple(name for name in experimentalConditionId)}(___timePositionInODESolutions)
+end
+
+
+# For creating terminateSS steady state where we do a Newton step to check if the model is in a steady state 
+function conditionTerminateSS(u, t, integrator, computeJacobian::Function, 
+                              absTolSS::Float64, relTolSS::Float64, checkNewton::Bool)
+
+    testval = first(get_tmp_cache(integrator))
+    DiffEqBase.get_du!(testval, integrator)
+
+    wrms = sqrt(sum((testval ./ (relTolSS * integrator.u .+ absTolSS)).^2) / length(u))
+    if wrms ≤ 1 
+        checkNewton == false && return true
+
+        J = computeJacobian(dualToFloat.(u), dualToFloat.(integrator.p), t)
+        local Δu
+        try 
+            Δu = J \ DualToFloat.(testval)
+        catch 
+            Δu = pinv(J) * dualToFloat.(testval)
+        end
+        wrmsΔu = sqrt(sum((Δu / (relTolSS * integrator.u .+ absTolSS)).^2) / length(u))
+        wrmsΔu ≤ 1 && return true
+    end
+
+    return false
+end
+function affectTerminateSS!(integrator) 
+    terminate!(integrator)
+end
+function createSSTerminateSteadyState(odeSystem::ODESystem, absTolSS::Float64, relTolSS::Float64; checkNewton::Bool=false)
+
+    j_func = generate_jacobian(odeSystem)[1] # second is in-place
+    computeJacobian = eval(j_func)
+    fTerminate = (u, t, integrator) -> conditionTerminateSS(u, t, integrator, computeJacobian, absTolSS, relTolSS, checkNewton)
+
+    return DiscreteCallback(fTerminate, affectTerminateSS!, save_positions=(false, true))
 end

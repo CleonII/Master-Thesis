@@ -67,9 +67,13 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                       absTol::Float64, 
                                       relTol::Float64,
                                       nStartGuess::Integer;
-                                      algList=[:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS, :FidesAutoHess, :FidesBlockAutoHess, :FidesBFGS])
+                                      algList=[:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS, :FidesAutoHess, :FidesBlockAutoHess, :FidesBFGS], 
+                                      terminateSSMethod=:Norm, 
+                                      solverSSRelTol::Float64=1e-10,
+                                      solverSSAbsTol::Float64=1e-12)
 
-    petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=absTol, solverRelTol=relTol)
+    petabProblem = setUpPEtabODEProblem(solverSSRelTolpetabModel, solver, solverAbsTol=absTol, solverRelTol=relTol, terminateSSMethod=terminateSSMethod, 
+                                        solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol)
 
     pathCube = joinpath(petabModel.dirJulia, "Cube_benchmark.csv")
     createCube(pathCube, petabProblem, nStartGuess, seed=123, verbose=true)
@@ -284,8 +288,9 @@ end
 if ARGS[1] == "Brannmark"
     pathYML = joinpath(@__DIR__, "..", "Intermediate", "PeTab_models", "model_Brannmark_JBC2010", "Brannmark_JBC2010.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :FidesAutoHess, :FidesBlockAutoHess]
-    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", 1e-8, 1e-8, 1000, algList=algsTest)
+    algsTest = [:OptimIPNewtonAutoHess, :FidesBFGS]
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", 1e-8, 1e-8, 400, algList=algsTest, terminateSSMethod=:Norm)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", 1e-8, 1e-8, 400, algList=algsTest, terminateSSMethod=:NewtonNorm)
 end
 
 

@@ -14,7 +14,8 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
                               solverAdjointRelTol::Float64=1e-8,
                               sensealgAdjoint::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), 
                               sensealgAdjointSS::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm=SteadyStateAdjoint(), 
-                              chunkSize::Union{Nothing, Int64}=nothing)::PEtabODEProblem
+                              chunkSize::Union{Nothing, Int64}=nothing, 
+                              terminateSSMethod::Symbol=:Norm)::PEtabODEProblem
 
     if !(typeof(sensealgAdjointSS) <: SteadyStateAdjoint)
         println("If you are using adjoint sensitivity analysis for a model with PreEq-criteria the most the most efficient adjSensealgSS is usually SteadyStateAdjoint. The algorithm you have provided, ", sensealgAdjointSS, "might not work (as there are some bugs here). In case it does not work, and SteadyStateAdjoint fails (because a dependancy on time or a singular Jacobian) a good choice might be QuadratureAdjoint(autodiff=false, autojacvec=false)")
@@ -23,7 +24,7 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    simulationInfo = processSimulationInfo(petabModel, measurementInfo, sensealg=sensealgAdjoint, absTolSS=solverSSAbsTol, relTolSS=solverSSRelTol)
+    simulationInfo = processSimulationInfo(petabModel, measurementInfo, sensealg=sensealgAdjoint, absTolSS=solverSSAbsTol, relTolSS=solverSSRelTol, terminateSSMethod=terminateSSMethod)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
     
     # Set up potential prior for the parameters to estimate 
