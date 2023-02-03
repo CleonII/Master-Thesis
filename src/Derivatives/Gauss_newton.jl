@@ -160,7 +160,7 @@ end
 
 # For an experimental condition compute residuals 
 function computeResidualsExpCond!(residuals::AbstractVector, 
-                                  odeSolution::Union{ODESolution, OrdinaryDiffEq.ODECompositeSolution},
+                                  odeSolution::ODESolution,
                                   θ_dynamic::Vector{Float64},
                                   θ_sd::AbstractVector, 
                                   θ_observable::AbstractVector, 

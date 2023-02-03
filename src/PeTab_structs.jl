@@ -150,9 +150,9 @@ struct SimulationInfo{T1<:NamedTuple,
     simulationConditionId::Vector{Symbol}
     experimentalConditionId::Vector{Symbol}
     haspreEquilibrationConditionId::Bool
-    odeSolutions::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}}
-    odeSolutionsDerivatives::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}}
-    odePreEqulibriumSolutions::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}}
+    odeSolutions::Dict{Symbol, Union{Nothing, ODESolution}}
+    odeSolutionsDerivatives::Dict{Symbol, Union{Nothing, ODESolution}}
+    odePreEqulibriumSolutions::Dict{Symbol, Union{Nothing, ODESolution}}
     timeMax::T1
     timeObserved::T2
     iMeasurements::T3

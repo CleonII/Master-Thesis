@@ -4,7 +4,7 @@
 =#
 
 
-function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}},
+function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Nothing, ODESolution}},
                                             odeProblem::ODEProblem, 
                                             changeExperimentalCondition!::Function, 
                                             simulationInfo::SimulationInfo,
@@ -156,7 +156,7 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
 
     return sucess
 end
-function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}},
+function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Nothing, ODESolution}},
                                             odeProblem::ODEProblem, 
                                             θ_dynamic::AbstractVector,
                                             __changeExperimentalCondition!::Function, 
@@ -187,7 +187,7 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                                 trackCallback=trackCallback)
     return sucess
 end
-function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}},
+function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Nothing, ODESolution}},
                                             S::Matrix{Float64},
                                             odeProblem::ODEProblem, 
                                             θ_dynamic::AbstractVector,
@@ -280,7 +280,7 @@ function solveODEAllExperimentalConditions(odeProblem::ODEProblem,
                                            nTimePointsSave::Int64=0, 
                                            onlySaveAtObservedTimes::Bool=false,
                                            denseSolution::Bool=true, 
-                                           trackCallback::Bool=false)::Tuple{Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}}, Bool}
+                                           trackCallback::Bool=false)::Tuple{Dict{Symbol, Union{Nothing, ODESolution}}, Bool}
 
     odeSolutions = deepcopy(simulationInfo.odeSolutions)
     success = solveODEAllExperimentalConditions!(odeSolutions, 
@@ -310,7 +310,7 @@ function solveODEPreEqulibrium!(uAtSS::AbstractVector,
                                 relTol::Float64, 
                                 solver::Union{SciMLAlgorithm, Vector{Symbol}},
                                 absTolSS::Float64, 
-                                relTolSS::Float64)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                                relTolSS::Float64)::Union{ODESolution}
 
     # Change to parameters for the preequilibration simulations 
     changeExperimentalCondition!(odeProblem.p, odeProblem.u0, preEquilibrationId)
@@ -331,7 +331,7 @@ function computeODEPreEqulibriumSolution(odeProblem::ODEProblem,
                                          absTol::Float64, 
                                          relTol::Float64, 
                                          absTolSS::Float64, 
-                                         relTolSS::Float64)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                                         relTolSS::Float64)::ODESolution
     
     return solve(odeProblem, alg_hints=solver, abstol=absTol, reltol=relTol, dense=false, callback=TerminateSteadyState(absTolSS, relTolSS))
 end
@@ -340,7 +340,7 @@ function computeODEPreEqulibriumSolution(odeProblem::ODEProblem,
                                          absTol::Float64, 
                                          relTol::Float64, 
                                          absTolSS::Float64, 
-                                         relTolSS::Float64)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                                         relTolSS::Float64)::ODESolution
     
     return solve(odeProblem, solver, abstol=absTol, reltol=relTol, dense=false, callback=TerminateSteadyState(absTolSS, relTolSS))
 end
@@ -360,7 +360,7 @@ function solveODEPostEqulibrium(odeProblem::ODEProblem,
                                 computeTStops::Function;
                                 tSave::Vector{Float64}=Float64[], 
                                 denseSolution::Bool=true, 
-                                trackCallback::Bool=false)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                                trackCallback::Bool=false)::ODESolution
 
     changeExperimentalCondition!(odeProblem.p, odeProblem.u0, simulationConditionId)
     # Sometimes the experimentaCondition-file changes the initial values for a state 
@@ -398,7 +398,7 @@ function solveODENoPreEqulibrium!(odeProblem::ODEProblem,
                                  computeTStops::Function; 
                                  tSave=Float64[], 
                                  denseSolution::Bool=true, 
-                                 trackCallback::Bool=false)::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                                 trackCallback::Bool=false)::ODESolution
 
     # Change experimental condition 
     tMax = isinf(_tMax) ? 1e8 : _tMax
@@ -425,7 +425,7 @@ function computeODESolution(odeProblem::ODEProblem,
                             tSave::Vector{Float64}, 
                             denseSolution::Bool, 
                             callbackSet::SciMLBase.DECallback, 
-                            tStops::Vector{<:AbstractFloat})::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                            tStops::Vector{<:AbstractFloat})::ODESolution
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
@@ -446,7 +446,7 @@ function computeODESolution(odeProblem::ODEProblem,
                             tSave::Vector{Float64}, 
                             denseSolution::Bool, 
                             callbackSet::SciMLBase.DECallback, 
-                            tStops::Vector{<:AbstractFloat})::Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}
+                            tStops::Vector{<:AbstractFloat})::ODESolution
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.

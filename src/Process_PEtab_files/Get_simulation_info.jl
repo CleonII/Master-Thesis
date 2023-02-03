@@ -40,9 +40,9 @@ function processSimulationInfo(petabModel::PEtabModel,
     # When computing the gradient and hessian the ODE-system needs to be resolved to compute the gradient 
     # of the dynamic parameters, while for the observable/sd parameters the system should not be resolved. 
     # Hence we need a specific dictionary with ODE solutions when compuating derivatives. 
-    odeSolutions::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}} = Dict{Symbol, Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}}()
-    odePreEqulibriumSolutions::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}} = Dict{Symbol, Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}}()
-    odeSolutionsDerivatives::Dict{Symbol, Union{Nothing, OrdinaryDiffEq.ODECompositeSolution, ODESolution}} = Dict{Symbol, Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}}()
+    odeSolutions::Dict{Symbol, Union{Nothing, ODESolution}} = Dict{Symbol, ODESolution}()
+    odePreEqulibriumSolutions::Dict{Symbol, Union{Nothing, ODESolution}} = Dict{Symbol, ODESolution}()
+    odeSolutionsDerivatives::Dict{Symbol, Union{Nothing, ODESolution}} = Dict{Symbol, ODESolution}()
     for i in eachindex(experimentalConditionId)
         odeSolutions[experimentalConditionId[i]] = nothing
         odeSolutionsDerivatives[experimentalConditionId[i]] = nothing

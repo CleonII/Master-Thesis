@@ -153,7 +153,7 @@ function _computeCost(θ_dynamic::AbstractVector,
 end
 
 
-function computeCostExpCond(odeSolution::Union{ODESolution, OrdinaryDiffEq.ODECompositeSolution},
+function computeCostExpCond(odeSolution::ODESolution,
                             θ_dynamic::AbstractVector,
                             θ_sd::AbstractVector, 
                             θ_observable::AbstractVector, 

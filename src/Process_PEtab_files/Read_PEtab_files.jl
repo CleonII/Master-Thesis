@@ -47,19 +47,19 @@ function readPEtabFiles(pathYAML::String)
 
     pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName = readPEtabYamlFile(pathYAML)
 
-    experimentalConditions = CSV.read(pathConditions, DataFrame)
-    measurementsData = CSV.read(pathMeasurements, DataFrame)
-    parametersData = CSV.read(pathParameters, DataFrame)
-    observablesData = CSV.read(pathObservables, DataFrame)
+    experimentalConditions = CSV.read(pathConditions, DataFrame, stringtype=String)
+    measurementsData = CSV.read(pathMeasurements, DataFrame, stringtype=String)
+    parametersData = CSV.read(pathParameters, DataFrame, stringtype=String)
+    observablesData = CSV.read(pathObservables, DataFrame, stringtype=String)
     
     return experimentalConditions, measurementsData, parametersData, observablesData
 end
 function readPEtabFiles(petabModel::PEtabModel)
 
-    experimentalConditions = CSV.read(petabModel.pathConditions, DataFrame)
-    measurementsData = CSV.read(petabModel.pathMeasurements, DataFrame)
-    parametersData = CSV.read(petabModel.pathParameters, DataFrame)
-    observablesData = CSV.read(petabModel.pathObservables, DataFrame)
+    experimentalConditions = CSV.read(petabModel.pathConditions, DataFrame, stringtype=String)
+    measurementsData = CSV.read(petabModel.pathMeasurements, DataFrame, stringtype=String)
+    parametersData = CSV.read(petabModel.pathParameters, DataFrame, stringtype=String)
+    observablesData = CSV.read(petabModel.pathObservables, DataFrame, stringtype=String)
     
     return experimentalConditions, measurementsData, parametersData, observablesData
 end
