@@ -72,7 +72,7 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                       solverSSRelTol::Float64=1e-10,
                                       solverSSAbsTol::Float64=1e-12)
 
-    petabProblem = setUpPEtabODEProblem(solverSSRelTolpetabModel, solver, solverAbsTol=absTol, solverRelTol=relTol, terminateSSMethod=terminateSSMethod, 
+    petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=absTol, solverRelTol=relTol, terminateSSMethod=terminateSSMethod, 
                                         solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol)
 
     pathCube = joinpath(petabModel.dirJulia, "Cube_benchmark.csv")
@@ -270,10 +270,11 @@ end
 
 
 if ARGS[1] == "Weber"
-    algsTest = [:IpoptLBFGS, :OptimLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
+    algsTest = [:IpoptLBFGS, :FidesBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Weber_BMC2015", "Weber_BMC2015.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", 1e-8, 1e-8, 1000, algList=algsTest) 
+    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", 1e-8, 1e-8, 200, algList=algsTest, terminateSSMethod=:Norm) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", 1e-8, 1e-8, 200, algList=algsTest, terminateSSMethod=:NewtonNorm)
 end
 
 
@@ -286,7 +287,7 @@ end
 
 
 if ARGS[1] == "Brannmark"
-    pathYML = joinpath(@__DIR__, "..", "Intermediate", "PeTab_models", "model_Brannmark_JBC2010", "Brannmark_JBC2010.yaml")
+    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Brannmark_JBC2010", "Brannmark_JBC2010.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
     algsTest = [:OptimIPNewtonAutoHess, :FidesBFGS]
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", 1e-8, 1e-8, 400, algList=algsTest, terminateSSMethod=:Norm)
