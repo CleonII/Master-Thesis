@@ -14,6 +14,7 @@ using Zygote
 using Symbolics
 using Sundials
 using YAML
+using BenchmarkTools
 
 BLAS.set_num_threads(1)
 
@@ -63,8 +64,9 @@ end
 
 function benchmarkCostGrad(petabModel::PEtabModel, 
                            gradientInfo, 
-                           solversCheck, 
-                           pathFileSave, 
+                           odeSolver::SciMLAlgorithm,
+                           odeSolverName::String, 
+                           pathFileSave::String, 
                            absTol::Float64, 
                            relTol::Float64; 
                            checkCost::Bool=false, 
@@ -91,93 +93,81 @@ function benchmarkCostGrad(petabModel::PEtabModel,
         θ_est = _θ_est
     end
     
-    for i in eachindex(solversCheck)
+    runTime = Vector{Float64}(undef, nRepeat)
 
-        odeSolver = solversCheck[i][1]
-        odeSolverName = solversCheck[i][2]
-        runTime = Vector{Float64}(undef, nRepeat)
+    if checkGradient == true
+        whatCompute = "Gradient"
+        gradientMethod, sensealg, methodInfo = gradientInfo
+        petabProblem, computeGradient = getPEtabProblem(petabModel, gradientMethod, sensealg, odeSolver, absTol, relTol, sparseJacobian, chunkSize)
 
-        if checkGradient == true
-            whatCompute = "Gradient"
-            gradientMethod, sensealg, methodInfo = gradientInfo
-            petabProblem, computeGradient = getPEtabProblem(petabModel, gradientMethod, sensealg, odeSolver, absTol, relTol, sparseJacobian, chunkSize)
-
-            # Use nominal parameter vector 
-            println("Precompiling the code")
-            gradient = zeros(length(θ_est))
-            # Zygote have problems with Steady-state models 
-            if petabModel.modelName ∈ ["model_Isensee_JCB2018", "model_Brannmark_JBC2010", "model_Weber_BMC2015"] && gradientMethod == :Zyogte
-                return
-            end
-            local canEval = true
-            evalGradF(grad, peTabOpt.paramVecTransformed)
-            try 
-                computeGradient(gradient, θ_est)
-            catch 
-                canEval = false
-            end
-            if all(gradient .== 1e8) || canEval == false
-                runTime .= Inf
-            else
-                for j in 1:nRepeat
-                    bGrad = @elapsed computeGradient(gradient, θ_est)
-                    runTime[j] = bGrad 
-                end
-            end
-
-        elseif checkCost == true
-            
-            whatCompute = "Cost"
-            methodInfo = "Standard"
-            petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sparseJacobian=sparseJacobian)
-            
-            println("Precompiling the code")
-            cost = petabProblem.computeCost(θ_est)
-            if !isinf(cost)
-                for j in 1:nRepeat
-                    bCost = @elapsed cost = petabProblem.computeCost(θ_est) 
-                    runTime[j] = bCost
-                end
-            else
-                runTime .= Inf
-            end
-
-        elseif checkHessian == true
-            
-            whatCompute = "Hessian"
-            methodInfo = "ForwardDiff"
-            petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, absTol=absTol, relTol=relTol, sparseJacobian=sparseJacobian)
-            hessian = zeros(length(θ_est), length(θ_est))
-            cost = petabProblem.computeCost(θ_est)
-            if !isinf(cost)
-                for j in 1:nIter
-                    bHess = @elapsed petabProblem.computeHessian(hessian, θ_est)
-                    runTime[j] = bHess
-                end
-            else
-                runTime .= Inf
-            end
+        # Use nominal parameter vector 
+        println("Precompiling the code")
+        gradient = zeros(length(θ_est))
+        # Zygote have problems with Steady-state models 
+        if petabModel.modelName ∈ ["model_Isensee_JCB2018", "model_Brannmark_JBC2010", "model_Weber_BMC2015"] && gradientMethod == :Zyogte
+            return
         end
-
-        writeParamFixed = isnothing(nParamFixed) ? 0 : nParamFixed
-        dataSave = DataFrame(Time = runTime, 
-                             What_calc=whatCompute,
-                             Method_info=methodInfo,
-                             Model = petabModel.modelName, 
-                             absTol = absTol, 
-                             relTol = relTol,
-                             N_param_fixed=writeParamFixed,
-                             I_parameter=iParameter,
-                             chunk_size = chunkSizeWrite,
-                             solver = odeSolverName)
-
-        if isfile(pathFileSave)
-            CSV.write(pathFileSave, dataSave, append = true)
+        local canEval = true
+        computeGradient(gradient, θ_est)
+        try 
+            #computeGradient(gradient, θ_est)
+        catch 
+            canEval = false
+        end
+        if all(gradient .== 1e8) || canEval == false
+            runTime .= Inf
         else
-            CSV.write(pathFileSave, dataSave)
+            bGrad =  @benchmark $computeGradient($gradient, $θ_est) samples=(nRepeat+1) seconds=100000 evals=1
+            println("bGradTimes = ", bGrad.times)
+            runTime .= bGrad.times[2:end] .* 1e-9
         end
 
-        GC.gc()
+    elseif checkCost == true
+            
+        whatCompute = "Cost"
+        methodInfo = "Standard"
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sparseJacobian=sparseJacobian)
+            
+        println("Precompiling the code")
+        cost = petabProblem.computeCost(θ_est)
+        if !isinf(cost)
+            bCost = @benchmark $petabProblem.computeCost($θ_est) samples=(nRepeat+1) seconds=1e5 evals=1
+            runTime .= bCost.times[2:end] .* 1e-9
+        else
+            runTime .= Inf
+        end
+
+    elseif checkHessian == true
+            
+        whatCompute = "Hessian"
+        methodInfo = "ForwardDiff"
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, absTol=absTol, relTol=relTol, sparseJacobian=sparseJacobian)
+        hessian = zeros(length(θ_est), length(θ_est))
+        cost = petabProblem.computeCost(θ_est)
+        if !isinf(cost)
+            bHess = @benchmark $petabProblem.computeHessian($hessian, $θ_est) samples=(nRepeat+1) seconds=1e5 evals=1
+            runTime .= bHess.times
+        else
+            runTime .= Inf
+        end
+    end
+
+    writeParamFixed = isnothing(nParamFixed) ? 0 : nParamFixed
+    dataSave = DataFrame(Time = runTime, 
+                         What_calc=whatCompute,
+                         Method_info=methodInfo,
+                         Model = petabModel.modelName, 
+                         absTol = absTol, 
+                         relTol = relTol,
+                         N_param_fixed=writeParamFixed,
+                         I_parameter=iParameter,
+                         chunk_size = chunkSizeWrite,
+                         solver = odeSolverName)
+
+    if isfile(pathFileSave)
+        CSV.write(pathFileSave, dataSave, append = true)
+    else
+        CSV.write(pathFileSave, dataSave)
     end
 end
 
@@ -195,34 +185,34 @@ if ARGS[1] == "No_pre_eq_models"
                  "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
                  "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]                  
 
-    solversCheck = [[Rodas5(), "Rodas5"], 
-                    [Rodas5P(), "Rodas5P"], 
-                    [QNDF(), "QNDF"]]
+    odeSolvers = [Rodas5(), KenCarp4(), QNDF(), AutoVern7(Rodas5())]
+    odeSolversName = ["Rodas5", "KenCarp4", "QNDF", "Vern7(Rodas5)"]                 
     sensealgsCheck = [[:ForwardDiff, nothing, "ForwardDiff"], 
                       [:ForwardEquations, :AutoDiffForward, "ForEq_AutoDiff"],
                       [:Zygote, ForwardDiffSensitivity(), "Zygote_ForwardDiffSensitivity"], 
                       [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
                       [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"], 
                       [:Adjoint, QuadratureAdjoint(autodiff=false, autojacvec=false), "Adj_QuadratureAdjoint(autodiff=false, autojacvec=false)"]]
-                    
+
+    absTol, relTol = 1e-8, 1e-8                      
     for i in eachindex(modelList)
-        
         dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
         pathYML = getPathYmlFile(dirModel)
         petabModel = readPEtabModel(pathYML)
-        absTol, relTol = 1e-8, 1e-8
+        for j in eachindex(odeSolvers)
+        
+            # Check cost 
+            benchmarkCostGrad(petabModel, nothing, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkCost=true, nRepeat=10)
 
-        # Check cost 
-        benchmarkCostGrad(petabModel, nothing, solversCheck, pathSave, absTol, relTol, checkCost=true, nRepeat=5)
-
-        # Check Gradient 
-        for sensealgInfo in sensealgsCheck
-            benchmarkCostGrad(petabModel, sensealgInfo, solversCheck, pathSave, absTol, relTol, checkGradient=true, nRepeat=5)
+            # Check Gradient 
+            for sensealgInfo in sensealgsCheck
+                benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
+            end
         end
 
         # For fun Check CVODE_BDF
         benchmarkCostGrad(petabModel, [:ForwardEquations, ForwardSensitivity(), "ForEq_ForwardSensitivity"], 
-                          [[CVODE_BDF(), "CVODE_BDF"]], pathSave, absTol, relTol, checkGradient=true, nRepeat=5)
+                          CVODE_BDF(), "CVODE_BDF", pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
     end
 end
 
@@ -236,20 +226,15 @@ if ARGS[1] == "Chen_model"
     end
 
     modelList = ["model_Chen_MSB2009"]
+    odeSolversCost = [QNDF(), Rodas5(), KenCarp4(), CVODE_BDF()]
+    odeSolversCostName = ["QNDF", "Rodas5", "KenCarp4", "CVODE_BDF"]                 
+    odeSolversCostS = [QNDF(), Rodas5(), KenCarp4(), CVODE_BDF()]
+    odeSolversCostNameS = ["QNDF_S", "Rodas5_S", "KenCarp4_S", "CVODE_BDF_S"]                 
 
-    solversCheckCost = [[QNDF(), "QNDF"], 
-                        [Rodas5(), "Rodas5"], 
-                        [KenCarp4(), "KenCarp4"], 
-                        [CVODE_BDF(), "CVODE_BDF"]]
-    solversCheckCostS = [[QNDF(), "QNDFS"], 
-                         [Rodas5(), "Rodas5S"], 
-                         [KenCarp4(), "KenCarp4S"], 
-                         [CVODE_BDF(linear_solver=:KLU), "CVODE_BDF_KLU"]]                        
-
-    solversCheckGrad = [[QNDF(), "QNDF"], 
-                        [KenCarp4(), "KenCarp4"]]
-    solversCheckGradS = [[QNDF(), "QNDFS"], 
-                         [KenCarp4(), "KenCarp4S"]]                                                 
+    odeSolversGradient = [QNDF(), KenCarp4()]
+    odeSolversGradientName = ["QNDF", "KenCarp4"]    
+    odeSolversGradientS = [QNDF(), KenCarp4()]
+    odeSolversGradientSName = ["QNDF_S", "KenCarp4_S"]    
 
     sensealgsTry = [[:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
                     [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"]]                          
@@ -259,12 +244,16 @@ if ARGS[1] == "Chen_model"
     petabModel = readPEtabModel(pathYML)
 
     absTol, relTol = 1e-8, 1e-8
-    benchmarkCostGrad(petabModel, nothing, solversCheckCost, pathSave, absTol, relTol, checkCost=true, nRepeat=5)
-    benchmarkCostGrad(petabModel, nothing, solversCheckCostS, pathSave, absTol, relTol, checkCost=true, nRepeat=5, sparseJacobian=true)                          
+    for i in eachindex(odeSolversCost)
+        benchmarkCostGrad(petabModel, nothing, odeSolversCost[i], odeSolversCostName[i], pathSave, absTol, relTol, checkCost=true, nRepeat=5)
+        benchmarkCostGrad(petabModel, nothing, odeSolversCostS[i], odeSolversCostNameS[i], pathSave, absTol, relTol, checkCost=true, nRepeat=5, sparseJacobian=true)                          
+    end
 
-    for sensealgInfo in sensealgsTry                          
-        benchmarkCostGrad(petabModel, sensealgInfo, solversCheckGradS, pathSave, absTol, relTol, checkGradient=true, nRepeat=5, sparseJacobian=true)                          
-        benchmarkCostGrad(petabModel, sensealgInfo, solversCheckGrad, pathSave, absTol, relTol, checkGradient=true, nRepeat=5)
+    for sensealgInfo in sensealgsTry  
+        for i in eachindex(odeSolversGradient)                        
+            benchmarkCostGrad(petabModel, sensealgInfo, odeSolversGradient[i], odeSolversGradientName[i], pathSave, absTol, relTol, checkGradient=true, nRepeat=2)                          
+            benchmarkCostGrad(petabModel, sensealgInfo, odeSolversGradientS[i], odeSolversGradientSName[i], pathSave, absTol, relTol, checkGradient=true, nRepeat=2, sparseJacobian=true)
+        end
     end
 end
 
@@ -289,7 +278,6 @@ if ARGS[1] == "Fix_parameters"
     end
 
     Random.seed!(123)
-    solversCheck = [[QNDF(), "QNDF"]]
     sensealgInfo = [[:ForwardDiff, nothing, "ForwardDiff"]]
 
     for i in eachindex(modelList)
@@ -304,10 +292,10 @@ if ARGS[1] == "Fix_parameters"
             for j in 1:10
                 petabModelFewerParameters = getPEtabModelNparamFixed(petabModel, nParamFix)
 
-                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], solversCheck, pathSave, absTol, relTol, 
-                                  checkGradient=true, nParamFixed=nParamFix, nRepeat=10)
-                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], solversCheck, pathSave, absTol, relTol, 
-                                  checkGradient=true, nParamFixed=nParamFix, nRepeat=10, chunkSize=1)      
+                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF, "QNDF", pathSave, absTol, relTol, 
+                                  checkGradient=true, nParamFixed=nParamFix, nRepeat=5)
+                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF, "QNDF", pathSave, absTol, relTol, 
+                                  checkGradient=true, nParamFixed=nParamFix, nRepeat=5, chunkSize=1)      
                                   
                 if isdir(petabModelFewerParameters.dirModel) 
                     rm(petabModelFewerParameters.dirModel, recursive=true)
@@ -353,8 +341,8 @@ if ARGS[1] == "Test_chunks_random_p"
         for j in 1:30
             θ_est = getRandomModelParameters(petabModel, Rodas4P(), j, odeSolvers=false)
             for k in eachindex(chunkList)
-                benchmarkCostGrad(petabModel, sensealgInfo[1], solversCheck, pathSave, absTol, relTol, 
-                                checkGradient=true, nRepeat=10, chunkSize=chunkList[k], iParameter=j, _θ_est=θ_est)
+                benchmarkCostGrad(petabModel, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
+                                checkGradient=true, nRepeat=5, chunkSize=chunkList[k], iParameter=j, _θ_est=θ_est)
             end
         end
     end
