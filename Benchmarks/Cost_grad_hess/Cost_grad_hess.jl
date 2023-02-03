@@ -192,7 +192,9 @@ if ARGS[1] == "No_pre_eq_models"
                       [:Zygote, ForwardDiffSensitivity(), "Zygote_ForwardDiffSensitivity"], 
                       [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
                       [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"], 
-                      [:Adjoint, QuadratureAdjoint(autodiff=false, autojacvec=false), "Adj_QuadratureAdjoint(autodiff=false, autojacvec=false)"]]
+                      [:Adjoint, QuadratureAdjoint(autodiff=false, autojacvec=false), "Adj_QuadratureAdjoint(autodiff=false, autojacvec=false)"], 
+                      [:Adjoint, InterpolatingAdjoint(autojacvec=EnzymeVJP()), "Adj_InterpolatingAdjoint(autojacvec=EnzymeVJP())"], 
+                      [:Adjoint, QuadratureAdjoint(autojacvec=EnzymeVJP()), "Adj_QuadratureAdjoint(autojacvec=EnzymeVJP())"]]
 
     absTol, relTol = 1e-8, 1e-8                      
     for i in eachindex(modelList)
