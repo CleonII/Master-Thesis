@@ -108,9 +108,8 @@ function benchmarkCostGrad(petabModel::PEtabModel,
             return
         end
         local canEval = true
-        computeGradient(gradient, θ_est)
         try 
-            #computeGradient(gradient, θ_est)
+            computeGradient(gradient, θ_est)
         catch 
             canEval = false
         end
@@ -183,7 +182,11 @@ if ARGS[1] == "No_pre_eq_models"
     modelList = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011", "model_Beer_MolBioSystems2014", 
                  "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
                  "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
-                 "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]                  
+                 "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]
+                 
+    modelList = ["model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
+                 "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
+                 "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002", "model_Beer_MolBioSystems2014"]                  
 
     odeSolvers = [Rodas5(), KenCarp4(), QNDF(), AutoVern7(Rodas5())]
     odeSolversName = ["Rodas5", "KenCarp4", "QNDF", "Vern7(Rodas5)"]                 
@@ -192,9 +195,7 @@ if ARGS[1] == "No_pre_eq_models"
                       [:Zygote, ForwardDiffSensitivity(), "Zygote_ForwardDiffSensitivity"], 
                       [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
                       [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"], 
-                      [:Adjoint, QuadratureAdjoint(autodiff=false, autojacvec=false), "Adj_QuadratureAdjoint(autodiff=false, autojacvec=false)"], 
-                      [:Adjoint, InterpolatingAdjoint(autojacvec=EnzymeVJP()), "Adj_InterpolatingAdjoint(autojacvec=EnzymeVJP())"], 
-                      [:Adjoint, QuadratureAdjoint(autojacvec=EnzymeVJP()), "Adj_QuadratureAdjoint(autojacvec=EnzymeVJP())"]]
+                      [:Adjoint, QuadratureAdjoint(autodiff=false, autojacvec=false), "Adj_QuadratureAdjoint(autodiff=false, autojacvec=false)"]]
 
     absTol, relTol = 1e-8, 1e-8                      
     for i in eachindex(modelList)
@@ -230,7 +231,7 @@ if ARGS[1] == "Chen_model"
     modelList = ["model_Chen_MSB2009"]
     odeSolversCost = [QNDF(), Rodas5(), KenCarp4(), CVODE_BDF()]
     odeSolversCostName = ["QNDF", "Rodas5", "KenCarp4", "CVODE_BDF"]                 
-    odeSolversCostS = [QNDF(), Rodas5(), KenCarp4(), CVODE_BDF()]
+    odeSolversCostS = [QNDF(), Rodas5(), KenCarp4(), CVODE_BDF(linear_solver=:KLU)]
     odeSolversCostNameS = ["QNDF_S", "Rodas5_S", "KenCarp4_S", "CVODE_BDF_S"]                 
 
     odeSolversGradient = [QNDF(), KenCarp4()]
@@ -294,9 +295,9 @@ if ARGS[1] == "Fix_parameters"
             for j in 1:10
                 petabModelFewerParameters = getPEtabModelNparamFixed(petabModel, nParamFix)
 
-                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF, "QNDF", pathSave, absTol, relTol, 
+                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
                                   checkGradient=true, nParamFixed=nParamFix, nRepeat=5)
-                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF, "QNDF", pathSave, absTol, relTol, 
+                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
                                   checkGradient=true, nParamFixed=nParamFix, nRepeat=5, chunkSize=1)      
                                   
                 if isdir(petabModelFewerParameters.dirModel) 

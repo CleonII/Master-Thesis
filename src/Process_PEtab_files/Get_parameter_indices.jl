@@ -290,15 +290,16 @@ function getMapsConditionId(odeSystem::ODESystem,
             end
 
             # In case rowI is a parameter but we do not estimate said parameter 
-            if rowI[j] ∈ parameterInfo.parameterId
-                iVal = findfirst(x -> x == rowI[j], parameterInfo.parameterId)
+            if rowI[j] ∈ string.(parameterInfo.parameterId)
+                iVal = findfirst(x -> x == rowI[j], string.(parameterInfo.parameterId))
                 constantParameters = vcat(constantParameters, parameterInfo.nominalValue[iVal])
                 iODEProblemConstantParameters = vcat(iODEProblemConstantParameters, findfirst(x -> x == conditionSpecificVariables[j], allODESystemParameters))
                 continue
             end
 
             # If we reach this far something is off
-            println("Could not map parameters for condition $condID  parameters", rowI[j])
+            strWrite = "Could not map parameters for condition ", conditionIdNames[i], " for parameter ", rowI[j]
+            throw(PEtabFileError(strWrite))
         end
 
         _mapsConditionId[i] = MapConditionId(constantParameters, 

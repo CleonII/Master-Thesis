@@ -74,7 +74,7 @@ end
 # fixed (not considered to be gradient related parameters )
 function getPEtabModelNparamFixed(petabModel::PEtabModel, nParamFixate::Integer)::PEtabModel
     
-    dirNew = joinpath(petabModel.dirModel, "Fewer_param")
+    dirNew = joinpath(petabModel.dirModel, "Fewer_param" * petabModel.modelName)
     if !isdir(dirNew)
         mkdir(dirNew)
     end
