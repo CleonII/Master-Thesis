@@ -101,12 +101,18 @@ function benchmarkCostGrad(petabModel::PEtabModel,
         petabProblem, computeGradient = getPEtabProblem(petabModel, gradientMethod, sensealg, odeSolver, absTol, relTol, sparseJacobian, chunkSize)
 
         # Use nominal parameter vector 
-        println("Precompiling the code")
         gradient = zeros(length(θ_est))
         # Zygote have problems with Steady-state models 
-        if petabModel.modelName ∈ ["model_Isensee_JCB2018", "model_Brannmark_JBC2010", "model_Weber_BMC2015"] && gradientMethod == :Zyogte
+        if petabModel.modelName ∈ ["model_Isensee_JCB2018", "model_Brannmark_JBC2010", "model_Weber_BMC2015", "model_Fiedler_BMC2016"] && gradientMethod == :Zygote
+            println("Will not run Zygote")
             return
         end
+        # Callbacks are not handled well at all by the lower level interface 
+        if petabModel.modelName ∈ ["model_Fujita_SciSignal2010", "model_Beer_MolBioSystems2014"] && gradientMethod == :Adjoint
+            println("Will not run Zygote")
+            return
+        end
+        println("Precompiling the code for method ", methodInfo)
         local canEval = true
         try 
             computeGradient(gradient, θ_est)
@@ -183,10 +189,7 @@ if ARGS[1] == "No_pre_eq_models"
                  "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
                  "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
                  "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]
-                 
-    modelList = ["model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
-                 "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
-                 "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002", "model_Beer_MolBioSystems2014"]                  
+                            
 
     odeSolvers = [Rodas5(), KenCarp4(), QNDF(), AutoVern7(Rodas5())]
     odeSolversName = ["Rodas5", "KenCarp4", "QNDF", "Vern7(Rodas5)"]                 
@@ -216,6 +219,45 @@ if ARGS[1] == "No_pre_eq_models"
         # For fun Check CVODE_BDF
         benchmarkCostGrad(petabModel, [:ForwardEquations, ForwardSensitivity(), "ForEq_ForwardSensitivity"], 
                           CVODE_BDF(), "CVODE_BDF", pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
+    end
+end
+
+
+if ARGS[1] == "Test_flags"
+
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
+    pathSave = joinpath(dirSave, "Test_flags" * ARGS[2] * ".csv")
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+
+    modelList = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011", "model_Beer_MolBioSystems2014", 
+                 "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
+                 "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
+                 "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]
+                            
+
+    odeSolvers = [Rodas5(), KenCarp4(), QNDF(), AutoVern7(Rodas5())]
+    odeSolversName = ["Rodas5", "KenCarp4", "QNDF", "Vern7(Rodas5)"]                 
+    sensealgsCheck = [[:ForwardDiff, nothing, "ForwardDiff"], 
+                      [:ForwardEquations, :AutoDiffForward, "ForEq_AutoDiff"]]
+
+    absTol, relTol = 1e-8, 1e-8                      
+    for i in eachindex(modelList)
+        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+        pathYML = getPathYmlFile(dirModel)
+        petabModel = readPEtabModel(pathYML)
+        for j in eachindex(odeSolvers)
+        
+            # Check cost 
+            benchmarkCostGrad(petabModel, nothing, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkCost=true, nRepeat=10)
+
+            # Check Gradient 
+            for sensealgInfo in sensealgsCheck
+                benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
+                benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=10, chunkSize=1)
+            end
+        end
     end
 end
 
