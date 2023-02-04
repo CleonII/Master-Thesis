@@ -82,7 +82,8 @@ function readPEtabModel(pathYAML::String;
         end
 
     else
-        modelDict, modelFileJl = JLToModellingToolkit(modelName, dirModel, ifElseToEvent=ifElseToEvent)
+        jlDir = joinpath(dirModel,"Julia_model_files")
+        modelDict, pathModelJlFile = JLToModellingToolkit(modelName, jlDir, ifElseToEvent=ifElseToEvent)
     end
 
     # Load model ODE-system

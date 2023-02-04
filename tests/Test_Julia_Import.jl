@@ -1,6 +1,6 @@
 #= 
-    Check the accruacy of the Julia importer by checking the log-likelihood value against known values for several 
-    models containing ifelse-statements and one without.
+    Check the accruacy of the PeTab importer by checking the log-likelihood value against known values for several 
+    models.
 =#
 
 
@@ -20,16 +20,16 @@ using SciMLSensitivity
 using Zygote
 using Symbolics
 using Sundials
+using FiniteDifferences
+using YAML
+using Test
 
 
 # Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
-# Functions for solving ODE system 
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
-
 # PeTab importer to get cost, grad etc 
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
+include(joinpath(pwd(), "src", "Create_PEtab_model.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
@@ -38,140 +38,99 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
 
-passTest = true
+# Used to test cost-value at the nominal parameter value 
+function testLogLikelihoodValue(petabModel::PEtabModel, 
+                                referenceValue::Float64, 
+                                solver; absTol=1e-12, relTol=1e-12, atol=1e-3)
 
-
-# Beer model 
-dirModel = pwd() * "/tests/JuliaImport/model_Beer_MolBioSystems2014/"
-peTabModel = setUpPeTabModel("model_Beer_MolBioSystems2014", dirModel, verbose=false, jlFile=true)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
-costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed)
-diff = cost + (58622.9145631413)
-diffZygote = costZygote + (58622.9145631413)
-if diff > 1e-2
-    println("Does not pass ll-test for Beer model")
-    passTest = false
-elseif diffZygote > 1e-2
-    println("Does not pass ll-test for Zygote Beer model")
-    passTest = false
-end
-
-# Boehm model 
-dirModel = pwd() * "/tests/JuliaImport/model_Boehm_JProteomeRes2014/"
-peTabModel = setUpPeTabModel("model_Boehm_JProteomeRes2014", dirModel, verbose=false, jlFile=true)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
-costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed)
-diff = cost + (-138.22199693517703)
-diffZygote = costZygote + (-138.22199693517703)
-if diff > 1e-3
-    println("Does not pass ll-test for Boehm model")
-    passTest = false
-elseif diffZygote > 1e-3
-    println("Does not pass ll-test for Zygote Boehm model")
-    passTest = false
-end
-
-# Brännmark model 
-dirModel = pwd() * "/tests/JuliaImport/model_Brannmark_JBC2010/"
-peTabModel = setUpPeTabModel("model_Brannmark_JBC2010", dirModel, verbose=false, jlFile=true)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
-costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed)
-diff = abs(cost + (-141.889113770537))
-diffZygote = abs(costZygote + (-141.889113770537))
-if diff > 1e-3
-    println("Does not pass ll-test for Brännmark model")
-    passTest = false
-elseif diffZygote > 1e-3
-    println("Does not pass ll-test for Zygote Brännmark model")
-    passTest = false
-end
-# Check we get correct gradient for a pre-eq simulation model 
-peTabOpt = setUpCostGradHess(peTabModel, Rodas5(), 1e-9, adjSolver=Rodas5(), adjTol=1e-9, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)),
-                             sensealgForward = ForwardSensitivity(), solverForward=CVODE_BDF(),
-                             adjSensealg=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), 
-                             adjSensealgSS=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
-peTabOptAlt = setUpCostGradHess(peTabModel, Rodas5(), 1e-9, adjSolver=Rodas5(), adjTol=1e-9, sensealg=QuadratureAdjoint(autojacvec=ReverseDiffVJP(false)),
-                                sensealgForward = :AutoDiffForward, solverForward=Rodas5())
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)                             
-gradFor = zeros(length(peTabOpt.paramVecTransformed))
-gradForEqAlt = zeros(length(peTabOpt.paramVecTransformed))
-gradAdj = zeros(length(peTabOpt.paramVecTransformed))
-gradForEq = zeros(length(peTabOpt.paramVecTransformed))
-peTabOpt.evalGradF(gradFor, peTabOpt.paramVecTransformed)
-peTabOpt.evalGradFAdjoint(gradAdj, peTabOpt.paramVecTransformed)
-peTabOpt.evalGradFForwardEq(gradForEq, peTabOpt.paramVecTransformed)
-peTabOptAlt.evalGradFForwardEq(gradForEqAlt, peTabOpt.paramVecTransformed)
-if sum((gradFor - gradAdj).^2) > 1e-4
-    println("Does not pass prior test for adjoint sensitivity")
-    passTest=false
-end
-if sum((gradFor - gradForEq).^2) > 1e-4
-    println("Does not pass prior test for forward sensitiviity equations")
-    passTest=false
-end
-if sum((gradFor - gradForEqAlt).^2) > 1e-4
-    println("Does not pass prior test for forward sensitivity equations via autodiff")
-    passTest=false
+    petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=absTol, solverRelTol=relTol)
+    cost = petabProblem.computeCost(petabProblem.θ_nominalT)
+    costZygote = petabProblem.computeCostZygote(petabProblem.θ_nominalT)
+    println("Model : ", petabModel.modelName)
+    @test cost ≈ referenceValue atol=atol    
+    @test costZygote ≈ referenceValue atol=atol    
 end
 
 
-# Fujita model 
-dirModel = pwd() * "/tests/JuliaImport/model_Fujita_SciSignal2010/"
-peTabModel = setUpPeTabModel("model_Fujita_SciSignal2010", dirModel, verbose=false, jlFile=true)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
-costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed)
-diff = abs(cost + (53.08377736998929))
-diffZygote = abs(costZygote + (53.08377736998929))
-if diff > 1e-3
-    println("Does not pass ll-test for Fujita model")
-    passTest = false
-elseif diffZygote > 1e-3
-    println("Does not pass ll-test for Zygote Fujita model")
-    passTest = false
+function testGradientFiniteDifferences(petabModel::PEtabModel, solver, tol::Float64; 
+                                       checkAdjoint::Bool=false, 
+                                       solverForwardEq=CVODE_BDF(),
+                                       checkForwardEquations::Bool=false, 
+                                       testTol::Float64=1e-3, 
+                                       sensealgSS=SteadyStateAdjoint(), 
+                                       sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
+                                       solverSSRelTol=1e-8, solverSSAbsTol=1e-10)
+
+    # Testing the gradient via finite differences 
+    petabProblem1 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                         sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver, 
+                                         odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
+                                         sensealgAdjoint=sensealgAdjoint, 
+                                         solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol,
+                                         sensealgAdjointSS=sensealgSS)
+    petabProblem2 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                         solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol,
+                                         sensealgForwardEquations=ForwardSensitivity(), odeSolverForwardEquations=solverForwardEq)                                        
+    θ_use = petabProblem1.θ_nominalT
+
+    gradientFinite = FiniteDifferences.grad(central_fdm(5, 1), petabProblem1.computeCost, θ_use)[1]
+    gradientForward = zeros(length(θ_use))
+    petabProblem1.computeGradientAutoDiff(gradientForward, θ_use)                                       
+    @test norm(gradientFinite - gradientForward) ≤ testTol
+
+    if checkForwardEquations == true
+        gradientForwardEquations1 = zeros(length(θ_use))
+        gradientForwardEquations2 = zeros(length(θ_use))
+        petabProblem1.computeGradientForwardEquations(gradientForwardEquations1, θ_use)
+        petabProblem2.computeGradientForwardEquations(gradientForwardEquations2, θ_use)
+        @test norm(gradientFinite - gradientForwardEquations1) ≤ testTol
+        @test norm(gradientFinite - gradientForwardEquations2) ≤ testTol
+    end
+
+    if checkAdjoint == true
+        gradientAdjoint = zeros(length(θ_use))
+        petabProblem1.computeGradientAdjoint(gradientAdjoint, θ_use)
+        @test norm(gradientFinite - gradientAdjoint) ≤ testTol
+    end
 end
 
 
-# Isensee model - Extremly strange as it works without priors (must double check)
-dirModel = pwd() * "/tests/JuliaImport/model_Isensee_JCB2018/"
-peTabModel = setUpPeTabModel("model_Isensee_JCB2018", dirModel, verbose=false, jlFile=true)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed) + 4.45299970460275
-costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed) + 4.45299970460275
-diff = abs(cost + (-3949.375966548649))
-diffZygote = abs(costZygote + (-3949.375966548649))
-if diff > 1e-2
-    println("Does not pass ll-test for Isensee model")
-    passTest = false
-elseif diffZygote > 1e-2
-    println("Does not pass ll-test for Zygote Isensee model")
-    passTest = false
-end
+@testset "Log likelihood values and gradients for benchmark collection" begin
 
+    # Beer model - Numerically challenging gradient as we have callback rootfinding
+    pathYML = joinpath(@__DIR__, "..", "tests", "JuliaImport", "model_Beer_MolBioSystems2014", "Beer_MolBioSystems2014.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=false, jlFile=true)     
+    testLogLikelihoodValue(petabModel, -58622.9145631413, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8, testTol=1e-1)           
+    
+    # Boehm model 
+    pathYML = joinpath(@__DIR__, "..", "tests", "JuliaImport", "model_Boehm_JProteomeRes2014", "Boehm_JProteomeRes2014.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=false, jlFile=true)     
+    testLogLikelihoodValue(petabModel, 138.22199693517703, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8)
 
-# Weber model 
-dirModel = pwd() * "/tests/JuliaImport/model_Weber_BMC2015/"
-peTabModel = setUpPeTabModel("model_Weber_BMC2015", dirModel, verbose=false, jlFile=true)
-peTabOpt = setUpCostGradHess(peTabModel, Rodas4P(), 1e-12)
-cost = peTabOpt.evalF(peTabOpt.paramVecTransformed)
-costZygote = peTabOpt.evalFZygote(peTabOpt.paramVecTransformed)
-diff = abs(cost + (-296.2017922646865))
-diffZygote = abs(costZygote + (-296.2017922646865))
-if diff > 1e-3
-    println("Does not pass ll-test for Lucarelli model")
-    passTest = false
-elseif diffZygote > 1e-3
-    println("Does not pass ll-test for Zygote Lucarelli model")
-    passTest = false
-end
+    # Brännmark model. Model has pre-equlibration criteria so here we test all gradients. Challenging to compute gradients.
+    pathYML = joinpath(@__DIR__, "..", "tests", "JuliaImport", "model_Brannmark_JBC2010", "Brannmark_JBC2010.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=false, jlFile=true)
+    testLogLikelihoodValue(petabModel, 141.889113770537, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8, checkAdjoint=true, checkForwardEquations=true, testTol=1e-2, sensealgSS=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)))
 
+    # Fujita model. Challangeing to compute accurate gradients  
+    pathYML = joinpath(@__DIR__, "..", "tests", "JuliaImport", "model_Fujita_SciSignal2010", "Fujita_SciSignal2010.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=false, jlFile=true)
+    testLogLikelihoodValue(petabModel, -53.08377736998929, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-12, testTol=1e-2)
 
+    # Isensee model. Accurate gradients are computed (but the code takes ages to run with low tolerances)
+    pathYML = joinpath(@__DIR__, "..", "tests", "JuliaImport", "model_Isensee_JCB2018", "Isensee_JCB2018.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=false, jlFile=true)
+    testLogLikelihoodValue(petabModel, 3949.375966548649-4.45299970460275, Rodas4P(), atol=1e-2)
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8, testTol=1e-1)
 
-if passTest
-    println("Passes ll-test")
-else
-    println("Does not pass ll-test!")
+    # Weber model. Challanging as it sensitivity to steady state tolerances 
+    pathYML = joinpath(@__DIR__, "..", "tests", "JuliaImport", "model_Weber_BMC2015", "Weber_BMC2015.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=false, jlFile=true)
+    testLogLikelihoodValue(petabModel, 296.2017922646865, Rodas4P())
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-12, testTol=1e-2, solverSSRelTol=1e-13, solverSSAbsTol=1e-15)
+
 end
