@@ -17,10 +17,12 @@ function createIpoptProb(petabProblem::PEtabODEProblem;
         evalHessian = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, petabProblem.computeHessian)
     elseif hessianUse == :blockAutoDiff
         evalHessian = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, petabProblem.computeHessianBlock)
+    elseif hessianUse == :GaussNewton
+        evalHessian = (x_arg, rows, cols, obj_factor, lambda, values) -> eval_h(x_arg, rows, cols, obj_factor, lambda, values, nParam, petabProblem.computeHessianGN)
     elseif hessianUse == :LBFGS
         evalHessian = eval_h_empty
     else
-        println("Error : For Ipopt hessianUse options are :autoDiff, :blockAutoDiff, :LBFGS, not $hessianUse")
+        println("Error : For Ipopt hessianUse options are :autoDiff, :blockAutoDiff, :GaussNewton, :LBFGS, not $hessianUse")
     end
 
     # Of course Ipopt and Optim accept the gradient in different order 

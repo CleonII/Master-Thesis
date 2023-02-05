@@ -56,8 +56,10 @@ function createOptimInteriorNewton(petabProblem::PEtabODEProblem;
         evalHessian = petabProblem.computeHessian
     elseif hessianUse == :blockAutoDiff
         evalHessian = petabProblem.computeHessianBlock
+    elseif hessianUse == :GaussNewton
+        evalHessian = petabProblem.computeHessianGN
     else
-        println("Error : For optim interior point Newton availble hessianUse options are :autoDiff, :blockAutoDiff not $hessianUse")
+        println("Error : For optim interior point Newton availble hessianUse options are :autoDiff, :blockAutoDiff and :GaussNewton not $hessianUse")
     end
 
     x0 = zeros(Float64, nParam)

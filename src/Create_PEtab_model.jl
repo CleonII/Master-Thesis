@@ -103,7 +103,7 @@ function readPEtabModel(pathYAML::String;
         verbose && forceBuildJuliaFiles == true && @printf("By user option will rebuild h, σ and u0\n")
             
         if !@isdefined(modelDict)
-            modelDict = XmlToModellingToolkit(modelFileXml, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
+            modelDict = XmlToModellingToolkit(pathSBML, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
         create_σ_h_u0_File(modelName, pathYAML, dirJulia, odeSystem, stateMap, modelDict, verbose=verbose)
         createDerivative_σ_h_File(modelName, pathYAML, dirJulia, odeSystem, modelDict, verbose=verbose)
@@ -119,7 +119,7 @@ function readPEtabModel(pathYAML::String;
         verbose && forceBuildJuliaFiles == true && @printf("By user option will rebuild callback file\n")
         
         if !@isdefined(modelDict)
-            modelDict = XmlToModellingToolkit(modelFileXml, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
+            modelDict = XmlToModellingToolkit(pathSBML, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
         createCallbacksForTimeDepedentPiecewise(odeSystem, modelDict, modelName, pathYAML, dirJulia)
     end

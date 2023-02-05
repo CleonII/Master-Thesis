@@ -15,7 +15,6 @@ using Random
 using LinearAlgebra
 using Distributions
 using Printf
-using Calculus
 using SciMLSensitivity
 using Zygote
 using Symbolics

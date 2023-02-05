@@ -1,4 +1,4 @@
 conditionId	conditionName	a_scale
-default	1	1.0
-double	2	2.0
-half	3	0.5
+default	c1	1.0
+double	c2	2.0
+half	c3	0.5

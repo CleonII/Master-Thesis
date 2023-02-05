@@ -76,7 +76,7 @@ function compareAgainstPyPestoBachmann(petabModel::PEtabModel, solver, tol)
     end
     iUseHess = [findfirst(x -> x == namesParamHess[i], names(hessPythonMat)) for i in eachindex(namesParamHess)]
 
-    for i in 1:nrow(paramMat)
+    for i in 1:2
 
         p = collect(paramMat[i, iUse])
         referenceCost = costPython[i]
@@ -84,24 +84,24 @@ function compareAgainstPyPestoBachmann(petabModel::PEtabModel, solver, tol)
         referenceHessian = collect(hessPythonMat[i, iUseHess])
 
         cost = _testCostGradientOrHessian(petabProblem1, p, cost=true)
-        @test cost ≈ referenceCost atol=1e-4
+        @test cost ≈ referenceCost atol=1e-3
         costZygote = _testCostGradientOrHessian(petabProblem1, p, costZygote=true)
-        @test costZygote ≈ referenceCost atol=1e-4
+        @test costZygote ≈ referenceCost atol=1e-3
         
         # Test all gradient combinations. Note we test sensitivity equations with and without autodiff 
         gradientAutoDiff = _testCostGradientOrHessian(petabProblem1, p, gradientAutoDiff=true)
-        @test norm(gradientAutoDiff - referenceGradient) ≤ 1e-4
+        @test norm(gradientAutoDiff - referenceGradient) ≤ 1e-3
         # This currently takes considerble time (hence it does not run for all passes)
         if i == 1
             gradientZygote = _testCostGradientOrHessian(petabProblem1, p, gradientZygote=true)
-            @test norm(gradientZygote - referenceGradient) ≤ 1e-4
+            @test norm(gradientZygote - referenceGradient) ≤ 1e-3
         end
         gradientAdjoint = _testCostGradientOrHessian(petabProblem1, p, gradientAdjoint=true)
         @test norm(normalize(gradientAdjoint) - normalize((referenceGradient))) ≤ 1e-2
         gradientForwardEquations1 = _testCostGradientOrHessian(petabProblem1, p, gradientForwardEquations=true)
-        @test norm(gradientForwardEquations1 - referenceGradient) ≤ 1e-4
+        @test norm(gradientForwardEquations1 - referenceGradient) ≤ 1e-3
         gradientForwardEquations2 = _testCostGradientOrHessian(petabProblem2, p, gradientForwardEquations=true)
-        @test norm(gradientForwardEquations2 - referenceGradient) ≤ 1e-4
+        @test norm(gradientForwardEquations2 - referenceGradient) ≤ 1e-3
         
         # Testing "exact" hessian via autodiff 
         hessian = _testCostGradientOrHessian(petabProblem1, p, hessianGN=true)

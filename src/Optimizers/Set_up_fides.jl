@@ -19,10 +19,14 @@ function setUpFides(petabProblem::PEtabODEProblem,
         useHessApprox = false
         hessMat = zeros(Float64, (nParam, nParam))
         evalHessian = (pVec) -> evalAutoDiffHess(pVec, petabProblem.computeHessianBlock, hessMat)        
+    elseif autoDiffHess == :GaussNewton
+        useHessApprox = false
+        hessMat = zeros(Float64, (nParam, nParam))
+        evalHessian = (pVec) -> evalAutoDiffHess(pVec, petabProblem.computeHessianGN, hessMat)        
     elseif autoDiffHess == :None
         useHessApprox = true
     else
-        println("Error : For Fides availble autoDiffHess options are :autoDiff, :blockAutoDiff or :None" )
+        println("Error : For Fides availble autoDiffHess options are :autoDiff, :GaussNewton, :blockAutoDiff or :None" )
         println("User provided : $autoDiffHess")
     end
 

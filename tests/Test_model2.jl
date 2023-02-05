@@ -216,6 +216,7 @@ function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
     ipoptProbHessApprox, iterArrHessApprox = createIpoptProb(petabProblem, hessianUse=:blockAutoDiff)
     ipoptProbBfgs, iterArrBfgs = createIpoptProb(petabProblem, hessianUse=:LBFGS)
     ipoptProbAutoHess, iterArrAutoHess = createIpoptProb(petabProblem, hessianUse=:autoDiff)
+    ipoptProbGN, iterArrAutoHess = createIpoptProb(petabProblem, hessianUse=:GaussNewton)
     Ipopt.AddIpoptNumOption(ipoptProbAutoHess, "acceptable_tol", 1e-8)
     
     # Fides optimizers 
@@ -223,6 +224,8 @@ function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
                               options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
     runFidesHessBlock = setUpFides(petabProblem, :blockAutoDiff; verbose=0, 
                                    options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)
+    runFidesGN = setUpFides(petabProblem, :GaussNewton; verbose=0, 
+                            options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)                                   
     runFidesHessBFGS = setUpFides(petabProblem, :None; verbose=0, 
                                   fidesHessApprox=py"fides.hessian_approximation.BFGS()"o, 
                                   options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 1e-6}"o)                                   
@@ -232,6 +235,9 @@ function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
     optimProbAutoHess = createOptimProb(petabProblem, IPNewton(), hessianUse=:autoDiff, 
                                         options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
                                                               successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
+    optimProbGN = createOptimProb(petabProblem, IPNewton(), hessianUse=:GaussNewton, 
+                                  options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
+                                                         successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))                                                              
     optimProbBFGS = createOptimProb(petabProblem, BFGS())
     optimProbLBFGS = createOptimProb(petabProblem, LBFGS(), 
                                      options=Optim.Options(iterations = 250, 
@@ -265,6 +271,13 @@ function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
     sqDiffIpoptBlockHessian = sum((ipoptProbHessApprox.x - petabProblem.θ_nominal).^2)
     @test sqDiffIpoptBlockHessian ≤ 1e-3
 
+    # Ipot Hessian Gauss Newton approximation
+    ipoptProbGN.x = deepcopy(p0)
+    ipoptProbGN.eval_f(p0) # Needed to avoid segfault, must write a wrapper for this 
+    sol_opt = Ipopt.IpoptSolve(ipoptProbGN)
+    sqDiffIpoptGN = sum((ipoptProbGN.x - petabProblem.θ_nominal).^2)
+    @test sqDiffIpoptGN ≤ 1e-3
+
     # Ipopt BFGS 
     ipoptProbBfgs.x = deepcopy(p0)
     ipoptProbBfgs.eval_f(p0)
@@ -282,6 +295,11 @@ function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
     sqDiffFidesBlockHessian = sum((res[2] - petabProblem.θ_nominal).^2)
     @test sqDiffFidesBlockHessian ≤ 1e-3
 
+    # Fides Guass Newton hessian
+    res, niter, converged = runFidesGN(p0)
+    sqDiffFidesGN= sum((res[2] - petabProblem.θ_nominal).^2)
+    @test sqDiffFidesGN ≤ 1e-3
+
     # Fides BFGS 
     res, niter, converged = runFidesHessBFGS(p0)
     sqDiffFidesBFGS = sum((res[2] - petabProblem.θ_nominal).^2)
@@ -296,6 +314,11 @@ function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
     res = optimProbHessApprox(p0, showTrace=false)
     sqDiffOptimBlockHessian = sum((res.minimizer - petabProblem.θ_nominal).^2)
     @test sqDiffOptimBlockHessian ≤ 1e-3
+
+    # Optim Gauss Newton hessian 
+    res = optimProbGN(p0, showTrace=false)
+    sqDiffOptimGN = sum((res.minimizer - petabProblem.θ_nominal).^2)
+    @test sqDiffOptimGN ≤ 1e-3
 
     # Optim BFGS
     res = optimProbBFGS(p0, showTrace=false)

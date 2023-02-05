@@ -55,7 +55,7 @@ function getSolAlgebraicSS(petabModel::PEtabModel, solver, tol::Float64, a::T1, 
     # ODE solution with algebraically computed initial values (instead of ss pre-simulation)
     odeProb = ODEProblem(petabModel.odeSystem, petabModel.stateMap, (0.0, 9.7), petabModel.parameterMap, jac=true)
     odeProb = remake(odeProb, p = convert.(eltype(a), odeProb.p), u0 = convert.(eltype(a), odeProb.u0))
-    solArray = Array{Union{OrdinaryDiffEq.ODECompositeSolution, ODESolution}, 1}(undef, 2)
+    solArray = Array{ODESolution, 1}(undef, 2)
 
     # Set model parameter values to ensure initial steady state 
     odeProb.p[5], odeProb.p[3], odeProb.p[1], odeProb.p[6] = a, b, c, d
