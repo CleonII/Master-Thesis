@@ -41,7 +41,9 @@ include(joinpath(pwd(), "src", "Optimizers", "Set_up_NLopt.jl"))
 include(joinpath(pwd(), "src", "Optimizers", "Set_up_fides.jl"))
 
 
-function writeFile(pathFile::String, 
+function writeFile(dirSave::String,
+                   θ_opt::Vector{Float64},
+                   parameterNames::Vector{String}, 
                    finalCost, 
                    runTime, 
                    retCode, 
@@ -51,13 +53,22 @@ function writeFile(pathFile::String,
                    solver::String,
                    absTol::String, 
                    relTol::String)
-
+                   
     # Save after each iteration (do not loose data)
+    pathFile = joinpath(dirSave, "Estimation_statistics.csv")
     dataSave = [alg finalCost runTime retCode nIter startGuess solver absTol relTol]
     dataSave = DataFrame(dataSave, ["Alg", "Cost", "Run_time", "Ret_code", "N_iter", "Start_guess", "Solver", "absTol", "relTol"])
     shouldAppend = isfile(pathFile) ? true : false
     CSV.write(pathFile, dataSave, append=shouldAppend)
 
+    # Save optimal parameter vector
+    pathFile = joinpath(dirSave, "Minimizer.csv")
+    _dataSave = Matrix{Any}(undef, (1, length(θ_opt)+5))
+    _dataSave[:] .= vcat(θ_opt, startGuess, alg, solver, absTol, relTol)
+    dataSaveθ = DataFrame(_dataSave, vcat(parameterNames, "Start_guess", "Alg", "Solver", "absTol", "relTol"))
+    shouldAppend = isfile(pathFile) ? true : false
+    CSV.write(pathFile, dataSaveθ, append=shouldAppend)
+    
 end
 
 
@@ -69,11 +80,12 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                       nStartGuess::Integer;
                                       algList=[:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS, :FidesAutoHess, :FidesBlockAutoHess, :FidesBFGS], 
                                       terminateSSMethod=:Norm, 
-                                      solverSSRelTol::Float64=1e-10,
-                                      solverSSAbsTol::Float64=1e-12)
+                                      solverSSRelTol::Float64=1e-8,
+                                      solverSSAbsTol::Float64=1e-10)
 
     petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=absTol, solverRelTol=relTol, terminateSSMethod=terminateSSMethod, 
                                         solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol)
+    θ_estNames = string.(petabProblem.θ_estNames)
 
     pathCube = joinpath(petabModel.dirJulia, "Cube_benchmark.csv")
     createCube(pathCube, petabProblem, nStartGuess, seed=123, verbose=true)
@@ -83,7 +95,6 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
     if !isdir(dirResult)
         mkpath(dirResult)
     end
-    pathSave = joinpath(dirResult, "Benchmark_result_estimation.csv")
 
     #=
         The termination criteria are set to match Optim which terminates based on;
@@ -109,6 +120,9 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
     optimProbAutoHess = createOptimProb(petabProblem, IPNewton(), hessianUse=:autoDiff, 
                                         options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
                                                               successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
+    optimProbGN = createOptimProb(petabProblem, IPNewton(), hessianUse=:GaussNewton, 
+                                  options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
+                                                        successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))                                                              
     optimProbLBFGS = createOptimProb(petabProblem, LBFGS(), 
                                      options=Optim.Options(iterations = 250, 
                                                            show_trace = false, 
@@ -127,11 +141,13 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
     FidesAutoHessBlock = setUpFides(petabProblem, :blockAutoDiff; verbose=0, 
                                     options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
+    FidesGN = setUpFides(petabProblem, :GaussNewton; verbose=0, 
+                         options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)                                    
     FidesBFGS = setUpFides(petabProblem, :None; verbose=0,
                            fidesHessApprox=py"fides.hessian_approximation.BFGS()"o, 
                            options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
 
-    # Make sure to activate allocation of required arrays for Ipopt solvers, and to compile 
+    # Make sure to activate allocation of required arrays for Ipopt solvers, and to precompile 
     # gradient and required hessian functions to prevent pre-allocations from affecting run-times 
     # The hessian is only pre-compilied in case of a Hessian based algorithm being used 
     θ_tmp = cube[1, :]
@@ -144,6 +160,9 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
     end
     if :IpoptBlockAutoDiff in algList || :OptimIPNewtonBlockAutoDiff in algList || :FidesBlockAutoDiff in algList
         petabProblem.computeHessianBlock(_hessian, θ_tmp)
+    end
+    if :FidesGN in algList || :OptimIPNewtonGN in algList 
+        petabProblem.computeHessianGN(_hessian, θ_tmp)
     end
 
     for i in 1:nStartGuess
@@ -158,14 +177,14 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
             ipoptProbAutoHess.x = deepcopy(p0)
             Ipopt.AddIpoptIntOption(ipoptProbAutoHess, "print_level", 0)
             runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbAutoHess)
-            writeFile(pathSave, ipoptProbAutoHess.obj_val, runTime, ipoptProbAutoHess.status, iterArrAutoHess[1], i, "IpoptAutoHess", solverStr, string(absTol), string(relTol))
+            writeFile(dirResult, ipoptProbAutoHess.x, θ_estNames, ipoptProbAutoHess.obj_val, runTime, ipoptProbAutoHess.status, iterArrAutoHess[1], i, "IpoptAutoHess", solverStr, string(absTol), string(relTol))
         end
 
         if :IpoptBlockAutoDiff in algList
             ipoptProbHessApprox.x = deepcopy(p0)
             Ipopt.AddIpoptIntOption(ipoptProbHessApprox, "print_level", 0)
             runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbHessApprox)
-            writeFile(pathSave, ipoptProbHessApprox.obj_val, runTime, ipoptProbHessApprox.status, iterArrHessApprox[1], i, "IpoptBlockAutoHess", solverStr, string(absTol), string(relTol))
+            writeFile(dirResult, ipoptProbHessApprox.x, θ_estNames, ipoptProbHessApprox.obj_val, runTime, ipoptProbHessApprox.status, iterArrHessApprox[1], i, "IpoptBlockAutoHess", solverStr, string(absTol), string(relTol))
         end
 
         if :IpoptLBFGS in algList
@@ -173,61 +192,75 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
             Ipopt.AddIpoptIntOption(ipoptProbBfgs, "print_level", 0)
             try
                 runTime = @elapsed sol_opt = Ipopt.IpoptSolve(ipoptProbBfgs)
-                writeFile(pathSave, ipoptProbBfgs.obj_val, runTime, ipoptProbBfgs.status, iterArrBfgs[1], i, "IpoptLBFGS", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, ipoptProbBfgs.x, θ_estNames, ipoptProbBfgs.obj_val, runTime, ipoptProbBfgs.status, iterArrBfgs[1], i, "IpoptLBFGS", solverStr, string(absTol), string(relTol))
             catch
-                writeFile(pathSave, Inf, Inf, 0, Inf, i, "IpoptLBFGS", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, ipoptProbBfgs.x, θ_estNames, Inf, Inf, 0, Inf, i, "IpoptLBFGS", solverStr, string(absTol), string(relTol))
             end
         end
 
         if :OptimIPNewtonAutoHess in algList
             res = optimProbAutoHess(p0, showTrace=false)
-            writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimIPNewtonAutoHess", solverStr, string(absTol), string(relTol))
+            writeFile(dirResult, res.minimizer, θ_estNames, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimIPNewtonAutoHess", solverStr, string(absTol), string(relTol))
         end
 
         if :OptimIPNewtonBlockAutoDiff in algList
             res = optimProbHessApprox(p0, showTrace=false)
-            writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimIPNewtonBlockAutoHess", solverStr, string(absTol), string(relTol))
+            writeFile(dirResult, res.minimizer, θ_estNames, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimIPNewtonBlockAutoHess", solverStr, string(absTol), string(relTol))
+        end
+
+        if :OptimIPNewtonGN in algList
+            res = optimProbGN(p0, showTrace=false)
+            writeFile(dirResult, res.minimizer, θ_estNames, res.minimum, res.time_run, res.f_converged, res.iterations, i, "OptimIPNewtonGN", solverStr, string(absTol), string(relTol))
         end
 
         if :OptimLBFGS in algList
             try
                 res = optimProbLBFGS(p0, showTrace=false)
                 println("Final cost value = ", petabProblem.evalF(res.minimizer))
-                writeFile(pathSave, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimLBFGS", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, res.minimizer, θ_estNames, res.minimum, res.time_run, res.f_converged, res.iterations, i, "optimLBFGS", solverStr, string(absTol), string(relTol))
             catch
-                writeFile(pathSave, Inf, Inf, 0, Inf, i, "optimLBFGS", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "optimLBFGS", solverStr, string(absTol), string(relTol))
             end
         end
 
         if :NLoptLBFGS in algList
             runTime = @elapsed minF, min, ret = NLopt.optimize(NLoptLBFGS, p0)
-            writeFile(pathSave, minF, runTime, string(ret), NLoptLBFGS.numevals, i, "NLoptLBFGS", solverStr, string(absTol), string(relTol))
+            writeFile(dirResult, min, θ_estNames, minF, runTime, string(ret), NLoptLBFGS.numevals, i, "NLoptLBFGS", solverStr, string(absTol), string(relTol))
         end
 
         if :FidesAutoHess in algList
             try
                 runTime = @elapsed res, nIter, converged = FidesAutoHess(p0)
-                writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHess", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesAutoHess", solverStr, string(absTol), string(relTol))
             catch
-                writeFile(pathSave, Inf, Inf, 0, Inf, i, "FidesAutoHess", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesAutoHess", solverStr, string(absTol), string(relTol))
             end
         end
 
         if :FidesBlockAutoHess in algList
             try
                 runTime = @elapsed res, nIter, converged = FidesAutoHessBlock(p0)
-                writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesAutoHessBlock", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesAutoHessBlock", solverStr, string(absTol), string(relTol))
             catch
-                writeFile(pathSave, Inf, Inf, 0, Inf, i, "FidesAutoHessBlock", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesAutoHessBlock", solverStr, string(absTol), string(relTol))
             end
         end
 
         if :FidesBFGS in algList
             try
                 runTime = @elapsed res, nIter, converged = FidesBFGS(p0)
-                writeFile(pathSave, res[1], runTime, string(converged), nIter, i, "FidesBFGS", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesBFGS", solverStr, string(absTol), string(relTol))
             catch
-                writeFile(pathSave, Inf, Inf, 0, Inf, i, "FidesBFGS", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, 0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesBFGS", solverStr, string(absTol), string(relTol))
+            end
+        end
+
+        if :FidesGN in algList
+            try
+                runTime = @elapsed res, nIter, converged = FidesGN(p0)
+                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesGN", solverStr, string(absTol), string(relTol))
+            catch
+                writeFile(dirResult, 0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesGN", solverStr, string(absTol), string(relTol))
             end
         end
     end
@@ -237,91 +270,90 @@ end
 loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
 
 
-if ARGS[1] == "Fiedler"
-    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :FidesAutoHess, :FidesBlockAutoHess]
+if length(ARGS) < 3
+    println("Error : Must be provide at least three command line arguments")
+    exit(1)
+end
+
+
+absTol, relTol = 1e-8, 1e-8
+modelRun = ARGS[1]
+nMultiStarts = parse(Int64, ARGS[2])
+optmizersTest = Symbol.(ARGS[3:end])
+
+
+if ARGS[1] == "Fiedler_BMC2016"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Fiedler_BMC2016", "Fiedler_BMC2016.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", 1e-8, 1e-8, 1000, algList=algsTest) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest) 
 end
 
 
-if ARGS[1] == "Boehm"
-    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :FidesAutoHess, :FidesBlockAutoHess, :FidesBFGS]
+if ARGS[1] == "Boehm_JProteomeRes2014"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Boehm_JProteomeRes2014", "Boehm_JProteomeRes2014.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)     
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", 1e-8, 1e-8, 1000, algList=algsTest) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest) 
 end
 
 
-if ARGS[1] == "Elowitz"
-    algsTest = [:OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :NLoptLBFGS, :FidesAutoHess, :FidesBlockAutoHess]
+if ARGS[1] == "Elowitz_Nature2000"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Elowitz_Nature2000", "Elowitz_Nature2000.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", 1e-8, 1e-8, 1000, algList=algsTest) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest) 
 end
 
 
-if ARGS[1] == "Crauste"
-    algsTest = [:OptimLBFGS, :NLoptLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
+if ARGS[1] == "Crauste_CellSystems2017"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Crauste_CellSystems2017", "Crauste_CellSystems2017.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, AutoVern7(Rodas5()), "Vern7(Rodas5)", 1e-12, 1e-12, 1000, algList=algsTest) 
+    benchmarkParameterEstimation(petabModel, AutoVern7(Rodas5()), "Vern7(Rodas5)", 1e-12, 1e-12, nMultiStarts, algList=optmizersTest) 
 end
 
 
-if ARGS[1] == "Weber"
-    algsTest = [:IpoptLBFGS, :FidesBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess]
+if ARGS[1] == "Weber_BMC2015"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Weber_BMC2015", "Weber_BMC2015.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", 1e-8, 1e-8, 200, algList=algsTest, terminateSSMethod=:Norm) 
-    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", 1e-8, 1e-8, 200, algList=algsTest, terminateSSMethod=:NewtonNorm)
+    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest, terminateSSMethod=:Norm) 
 end
 
 
-if ARGS[1] == "Bachmann"
+if ARGS[1] == "Bachmann_MSB2011"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Bachmann_MSB2011", "Bachmann_MSB2011.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    algsTest = [:IpoptLBFGS, :OptimLBFGS, :NLoptLBFGS]
-    benchmarkParameterEstimation(petabModel, Rodas4P(), "QNDF", 1e-8, 1e-8, 1000, algList=algsTest)
+    benchmarkParameterEstimation(petabModel, Rodas4P(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest)
 end
 
 
-if ARGS[1] == "Brannmark"
+if ARGS[1] == "Brannmark_JBC2010"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Brannmark_JBC2010", "Brannmark_JBC2010.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    algsTest = [:OptimIPNewtonAutoHess, :FidesBFGS]
-    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", 1e-8, 1e-8, 400, algList=algsTest, terminateSSMethod=:Norm)
-    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", 1e-8, 1e-8, 400, algList=algsTest, terminateSSMethod=:NewtonNorm)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest)
 end
 
 
-if ARGS[1] == "Fujita"
+if ARGS[1] == "Fujita_SciSignal2010"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Fujita_SciSignal2010", "Fujita_SciSignal2010.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    algsTest = [:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :FidesAutoHess, :FidesBlockAutoHess]
-    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", 1e-8, 1e-8, 1000, algList=algsTest)
+    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest)
 end
 
 
-if ARGS[1] == "Zheng"
+if ARGS[1] == "Zheng_PNAS2012"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Zheng_PNAS2012", "Zheng_PNAS2012.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    algsTest = [:IpoptLBFGS, :OptimIPNewtonAutoHess, :FidesAutoHess, :NLoptLBFGS]
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", 1e-8, 1e-8, 1000, algList=algsTest)
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest)
 end
 
 
-if ARGS[1] == "Schwen"
+if ARGS[1] == "Schwen_PONE2014"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Schwen_PONE2014", "Schwen_PONE2014.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    algsTest = [:IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :FidesBlockAutoHess]
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", 1e-8, 1e-8, 1000, algList=algsTest)
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest)
 end
 
 
-if ARGS[1] == "Sneyd"
+if ARGS[1] == "Sneyd_PNAS2002"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Sneyd_PNAS2002", "Sneyd_PNAS2002.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    algsTest = [:IpoptAutoHess, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimLBFGS, :FidesAutoHess]
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", 1e-8, 1e-8, 1000, algList=algsTest)
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest)
 end
