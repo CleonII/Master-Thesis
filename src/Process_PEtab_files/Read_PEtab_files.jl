@@ -1,4 +1,4 @@
-function readPEtabYamlFile(pathYAML::AbstractString)
+function readPEtabYamlFile(pathYAML::AbstractString; jlFile::Bool=false)
 
     if !isfile(pathYAML)
         throw(PEtabFileError("Model YAML file does not exist in the model directory"))
@@ -6,10 +6,12 @@ function readPEtabYamlFile(pathYAML::AbstractString)
     fileYAML = YAML.load_file(pathYAML)
 
     dirModel = dirname(pathYAML)
-
-    pathSBML = joinpath(dirModel, fileYAML["problems"][1]["sbml_files"][1])
-    if !isfile(pathSBML)
-        throw(PEtabFileError("SBML file does not exist in the model directory"))
+    pathSBML = ""
+    if jlFile == false
+        pathSBML = joinpath(dirModel, fileYAML["problems"][1]["sbml_files"][1])
+        if !isfile(pathSBML)
+            throw(PEtabFileError("SBML file does not exist in the model directory"))
+        end
     end
 
     pathMeasurements = joinpath(dirModel, fileYAML["problems"][1]["measurement_files"][1])
@@ -43,9 +45,9 @@ function readPEtabYamlFile(pathYAML::AbstractString)
 end
 
 
-function readPEtabFiles(pathYAML::String)
+function readPEtabFiles(pathYAML::String; jlFile::Bool=false)
 
-    pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName = readPEtabYamlFile(pathYAML)
+    pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName = readPEtabYamlFile(pathYAML, jlFile=jlFile)
 
     experimentalConditions = CSV.read(pathConditions, DataFrame, stringtype=String)
     measurementsData = CSV.read(pathMeasurements, DataFrame, stringtype=String)
