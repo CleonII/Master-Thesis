@@ -18,12 +18,13 @@ function createDerivative_σ_h_File(modelName::String,
                                    dirJulia::String, 
                                    odeSystem::ODESystem, 
                                    SBMLDict::Dict;
-                                   verbose::Bool=true)
+                                   verbose::Bool=true,
+                                   jlFile::Bool=false)
                             
     pODEProblemNames = string.(parameters(odeSystem))
     modelStateNames = replace.(string.(states(odeSystem)), "(t)" => "")
 
-    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAMl)
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAMl, jlFile = jlFile)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
     

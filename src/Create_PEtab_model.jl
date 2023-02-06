@@ -62,7 +62,7 @@ function readPEtabModel(pathYAML::String;
                         ifElseToEvent::Bool=true, 
                         jlFile=false)::PEtabModel
 
-    pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName = readPEtabYamlFile(pathYAML)                    
+    pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName = readPEtabYamlFile(pathYAML,jlFile=jlFile)                    
     
     if jlFile == false
         
@@ -105,8 +105,8 @@ function readPEtabModel(pathYAML::String;
         if !@isdefined(modelDict)
             modelDict = XmlToModellingToolkit(pathSBML, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
-        create_σ_h_u0_File(modelName, pathYAML, dirJulia, odeSystem, stateMap, modelDict, verbose=verbose)
-        createDerivative_σ_h_File(modelName, pathYAML, dirJulia, odeSystem, modelDict, verbose=verbose)
+        create_σ_h_u0_File(modelName, pathYAML, dirJulia, odeSystem, stateMap, modelDict, verbose=verbose, jlFile=jlFile)
+        createDerivative_σ_h_File(modelName, pathYAML, dirJulia, odeSystem, modelDict, verbose=verbose, jlFile=jlFile)
     else
         verbose == true && @printf("File for h, u0 and σ exists will not rebuild it\n")
     end
@@ -121,7 +121,7 @@ function readPEtabModel(pathYAML::String;
         if !@isdefined(modelDict)
             modelDict = XmlToModellingToolkit(pathSBML, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
-        createCallbacksForTimeDepedentPiecewise(odeSystem, modelDict, modelName, pathYAML, dirJulia)
+        createCallbacksForTimeDepedentPiecewise(odeSystem, modelDict, modelName, pathYAML, dirJulia, jlFile = jlFile)
     end
     include(pathCallback)
     exprCallback = Expr(:call, Symbol("getCallbacks_" * modelName))
