@@ -239,8 +239,7 @@ if ARGS[1] == "Test_flags"
 
     odeSolvers = [Rodas5(), KenCarp4(), QNDF(), AutoVern7(Rodas5())]
     odeSolversName = ["Rodas5", "KenCarp4", "QNDF", "Vern7(Rodas5)"]                 
-    sensealgsCheck = [[:ForwardDiff, nothing, "ForwardDiff"], 
-                      [:ForwardEquations, :AutoDiffForward, "ForEq_AutoDiff"]]
+    sensealgsCheck = [[:ForwardDiff, nothing, "ForwardDiff"]]
 
     absTol, relTol = 1e-8, 1e-8                      
     for i in eachindex(modelList)

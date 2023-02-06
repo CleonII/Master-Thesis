@@ -1,4 +1,6 @@
-
+# $1 - Model name 
+# $2 - Number of multistarts (Integer)
+# $3 - List of optmizers to try with the Julia parameter estimation 
 
 # Script must be run from the Root directory to correctly load Julia environment
 currentDir=${PWD##*/}
@@ -13,11 +15,9 @@ conda activate PeTab
 
 runJulia="/home/sebpe/julia-1.8.5-linux-x86_64/julia-1.8.5/bin/julia --project=. --threads=1"
 pathBenchmarkScript="./Benchmarks/Parameter_estimation/Run_benchmark.jl"
-nMultiStarts="1000"
 
 if [ $1 == "Boehm_JProteomeRes2014" ];then
-    optimizersTest="OptimIPNewtonAutoHess OptimIPNewtonGN FidesBFGS FidesGN FidesAutoHess"
-    ${runJulia} ${pathBenchmarkScript} Boehm_JProteomeRes2014 ${nMultiStarts} ${optimizersTest}
+    ${runJulia} ${pathBenchmarkScript} Boehm_JProteomeRes2014 $2 $3
 fi
 
 exit 0
