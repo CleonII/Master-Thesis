@@ -85,20 +85,9 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
     
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
 
-    # In case the sensitivites are computed via automatic differentitation we need to pre-allocate an 
-    # sensitivity matrix all experimental conditions (to efficiently levarage autodiff and handle scenarios are 
-    # pre-equlibrita model). Here we pre-allocate said matrix, or leave it empty.
-    if sensealg == :AutoDiffForward
-        nModelStates = length(odeProblem.u0)
-        nTimePointsSaveAt = sum(length(simulationInfo.timeObserved[experimentalConditionId]) for experimentalConditionId in simulationInfo.experimentalConditionId)
-        S = zeros(Float64, (nTimePointsSaveAt*nModelStates, length(θ_dynamic)))
-    else
-        S = zeros(Float64, (0, 0))
-    end
-
     # Calculate gradient seperately for dynamic and non dynamic parameter. 
     gradientDyanmicθ::Vector{Float64} = zeros(Float64, length(θ_dynamic))
-    computeGradientForwardEqDynamicθ!(gradientDyanmicθ, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, S, petabModel, 
+    computeGradientForwardEqDynamicθ!(gradientDyanmicθ, θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, simulationInfo.S, petabModel, 
                                       sensealg, odeProblem, simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                       changeODEProblemParameters!, solveOdeModelAllConditions!, expIDSolve=expIDSolve)                            
     gradient[θ_indices.iθ_dynamic] .= gradientDyanmicθ

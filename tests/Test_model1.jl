@@ -122,7 +122,7 @@ function testODESolverTestModel1(petabModel::PEtabModel, solver, tol)
     θ_indices = computeIndicesθ(paramData, measurementData, petabModel.odeSystem, experimentalConditionsFile)
     
     # Extract experimental conditions for simulations 
-    simulationInfo = processSimulationInfo(petabModel, measurementData)
+    simulationInfo = processSimulationInfo(petabModel, measurementData, paramData)
     
     # Parameter values where to test accuracy. Each column is a α, β, γ and δ
     u0 = [8.0, 4.0]

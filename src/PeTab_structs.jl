@@ -154,6 +154,7 @@ struct SimulationInfo{T1<:NamedTuple,
     odeSolutions::Dict{Symbol, Union{Nothing, ODESolution}}
     odeSolutionsDerivatives::Dict{Symbol, Union{Nothing, ODESolution}}
     odePreEqulibriumSolutions::Dict{Symbol, Union{Nothing, ODESolution}}
+    S::Matrix{Float64} # Sensitivity matrix from forward equations
     timeMax::T1
     timeObserved::T2
     iMeasurements::T3

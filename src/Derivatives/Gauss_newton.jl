@@ -12,20 +12,24 @@ function computeJacobianResidualsDynamicθ!(jacobian::Union{Matrix{Float64}, Sub
                                            parameterInfo::ParametersInfo, 
                                            changeODEProblemParameters!::Function,
                                            solveOdeModelAllConditions!::Function;
-                                           expIDSolve::Vector{Symbol} = [:all])
+                                           expIDSolve::Vector{Symbol} = [:all], 
+                                           reuseS::Bool=false)
 
     θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, θ_indices)
     θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, θ_indices)
     θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
     θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
 
-    # Solve the expanded ODE system for the sensitivites
-    success = solveForSensitivites(S, odeProblem, simulationInfo, petabModel, :AutoDiff, θ_dynamicT, 
-                                   solveOdeModelAllConditions!, changeODEProblemParameters!, expIDSolve)
-    if success != true
-        println("Failed to solve sensitivity equations")
-        jacobian .= 1e8
-        return
+    # Solve the expanded ODE system for the sensitivites. When running optmization algorithms like Fides the same 
+    # sensitivity matrix can be used when computing both the hessian approxmiation and gradient 
+    if reuseS == false
+        success = solveForSensitivites(S, odeProblem, simulationInfo, petabModel, :AutoDiff, θ_dynamicT, 
+                                       solveOdeModelAllConditions!, changeODEProblemParameters!, expIDSolve)
+        if success != true
+            println("Failed to solve sensitivity equations")
+            jacobian .= 1e8
+            return
+        end
     end
 
     jacobian .= 0.0

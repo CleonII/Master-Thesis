@@ -164,7 +164,7 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    simulationInfo = processSimulationInfo(petabModel, measurementInfo, absTolSS=1e-10, relTolSS=1e-8)
+    simulationInfo = processSimulationInfo(petabModel, measurementInfo, parameterInfo, absTolSS=1e-10, relTolSS=1e-8)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
      
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
@@ -322,7 +322,6 @@ if ARGS[1] == "Test_all"
                 "model_SalazarCavazos_MBoC2020", "model_Sneyd_PNAS2002", "model_Zhao_QuantBiol2020", "model_Zheng_PNAS2012"]                    
 
     tolsTry = [(1e-16, 1e-8), (1e-8, 1e-8), (1e-6, 1e-6)]            
-    tolsTry = [(1e-6, 1e-6)]            
     for i in eachindex(modelList)
         dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
         pathYML = getPathYmlFile(dirModel)

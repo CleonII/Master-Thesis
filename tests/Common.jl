@@ -61,7 +61,7 @@ function checkGradientResiduals(petabModel::PEtabModel, solver, tol; verbose::Bo
     experimentalConditionsFile, measurementDataFile, parameterDataFile, observablesDataFile = readPEtabFiles(petabModel)
     parameterData = processParameters(parameterDataFile)
     measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
-    simulationInfo = processSimulationInfo(petabModel, measurementData)
+    simulationInfo = processSimulationInfo(petabModel, measurementData, parameterData)
 
     # Indices for mapping parameter-estimation vector to dynamic, observable and sd parameters correctly when calculating cost
     paramEstIndices = computeIndicesθ(parameterData, measurementData, petabModel.odeSystem, experimentalConditionsFile)

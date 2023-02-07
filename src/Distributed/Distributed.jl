@@ -171,7 +171,7 @@ function setUpPEtabOptDistributed(petabModel::PEtabModel,
                                     @inbounds for i in nProcs:-1:1
                                         status::Symbol, hessPart::Matrix{Float64} = take!(results[i])
                                         if status != :Done
-                                            println("Error : Could not send ODE problem to proces ", procs()[i])
+                                            println("Error : Could not send ODE problem to process ", procs()[i])
                                         end
                                         hess .+= hessPart
                                     end
@@ -214,7 +214,6 @@ function loadPackages()
                                 using DataFrames
                                 using LinearAlgebra
                                 using ForwardDiff
-                                using ForwardDiff
                                 using ReverseDiff
                                 using Zygote
                                 using Printf
@@ -232,14 +231,8 @@ function loadFunctionsAndStructs()
     @eval @everywhere begin 
                         macro LoadFuncStruct()
                             quote
-                                include(joinpath(pwd(), "src", "PeTab_structs.jl"))
-                                include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
-                                include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
-                                include(joinpath(pwd(), "src", "PeTab_importer", "Common.jl"))
-                                include(joinpath(pwd(), "src", "PeTab_importer", "Map_parameters.jl"))
-                                include(joinpath(pwd(), "src", "PeTab_importer", "Process_PeTab_files.jl"))
-                                include(joinpath(pwd(), "src", "PeTab_importer", "Distributed_run.jl"))
-                                include(joinpath(pwd(), "src", "Common.jl"))
+                                include(joinpath(pwd(), "src", "Create_PEtab_model.jl"))
+                                include(joinpath(pwd(), "src", "Distributed", "Distributed_run.jl"))
                             end
                         end
                     end
@@ -249,13 +242,13 @@ end
  
 
 function loadYmodSdU0(petabModel::PEtabModel)
-    println("Loading yMod, SD and u0 functions")
-    pathObsSdU0 = petabModel.dirModel * petabModel.modelName * "ObsSdU0.jl"
-    pathDObsSdU0 = petabModel.dirModel * petabModel.modelName * "DObsSdU0.jl"
-    pathCallbacks = petabModel.dirModel * petabModel.modelName * "Callbacks_time_piecewise.jl"
-    @eval @everywhere include($pathObsSdU0)
-    @eval @everywhere include($pathDObsSdU0)
-    @eval @everywhere include($pathCallbacks)
+    println("Loading u0, σ, h and callback functions")
+    path_u0_h_sigma = joinpath(petabModel.dirJulia, petabModel.modelName * "_h_sd_u0.jl")
+    path_D_h_sd = joinpath(petabMode.dirJulia, petabModel.modelName * "_D_h_sd.jl")
+    pathCallback = joinpath(petabModel.dirJulia, petabModel.modelName * "_callbacks.jl")
+    @eval @everywhere include($path_u0_h_sigma)
+    @eval @everywhere include($path_D_h_sd)
+    @eval @everywhere include($pathCallback)
     println("Done")
 end
 

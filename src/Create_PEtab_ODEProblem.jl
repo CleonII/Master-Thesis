@@ -15,7 +15,8 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
                               sensealgAdjoint::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), 
                               sensealgAdjointSS::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm=SteadyStateAdjoint(), 
                               chunkSize::Union{Nothing, Int64}=nothing, 
-                              terminateSSMethod::Symbol=:Norm)::PEtabODEProblem
+                              terminateSSMethod::Symbol=:Norm, 
+                              reuseS::Bool=false)::PEtabODEProblem
 
     if !(typeof(sensealgAdjointSS) <: SteadyStateAdjoint)
         println("If you are using adjoint sensitivity analysis for a model with PreEq-criteria the most the most efficient adjSensealgSS is usually SteadyStateAdjoint. The algorithm you have provided, ", sensealgAdjointSS, "might not work (as there are some bugs here). In case it does not work, and SteadyStateAdjoint fails (because a dependancy on time or a singular Jacobian) a good choice might be QuadratureAdjoint(autodiff=false, autojacvec=false)")
@@ -24,7 +25,7 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    simulationInfo = processSimulationInfo(petabModel, measurementInfo, sensealg=sensealgAdjoint, absTolSS=solverSSAbsTol, relTolSS=solverSSRelTol, terminateSSMethod=terminateSSMethod)
+    simulationInfo = processSimulationInfo(petabModel, measurementInfo, parameterInfo, sensealg=sensealgAdjoint, absTolSS=solverSSAbsTol, relTolSS=solverSSRelTol, terminateSSMethod=terminateSSMethod, sensealgForwardEquations=sensealgForwardEquations)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
     
     # Set up potential prior for the parameters to estimate 
@@ -70,7 +71,7 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
     computeHessianBlock = setUpHessian(:BlockAutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
                                         θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIdSolve)                                  
     computeHessianGN = setUpHessian(:GaussNewton, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
-                                    θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIdSolve)                                                                          
+                                    θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIdSolve, reuseS=reuseS)                                                                          
 
     # Extract nominal parameter vector and parameter bounds. If needed transform parameters
     θ_estNames = θ_indices.θ_estNames               
@@ -272,7 +273,8 @@ function setUpHessian(whichMethod::Symbol,
                       parameterInfo::ParametersInfo,
                       priorInfo::PriorInfo, 
                       chunkSize::Union{Nothing, Int64},
-                      expIDSolve::Vector{Symbol})
+                      expIDSolve::Vector{Symbol};
+                      reuseS::Bool=false)
 
     # Functions needed for mapping θ_est to the ODE problem, and then for solving said ODE-system                           
     if whichMethod == :AutoDiff || whichMethod == :BlockAutoDiff
@@ -328,7 +330,8 @@ function setUpHessian(whichMethod::Symbol,
                                                                                     _changeODEProblemParameters!, 
                                                                                     _solveODEAllExperimentalConditions!, 
                                                                                     priorInfo, 
-                                                                                    expIDSolve=expIDSolve) 
+                                                                                    expIDSolve=expIDSolve, 
+                                                                                    reuseS=reuseS) 
 
     end
 

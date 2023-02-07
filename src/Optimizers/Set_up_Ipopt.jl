@@ -26,7 +26,11 @@ function createIpoptProb(petabProblem::PEtabODEProblem;
     end
 
     # Of course Ipopt and Optim accept the gradient in different order 
-    evalGradFUse = (xArg, grad) -> petabProblem.computeGradientAutoDiff(grad, xArg)
+    if hessianUse == :GaussNewton
+        evalGradFUse = (xArg, grad) -> petabProblem.computeGradientForwardEquations(grad, xArg)
+    else
+        evalGradFUse = (xArg, grad) -> petabProblem.computeGradientAutoDiff(grad, xArg)
+    end
 
     # Ipopt does not allow the iteration count to be stored directly. Thus the iteration is stored in an arrary which 
     # is sent into the Ipopt callback function. 

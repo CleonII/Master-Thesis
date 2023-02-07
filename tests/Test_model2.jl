@@ -67,7 +67,7 @@ function testODESolverTestModel2(petabModel::PEtabModel, solver, tol)
     measurementData = processMeasurements(measurementDataFile, observablesDataFile) 
     paramData = processParameters(parameterDataFile) 
     θ_indices = computeIndicesθ(paramData, measurementData, petabModel.odeSystem, experimentalConditionsFile)
-    simulationInfo = processSimulationInfo(petabModel, measurementData)
+    simulationInfo = processSimulationInfo(petabModel, measurementData, paramData)
     setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, paramData)
 
     # Parameter values where to teast accuracy. Each column is a alpha, beta, gamma and delta
@@ -206,7 +206,8 @@ end
 """
 function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
 
-    petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol)
+    petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                        reuseS=true, sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver)
 
     Random.seed!(123)
     createCube(petabProblem, 5)
@@ -363,11 +364,11 @@ loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
         testCostGradientOrHessianTestModel2(petabModel, Vern9(), 1e-15)
     end
 
-    @testset "Test model 2 : Optimizers" begin
-        testOptimizersTestModel2(petabModel, Rodas4P(), 1e-9)
-    end
-
     @testset "Test model 2 : Gradient of residuals" begin
         checkGradientResiduals(petabModel, Rodas5(), 1e-9)
+    end
+
+    @testset "Test model 2 : Optimizers" begin
+        testOptimizersTestModel2(petabModel, Rodas4P(), 1e-9)
     end
 end

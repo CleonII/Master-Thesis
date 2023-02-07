@@ -122,6 +122,7 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
                                                  changeODEProblemParameters!::Function,
                                                  solveOdeModelAllConditions!::Function, 
                                                  priorInfo::PriorInfo; 
+                                                 reuseS::Bool=false,
                                                  returnJacobian::Bool=false,
                                                  expIDSolve::Vector{Symbol} = [:all])   
 
@@ -135,7 +136,13 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
     # pre-equlibrita model). Here we pre-allocate said matrix.
     nModelStates = length(odeProblem.u0)
     nTimePointsSaveAt = sum(length(simulationInfo.timeObserved[experimentalConditionId]) for experimentalConditionId in simulationInfo.experimentalConditionId)
-    S::Matrix{Float64} = zeros(Float64, (nTimePointsSaveAt*nModelStates, length(θ_dynamic)))
+    # If the ForwardSensitivity equation approach used is autodiff the sensitivity needed by GN is already pre-allocated
+    if isempty(simulationInfo.S)
+        @assert reuseS == false
+        S::Matrix{Float64} = zeros(Float64, (nTimePointsSaveAt*nModelStates, length(θ_dynamic)))
+    else
+        S = simulationInfo.S
+    end
 
     # For Guass-Newton we compute the gradient via J*J' where J is the Jacobian of the residuals, here we pre-allocate 
     # the entire matrix.
@@ -146,7 +153,7 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
                                       θ_observable, θ_nonDynamic, S, petabModel, odeProblem,
                                       simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                       changeODEProblemParameters!, solveOdeModelAllConditions!;
-                                      expIDSolve=expIDSolve)
+                                      expIDSolve=expIDSolve, reuseS=reuseS)
 
     # Happens when at least one forward pass fails
     if all(jacobian[θ_indices.iθ_dynamic, :] .== 1e8)

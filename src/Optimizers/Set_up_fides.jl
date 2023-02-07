@@ -36,7 +36,12 @@ function setUpFides(petabProblem::PEtabODEProblem,
     end 
 
     gradient = zeros(Float64, nParam)
-    evalGradF = (pVec) -> evalAutoDiffGrad(pVec, petabProblem.computeGradientAutoDiff, gradient)
+    if autoDiffHess == :GaussNewton
+        evalGradF = (pVec) -> evalAutoDiffGrad(pVec, petabProblem.computeGradientForwardEquations, gradient)
+    else
+        evalGradF = (pVec) -> evalAutoDiffGrad(pVec, petabProblem.computeGradientAutoDiff, gradient)
+    end
+    
 
     # Runnable fides function 
     if useHessApprox == false
