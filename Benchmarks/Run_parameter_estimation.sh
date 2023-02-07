@@ -20,4 +20,12 @@ if [ $1 == "Boehm_JProteomeRes2014" ];then
     ${runJulia} ${pathBenchmarkScript} Boehm_JProteomeRes2014 $2 $3
 fi
 
+if [ $1 == "Fiedler_BMC2016" ];then
+    ${runJulia} ${pathBenchmarkScript} Fiedler_BMC2016 $2 $3
+fi
+
+if [ $1 == "Fujita_SciSignal2010" ];then
+    ${runJulia} ${pathBenchmarkScript} Fujita_SciSignal2010 $2 $3
+fi
+
 exit 0
