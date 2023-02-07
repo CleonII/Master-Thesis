@@ -63,11 +63,7 @@ function createOptimInteriorNewton(petabProblem::PEtabODEProblem;
     end
 
     x0 = zeros(Float64, nParam)
-    if hessianUse == :GaussNewton
-        df = TwiceDifferentiable(petabProblem.computeCost, petabProblem.computeGradientAutoDiff, evalHessian, x0)
-    else
-        df = TwiceDifferentiable(petabProblem.computeCost, petabProblem.computeGradientForwardEquations, evalHessian, x0)
-    end
+    df = TwiceDifferentiable(petabProblem.computeCost, petabProblem.computeGradientAutoDiff, evalHessian, x0)
     dfc = TwiceDifferentiableConstraints(lowerBounds, upperBounds)
 
     evalOptim = (p0; showTrace=false) -> begin 

@@ -81,10 +81,12 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                       algList=[:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS, :FidesAutoHess, :FidesBlockAutoHess, :FidesBFGS], 
                                       terminateSSMethod=:Norm, 
                                       solverSSRelTol::Float64=1e-8,
-                                      solverSSAbsTol::Float64=1e-10)
+                                      solverSSAbsTol::Float64=1e-10, 
+                                      reuseS::Bool=true)
 
     petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=absTol, solverRelTol=relTol, terminateSSMethod=terminateSSMethod, 
-                                        solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol)
+                                        solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol, 
+                                        reuseS=reuseS, sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver)
     θ_estNames = string.(petabProblem.θ_estNames)
 
     pathCube = joinpath(petabModel.dirJulia, "Cube_benchmark.csv")
@@ -281,11 +283,20 @@ modelRun = ARGS[1]
 nMultiStarts = parse(Int64, ARGS[2])
 optmizersTest = Symbol.(ARGS[3:end])
 
+#=
+    With Fides we can reuse the sensitivity matrix when computing the GN hessian approxmiation.
+    However, for IPNewton in Optim this does not work well. Hence we run a seperate run for 
+    IPNewton with GN in case it is one of the provided algorithms.
+=#
+iOptimIPNewtonGN = findall(x -> x == :OptimIPNewtonGN, optmizersTest)
+iNotOptimIPNewtonGN = findall(x -> x != :OptimIPNewtonGN, optmizersTest)
+
 
 if ARGS[1] == "Fiedler_BMC2016"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Fiedler_BMC2016", "Fiedler_BMC2016.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
 
 

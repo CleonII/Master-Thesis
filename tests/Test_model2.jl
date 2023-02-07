@@ -208,6 +208,8 @@ function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
 
     petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
                                         reuseS=true, sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver)
+    petabProblem2 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                        reuseS=false, sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver)                                        
 
     Random.seed!(123)
     createCube(petabProblem, 5)
@@ -236,7 +238,7 @@ function testOptimizersTestModel2(petabModel::PEtabModel, solver, tol)
     optimProbAutoHess = createOptimProb(petabProblem, IPNewton(), hessianUse=:autoDiff, 
                                         options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
                                                               successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))
-    optimProbGN = createOptimProb(petabProblem, IPNewton(), hessianUse=:GaussNewton, 
+    optimProbGN = createOptimProb(petabProblem2, IPNewton(), hessianUse=:GaussNewton, 
                                   options=Optim.Options(iterations = 1000, show_trace = false, allow_f_increases=true, 
                                                          successive_f_tol = 3, f_tol=1e-8, g_tol=1e-6, x_tol=0.0))                                                              
     optimProbBFGS = createOptimProb(petabProblem, BFGS())
