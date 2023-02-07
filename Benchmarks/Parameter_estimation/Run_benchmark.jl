@@ -164,6 +164,7 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
         petabProblem.computeHessianBlock(_hessian, θ_tmp)
     end
     if :FidesGN in algList || :OptimIPNewtonGN in algList 
+        petabProblem.computeGradientForwardEquations(_gradient, θ_tmp)
         petabProblem.computeHessianGN(_hessian, θ_tmp)
     end
 
@@ -304,6 +305,7 @@ if ARGS[1] == "Boehm_JProteomeRes2014"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Boehm_JProteomeRes2014", "Boehm_JProteomeRes2014.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)     
     benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
 
 
@@ -345,7 +347,8 @@ end
 if ARGS[1] == "Fujita_SciSignal2010"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Fujita_SciSignal2010", "Fujita_SciSignal2010.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest)
+    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest) 
+    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
 
 
