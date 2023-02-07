@@ -1,5 +1,6 @@
 using ModelingToolkit 
-using DifferentialEquations
+using OrdinaryDiffEq
+using DiffEqCallbacks
 using DataFrames
 using CSV 
 using ForwardDiff
@@ -155,17 +156,26 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
     θ_tmp = cube[1, :]
     _gradient = zeros(length(θ_tmp))
     _hessian = zeros(length(θ_tmp), length(θ_tmp))
+    print("Precompiling cost ... ")
     _cost = petabProblem.computeCost(θ_tmp)
+    print("done \n")
+    print("Precompiling gradient ... ")
     petabProblem.computeGradientAutoDiff(_gradient, θ_tmp)
+    print("done \n")
+    GC.gc(); GC.gc(); GC.gc()
     if :IpoptAutoHess in algList || :OptimIPNewtonAutoHess in algList || :FidesAutoHess in algList
+        print("Precompiling hessian ... ")
         petabProblem.computeHessian(_hessian, θ_tmp)
+        print("done \n")
     end
     if :IpoptBlockAutoDiff in algList || :OptimIPNewtonBlockAutoDiff in algList || :FidesBlockAutoDiff in algList
         petabProblem.computeHessianBlock(_hessian, θ_tmp)
     end
     if :FidesGN in algList || :OptimIPNewtonGN in algList 
+        print("Precompiling Gauss Newton ... ")
         petabProblem.computeGradientForwardEquations(_gradient, θ_tmp)
         petabProblem.computeHessianGN(_hessian, θ_tmp)
+        print("done \n")
     end
 
     for i in 1:nStartGuess
@@ -304,7 +314,7 @@ end
 if ARGS[1] == "Boehm_JProteomeRes2014"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Boehm_JProteomeRes2014", "Boehm_JProteomeRes2014.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)     
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
     benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
 
@@ -347,7 +357,7 @@ end
 if ARGS[1] == "Fujita_SciSignal2010"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Fujita_SciSignal2010", "Fujita_SciSignal2010.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest) 
+    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
     benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
 
