@@ -191,32 +191,14 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
     # zero. Overall, the only workflow that changes below is that we compute du outside of the adjoint interface 
     # and use sol[:] as we no longer can interpolate from the forward solution.
     onlyObsAtZero::Bool = false
+    du = zeros(Float64, length(sol.prob.u0))
+    dp = zeros(Float64, length(sol.prob.p))'
     if !(length(timeObserved) == 1 && timeObserved[1] == 0.0)
 
-        # adjoint_sensitivities does not return a retcode. Hence upon integration error only a warning is thrown. To capture 
-        # this stderr is redirected to a read only stream. Thus upon warning an error is triggered, upon which we return 
-        # false to signify that we could not compute the gradient.
-        stderrOld = stderr
-        redirect_stderr(open(touch(tempname()), "r"))
-        local du, dp
-            try
-            du, dp = adjoint_sensitivities(sol, 
-                                           odeSolver,
-                                           dgdp_discrete=nothing,
-                                           dgdu_discrete=compute∂G∂u, 
-                                           callback=callback,
-                                           t=timeObserved, 
-                                           sensealg=sensealg, 
-                                           abstol=solverAbsTol, 
-                                           reltol=solverRelTol)
-            catch
-                redirect_stderr(stderrOld)
-                return false
-            end
-        redirect_stderr(stderrOld)
+        status = __adjoint_sensitivities!(du, dp, sol, sensealg, timeObserved, odeSolver, 
+                                          solverAbsTol, solverRelTol, callback, compute∂G∂u)
+        status == false && return false
     else
-        du = zeros(Float64, length(sol.prob.u0))
-        dp = zeros(Float64, length(sol.prob.p))'
         compute∂G∂u(du, sol[1], sol.prob.p, 0.0, 1)
         onlyObsAtZero = true
     end
@@ -254,4 +236,165 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
     adjustGradientTransformedParameters!(gradient, _gradient[:], nothing, θ_dynamic, θ_indices, 
                                          simulationConditionId, adjoint=true)                           
     return true                                         
+end
+
+
+# In order to obtain the ret-codes when solving the adjoint ODE system we must, as here copy to 99% from SciMLSensitivity 
+# GitHub repo to access the actual solve-call to the ODEAdjointProblem 
+function __adjoint_sensitivities!(_du::AbstractVector, 
+                                  _dp::Adjoint,
+                                  sol::ODESolution, 
+                                  sensealg::InterpolatingAdjoint, 
+                                  t::Vector{Float64},
+                                  odeSolver::SciMLAlgorithm, 
+                                  absTol::Float64, 
+                                  relTol::Float64,
+                                  callback::SciMLBase.DECallback, 
+                                  compute_∂G∂u)::Bool
+
+    rcb = nothing
+    adjProb, rcb = ODEAdjointProblem(sol, sensealg, odeSolver, t,
+                                     compute_∂G∂u, nothing, nothing, nothing, nothing, Val(true);
+                                     abstol=absTol, reltol=relTol, callback=callback)
+
+    tstops = SciMLSensitivity.ischeckpointing(sensealg, sol) ? checkpoints : similar(sol.t, 0)
+    adj_sol = solve(adjProb, odeSolver;
+                    save_everystep = false, save_start = false, saveat = eltype(sol[1])[],
+                    abstol=absTol, reltol=relTol, tstops=tstops)
+    if adj_sol.retcode != :Success                    
+        _du .= 0.0
+        _dp .= 0.0
+        return false
+    end
+
+    p = sol.prob.p
+    l = p === nothing || p === DiffEqBase.NullParameters() ? 0 : length(sol.prob.p)
+    du0 = adj_sol[end][1:length(sol.prob.u0)]
+                
+    if eltype(sol.prob.p) <: real(eltype(adj_sol[end]))
+        dp = real.(adj_sol[end][(1:l) .+ length(sol.prob.u0)])'
+    elseif p === nothing || p === DiffEqBase.NullParameters()
+        dp = nothing
+    else
+        dp = adj_sol[end][(1:l) .+ length(sol.prob.u0)]'
+    end                
+
+    if rcb !== nothing && !isempty(rcb.Δλas)
+        S = adj_prob.f.f
+        iλ = similar(rcb.λ, length(first(sol.u)))
+        out = zero(dp')
+        yy = similar(rcb.y)
+        for (Δλa, tt) in rcb.Δλas
+            iλ .= zero(eltype(iλ))
+            @unpack algevar_idxs = rcb.diffcache
+            iλ[algevar_idxs] .= Δλa
+            sol(yy, tt)
+            vecjacobian!(nothing, yy, iλ, sol.prob.p, tt, S, dgrad = out)
+            dp .+= out'
+        end
+    end
+
+    _du .= du0
+    _dp .= dp
+    return true
+end
+function __adjoint_sensitivities!(_du::AbstractVector, 
+                                  _dp::Adjoint,
+                                  sol::ODESolution, 
+                                  sensealg::QuadratureAdjoint, 
+                                  t::Vector{Float64},
+                                  odeSolver::SciMLAlgorithm, 
+                                  absTol::Float64, 
+                                  relTol::Float64,
+                                  callback::SciMLBase.DECallback, 
+                                  compute_∂G∂u)::Bool
+
+    adj_prob, rcb = ODEAdjointProblem(sol, sensealg, odeSolver, t, compute_∂G∂u, nothing,
+                                      nothing, nothing, nothing, Val(true);
+                                      callback)
+    adj_sol = solve(adj_prob, odeSolver; abstol = absTol, reltol = relTol,
+                    save_everystep = true, save_start = true)
+
+    if adj_sol.retcode != :Success                    
+        _du .= 0.0
+        _dp .= 0.0
+        return false
+    end                    
+
+    p = sol.prob.p
+    if p === nothing || p === DiffEqBase.NullParameters()
+        _du .= adj_sol[end]
+        return true
+    else
+        integrand = AdjointSensitivityIntegrand(sol, adj_sol, sensealg, nothing)
+        if t === nothing
+            res, err = SciMLSensitivity.quadgk(integrand, sol.prob.tspan[1], sol.prob.tspan[2],
+                              atol = absTol, rtol = relTol)
+        else
+            res = zero(integrand.p)'
+
+            if callback !== nothing
+                cur_time = length(t)
+                dλ = similar(integrand.λ)
+                dλ .*= false
+                dgrad = similar(res)
+                dgrad .*= false
+            end
+
+            # correction for end interval.
+            if t[end] != sol.prob.tspan[2] && sol.retcode !== :Terminated
+                res .+= SciMLSensitivity.quadgk(integrand, t[end], sol.prob.tspan[end],
+                               atol = absTol, rtol = relTol)[1]
+            end
+
+            if sol.retcode === :Terminated
+                integrand = update_integrand_and_dgrad(res, sensealg, callback, integrand,
+                                                       adj_prob, sol, compute_∂G∂u,
+                                                       nothing, dλ, dgrad, t[end],
+                                                       cur_time)
+            end
+
+            for i in (length(t) - 1):-1:1
+                if SciMLSensitivity.ArrayInterfaceCore.ismutable(res)
+                    res .+= SciMLSensitivity.quadgk(integrand, t[i], t[i + 1],
+                                   atol = absTol, rtol = relTol)[1]
+                else
+                    res += SciMLSensitivity.quadgk(integrand, t[i], t[i + 1],
+                                  atol = absTol, rtol = relTol)[1]
+                end
+                if t[i] == t[i + 1]
+                    integrand = SciMLSensitivity.update_integrand_and_dgrad(res, sensealg, callback,
+                                                                            integrand,
+                                                                            adj_prob, sol, compute_∂G∂u,
+                                                                            nothing, dλ, dgrad, t[i],
+                                                                            cur_time)
+                end
+                (callback !== nothing || dgdp_discrete !== nothing) &&
+                    (cur_time -= one(cur_time))
+            end
+            # correction for start interval
+            if t[1] != sol.prob.tspan[1]
+                res .+= SciMLSensitivity.quadgk(integrand, sol.prob.tspan[1], t[1],
+                               atol = absTol, rtol = relTol)[1]
+            end
+        end
+    end
+
+    if rcb !== nothing && !isempty(rcb.Δλas)
+        iλ = zero(rcb.λ)
+        out = zero(res')
+        yy = similar(rcb.y)
+        for (Δλa, tt) in rcb.Δλas
+            @unpack algevar_idxs = rcb.diffcache
+            iλ[algevar_idxs] .= Δλa
+            sol(yy, tt)
+            vec_pjac!(out, iλ, yy, tt, integrand)
+            res .+= out'
+            iλ .= zero(eltype(iλ))
+        end
+    end
+
+    _du .= adj_sol[end]
+    _dp .= res
+    return true
 end
