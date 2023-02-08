@@ -315,6 +315,9 @@ if ARGS[1] == "Fix_parameters"
         exit(1)
     end
 
+    nParamFix = parse(Int64, ARGS[3])
+    println("Number of parameter fixed = ", nParamFix)
+
     dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
     pathSave = joinpath(dirSave, "Fix_parameters.csv")
     if !isdir(dirSave)
@@ -332,21 +335,18 @@ if ARGS[1] == "Fix_parameters"
         absTol, relTol = 1e-8, 1e-8
         nDynamicParameters = length(getNominalODEValues(petabModel))
 
-        for nParamFix in 1:(nDynamicParameters-1)
-            for j in 1:10
-                petabModelFewerParameters = getPEtabModelNparamFixed(petabModel, nParamFix)
+        for j in 1:5
+            petabModelFewerParameters = getPEtabModelNparamFixed(petabModel, nParamFix)
 
-                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
-                                  checkGradient=true, nParamFixed=nParamFix, nRepeat=5)
-                benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
-                                  checkGradient=true, nParamFixed=nParamFix, nRepeat=5, chunkSize=1)      
+            benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
+                              checkGradient=true, nParamFixed=nParamFix, nRepeat=5)
+            benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
+                              checkGradient=true, nParamFixed=nParamFix, nRepeat=5, chunkSize=1)      
                                   
-                if isdir(petabModelFewerParameters.dirModel) 
-                    rm(petabModelFewerParameters.dirModel, recursive=true)
-                end
+            if isdir(petabModelFewerParameters.dirModel) 
+                rm(petabModelFewerParameters.dirModel, recursive=true)
             end
         end
-
     end
 end
 
