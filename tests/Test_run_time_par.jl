@@ -1,5 +1,6 @@
 #= 
-    Using the Bachman and Fideler model this file tests that our parallellisation scales well. 
+    Using the Bachman and Brännmark model this file tests that our parallellisation scales well, 
+    and that we compute accurate values.
 
     Briefly, using Distributed.jl we parallellise over different experimental conditions.
     The Bachman models has 36 different experimental conditions (we solve the ODE 36 times). 
@@ -7,8 +8,10 @@
     especially for the gradient, close to the ideal reduction of factor 2 when using 
     two processes. 
     Similarly, the Brännmark model has 8 different experimental conditions, and we can further 
-    compute the hessian and an associated hessian approximation.
+    compute the hessian and an associated hessian approximation and check corresponding accuracy 
+    in for each computation.
 =#
+
 
 using ModelingToolkit 
 using DifferentialEquations
@@ -22,19 +25,20 @@ using LinearAlgebra
 using Distributions
 using Printf
 using SciMLSensitivity
-using BenchmarkTools
 using Zygote
-using Distributed
+using Symbolics
+using Sundials
+using FiniteDifferences
+using BenchmarkTools
+using YAML
+using Test
 
 
 # Relevant PeTab structs for compuations 
 include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 
-# Functions for solving ODE system 
-include(joinpath(pwd(), "src", "Solve_ODE_model", "Solve_ode_model.jl"))
-
 # PeTab importer to get cost, grad etc 
-include(joinpath(pwd(), "src", "PeTab_importer", "Create_cost_grad_hessian.jl"))
+include(joinpath(pwd(), "src", "Create_PEtab_model.jl"))
 
 # HyperCube sampling 
 include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
@@ -43,218 +47,103 @@ include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
 
-function testRunBenchmark(peTabModel::PeTabModel, solver, tol::Float64, nProcs::Integer; verbose=true, computeH::Bool=false)::Bool
+function testAccuracyDistributed(petabModel::PEtabModel, 
+                                 solver, 
+                                 tol::Float64;
+                                 solverSSRelTol=1e-10, 
+                                 solverSSAbsTol=1e-10,
+                                 sensealgSS=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)),
+                                 testHessian::Bool=false)
 
-    peTabOptSeq = setUpCostGradHess(peTabModel, solver, tol, 
-                                    adjSolver=solver, adjSensealg=QuadratureAdjoint(autojacvec=false, autodiff=false), adjTol=tol,
-                                    solverForward=solver, sensealgForward=:AutoDiffForward)
-    peTabOptPar = setUpCostGradHess(peTabModel, solver, tol, nProcs=nProcs, 
-                                    adjSolver=solver, adjSensealg=QuadratureAdjoint(autojacvec=false, autodiff=false), adjTol=tol,
-                                    solverForward=solver, sensealgForward=:AutoDiffForward)
+    println("Model = ", petabModel.modelName)                                 
 
-    passTest = true
+    petabProblemSeq = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                           sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver, 
+                                           odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
+                                           sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), 
+                                           sensealgAdjointSS=sensealgSS,
+                                           solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol, numberOfprocesses=1)
 
-    # Compute everything first for the sake of pre-compilation to get fair benchmark
-    costSeq = peTabOptSeq.evalF(peTabOptSeq.paramVecTransformed)
-    costPar = peTabOptPar.evalF(peTabOptSeq.paramVecTransformed)
-    # Check accuracy of parallell computation before moving on
-    if abs(costSeq - costPar) > 1e-5
-        println("Does not pass test on accurately computing cost.")
-        @printf("Cost sequential = %.e3\n", costSeq)
-        @printf("Cost with %d processes = %.e3\n",  costPar)
-        return false
-    elseif verbose
-        @printf("abs-diff cost = %.e3\n",  abs(costSeq - costPar))
-    end
+    petabProblemPar = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                           sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver, 
+                                           odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
+                                           sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), 
+                                           sensealgAdjointSS=sensealgSS,
+                                           solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol, numberOfprocesses=2)       
 
-    grad1, grad2, = zeros(length(peTabOptSeq.paramVecTransformed)), zeros(length(peTabOptSeq.paramVecTransformed))
-    peTabOptSeq.evalGradF(grad1, peTabOptSeq.paramVecTransformed)
-    peTabOptPar.evalGradF(grad2, peTabOptSeq.paramVecTransformed)
-    if sum((grad1 - grad2).^2) > 1e-5
-        println("Does not pass test on accurately computing gradient using forward mode AD")
-        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
-        return false
-    elseif verbose
-        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
-    end
-
-    peTabOptSeq.evalGradFAdjoint(grad1, peTabOptSeq.paramVecTransformed)
-    peTabOptPar.evalGradFAdjoint(grad2, peTabOptSeq.paramVecTransformed)
-    if sum((grad1 - grad2).^2) > 1e-5
-        println("Does not pass test on accurately computing gradient using adjoint")
-        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
-        return false
-    elseif verbose
-        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
-    end
-
-    peTabOptSeq.evalGradFForwardEq(grad1, peTabOptSeq.paramVecTransformed)
-    peTabOptPar.evalGradFForwardEq(grad2, peTabOptSeq.paramVecTransformed)
-    if sum((grad1 - grad2).^2) > 1e-5
-        println("Does not pass test on accurately computing gradient using forward sensitivity equations")
-        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
-        return false
-    elseif verbose
-        @printf("sqDiffGrad = %.e3\n", sum((grad1 - grad2).^2))
-    end
-
-    if computeH == true
-        dimP = length(peTabOptSeq.paramVecTransformed)
-        hess1, hess2 = zeros(dimP, dimP), zeros(dimP, dimP)
-
-        peTabOptSeq.evalHess(hess1, peTabOptSeq.paramVecTransformed)
-        peTabOptPar.evalHess(hess2, peTabOptSeq.paramVecTransformed)
-        if sum((hess1 - hess2).^2) > 1e-5
-            println("Does not pass test on accurately computing hessian")
-            @printf("sqDiffHess = %.e3\n", sum((hess1 - hess2).^2))
-            return false
-        elseif verbose
-            @printf("sqDiffHess = %.e3\n", sum((hess1 - hess2).^2))
-        end
-           
-        hess1, hess2 = zeros(dimP, dimP), zeros(dimP, dimP)
-        peTabOptSeq.evalHessApprox(hess1, peTabOptSeq.paramVecTransformed)
-        peTabOptPar.evalHessApprox(hess2, peTabOptSeq.paramVecTransformed)
-        if sum((hess1 - hess2).^2) > 1e-5
-            println("Does not pass test on accurately computing hessian")
-            @printf("sqDiffHessApprox = %.e3\n", sum((hess1 - hess2).^2))
-            return false
-        elseif verbose
-            @printf("sqDiffHessApprox = %.e3\n", sum((hess1 - hess2).^2))
-        end
-    end
-
-    b1, b2 = 0.0, 0.0
-    for i in 1:5
-        b1Tmp = @elapsed peTabOptSeq.evalF(peTabOptSeq.paramVecTransformed)
-        sleep(0.1)
-        b2Tmp = @elapsed peTabOptPar.evalF(peTabOptSeq.paramVecTransformed)
-        b1 += b1Tmp
-        b2 += b2Tmp
-        sleep(0.1)
-    end
-    if b1 < b2
-        println("Does not pass test. On cost for model ", peTabModel.modelName, " the run time 
-                 using $nProcs processes is slower than using a single process")
-        @printf("Run time single proces = %.2e s", b1 / 5)
-        @printf("Run time %d processes = %.2e s", nProcs, b2 / 5)
-        return false
-    elseif verbose
-        @printf("For cost\n")
-        @printf("Run time single proces = %.2e s\n", b1 / 5)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
-        @printf("Ratio = %.2f\n\n", b2 / b1)
-    end
+    θ_est = petabProblemSeq.θ_nominalT               
+    costSeq = petabProblemSeq.computeCost(θ_est)                                                 
+    costPar = petabProblemPar.computeCost(θ_est)    
+    @test costSeq ≈ costPar atol=1e-8
     
-    b1, b2 = 0.0, 0.0
-    for i in 1:5
-        b1Tmp = @elapsed peTabOptSeq.evalGradF(grad1, peTabOptSeq.paramVecTransformed)
-        sleep(0.1)
-        b2Tmp = @elapsed peTabOptPar.evalGradF(grad2, peTabOptSeq.paramVecTransformed)
-        b1 += b1Tmp
-        b2 += b2Tmp
-        sleep(0.1)
-    end
-    if b1 < b2
-        println("Does not pass test. On gradient for model forward autodiff ", peTabModel.modelName, " the run time 
-                 using $nProcs processes is slower than using a single process")
-        @printf("Run time single proces = %.2e s\n", b1 / 5)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
-        return false
-    elseif verbose
-        @printf("For gradient forward autodiff\n")
-        @printf("Run time single proces = %.2e s\n", b1 / 5)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
-        @printf("Ratio = %.2f\n\n", b2 / b1)
-    end
+    gradientSeqAuto, gradientParAuto = zeros(length(θ_est)), zeros(length(θ_est))
+    petabProblemSeq.computeGradientAutoDiff(gradientSeqAuto, θ_est)          
+    petabProblemPar.computeGradientAutoDiff(gradientParAuto, θ_est)          
+    normDiffAuto = norm(gradientSeqAuto - gradientParAuto)
+    @test normDiffAuto ≤ 1e-8
 
-    b1, b2 = 0.0, 0.0
-    for i in 1:5
-        b1Tmp = @elapsed peTabOptSeq.evalGradFAdjoint(grad1, peTabOptSeq.paramVecTransformed)
+    # To check that the implementation is reasonable the run time is also tested for the gradient 
+    bGradSeq = 0.0 
+    bGradPar = 0.0 
+    for i in 1:20
+        bGradSeq += @elapsed petabProblemSeq.computeGradientAutoDiff(gradientSeqAuto, θ_est)          
         sleep(0.1)
-        b2Tmp = @elapsed peTabOptPar.evalGradFAdjoint(grad2, peTabOptSeq.paramVecTransformed)
-        b1 += b1Tmp
-        b2 += b2Tmp
+        bGradPar += @elapsed petabProblemPar.computeGradientAutoDiff(gradientParAuto, θ_est)          
         sleep(0.1)
     end
-    if b1 < b2
-        println("Does not pass test. On gradient for model adjoint gradient ", peTabModel.modelName, " the run time 
-                 using $nProcs processes is slower than using a single process")
-        @printf("Run time single proces = %.2e s\n", b1 / 5)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
-        return false
-    elseif verbose
-        @printf("For gradient adjoint\n")
-        @printf("Run time single proces = %.2e s\n", b1 / 5)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
-        @printf("Ratio = %.2f\n\n", b2 / b1)
-    end
+    @test bGradPar ≤ bGradSeq * 0.9
+    @printf("Ratio run time = %.2f\n", bGradPar / bGradSeq)                                           
 
-    b1, b2 = 0.0, 0.0
-    for i in 1:5
-        b1Tmp = @elapsed peTabOptSeq.evalGradFForwardEq(grad1, peTabOptSeq.paramVecTransformed)
-        sleep(0.1)
-        b2Tmp = @elapsed peTabOptPar.evalGradFForwardEq(grad2, peTabOptSeq.paramVecTransformed)
-        b1 += b1Tmp
-        b2 += b2Tmp
-        sleep(0.1)
-    end
-    if b1 < b2
-        println("Does not pass test. On gradient for model forward sense-eq gradient ", peTabModel.modelName, " the run time 
-                 using $nProcs processes is slower than using a single process")
-        @printf("Run time single proces = %.2e s\n", b1 / 5)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
-        return false
-    elseif verbose
-        @printf("For gradient forward sense-eq\n")
-        @printf("Run time single proces = %.2e s\n", b1 / 5)
-        @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
-        @printf("Ratio = %.2f\n\n", b2 / b1)
-    end
-    
-    if computeH == true
-        b1, b2 = 0.0, 0.0
-        for i in 1:5
-            b1Tmp = @elapsed peTabOptSeq.evalHessApprox(hess1, peTabOptSeq.paramVecTransformed)
-            sleep(0.1)
-            b2Tmp = @elapsed peTabOptSeq.evalHessApprox(hess2, peTabOptSeq.paramVecTransformed)
-            b1 += b1Tmp
-            b2 += b2Tmp
-            sleep(0.1)
-        end
-        if b1 < b2
-            println("Does not pass test. On hessian for model ", peTabModel.modelName, " the run time 
-                    using $nProcs processes is slower than using a single process")
-            @printf("Run time single proces = %.2e s\n", b1 / 5)
-            @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
-            return false
-        elseif verbose
-            @printf("For hessian block approximation\n")
-            @printf("Run time single proces = %.2e s\n", b1 / 5)
-            @printf("Run time %d processes = %.2e s\n", nProcs, b2 / 5)
-            @printf("Ratio = %.2f\n\n", b2 / b1)
-        end
-    end
+    gradientSeqAdjoint, gradientParAdjoint = zeros(length(θ_est)), zeros(length(θ_est))
+    petabProblemSeq.computeGradientAdjoint(gradientSeqAdjoint, θ_est)          
+    petabProblemPar.computeGradientAdjoint(gradientParAdjoint, θ_est)          
+    normDiffAdjoint = norm(gradientSeqAdjoint - gradientParAdjoint)
+    @test normDiffAdjoint ≤ 1e-8
 
-    return passTest
+    gradientSeqForward, gradientParForward = zeros(length(θ_est)), zeros(length(θ_est))
+    petabProblemSeq.computeGradientForwardEquations(gradientSeqForward, θ_est)          
+    petabProblemPar.computeGradientForwardEquations(gradientParForward, θ_est)          
+    normDiffForward = norm(gradientSeqForward - gradientParForward)
+    @test normDiffForward ≤ 1e-8
+
+    if testHessian == true
+        hessianAutoDiffSeq, hessianAutoDiffPar = zeros(length(θ_est), length(θ_est)), zeros(length(θ_est), length(θ_est))
+        petabProblemSeq.computeHessian(hessianAutoDiffSeq, θ_est)          
+        petabProblemPar.computeHessian(hessianAutoDiffPar, θ_est)          
+        normDiffHessian = norm(hessianAutoDiffSeq - hessianAutoDiffPar)
+        @test normDiffHessian ≤ 1e-8
+
+        hessianBlockDiffSeq, hessianBlockDiffPar = zeros(length(θ_est), length(θ_est)), zeros(length(θ_est), length(θ_est))
+        petabProblemSeq.computeHessianGN(hessianBlockDiffSeq, θ_est)          
+        petabProblemPar.computeHessianGN(hessianBlockDiffPar, θ_est)          
+        normDiffHessianBlock = norm(hessianBlockDiffSeq - hessianBlockDiffPar)
+        @test normDiffHessianBlock ≤ 1e-8
+
+        hessianGNSeq, hessianGNPar = zeros(length(θ_est), length(θ_est)), zeros(length(θ_est), length(θ_est))
+        petabProblemSeq.computeHessianGN(hessianGNSeq, θ_est)          
+        petabProblemPar.computeHessianGN(hessianGNPar, θ_est)          
+        normDiffGNHessian = norm(hessianGNSeq - hessianGNPar)
+        @test normDiffGNHessian ≤ 1e-8
+    end
 end
 
 
-peTabModel = readPEtabModel("Bachmann_MSB2011", pwd() * "/tests/Bachman/")
-removeAllProcs()
-addprocs(1, exeflags="--project=.")
-passTest = testRunBenchmark(peTabModel, Rodas5(), 1e-9, 2)
-if passTest == false
-    println("Does not pass parallellisation test for Bachman model")
-end
 
+@testset verbose = true "Test distributed" begin
 
-dirModel = pwd() * "/Intermediate/PeTab_models/model_Brannmark_JBC2010/"
-peTabModel = readPEtabModel("model_Brannmark_JBC2010", dirModel)
-removeAllProcs()
-solver, tol = Rodas5(), 1e-9
-addprocs(1, exeflags="--project=.")
-passTest = testRunBenchmark(peTabModel, Rodas5(), 1e-9, 2, computeH=true)
-if passTest == false
-    println("Does not pass parallellisation test for Brännmark model")
+    removeAllProcs()
+    pathYML = joinpath(@__DIR__, "..", "Intermediate", "PeTab_models", "model_Bachmann_MSB2011", "Bachmann_MSB2011.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=false, forceBuildJuliaFiles=true)
+    addprocs(1, exeflags="--project=.")
+    @testset "Bachman : Accuracy and run-time distributed" begin
+        testAccuracyDistributed(petabModel, Rodas5(), 1e-8)
+    end
+
+    removeAllProcs()
+    pathYML = joinpath(@__DIR__, "..", "Intermediate", "PeTab_models", "model_Brannmark_JBC2010", "Brannmark_JBC2010.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=false, forceBuildJuliaFiles=true)
+    addprocs(1, exeflags="--project=.")
+    @testset "Brännmark : Accuracy and run-time distributed" begin
+        testAccuracyDistributed(petabModel, Rodas5(), 1e-8)
+    end
 end

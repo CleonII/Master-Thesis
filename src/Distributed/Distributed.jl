@@ -1,21 +1,24 @@
 using Distributed
 
 
-function setUpPEtabOptDistributed(petabModel::PEtabModel,
-                                  solver::SciMLAlgorithm, 
-                                  tol::Float64,
-                                  adjSolver::SciMLAlgorithm,
-                                  adjSensealg::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
-                                  adjSensealgSS::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
-                                  adjTol::Float64,
-                                  forwardSolver::SciMLAlgorithm, 
-                                  sensealgForward::Union{Symbol, SciMLSensitivity.AbstractForwardSensitivityAlgorithm},
-                                  parameterData::ParametersInfo,
-                                  measurementInfo::MeasurementsInfo, 
-                                  simulationInfo::SimulationInfo, 
-                                  paramEstIndices::ParameterIndices, 
-                                  pirorInfo::PriorInfo,
-                                  odeProb::ODEProblem)
+function setUpProcesses(petabModel::PEtabModel,
+                        odeSolver::SciMLAlgorithm, 
+                        solverAbsTol::Float64, 
+                        solverRelTol::Float64,
+                        odeSolverAdjoint::SciMLAlgorithm,
+                        sensealgAdjoint::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
+                        sensealgAdjointSS::SciMLSensitivity.AbstractAdjointSensitivityAlgorithm,
+                        solverAdjointAbsTol::Float64,
+                        solverAdjointRelTol::Float64,
+                        odeSolverForwardEquations::SciMLAlgorithm, 
+                        sensealgForwardEquations::Union{Symbol, SciMLSensitivity.AbstractForwardSensitivityAlgorithm},
+                        parameterInfo::ParametersInfo,
+                        measurementInfo::MeasurementsInfo, 
+                        simulationInfo::SimulationInfo, 
+                        θ_indices::ParameterIndices, 
+                        pirorInfo::PriorInfo,
+                        odeProblem::ODEProblem, 
+                        chunkSize::Union{Int64, Nothing})                              
 
     println("Setting up cost, grad, and hessian to be computed on several processes using Distributed.jl")
 
@@ -25,11 +28,12 @@ function setUpPEtabOptDistributed(petabModel::PEtabModel,
     loadYmodSdU0(petabModel)
     
     nProcs = nprocs()                                  
-    if nProcs > length(simulationInfo.conditionIdSol)
+    experimentalConditionId = unique(simulationInfo.experimentalConditionId)
+    if nProcs > length(experimentalConditionId)
         println("Warning - There are less experimental conditions than processes. Hence some processes will run empty")
         println("Number of processes = $nProcs, number of experimental conditions = ", length(simulationInfo.conditionIdSol))
     end
-    idsEachProcess = collect(Iterators.partition(simulationInfo.conditionIdSol, Int(round(length(simulationInfo.conditionIdSol) /nProcs))))
+    idsEachProcess = collect(Iterators.partition(experimentalConditionId, Int(round(length(experimentalConditionId) /nProcs))))
 
     # Divide the experimental conditions between the number of processes and set up channels for 
     # communicating with each process
@@ -38,27 +42,27 @@ function setUpPEtabOptDistributed(petabModel::PEtabModel,
 
     # Send ODE-problem, and simultaneously launch the processes 
     for i in 1:nProcs
-        @async put!(jobs[i], tuple(deepcopy(odeProb))) 
+        @async put!(jobs[i], tuple(deepcopy(odeProblem))) 
         remote_do(runProcess, procs()[i], jobs[i], results[i])
         status = take!(results[i])[1]
         if status != :Done
-            println("Error : Could not send ODE problem to proces ", procs()[i])
+            println("Error : Could not send ODEProblem to proces ", procs()[i])
         end
     end
 
     # Send required PEtab structs to processes 
     for i in 1:nProcs
         sendPEtabStruct(petabModel, jobs[i], results[i], "PEtab model", procs()[i])
-        sendPEtabStruct(parameterData, jobs[i], results[i], "Parameter data", procs()[i])
+        sendPEtabStruct(parameterInfo, jobs[i], results[i], "Parameter data", procs()[i])
         sendPEtabStruct(measurementInfo, jobs[i], results[i], "Measurement data", procs()[i])
         sendPEtabStruct(simulationInfo, jobs[i], results[i], "Simulation info", procs()[i])
-        sendPEtabStruct(paramEstIndices, jobs[i], results[i], "Parameter indices", procs()[i])
+        sendPEtabStruct(θ_indices, jobs[i], results[i], "Parameter indices", procs()[i])
         sendPEtabStruct(pirorInfo, jobs[i], results[i], "Prior info", procs()[i])
     end
 
     # Send solver and solver tolerance 
     for i in 1:nProcs
-        @async put!(jobs[i], tuple(solver, tol)) 
+        @async put!(jobs[i], tuple(odeSolver, solverAbsTol, solverRelTol)) 
         status = take!(results[i])[1]
         if status != :Done
             println("Error : Could not send solver and tolerance problem to proces ", procs()[i])
@@ -67,16 +71,16 @@ function setUpPEtabOptDistributed(petabModel::PEtabModel,
 
     # Send adjoint solver, adjont tolerance and adjoint solver tolerance
     for i in 1:nProcs
-        @async put!(jobs[i], tuple(adjSolver, adjTol, adjSensealg, adjSensealgSS)) 
+        @async put!(jobs[i], tuple(odeSolverAdjoint, solverAdjointAbsTol, solverAdjointRelTol, sensealgAdjoint, sensealgAdjointSS)) 
         status = take!(results[i])[1]
         if status != :Done
-            println("Error : Could not send adjSolver, adjTolerance and adjSensealg to proces ", procs()[i])
+            println("Error : Could not send adjoint solver info to process ", procs()[i])
         end
     end
 
     # Send forward sensitivity equations solver and associated 
     for i in 1:nProcs
-        @async put!(jobs[i], tuple(forwardSolver, sensealgForward)) 
+        @async put!(jobs[i], tuple(odeSolverForwardEquations, sensealgForwardEquations, chunkSize)) 
         status = take!(results[i])[1]
         if status != :Done
             println("Error : Could not send adjSolver, adjTolerance and adjSensealg to proces ", procs()[i])
@@ -92,92 +96,7 @@ function setUpPEtabOptDistributed(petabModel::PEtabModel,
         end
     end
 
-    evalF = (pVec) ->           begin
-                                    costTot::Float64 = 0.0
-                                    @inbounds for i in nProcs:-1:1
-                                        @async put!(jobs[i], tuple(pVec, :Cost)) 
-                                    end
-                                    @inbounds for i in nProcs:-1:1
-                                        status::Symbol, cost::Float64 = take!(results[i])
-                                        if status != :Done
-                                            println("Error : Could not send ODE problem to proces ", procs()[i])
-                                        end
-                                        costTot += cost
-                                    end
-                                    return costTot
-                                end
-
-    evalGradF = (grad, pVec) -> begin
-                                    grad .= 0.0
-                                    @inbounds for i in nProcs:-1:1
-                                        @async put!(jobs[i], tuple(pVec, :Gradient)) 
-                                    end
-                                    @inbounds for i in nProcs:-1:1
-                                        status::Symbol, gradPart::Vector{Float64} = take!(results[i])
-                                        if status != :Done
-                                            println("Error : Could not send ODE problem to proces ", procs()[i])
-                                        end
-                                        grad .+= gradPart
-                                    end
-                                end
-
-    evalGradFAdjoint = (grad, pVec) -> begin
-                                    grad .= 0.0
-                                    @inbounds for i in nProcs:-1:1
-                                        @async put!(jobs[i], tuple(pVec, :AdjGradient)) 
-                                    end
-                                    @inbounds for i in nProcs:-1:1
-                                        status::Symbol, gradPart::Vector{Float64} = take!(results[i])
-                                        if status != :Done
-                                            println("Error : Could not send ODE problem to proces ", procs()[i])
-                                        end
-                                        grad .+= gradPart
-                                    end
-                                end       
-                                
-    evalGradFForwardEq = (grad, pVec) -> begin
-                                    grad .= 0.0
-                                    @inbounds for i in nProcs:-1:1
-                                        @async put!(jobs[i], tuple(pVec, :ForwardSenseEqGradient)) 
-                                    end
-                                    @inbounds for i in nProcs:-1:1
-                                        status::Symbol, gradPart::Vector{Float64} = take!(results[i])
-                                        if status != :Done
-                                            println("Error : Could not send ODE problem to proces ", procs()[i])
-                                        end
-                                        grad .+= gradPart
-                                    end
-                                end                                           
-
-    evalHessA = (hess, pVec) -> begin
-                                    hess .= 0.0
-                                    @inbounds for i in nProcs:-1:1
-                                        @async put!(jobs[i], tuple(pVec, :HessianApprox)) 
-                                    end
-                                    @inbounds for i in nProcs:-1:1
-                                        status::Symbol, hessPart::Matrix{Float64} = take!(results[i])
-                                        if status != :Done
-                                            println("Error : Could not send ODE problem to proces ", procs()[i])
-                                        end
-                                        hess .+= hessPart
-                                    end        
-                                end
-
-    evalHess = (hess, pVec) ->  begin
-                                    hess .= 0.0
-                                    @inbounds for i in nProcs:-1:1
-                                        @async put!(jobs[i], tuple(pVec, :Hessian)) 
-                                    end
-                                    @inbounds for i in nProcs:-1:1
-                                        status::Symbol, hessPart::Matrix{Float64} = take!(results[i])
-                                        if status != :Done
-                                            println("Error : Could not send ODE problem to process ", procs()[i])
-                                        end
-                                        hess .+= hessPart
-                                    end
-                                end
-
-    return tuple(evalF, evalGradF, evalGradFForwardEq, evalGradFAdjoint, evalHess, evalHessA)
+    return jobs, results 
 end
 
 
@@ -205,7 +124,7 @@ end
 
 
 function loadPackages()
-    println("Loading required packages for each process")
+    print("Loading required packages for each process ... ")
     @eval @everywhere begin 
                         macro LoadLib()
                             quote
@@ -222,12 +141,12 @@ function loadPackages()
                         end
                     end
     @eval @everywhere @LoadLib()
-    println("Done")
+    print("done \n")
 end
  
 
 function loadFunctionsAndStructs()
-    println("Loading required functions and structs for each process")
+    print("Loading required functions and structs for each process ... ")
     @eval @everywhere begin 
                         macro LoadFuncStruct()
                             quote
@@ -237,18 +156,18 @@ function loadFunctionsAndStructs()
                         end
                     end
     @eval @everywhere @LoadFuncStruct()
-    println("Done")
+    print("done \n")
 end
  
 
 function loadYmodSdU0(petabModel::PEtabModel)
-    println("Loading u0, σ, h and callback functions")
+    print("Loading u0, σ, h and callback functions ... ")
     path_u0_h_sigma = joinpath(petabModel.dirJulia, petabModel.modelName * "_h_sd_u0.jl")
-    path_D_h_sd = joinpath(petabMode.dirJulia, petabModel.modelName * "_D_h_sd.jl")
+    path_D_h_sd = joinpath(petabModel.dirJulia, petabModel.modelName * "_D_h_sd.jl")
     pathCallback = joinpath(petabModel.dirJulia, petabModel.modelName * "_callbacks.jl")
     @eval @everywhere include($path_u0_h_sigma)
     @eval @everywhere include($path_D_h_sd)
     @eval @everywhere include($pathCallback)
-    println("Done")
+    print("done \n")
 end
 

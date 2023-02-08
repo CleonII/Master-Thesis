@@ -38,7 +38,7 @@ function computeJacobianResidualsDynamicθ!(jacobian::Union{Matrix{Float64}, Sub
         experimentalConditionId = simulationInfo.experimentalConditionId[i]
         simulationConditionId = simulationInfo.simulationConditionId[i]
 
-        if expIDSolve[1] != :all && experimentalConditionId ∉ experimentalConditionId
+        if expIDSolve[1] != :all && experimentalConditionId ∉ expIDSolve
             continue
         end
 

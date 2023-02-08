@@ -40,11 +40,23 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
     odeProblem = remake(_odeProblem, p = convert.(Float64, _odeProblem.p), u0 = convert.(Float64, _odeProblem.u0))
     odeProblemForwardEquations = getODEProblemForwardEquations(odeProblem, sensealgForwardEquations)
 
+    # If we are computing the cost, gradient and hessians accross several processes we need to send ODEProblem, and 
+    # PEtab structs to each process 
+    if numberOfprocesses > 1
+        jobs, results = setUpProcesses(petabModel, odeSolver, solverAbsTol, solverRelTol, odeSolverAdjoint, sensealgAdjoint,
+                                       sensealgAdjointSS, solverAdjointAbsTol, solverAdjointRelTol, odeSolverForwardEquations, 
+                                       sensealgForwardEquations, parameterInfo, measurementInfo, simulationInfo, θ_indices, 
+                                       priorInfo, odeProblem, chunkSize)
+    else
+        jobs, results = nothing, nothing
+    end
+
     # The cost (likelihood) can either be computed in the standard way or the Zygote way. The second consumes more 
     # memory as in-place mutations are not compatible with Zygote 
     expIdSolve = [:all]
     computeCost = setUpCost(:Standard, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, 
-                            simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, expIdSolve)
+                            simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, expIdSolve, 
+                            numberOfprocesses=numberOfprocesses, jobs=jobs, results=results)
     computeCostZygote = setUpCost(:Zygote, odeProblem, odeSolver, solverAbsTol, solverRelTol, 
                                   petabModel, simulationInfo, θ_indices, measurementInfo, parameterInfo, 
                                   priorInfo, expIdSolve, sensealgZygote=sensealgZygote)          
@@ -53,25 +65,30 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
     # and Zygote 
     computeGradientAutoDiff = setUpGradient(:AutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, 
                                             simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, expIdSolve, 
-                                            chunkSize=chunkSize)
+                                            chunkSize=chunkSize, numberOfprocesses=numberOfprocesses, jobs=jobs, results=results)
     computeGradientForwardEquations = setUpGradient(:ForwardEquations, odeProblemForwardEquations, odeSolverForwardEquations, solverAbsTol, 
                                                     solverRelTol, petabModel, simulationInfo, θ_indices, measurementInfo, 
-                                                    parameterInfo, priorInfo, expIdSolve, sensealg=sensealgForwardEquations, chunkSize=chunkSize)                                                   
+                                                    parameterInfo, priorInfo, expIdSolve, sensealg=sensealgForwardEquations, chunkSize=chunkSize, 
+                                                    numberOfprocesses=numberOfprocesses, jobs=jobs, results=results)                                                   
     computeGradientAdjoint = setUpGradient(:Adjoint, odeProblem, odeSolverAdjoint, solverAdjointAbsTol, solverAdjointRelTol, 
                                            petabModel, simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, 
-                                           expIdSolve, sensealg=sensealgAdjoint, sensealgSS=sensealgAdjointSS)   
+                                           expIdSolve, sensealg=sensealgAdjoint, sensealgSS=sensealgAdjointSS, 
+                                           numberOfprocesses=numberOfprocesses, jobs=jobs, results=results)   
     computeGradientZygote = setUpGradient(:Zygote, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, 
                                           simulationInfo, θ_indices, measurementInfo, parameterInfo, priorInfo, 
                                           expIdSolve, sensealg=sensealgZygote)                 
             
     # The Hessian can either be computed via automatic differentation, or approximated via a block approximation or the 
     # Gauss Newton method                                       
-    computeHessian = setUpHessian(:AutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
-                                  θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIdSolve)
+    computeHessian = setUpHessian(:HessianAutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
+                                  θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIdSolve, 
+                                  numberOfprocesses=numberOfprocesses, jobs=jobs, results=results)
     computeHessianBlock = setUpHessian(:BlockAutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
-                                        θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIdSolve)                                  
+                                        θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIdSolve, 
+                                        numberOfprocesses=numberOfprocesses, jobs=jobs, results=results)                                  
     computeHessianGN = setUpHessian(:GaussNewton, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
-                                    θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIdSolve, reuseS=reuseS)                                                                          
+                                    θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIdSolve, reuseS=reuseS, 
+                                    numberOfprocesses=numberOfprocesses, jobs=jobs, results=results)                                                                          
 
     # Extract nominal parameter vector and parameter bounds. If needed transform parameters
     θ_estNames = θ_indices.θ_estNames               
@@ -115,25 +132,29 @@ function setUpCost(whichMethod::Symbol,
                    parameterInfo::ParametersInfo,
                    priorInfo::PriorInfo,
                    expIDSolveArg::Vector{Symbol}; 
-                   sensealgZygote=ForwardDiffSensitivity())
+                   sensealgZygote=ForwardDiffSensitivity(), 
+                   numberOfprocesses::Int64=1, 
+                   jobs=nothing, 
+                   results=nothing)
 
     # Functions needed for mapping θ_est to the ODE problem, and then for solving said ODE-system                           
-    if whichMethod == :Standard
+    if whichMethod == :Standard && numberOfprocesses == 1
+            
         _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)                          
         changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
         _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
         __computeCost = (θ_est) -> computeCost(θ_est, 
-                                            odeProblem, 
-                                            petabModel, 
-                                            simulationInfo, 
-                                            θ_indices, 
-                                            measurementInfo, 
-                                            parameterInfo, 
-                                            _changeODEProblemParameters!, 
-                                            _solveODEAllExperimentalConditions!, 
-                                            priorInfo, 
-                                            expIDSolve=expIDSolveArg)
-                                            
+                                                odeProblem, 
+                                                petabModel, 
+                                                simulationInfo, 
+                                                θ_indices, 
+                                                measurementInfo, 
+                                                parameterInfo, 
+                                                _changeODEProblemParameters!, 
+                                                _solveODEAllExperimentalConditions!, 
+                                                priorInfo, 
+                                                expIDSolve=expIDSolveArg)
+                                                                                            
     elseif whichMethod == :Zygote
         changeExperimentalCondition = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
         _changeODEProblemParameters = (pODEProblem, θ_est) -> changeODEProblemParameters(pODEProblem, θ_est, θ_indices, petabModel)
@@ -148,6 +169,22 @@ function setUpCost(whichMethod::Symbol,
                                                    _changeODEProblemParameters, 
                                                    solveODEExperimentalCondition, 
                                                    priorInfo)
+
+    else
+        __computeCost = (θ_est) ->  begin
+                                            costTot::Float64 = 0.0
+                                            @inbounds for i in numberOfprocesses:-1:1
+                                                @async put!(jobs[i], tuple(θ_est, :Cost)) 
+                                            end
+                                            @inbounds for i in numberOfprocesses:-1:1
+                                                status::Symbol, cost::Float64 = take!(results[i])
+                                                if status != :Done
+                                                    println("Error : Could not send ODE problem to proces ", procs()[i])
+                                                end
+                                                costTot += cost
+                                            end
+                                            return costTot
+                                        end
 
     end
 
@@ -169,10 +206,13 @@ function setUpGradient(whichMethod::Symbol,
                        expIDSolve::Vector{Symbol}; 
                        chunkSize::Union{Nothing, Int64}=nothing,
                        sensealg=nothing, 
-                       sensealgSS=nothing)
+                       sensealgSS=nothing, 
+                       numberOfprocesses::Int64=1, 
+                       jobs=nothing, 
+                       results=nothing)
 
     # Functions needed for mapping θ_est to the ODE problem, and then for solving said ODE-system                           
-    if whichMethod == :AutoDiff
+    if whichMethod == :AutoDiff && numberOfprocesses == 1
         _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)                          
         changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
         _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
@@ -190,7 +230,7 @@ function setUpGradient(whichMethod::Symbol,
                                                                          chunkSize,
                                                                          expIDSolve=expIDSolve)    
                                             
-    elseif whichMethod == :ForwardEquations
+    elseif whichMethod == :ForwardEquations && numberOfprocesses == 1
         _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)
         if sensealg == :AutoDiffForward  
             nTimePointsSaveAt = sum(length(simulationInfo.timeObserved[experimentalConditionId]) for experimentalConditionId in simulationInfo.experimentalConditionId)                                                    
@@ -217,7 +257,7 @@ function setUpGradient(whichMethod::Symbol,
                                                                                  priorInfo, 
                                                                                  expIDSolve=expIDSolve) 
 
-    elseif whichMethod == :Adjoint                                                                                 
+    elseif whichMethod == :Adjoint && numberOfprocesses == 1                                                                             
         _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)                          
         changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
         _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, denseSolution=true, expIDSolve=_expIDSolve, trackCallback=true)
@@ -255,6 +295,24 @@ function setUpGradient(whichMethod::Symbol,
                                                                       _changeODEProblemParameters, 
                                                                       solveODEExperimentalCondition, 
                                                                       priorInfo)
+
+    else
+
+        _computeGradient! = (gradient, θ_est) -> begin
+                                                    gradient .= 0.0
+                                                    @inbounds for i in numberOfprocesses:-1:1
+                                                        @async put!(jobs[i], tuple(θ_est, whichMethod)) 
+                                                    end
+                                                    @inbounds for i in numberOfprocesses:-1:1
+                                                        status::Symbol, gradientPart::Vector{Float64} = take!(results[i])
+                                                        if status != :Done
+                                                            println("Error : Could not compute gradient for ", procs()[i])
+                                                        end
+                                                        gradient .+= gradientPart
+                                                    end
+                                                end       
+
+
     end
 
     return _computeGradient!
@@ -274,15 +332,18 @@ function setUpHessian(whichMethod::Symbol,
                       priorInfo::PriorInfo, 
                       chunkSize::Union{Nothing, Int64},
                       expIDSolve::Vector{Symbol};
-                      reuseS::Bool=false)
+                      reuseS::Bool=false, 
+                      numberOfprocesses::Int64=1, 
+                      jobs=nothing, 
+                      results=nothing)
 
     # Functions needed for mapping θ_est to the ODE problem, and then for solving said ODE-system                           
-    if whichMethod == :AutoDiff || whichMethod == :BlockAutoDiff
+    if (whichMethod == :HessianAutoDiff || whichMethod == :BlockAutoDiff) && numberOfprocesses == 1
         _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)                          
         changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
         _solveODEAllExperimentalConditions! = (odeSolutions, odeProblem, θ_dynamic, _expIDSolve) -> solveODEAllExperimentalConditions!(odeSolutions, odeProblem, θ_dynamic, changeExperimentalCondition!, simulationInfo, odeSolver, solverAbsTol, solverRelTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, expIDSolve=_expIDSolve)
 
-        if whichMethod == :AutoDiff
+        if whichMethod == :HessianAutoDiff
             _computeHessian = (hessian, θ_est) -> computeHessian!(hessian, 
                                                                 θ_est, 
                                                                 odeProblem, 
@@ -312,7 +373,7 @@ function setUpHessian(whichMethod::Symbol,
                                                                                   expIDSolve=expIDSolve)            
         end
                                             
-    elseif whichMethod == :GaussNewton
+    elseif whichMethod == :GaussNewton && numberOfprocesses == 1
         _changeODEProblemParameters! = (pODEProblem, u0, θ_est) -> changeODEProblemParameters!(pODEProblem, u0, θ_est, θ_indices, petabModel)
         changeExperimentalCondition! = (pODEProblem, u0, conditionId, θ_dynamic) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
         nTimePointsSaveAt = sum(length(simulationInfo.timeObserved[experimentalConditionId]) for experimentalConditionId in simulationInfo.experimentalConditionId)                                                    
@@ -332,6 +393,22 @@ function setUpHessian(whichMethod::Symbol,
                                                                                     priorInfo, 
                                                                                     expIDSolve=expIDSolve, 
                                                                                     reuseS=reuseS) 
+
+    else
+
+        _computeHessian = (hessian, θ_est) ->   begin
+                                                    hessian .= 0.0
+                                                    @inbounds for i in numberOfprocesses:-1:1
+                                                        @async put!(jobs[i], tuple(θ_est, whichMethod)) 
+                                                    end
+                                                    @inbounds for i in numberOfprocesses:-1:1
+                                                        status::Symbol, hessianPart::Matrix{Float64} = take!(results[i])
+                                                        if status != :Done
+                                                            println("Error : Could not send ODE problem to process ", procs()[i])
+                                                        end
+                                                        hessian .+= hessianPart
+                                                    end
+                                                end
 
     end
 

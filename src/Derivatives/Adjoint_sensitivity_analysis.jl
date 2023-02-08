@@ -44,7 +44,7 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
         experimentalConditionId = simulationInfo.experimentalConditionId[i]
         simulationConditionId = simulationInfo.simulationConditionId[i]
         
-        if expIDSolve[1] != :all && experimentalConditionId ∉ experimentalConditionId
+        if expIDSolve[1] != :all && experimentalConditionId ∉ expIDSolve
             continue
         end
 

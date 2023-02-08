@@ -131,7 +131,7 @@ function _computeCost(θ_dynamic::AbstractVector,
     cost = 0.0
     for experimentalConditionId in simulationInfo.experimentalConditionId
         
-        if expIDSolve[1] != :all && experimentalConditionId ∉ experimentalConditionId
+        if expIDSolve[1] != :all && experimentalConditionId ∉ expIDSolve
             continue
         end
 
