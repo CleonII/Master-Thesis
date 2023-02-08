@@ -264,7 +264,7 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                 runTime = @elapsed res, nIter, converged = FidesBFGS(p0)
                 writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesBFGS", solverStr, string(absTol), string(relTol))
             catch
-                writeFile(dirResult, 0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesBFGS", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesBFGS", solverStr, string(absTol), string(relTol))
             end
         end
 
@@ -273,7 +273,7 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                 runTime = @elapsed res, nIter, converged = FidesGN(p0)
                 writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesGN", solverStr, string(absTol), string(relTol))
             catch
-                writeFile(dirResult, 0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesGN", solverStr, string(absTol), string(relTol))
+                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesGN", solverStr, string(absTol), string(relTol))
             end
         end
     end
@@ -301,7 +301,6 @@ optmizersTest = Symbol.(ARGS[3:end])
 =#
 iOptimIPNewtonGN = findall(x -> x == :OptimIPNewtonGN, optmizersTest)
 iNotOptimIPNewtonGN = findall(x -> x != :OptimIPNewtonGN, optmizersTest)
-
 
 if ARGS[1] == "Fiedler_BMC2016"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Fiedler_BMC2016", "Fiedler_BMC2016.yaml")
