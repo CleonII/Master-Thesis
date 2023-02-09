@@ -26,11 +26,13 @@ if [ $1 == "Fix_parameters" ];then
     # For Bachman 
     for i in {1..26}
     do
-        ${runJulia} ${pathBenchmarkScript} Fix_parameters Bachman $i
+        ${runJulia} ${pathBenchmarkScript} Fix_parameters Bachman $i 321
+        ${runJulia} ${pathBenchmarkScript} Fix_parameters Bachman $i 123
     done 
     for i in {1..70}
     do
-        ${runJulia} ${pathBenchmarkScript} Fix_parameters Lucarelli $i
+        ${runJulia} ${pathBenchmarkScript} Fix_parameters Lucarelli $i 123
+        ${runJulia} ${pathBenchmarkScript} Fix_parameters Lucarelli $i 321
     done 
 fi
 

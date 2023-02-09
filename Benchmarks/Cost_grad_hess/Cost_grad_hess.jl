@@ -62,6 +62,15 @@ function getPEtabProblem(petabModel::PEtabModel,
 end
 
 
+function getRunTime(computeGradient::F, runTime, nRepeat, gradient, θ_est) where F
+
+    computeGradient(gradient, θ_est)
+    bGrad =  @benchmark $computeGradient($gradient, $θ_est) samples=(nRepeat+1) seconds=100000 evals=1
+    runTime .= bGrad.times[2:end] .* 1e-9
+
+end
+
+
 function benchmarkCostGrad(petabModel::PEtabModel, 
                            gradientInfo, 
                            odeSolver::SciMLAlgorithm,
@@ -77,7 +86,8 @@ function benchmarkCostGrad(petabModel::PEtabModel,
                            nRepeat=5, 
                            chunkSize=nothing, 
                            iParameter=0,
-                           _θ_est=nothing)
+                           _θ_est=nothing,
+                           shouldSave::Bool=true)
 
     println("Running model ", petabModel.modelName)
     if isnothing(chunkSize)
@@ -122,9 +132,10 @@ function benchmarkCostGrad(petabModel::PEtabModel,
         if all(gradient .== 1e8) || canEval == false
             runTime .= Inf
         else
-            bGrad =  @benchmark $computeGradient($gradient, $θ_est) samples=(nRepeat+1) seconds=100000 evals=1
-            println("bGradTimes = ", bGrad.times)
-            runTime .= bGrad.times[2:end] .* 1e-9
+            GC.gc(), GC.gc(), GC.gc()
+            sleep(0.2)
+            getRunTime(computeGradient, runTime, nRepeat, gradient, θ_est) 
+            println("BGrad = ", runTime)
         end
 
     elseif checkCost == true
@@ -169,9 +180,9 @@ function benchmarkCostGrad(petabModel::PEtabModel,
                          chunk_size = chunkSizeWrite,
                          solver = odeSolverName)
 
-    if isfile(pathFileSave)
+    if isfile(pathFileSave) && shouldSave == true
         CSV.write(pathFileSave, dataSave, append = true)
-    else
+    elseif shouldSave == true
         CSV.write(pathFileSave, dataSave)
     end
 end
@@ -301,7 +312,6 @@ if ARGS[1] == "Chen_model"
     end
 end
 
-
 if ARGS[1] == "Fix_parameters"
 
     if length(ARGS) == 1
@@ -316,6 +326,7 @@ if ARGS[1] == "Fix_parameters"
     end
 
     nParamFix = parse(Int64, ARGS[3])
+    seed = parse(Int64, ARGS[4])
     println("Number of parameter fixed = ", nParamFix)
 
     dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
@@ -324,28 +335,28 @@ if ARGS[1] == "Fix_parameters"
         mkpath(dirSave)
     end
 
-    Random.seed!(123)
+    Random.seed!(seed)
     sensealgInfo = [[:ForwardDiff, nothing, "ForwardDiff"]]
+    absTol, relTol = 1e-8, 1e-8
 
     for i in eachindex(modelList)
 
-        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
-        pathYML = getPathYmlFile(dirModel)
-        petabModel = readPEtabModel(pathYML)
-        absTol, relTol = 1e-8, 1e-8
+        local pathYML = getPathYmlFile(joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i]))
+        local petabModel = readPEtabModel(pathYML)
         nDynamicParameters = length(getNominalODEValues(petabModel))
 
-        for j in 1:5
-            petabModelFewerParameters = getPEtabModelNparamFixed(petabModel, nParamFix)
+        petabModelFewerParameters = getPEtabModelNparamFixed(petabModel, nParamFix)
+        println("Number of dynamic parameters = ", length(getNominalODEValues(petabModelFewerParameters)))
 
-            benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
-                              checkGradient=true, nParamFixed=nParamFix, nRepeat=5)
-            benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
-                              checkGradient=true, nParamFixed=nParamFix, nRepeat=5, chunkSize=1)      
+        benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
+                            checkGradient=true, nParamFixed=nParamFix, nRepeat=5, shouldSave=true)
+        benchmarkCostGrad(petabModelFewerParameters, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
+                            checkGradient=true, nParamFixed=nParamFix, nRepeat=5, chunkSize=1, shouldSave=true)      
                                   
-            if isdir(petabModelFewerParameters.dirModel) 
-                rm(petabModelFewerParameters.dirModel, recursive=true)
-            end
+        if isdir(petabModelFewerParameters.dirModel) 
+            rm(petabModelFewerParameters.dirModel, recursive=true)
+            petabModelFewerParameters = nothing
+            GC.gc(); GC.gc(); GC.gc()
         end
     end
 end
@@ -373,13 +384,13 @@ if ARGS[1] == "Test_chunks_random_p"
     Random.seed!(123)
     solversCheck = [[QNDF(), "QNDF"]]
     sensealgInfo = [[:ForwardDiff, nothing, "ForwardDiff"]]
+    absTol, relTol = 1e-8, 1e-8
 
     for i in eachindex(modelList)
 
         dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
         pathYML = getPathYmlFile(dirModel)
         petabModel = readPEtabModel(pathYML)
-        absTol, relTol = 1e-8, 1e-8
         nDynamicParameters = length(getNominalODEValues(petabModel))
         chunkList = 1:nDynamicParameters
         for j in 1:30
