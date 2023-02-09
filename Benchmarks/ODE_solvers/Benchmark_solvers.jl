@@ -42,95 +42,91 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
     lSolver2 = FastLUFactorization()
     lSolver3 = KrylovJL_GMRES()
 
-    solverList = [Vern6(), "Vern6", "nonStiff", "OrdinaryDiffEq", 
-                  Vern7(), "Vern7", "nonStiff", "OrdinaryDiffEq", 
-                  Vern8(), "Vern8", "nonStiff", "OrdinaryDiffEq", 
-                  Vern9(), "Vern9", "nonStiff", "OrdinaryDiffEq", 
-                  Tsit5(), "Tsit5", "nonstiff", "OrdinaryDiffEq", 
-                  BS3(), "BS3", "nonstiff", "OrdinaryDiffEq", 
-                  BS5(), "BS5", "nonstiff", "OrdinaryDiffEq", 
-                  DP5(), "DP5", "nonStiff", "OrdinaryDiffEq", 
-                  DP8(), "DP8", "nonStiff", "OrdinaryDiffEq", 
-                  Feagin14(), "Feagin14", "nonStiff", "OrdinaryDiffEq", 
-                  VCABM(), "VCABM", "nonStiff", "OrdinaryDiffEq", 
-                  Rosenbrock23(), "Rosenbrock23", "stiff", "OrdinaryDiffEq", 
-                  TRBDF2(), "TRBDF2", "stiff", "OrdinaryDiffEq", 
-                  Rodas4(), "Rodas4", "stiff", "OrdinaryDiffEq", 
-                  Rodas4P(), "Rodas4P", "stiff", "OrdinaryDiffEq", 
-                  Rodas5(), "Rodas5", "stiff", "OrdinaryDiffEq", 
-                  QNDF(), "QNDF", "stiff", "OrdinaryDiffEq", 
-                  FBDF(), "FBDF", "stiff", "OrdinaryDiffEq", 
-                  Trapezoid(), "Trapezoid", "stiff", "OrdinaryDiffEq", 
-                  KenCarp4(), "KenCarp4", "stiff", "OrdinaryDiffEq", 
-                  Kvaerno5(), "Kvaerno5", "stiff", "OrdinaryDiffEq", 
-                  RadauIIA3(), "RadauIIA3", "stiff", "OrdinaryDiffEq", 
-                  RadauIIA5(), "RadauIIA5", "stiff", "OrdinaryDiffEq", 
-                  AutoTsit5(Rosenbrock23()), "Tsit5Rosenbrock23", "composite", "OrdinaryDiffEq", 
-                  AutoVern7(Rodas5()), "Vern7Rodas5", "composite", "OrdinaryDiffEq", 
-                  AutoVern7(Rodas4P()), "Vern7Rodas4P", "composite", "OrdinaryDiffEq", 
-                  AutoVern9(Rodas4P()), "Vern9Rodas4P", "composite", "OrdinaryDiffEq", 
-                  CVODE_BDF(), "CVODE_BDF_default", "stiff", "Sundials",
-                  CVODE_BDF(linear_solver=:Dense), "CVODE_BDF_Dense", "stiff", "Sundials", 
-                  CVODE_BDF(linear_solver=:LapackDense), "CVODE_BDF_LapackDense", "stiff", "Sundials", 
-                  CVODE_BDF(linear_solver=:GMRES), "CVODE_BDF_GMRES", "stiff", "Sundials", 
-                  CVODE_Adams(linear_solver=:Dense), "CVODE_Adams_Dense", "nonStiff", "Sundials", 
-                  CVODE_Adams(linear_solver=:LapackDense), "CVODE_Adams_LapackDense", "nonStiff", "Sundials", 
-                  # In Julia v1.8.1 these crash for problems solvers as there is problem with ccall
-                  #ARKODE(Sundials.Explicit(), order=4), "ARKODE_Exp4", "nonStiff", "Sundials", 
-                  #ARKODE(Sundials.Explicit(), order=8), "ARKODE_Exp8", "nonStiff", "Sundials", 
-                  #ARKODE(Sundials.Implicit(), order=3), "ARKODE_Imp3", "stiff", "Sundials", 
-                  #ARKODE(Sundials.Implicit(), order=5), "ARKODE_Imp5", "stiff", "Sundials",
-                  [:auto], "autoHint", "hint", "OrdinaryDiffEq", 
-                  [:nonstiff], "nonstiffHint", "hint", "OrdinaryDiffEq", 
-                  [:stiff], "stiffHint", "hint", "OrdinaryDiffEq", 
-                  RadauIIA5(linsolve=lSolver1), "RadauIIA5_RFLUF", "stiff", "OrdinaryDiffEq",
-                  Rodas5(linsolve=lSolver1), "Rodas5_RFLUF", "stiff", "OrdinaryDiffEq",
-                  Rodas4P(linsolve=lSolver1), "Rodas4P_RFLUF", "stiff", "OrdinaryDiffEq",
-                  QNDF(linsolve=lSolver1), "QNDF_RFLUF", "stiff", "OrdinaryDiffEq",
-                  RadauIIA5(linsolve=lSolver2), "RadauIIA5_FastLU", "stiff", "OrdinaryDiffEq",
-                  Rodas5(linsolve=lSolver2), "Rodas5_FastLU", "stiff", "OrdinaryDiffEq",
-                  Rodas4P(linsolve=lSolver2), "Rodas4P_FastLU", "stiff", "OrdinaryDiffEq",
-                  QNDF(linsolve=lSolver2), "QNDF_FastLU", "stiff", "OrdinaryDiffEq",
-                  QNDF(linsolve=lSolver3), "QNDF_GMRES", "stiff", "OrdinaryDiffEq",
-                  ImplicitDeuflhardExtrapolation(threading = true), "IDeuflar_Thread", "stiff", "OrdinaryDiffEq",
-                  ImplicitHairerWannerExtrapolation(threading = true), "IWanner_Thread", "stiff", "OrdinaryDiffEq",
-                  ImplicitEulerExtrapolation(threading = true), "IEuler_Thread", "stiff", "OrdinaryDiffEq",
-                  ImplicitDeuflhardExtrapolation(threading = false), "IDeuflar", "stiff", "OrdinaryDiffEq",
-                  ImplicitHairerWannerExtrapolation(threading = false), "IWanner", "stiff", "OrdinaryDiffEq",
-                  ImplicitEulerExtrapolation(threading = false), "IEuler", "stiff", "OrdinaryDiffEq",
-                  ImplicitDeuflhardExtrapolation(threading = false, linsolve=lSolver2), "IDeuflar_FastLU", "stiff", "OrdinaryDiffEq",
-                  ImplicitHairerWannerExtrapolation(threading = false, linsolve=lSolver2), "IWanner_FastLU", "stiff", "OrdinaryDiffEq",
-                  ImplicitEulerExtrapolation(threading = false, linsolve=lSolver2), "IEuler_FastLU", "stiff", "OrdinaryDiffEq", 
-                  ImplicitDeuflhardExtrapolation(threading = false, linsolve=lSolver3), "IDeuflar_GMRES", "stiff", "OrdinaryDiffEq",
-                  ImplicitHairerWannerExtrapolation(threading = false, linsolve=lSolver3), "IWanner_GMRES", "stiff", "OrdinaryDiffEq",
-                  ImplicitEulerExtrapolation(threading = false, linsolve=lSolver3), "IEuler_GMRES", "stiff", "OrdinaryDiffEq"]                
+    solverList = [Vern6(), "Vern6", "nonStiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  Vern7(), "Vern7", "nonStiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  Vern8(), "Vern8", "nonStiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  Vern9(), "Vern9", "nonStiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  Tsit5(), "Tsit5", "nonstiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  BS3(), "BS3", "nonstiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  BS5(), "BS5", "nonstiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  DP5(), "DP5", "nonStiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  DP8(), "DP8", "nonStiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  Feagin14(), "Feagin14", "nonStiff", "OrdinaryDiffEq", "E_Runge_Kutta",
+                  VCABM(), "VCABM", "nonStiff", "OrdinaryDiffEq", "Adams_explicit",
+                  Rosenbrock23(), "Rosenbrock23", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  TRBDF2(), "TRBDF2", "stiff", "OrdinaryDiffEq", "SDIRK",
+                  Rodas4(), "Rodas4", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  Rodas4P(), "Rodas4P", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  Rodas5(), "Rodas5", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  Rodas5P(), "Rodas5P", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  QNDF(), "QNDF", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                  FBDF(), "FBDF", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                  Trapezoid(), "Trapezoid", "stiff", "OrdinaryDiffEq", "SDIRK",
+                  KenCarp4(), "KenCarp4", "stiff", "OrdinaryDiffEq", "SDIRK",
+                  Kvaerno5(), "Kvaerno5", "stiff", "OrdinaryDiffEq", "SDIRK",
+                  RadauIIA3(), "RadauIIA3", "stiff", "OrdinaryDiffEq", "FIRK",
+                  RadauIIA5(), "RadauIIA5", "stiff", "OrdinaryDiffEq", "FIRK",
+                  AutoTsit5(Rosenbrock23()), "Tsit5Rosenbrock23", "composite", "OrdinaryDiffEq", "composite",
+                  AutoVern7(Rodas5()), "Vern7Rodas5", "composite", "OrdinaryDiffEq", "composite",
+                  AutoVern7(Rodas4P()), "Vern7Rodas4P", "composite", "OrdinaryDiffEq", "composite",
+                  AutoVern9(Rodas4P()), "Vern9Rodas4P", "composite", "OrdinaryDiffEq", "composite",
+                  CVODE_BDF(), "CVODE_BDF_default", "stiff", "Sundials", "Multistep_bdf",
+                  CVODE_BDF(linear_solver=:Dense), "CVODE_BDF_Dense", "stiff", "Sundials", "Multistep_bdf",
+                  CVODE_BDF(linear_solver=:LapackDense), "CVODE_BDF_LapackDense", "stiff", "Sundials", "Multistep_bdf",
+                  CVODE_BDF(linear_solver=:GMRES), "CVODE_BDF_GMRES", "stiff", "Sundials", "Multistep_bdf",
+                  CVODE_Adams(linear_solver=:Dense), "CVODE_Adams_Dense", "nonStiff", "Sundials", "Adams_explicit",
+                  CVODE_Adams(linear_solver=:LapackDense), "CVODE_Adams_LapackDense", "nonStiff", "Sundials", "Adams_explicit",
+                  [:auto], "autoHint", "hint", "OrdinaryDiffEq", "hint",
+                  [:nonstiff], "nonstiffHint", "hint", "OrdinaryDiffEq", "hint" ,
+                  [:stiff], "stiffHint", "hint", "OrdinaryDiffEq", "hint",
+                  RadauIIA5(linsolve=lSolver1), "RadauIIA5_RFLUF", "stiff", "OrdinaryDiffEq", "FIRK",
+                  Rodas5(linsolve=lSolver1), "Rodas5_RFLUF", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  Rodas4P(linsolve=lSolver1), "Rodas4P_RFLUF", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  QNDF(linsolve=lSolver1), "QNDF_RFLUF", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                  RadauIIA5(linsolve=lSolver2), "RadauIIA5_FastLU", "stiff", "OrdinaryDiffEq", "FIRK",
+                  Rodas5(linsolve=lSolver2), "Rodas5_FastLU", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  Rodas4P(linsolve=lSolver2), "Rodas4P_FastLU", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  QNDF(linsolve=lSolver2), "QNDF_FastLU", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                  QNDF(linsolve=lSolver3), "QNDF_GMRES", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                  ImplicitDeuflhardExtrapolation(threading = true), "IDeuflar_Thread", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitHairerWannerExtrapolation(threading = true), "IWanner_Thread", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitEulerExtrapolation(threading = true), "IEuler_Thread", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitDeuflhardExtrapolation(threading = false), "IDeuflar", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitHairerWannerExtrapolation(threading = false), "IWanner", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitEulerExtrapolation(threading = false), "IEuler", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitDeuflhardExtrapolation(threading = false, linsolve=lSolver2), "IDeuflar_FastLU", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitHairerWannerExtrapolation(threading = false, linsolve=lSolver2), "IWanner_FastLU", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitEulerExtrapolation(threading = false, linsolve=lSolver2), "IEuler_FastLU", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitDeuflhardExtrapolation(threading = false, linsolve=lSolver3), "IDeuflar_GMRES", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitHairerWannerExtrapolation(threading = false, linsolve=lSolver3), "IWanner_GMRES", "stiff", "OrdinaryDiffEq", "PIEP",
+                  ImplicitEulerExtrapolation(threading = false, linsolve=lSolver3), "IEuler_GMRES", "stiff", "OrdinaryDiffEq", "PIEP"]                
                 
     lSolver1 = KLUFactorization()
     lSolver2 = KrylovJL_GMRES()
-    solverListSparse = [RadauIIA5(), "RadauIIA5_S", "stiff", "OrdinaryDiffEq",
-                        Rodas5(), "Rodas5_S", "stiff", "OrdinaryDiffEq",
-                        Rodas4P(), "Rodas4P_S", "stiff", "OrdinaryDiffEq",
-                        QNDF(), "QNDF_S", "stiff", "OrdinaryDiffEq",
-                        KenCarp4(), "KenCarp4_S", "stiff", "OrdinaryDiffEq",
-                        FBDF(), "FBDF_S", "stiff", "OrdinaryDiffEq",
-                        Rosenbrock23(), "Rosenbrock23_S", "stiff", "OrdinaryDiffEq",
-                        Rodas4(), "Rodas4_S", "stiff", "OrdinaryDiffEq",
-                        TRBDF2(), "TRBDF2_S", "stiff", "OrdinaryDiffEq",
-                        RadauIIA5(linsolve=lSolver1), "RadauIIA5_KLU_S", "stiff", "OrdinaryDiffEq",
-                        Rodas5(linsolve=lSolver1), "Rodas5_KLU_S", "stiff", "OrdinaryDiffEq",
-                        Rodas4P(linsolve=lSolver1), "Rodas4P_KLU_S", "stiff", "OrdinaryDiffEq",
-                        QNDF(linsolve=lSolver1), "QNDF_KLU_S", "stiff", "OrdinaryDiffEq",
-                        RadauIIA5(linsolve=lSolver2), "RadauIIA5_GMRES_S", "stiff", "OrdinaryDiffEq",
-                        Rodas5(linsolve=lSolver2), "Rodas5_GMRES_S", "stiff", "OrdinaryDiffEq",
-                        Rodas4P(linsolve=lSolver2), "Rodas4P_GMRES_S", "stiff", "OrdinaryDiffEq",
-                        QNDF(linsolve=lSolver2), "QNDF_GMRES_S", "stiff", "OrdinaryDiffEq",
-                        CVODE_BDF(linear_solver=:GMRES), "CVODE_BDF_GMRES_S", "stiff", "Sundials",
-                        CVODE_BDF(linear_solver=:KLU), "CVODE_BDF_KLU_S", "stiff", "Sundials"]
+    solverListSparse = [RadauIIA5(), "RadauIIA5_S", "stiff", "OrdinaryDiffEq", "FIRK",
+                        Rodas5(), "Rodas5_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        Rodas4P(), "Rodas4P_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        QNDF(), "QNDF_S", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                        KenCarp4(), "KenCarp4_S", "stiff", "OrdinaryDiffEq", "SDIRK",
+                        FBDF(), "FBDF_S", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                        Rosenbrock23(), "Rosenbrock23_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        Rodas4(), "Rodas4_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        TRBDF2(), "TRBDF2_S", "stiff", "OrdinaryDiffEq", "SDIRK",
+                        RadauIIA5(linsolve=lSolver1), "RadauIIA5_KLU_S", "stiff", "OrdinaryDiffEq", "FIRK",
+                        Rodas5(linsolve=lSolver1), "Rodas5_KLU_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        Rodas4P(linsolve=lSolver1), "Rodas4P_KLU_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        QNDF(linsolve=lSolver1), "QNDF_KLU_S", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                        RadauIIA5(linsolve=lSolver2), "RadauIIA5_GMRES_S", "stiff", "OrdinaryDiffEq", "FIRK",
+                        Rodas5(linsolve=lSolver2), "Rodas5_GMRES_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        Rodas4P(linsolve=lSolver2), "Rodas4P_GMRES_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        QNDF(linsolve=lSolver2), "QNDF_GMRES_S", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                        CVODE_BDF(linear_solver=:GMRES), "CVODE_BDF_GMRES_S", "stiff", "Sundials", "Multistep_bdf",
+                        CVODE_BDF(linear_solver=:KLU), "CVODE_BDF_KLU_S", "stiff", "Sundials", "Multistep_bdf",]
                   
-    nRow = Int(length(solverList) / 4)
-    solverList = reshape(solverList, (4, nRow))
-    nRow = Int(length(solverListSparse) / 4)
-    solverListSparse = reshape(solverListSparse, (4, nRow))
+    nRow = Int(length(solverList) / 5)
+    solverList = reshape(solverList, (5, nRow))
+    nRow = Int(length(solverListSparse) / 5)
+    solverListSparse = reshape(solverListSparse, (5, nRow))
     
     if sparseJacobian == true && solversCheck == "all"
         return solverListSparseMat
@@ -218,6 +214,7 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
         solverName = solverInfo[2, i]
         solverType = solverInfo[3, i]
         solverLib = solverInfo[4, i]
+        solverCategory = solverInfo[5, i]
 
         println("Trying solver = ", solverName)
         # Crauste crashes as problem is to stiff 
@@ -266,7 +263,8 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                                      success = canSolveModel, 
                                      runTime = runTime, 
                                      sqDiff = sqDiffSolver, 
-                                     iteration = 1:nTimesRepat)
+                                     iteration = 1:nTimesRepat, 
+                                     solverCategory = solverCategory)
                 if isfile(pathFileSave)
                     CSV.write(pathFileSave, dataSave, append = true)
                 else
@@ -289,7 +287,8 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                                      success = false, 
                                      runTime = NaN,
                                      sqDiff = Inf, 
-                                     iteration = 1:nTimesRepat)                
+                                     iteration = 1:nTimesRepat, 
+                                     solverCategory = solverCategory)                
                 if isfile(pathFileSave)
                     CSV.write(pathFileSave, dataSave, append = true)
                 else
