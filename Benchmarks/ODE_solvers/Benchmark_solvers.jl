@@ -139,7 +139,7 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
         return solverList
 
     else
-        iUse = [findfirst(x -> x == solversCheck[i], solverList[2, :]) for i in eachindex(solversCheck)]
+        iUse = findall(x -> x ∈ solversCheck, solverList[2, :])
         return solverList[:, iUse]
     end         
 end
@@ -217,7 +217,7 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
         solverCategory = solverInfo[5, i]
 
         println("Trying solver = ", solverName)
-        # Crauste crashes as problem is to stiff 
+        # Crauste crashes as problem is to stiff (or horrible)
         if !((petabModel.modelName == "model_Crauste_CellSystems2017") && solver == AutoTsit5(Rosenbrock23())) 
             for tol in tolsCheck
                 
@@ -241,7 +241,6 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                     tmp, canSolveModel = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops, onlySaveAtObservedTimes=true)
                     sqDiffSolver = 0.0
                 end
-                    
                 if canSolveModel == true
                     for i in 1:nTimesRepat
                         status, _runTime = solveODEModelAllConditionsBenchmark(odeProblem, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, savePreEqTime=true) 

@@ -31,10 +31,9 @@ function solveODEModelAllConditionsBenchmark(odeProblem::ODEProblem,
                                                                                              absTol, 
                                                                                              relTol, 
                                                                                              solver, 
-                                                                                             simulationInfo.absTolSS, 
-                                                                                             simulationInfo.relTolSS)
+                                                                                             simulationInfo.callbackSS)
 
-            if _odeSolutions[preEquilibrationId[i]] != :Terminated                                                                                             
+            if _odeSolutions[preEquilibrationId[i]].retcode != :Terminated                                                                                             
                 success = false
                 break
             end
@@ -47,7 +46,6 @@ function solveODEModelAllConditionsBenchmark(odeProblem::ODEProblem,
 
     for i in eachindex(simulationInfo.experimentalConditionId)
         experimentalId = simulationInfo.experimentalConditionId[i]
-        highAccuracySolution = highAccuracySolutions[experimentalId]          
         
         if onlySaveAtObservedTimes == true
             nTimePointsSave = 0
