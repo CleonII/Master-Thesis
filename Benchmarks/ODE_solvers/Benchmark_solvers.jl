@@ -129,18 +129,18 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
     solverListSparse = reshape(solverListSparse, (5, nRow))
     
     if sparseJacobian == true && solversCheck == "all"
-        return solverListSparseMat
+        return solverListSparse
 
     elseif sparseJacobian == true && solversCheck != "all"
         iUse = [findfirst(x -> x == solversCheck[i], solverListSparse[2, :]) for i in eachindex(solversCheck)]
-        return solverListSparse[iUse, :]
+        return solverListSparse[:, iUse]
 
     elseif sparseJacobian == false && solversCheck == "all"
         return solverList
 
     else
         iUse = [findfirst(x -> x == solversCheck[i], solverList[2, :]) for i in eachindex(solversCheck)]
-        return solverList[iUse, :]
+        return solverList[:, iUse]
     end         
 end
 
@@ -228,7 +228,6 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                 # error cannot be computed the solver crashed and run time is not profiled.
                 # If we do not check accuracy, check that we can solve the model using the provided solver.
                 local sqDiffSolver = Float64
-                _sol = computeAccuracyODESolver(odeProblem, highAccuracySolutions, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops)
                 if checkAccuracy == true
                     try
                         sqDiffSolver = computeAccuracyODESolver(odeProblem, highAccuracySolutions, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops)
@@ -245,8 +244,8 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                     
                 if canSolveModel == true
                     for i in 1:nTimesRepat
-                        status, runTime = solveODEModelAllConditionsBenchmark(odeProblem, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, savePreEqTime=true) 
-                        runTime[i] = runTime # seconds-precision
+                        status, _runTime = solveODEModelAllConditionsBenchmark(odeProblem, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, savePreEqTime=true) 
+                        runTime[i] = _runTime # seconds-precision
                         GC.gc(); GC.gc();GC.gc()
                     end
                 else

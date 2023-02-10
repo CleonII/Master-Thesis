@@ -29,7 +29,7 @@ function getRandomModelParameters(petabModel::PEtabModel,
     measurementInfo = processMeasurements(measurementsData, observablesData) 
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
 
-    if odeSolver == true
+    if odeSolvers == true
         transformθ!(θ_est, θ_indices.θ_estNames, θ_indices)
         return θ_est[θ_indices.iθ_dynamic]
     else
