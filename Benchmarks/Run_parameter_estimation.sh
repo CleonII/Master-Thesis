@@ -28,4 +28,8 @@ if [ $1 == "Fujita_SciSignal2010" ];then
     ${runJulia} ${pathBenchmarkScript} Fujita_SciSignal2010 $2 $3
 fi
 
+if [ $1 == "Bachmann_MSB2011" ];then
+    ${runJulia} ${pathBenchmarkScript} Bachmann_MSB2011 $2 $3
+fi
+
 exit 0
