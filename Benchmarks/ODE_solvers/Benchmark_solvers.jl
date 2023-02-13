@@ -171,7 +171,7 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
     odeProblem = remake(_odeProblem, p = convert.(Float64, _odeProblem.p), u0 = convert.(Float64, _odeProblem.u0))
     # In case we have provided a random start-guess
     if isnothing(_θ_dynamic)
-        θ_dynamic = getFileODEvalues(petabModel)
+        θ_dynamic = getNominalODEValues(petabModel)
     else
         θ_dynamic = _θ_dynamic
     end
@@ -279,7 +279,7 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                                      solverType = solverType,
                                      solverLib = solverLib,
                                      nStates = length(petabModel.stateNames)-1,
-                                     nParam = length(petabModel.paramNames),
+                                     nParam = length(petabModel.parameterNames),
                                      reltol = absTol, 
                                      abstol = relTol, 
                                      success = false, 
@@ -388,7 +388,7 @@ if ARGS[1] == "Test_random_parameter"
         petabModel = readPEtabModel(pathYML)
         
         # 40 random vector 
-        for j in 1:40
+        for j in 1:100
             θ_dynamic = getRandomModelParameters(petabModel, Rodas4P(), j)
             runBenchmarkOdeSolvers(petabModel, pathSave, false, nTimesRepat=UInt(1), 
                                    solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false, 
