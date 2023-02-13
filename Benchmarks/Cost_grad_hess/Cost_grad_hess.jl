@@ -66,6 +66,9 @@ function getRunTime(computeGradient::F, runTime, nRepeat, gradient, θ_est) wher
 
     computeGradient(gradient, θ_est)
     bGrad =  @benchmark $computeGradient($gradient, $θ_est) samples=(nRepeat+1) seconds=100000 evals=1
+    println("bGrad1 = ", bGrad)
+    bGrad =  @benchmark $computeGradient($gradient, $θ_est) samples=(nRepeat+1) seconds=100000 evals=1
+    println("bGrad2 = ", bGrad)
     runTime .= bGrad.times[2:end] .* 1e-9
 
 end
@@ -315,11 +318,13 @@ end
 if ARGS[1] == "Fix_parameters"
 
     if length(ARGS) == 1
-        modelList = ["model_Bachmann_MSB2011", "model_Lucarelli_CellSystems2018"]
+        modelList = ["model_Bachmann_MSB2011", "model_Lucarelli_CellSystems2018", "model_Isensee_JCB2018"]
     elseif ARGS[2] == "Bachman"
         modelList = ["model_Bachmann_MSB2011"]
     elseif ARGS[2] == "Lucarelli"
         modelList = ["model_Lucarelli_CellSystems2018"]
+    elseif ARGS[2] == "Isensee"
+        modelList = ["model_Isensee_JCB2018"]        
     else
         println("ARGS must either be of length 2, or the second argument must be Bachman or Lucarelli not ", ARGS[2])
         exit(1)
