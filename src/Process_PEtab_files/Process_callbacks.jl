@@ -30,7 +30,7 @@ function createCallbacksForTimeDepedentPiecewise(odeSystem::ODESystem,
         stringWriteTstops *= "\t return Float64[]\nend"
     else
         for key in keys(SBMLDict["boolVariables"])
-            functionsStr, callbackStr =  createCallback(key, SBMLDict, pODEProblemNames, modelStateNames, θ_indices) 
+            functionsStr, callbackStr =  createCallback(key, SBMLDict, pODEProblemNames, modelStateNames) 
             stringWriteCallbacks *= callbackStr * "\n"
             stringWriteFunctions *= functionsStr * "\n"
         end
@@ -58,16 +58,14 @@ end
 function createCallback(callbackName::String, 
                         SBMLDict::Dict, 
                         pODEProblemNames::Vector{String}, 
-                        modelStateNames::Vector{String}, 
-                        θ_indices::ParameterIndices)
+                        modelStateNames::Vector{String})
 
     # Check if the event trigger depend on parameters which are to be i) estimated, or ii) if it depend on models state. 
     # For i) it must be a cont. event in order for us to be able to compute the gradient. For ii) we cannot compute 
     # tstops (the event times) prior to starting to solve the ODE so it most be cont. callback
     _conditionFormula = SBMLDict["boolVariables"][callbackName][1]
     hasModelStates = conditionHasStates(_conditionFormula, modelStateNames)
-    hasParametersToEstimate = conditionHasParametersToEstimate(_conditionFormula, pODEProblemNames, θ_indices)
-    discreteEvent = hasParametersToEstimate == true || hasModelStates == true ? false : true
+    discreteEvent = hasModelStates == true ? false : true
         
     # Replace any state or parameter with their corresponding index in the ODE system to be comaptible with event 
     # syntax 
@@ -120,20 +118,29 @@ end
 
 
 # Function computing t-stops (time for events) for piecewise expressions using the symbolics package 
-# to symboically solve for where the condition is zero
-function createFuncionForTstops(SBMLDict::Dict, modelStateNames::Vector{String}, pODEProblemNames::Vector{String}, θ_indices::ParameterIndices)
+# to symboically solve for where the condition is zero.
+function createFuncionForTstops(SBMLDict::Dict, 
+                                modelStateNames::Vector{String}, 
+                                pODEProblemNames::Vector{String}, 
+                                θ_indices::ParameterIndices)
 
     tstopsStr = Vector{String}(undef, length(keys(SBMLDict["boolVariables"])))
+    tstopsStrAlt = Vector{String}(undef, length(keys(SBMLDict["boolVariables"])))
+    convertTspan = false
     i = 1
     for key in keys(SBMLDict["boolVariables"])
 
         conditionFormula = SBMLDict["boolVariables"][key][1]
         # In case the activation formula contains a state we cannot precompute the t-stop time as it depends on 
         # the actual ODE solution.
-        if conditionHasStates(conditionFormula, modelStateNames) || conditionHasParametersToEstimate(conditionFormula, pODEProblemNames, θ_indices)
+        if conditionHasStates(conditionFormula, modelStateNames) 
             tstopsStr[i] = ""
+            tstopsStrAlt[i] = ""
             i += 1
             continue
+        end
+        if conditionHasParametersToEstimate(conditionFormula, pODEProblemNames, θ_indices)
+            convertTspan = true
         end
         
         # We need to make the parameters and states symbolic in order to solve the condition expression 
@@ -162,10 +169,15 @@ function createFuncionForTstops(SBMLDict::Dict, modelStateNames::Vector{String},
         end
         # dualToFloat is needed as tstops for the integrator cannot be of type Dual 
         tstopsStr[i] = "dualToFloat(" * expressionForTime * ")"
+        tstopsStrAlt[i] = expressionForTime # Used when we convert timespan
         i += 1
     end
 
-    return "Float64[" * prod([isempty(tstopsStr[i]) ? "" : tstopsStr[i] * ", " for i in eachindex(tstopsStr)])[1:end-2] * "]"
+    if convertTspan == true
+        return"[" * prod([isempty(tstopsStrAlt[i]) ? "" : tstopsStrAlt[i] * ", " for i in eachindex(tstopsStrAlt)])[1:end-2] * "]"
+    else
+        return "Float64[" * prod([isempty(tstopsStr[i]) ? "" : tstopsStr[i] * ", " for i in eachindex(tstopsStr)])[1:end-2] * "]"
+    end
 end
 
 
@@ -194,6 +206,31 @@ function conditionHasParametersToEstimate(conditionFormula::AbstractString,
             if i ∈ iODEProblemθConstantDynamic || i ∈ iODEProblemθDynamicCondition
                 return true
             end
+        end
+    end
+    return false
+end
+
+
+# Function checking if the condition of the picewise conditions depends on a parameter which is to be estimated. 
+# In case of true the time-span need to be converted to Dual when computing the gradient (or hessian) of the 
+# the model via automatic differentitation 
+function shouldConvertTspan(pathYAML::String, SBMLDict::Dict, odeSystem::ODESystem, jlFile::Bool)::Bool
+
+    pODEProblemNames = string.(parameters(odeSystem))
+    
+    # Compute indices tracking parameters (needed as down the line we need to know if a parameter should be estimated 
+    # or not, as if such a parameter triggers a callback we must let it be a continious callback)
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAML, jlFile = jlFile)
+    parameterInfo = processParameters(parametersData) 
+    measurementInfo = processMeasurements(measurementsData, observablesData) 
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, odeSystem, experimentalConditions)                                                  
+
+    for key in keys(SBMLDict["boolVariables"])
+
+        conditionFormula = SBMLDict["boolVariables"][key][1]
+        if conditionHasParametersToEstimate(conditionFormula, pODEProblemNames, θ_indices)
+            return true
         end
     end
     return false

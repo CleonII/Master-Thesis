@@ -64,6 +64,8 @@ function _createCube(pathSave::String, petabProblem::PEtabODEProblem, nSamples::
                 paramI = [rand(Uniform(lowerBounds[i], upperBounds[i])) for i in eachindex(lowerBounds)]
             end
 
+            println("p0 = ", paramI)
+
             local cost
             try 
                 cost = petabProblem.computeCost(paramI)
@@ -76,7 +78,7 @@ function _createCube(pathSave::String, petabProblem::PEtabODEProblem, nSamples::
                 k += 1
             end
 
-            if k % 50 == 0 && verbose == true
+            if k % 1 == 0 && verbose == true
                 println("Have found $k start guesses")
             end
 

@@ -49,7 +49,11 @@ function computeCostSolveODE(θ_dynamic::AbstractVector,
     θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
     θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
 
-    _odeProblem = remake(odeProblem, p = convert.(eltype(θ_dynamicT), odeProblem.p), u0 = convert.(eltype(θ_dynamicT), odeProblem.u0))
+    if petabModel.convertTspan == false
+        _odeProblem = remake(odeProblem, p = convert.(eltype(θ_dynamicT), odeProblem.p), u0 = convert.(eltype(θ_dynamicT), odeProblem.u0))
+    else
+        _odeProblem = remake(odeProblem, p = convert.(eltype(θ_dynamicT), odeProblem.p), u0 = convert.(eltype(θ_dynamicT), odeProblem.u0), tspan=convert.(eltype(θ_dynamicT), odeProblem.tspan))
+    end
     changeODEProblemParameters!(_odeProblem.p, _odeProblem.u0, θ_dynamicT)
     
     # If computing hessian or gradient store ODE solution in arrary with dual numbers, else use 

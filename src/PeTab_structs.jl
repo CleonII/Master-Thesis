@@ -47,6 +47,7 @@ struct PEtabModel{F1<:Function,
     compute_∂h∂p!::F7
     compute_∂σ∂p!::F8
     computeTStops::F9
+    convertTspan::Bool
     odeSystem::S
     parameterMap::T1
     stateMap::T2

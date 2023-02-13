@@ -16,13 +16,8 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                             nTimePointsSave::Int64=0, 
                                             onlySaveAtObservedTimes::Bool=false,
                                             denseSolution::Bool=true, 
-                                            trackCallback::Bool=false)::Bool # Required for adjoint sensitivity analysis 
-
-    # We only have continious callbacks if one the parameters we have to estimate triggers said callback. In these 
-    # cases we need to convert time time-span of the ODE problem to dual numbers to accurately compute gradients 
-    if SciMLSensitivity.has_continuous_callback(simulationInfo.callbacks[simulationInfo.experimentalConditionId[1]])
-        odeProblem = remake(odeProblem, tspan=convert.(eltype(odeProblem.p), odeProblem.tspan))
-    end
+                                            trackCallback::Bool=false, 
+                                            convertTspan::Bool=false)::Bool # Required for adjoint sensitivity analysis 
 
     local sucess::Bool = true
     # In case the model is first simulated to a steady state 
@@ -55,7 +50,8 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                                                                absTol, 
                                                                                relTol, 
                                                                                solver, 
-                                                                               simulationInfo.callbackSS)
+                                                                               simulationInfo.callbackSS, 
+                                                                               convertTspan)
                 if _odeSolutions[preEquilibrationId[i]].retcode != :Terminated
                     return false
                 end
@@ -111,7 +107,8 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                                                       computeTStops,
                                                                       tSave=tSave, 
                                                                       denseSolution=denseSolution, 
-                                                                      trackCallback=trackCallback)
+                                                                      trackCallback=trackCallback, 
+                                                                      convertTspan=convertTspan)
 
                 if odeSolutions[experimentalId].retcode != :Success
                     sucess = false
@@ -138,7 +135,8 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                                                         computeTStops,
                                                                         tSave=tSave,
                                                                         denseSolution=denseSolution, 
-                                                                        trackCallback=trackCallback)
+                                                                        trackCallback=trackCallback, 
+                                                                        convertTspan=convertTspan)
                 retcode = odeSolutions[experimentalId].retcode                                                                         
                 if !(retcode == :Success || retcode == :Terminated)
                     sucess = false
@@ -168,7 +166,8 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                             nTimePointsSave::Int64=0, 
                                             onlySaveAtObservedTimes::Bool=false,
                                             denseSolution::Bool=true, 
-                                            trackCallback::Bool=false)::Bool
+                                            trackCallback::Bool=false, 
+                                            convertTspan::Bool=false)::Bool
 
     changeExperimentalCondition! = (pOdeProblem, u0, conditionId) -> __changeExperimentalCondition!(pOdeProblem, u0, conditionId, θ_dynamic)
     sucess = solveODEAllExperimentalConditions!(odeSolutions, 
@@ -183,7 +182,8 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                                 nTimePointsSave=nTimePointsSave,                                                 
                                                 onlySaveAtObservedTimes=onlySaveAtObservedTimes, 
                                                 denseSolution=denseSolution, 
-                                                trackCallback=trackCallback)
+                                                trackCallback=trackCallback, 
+                                                convertTspan=convertTspan)
     return sucess
 end
 function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Nothing, ODESolution}},
@@ -203,11 +203,16 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                             onlySaveAtObservedTimes::Bool=false,
                                             denseSolution::Bool=true, 
                                             trackCallback::Bool=false, 
+                                            convertTspan::Bool=false,
                                             chunkSize::Union{Nothing, Int64}=nothing)::Bool
 
     function computeSensitivityMatrix!(odeSolutionValues::AbstractMatrix, θ::AbstractVector)
 
-        _odeProblem = remake(odeProblem, p = convert.(eltype(θ), odeProblem.p), u0 = convert.(eltype(θ), odeProblem.u0))
+        if convertTspan == false
+            _odeProblem = remake(odeProblem, p = convert.(eltype(θ), odeProblem.p), u0 = convert.(eltype(θ), odeProblem.u0))
+        else
+            _odeProblem = remake(odeProblem, p = convert.(eltype(θ), odeProblem.p), u0 = convert.(eltype(θ), odeProblem.u0), tspan=convert.(eltype(θ), odeProblem.tspan))
+        end
         
         changeODEProblemParameters(_odeProblem.p, _odeProblem.u0, θ)
         _changeExperimentalCondition! = (pOdeProblem, u0, conditionId) -> __changeExperimentalCondition!(pOdeProblem, u0, conditionId, θ)
@@ -224,7 +229,8 @@ function solveODEAllExperimentalConditions!(odeSolutions::Dict{Symbol, Union{Not
                                                     nTimePointsSave=nTimePointsSave, 
                                                     onlySaveAtObservedTimes=onlySaveAtObservedTimes, 
                                                     denseSolution=denseSolution, 
-                                                    trackCallback=trackCallback)
+                                                    trackCallback=trackCallback, 
+                                                    convertTspan=convertTspan)
 
         # Effectively we return a big-array with the ODE-solutions accross all experimental conditions, where 
         # each column is a time-point.                                                    
@@ -279,7 +285,8 @@ function solveODEAllExperimentalConditions(odeProblem::ODEProblem,
                                            nTimePointsSave::Int64=0, 
                                            onlySaveAtObservedTimes::Bool=false,
                                            denseSolution::Bool=true, 
-                                           trackCallback::Bool=false)::Tuple{Dict{Symbol, Union{Nothing, ODESolution}}, Bool}
+                                           trackCallback::Bool=false, 
+                                           convertTspan::Bool=false)::Tuple{Dict{Symbol, Union{Nothing, ODESolution}}, Bool}
 
     odeSolutions = deepcopy(simulationInfo.odeSolutions)
     success = solveODEAllExperimentalConditions!(odeSolutions, 
@@ -294,7 +301,8 @@ function solveODEAllExperimentalConditions(odeProblem::ODEProblem,
                                                  nTimePointsSave=nTimePointsSave, 
                                                  onlySaveAtObservedTimes=onlySaveAtObservedTimes, 
                                                  denseSolution=denseSolution, 
-                                                 trackCallback=trackCallback)
+                                                 trackCallback=trackCallback, 
+                                                 convertTspan=convertTspan)
 
     return odeSolutions, success
 end
@@ -308,11 +316,12 @@ function solveODEPreEqulibrium!(uAtSS::AbstractVector,
                                 absTol::Float64, 
                                 relTol::Float64, 
                                 solver::Union{SciMLAlgorithm, Vector{Symbol}},
-                                callbackSS::SciMLBase.DECallback)::ODESolution
+                                callbackSS::SciMLBase.DECallback, 
+                                convertTspan::Bool)::ODESolution
 
     # Change to parameters for the preequilibration simulations 
     changeExperimentalCondition!(odeProblem.p, odeProblem.u0, preEquilibrationId)
-    _odeProblem = remake(odeProblem, tspan = (0.0, 1e8), p = odeProblem.p[:], u0 = odeProblem.u0[:])
+    _odeProblem = remakeODEProblemPreSolve(odeProblem, (0.0, 1e8), convertTspan)
     uAtT0 .= _odeProblem.u0
 
     # Terminate if a steady state was not reached in preequilibration simulations 
@@ -356,7 +365,8 @@ function solveODEPostEqulibrium(odeProblem::ODEProblem,
                                 computeTStops::Function;
                                 tSave::Vector{Float64}=Float64[], 
                                 denseSolution::Bool=true, 
-                                trackCallback::Bool=false)::ODESolution
+                                trackCallback::Bool=false, 
+                                convertTspan::Bool=false)::ODESolution
 
     changeExperimentalCondition!(odeProblem.p, odeProblem.u0, simulationConditionId)
     # Sometimes the experimentaCondition-file changes the initial values for a state 
@@ -370,7 +380,7 @@ function solveODEPostEqulibrium(odeProblem::ODEProblem,
     # share the same parameter vector p. This will, for example, cause the lower level adjoint 
     # sensitivity interface to fail.
     _tMax = isinf(tMax) ? 1e8 : tMax
-    _odeProblem = remake(odeProblem, tspan = (0.0, _tMax), u0=odeProblem.u0[:], p=odeProblem.p[:])     
+    _odeProblem = remakeODEProblemPreSolve(odeProblem, (0.0, _tMax), convertTspan)
     _odeProblem.u0 .= odeProblem.u0[:] # This is needed due as remake does not work correctly for forward sensitivity equations
 
     # If case of adjoint sensitivity analysis we need to track the callback to get correct gradients 
@@ -394,12 +404,13 @@ function solveODENoPreEqulibrium!(odeProblem::ODEProblem,
                                  computeTStops::Function; 
                                  tSave=Float64[], 
                                  denseSolution::Bool=true, 
-                                 trackCallback::Bool=false)::ODESolution
+                                 trackCallback::Bool=false, 
+                                 convertTspan::Bool=false)::ODESolution
 
     # Change experimental condition 
     tMax = isinf(_tMax) ? 1e8 : _tMax
     changeExperimentalCondition!(odeProblem.p, odeProblem.u0, simulationConditionId)
-    _odeProblem = remake(odeProblem, tspan=(0.0, tMax), u0 = odeProblem.u0[:], p = odeProblem.p[:])
+    _odeProblem = remakeODEProblemPreSolve(odeProblem, (0.0, tMax), convertTspan)
     _odeProblem.u0 .= odeProblem.u0[:] # Required remake does not handle Senstivity-problems correctly
     
     tStops = computeTStops(_odeProblem.u0, _odeProblem.p)
@@ -421,7 +432,7 @@ function computeODESolution(odeProblem::ODEProblem,
                             tSave::Vector{Float64}, 
                             denseSolution::Bool, 
                             callbackSet::SciMLBase.DECallback, 
-                            tStops::Vector{<:AbstractFloat})::ODESolution
+                            tStops::AbstractVector)::ODESolution
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
@@ -442,7 +453,7 @@ function computeODESolution(odeProblem::ODEProblem,
                             tSave::Vector{Float64}, 
                             denseSolution::Bool, 
                             callbackSet::SciMLBase.DECallback, 
-                            tStops::Vector{<:AbstractFloat})::ODESolution
+                            tStops::AbstractVector)::ODESolution
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
@@ -476,5 +487,15 @@ function checkError(e)
         println("Domain error on ODE solve")
     else
         rethrow(e)
+    end
+end
+
+
+function remakeODEProblemPreSolve(odeProblem::ODEProblem, tspan, convertTspan::Bool)::ODEProblem
+
+    if convertTspan == false
+        return remake(odeProblem, tspan = tspan, p = odeProblem.p[:], u0 = odeProblem.u0[:])
+    else
+        return remake(odeProblem, tspan = convert.(eltype(odeProblem.p), odeProblem.tspan), p = odeProblem.p[:], u0 = odeProblem.u0[:])
     end
 end
