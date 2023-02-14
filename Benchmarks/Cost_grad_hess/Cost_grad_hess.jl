@@ -375,6 +375,8 @@ if ARGS[1] == "Test_chunks_random_p"
         modelList = ["model_Bachmann_MSB2011"]
     elseif ARGS[2] == "Lucarelli"
         modelList = ["model_Lucarelli_CellSystems2018"]
+    elseif ARGS[2] == "Isensee"
+        modelList = ["model_Isensee_JCB2018"]            
     else
         println("ARGS must either be of length 2, or the second argument must be Bachman or Lucarelli not ", ARGS[2])
         exit(1)

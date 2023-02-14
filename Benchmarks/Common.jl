@@ -15,9 +15,9 @@ function getRandomModelParameters(petabModel::PEtabModel,
     # Generate Cube if lacking and choose one parameter vector 
     petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=tol, solverRelTol=tol)
     if odeSolvers == true
-        pathCube = petabModel.dirJulia * "Cube_ode_solvers.csv"
+        pathCube = joinpath(petabModel.dirJulia, "Cube_ode_solvers.csv")
     else
-        pathCube = petabModel.dirJulia * "Cost_grad_hess.csv"
+        pathCube = joinpath(petabModel.dirJulia, "Cost_grad_hess.csv")
     end
     createCube(pathCube, petabProblem, nParamCube, seed=123, verbose=false)
     cube = Matrix(CSV.read(pathCube, DataFrame))
