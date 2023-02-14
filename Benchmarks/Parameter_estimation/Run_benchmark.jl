@@ -83,11 +83,13 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                       terminateSSMethod=:Norm, 
                                       solverSSRelTol::Float64=1e-8,
                                       solverSSAbsTol::Float64=1e-10, 
-                                      reuseS::Bool=true)
+                                      reuseS::Bool=true, 
+                                      splitOverConditions::Bool=false)
 
     petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=absTol, solverRelTol=relTol, terminateSSMethod=terminateSSMethod, 
                                         solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol, 
-                                        reuseS=reuseS, sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver)
+                                        reuseS=reuseS, sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver, 
+                                        splitOverConditions=splitOverConditions)
     θ_estNames = string.(petabProblem.θ_estNames)
 
     pathCube = joinpath(petabModel.dirJulia, "Cube_benchmark.csv")
@@ -144,9 +146,9 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
     FidesAutoHessBlock = setUpFides(petabProblem, :blockAutoDiff; verbose=0, 
                                     options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
-    FidesGN = setUpFides(petabProblem, :GaussNewton; verbose=0, 
+    FidesGN = setUpFides(petabProblem, :GaussNewton; verbose=1, 
                          options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)                                    
-    FidesBFGS = setUpFides(petabProblem, :None; verbose=0,
+    FidesBFGS = setUpFides(petabProblem, :None; verbose=1,
                            fidesHessApprox=py"fides.hessian_approximation.BFGS()"o, 
                            options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
 
@@ -310,6 +312,14 @@ if ARGS[1] == "Fiedler_BMC2016"
 end
 
 
+if ARGS[1] == "Beer_MolBioSystems2014"
+    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Beer_MolBioSystems2014", "Beer_MolBioSystems2014.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=true)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], splitOverConditions=true) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false, splitOverConditions=true) 
+end
+
+
 if ARGS[1] == "Boehm_JProteomeRes2014"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Boehm_JProteomeRes2014", "Boehm_JProteomeRes2014.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)     
@@ -338,6 +348,9 @@ if ARGS[1] == "Weber_BMC2015"
     benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest, terminateSSMethod=:Norm) 
 end
 
+pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Bachmann_MSB2011", "Bachmann_MSB2011.yaml")
+petabModel = readPEtabModel(pathYML, verbose=true)
+benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", 1e-8, 1e-8, 1000; algList=[:FidesBFGS])
 
 if ARGS[1] == "Bachmann_MSB2011"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Bachmann_MSB2011", "Bachmann_MSB2011.yaml")
