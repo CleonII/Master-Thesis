@@ -106,7 +106,8 @@ function computeAccuracyODESolver(odeProblem::ODEProblem,
                                                                           absTol, 
                                                                           relTol, 
                                                                           solver, 
-                                                                          simulationInfo.callbackSS)
+                                                                          simulationInfo.callbackSS, 
+                                                                          false)
         end
     end
 

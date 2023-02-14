@@ -321,7 +321,7 @@ function solveODEPreEqulibrium!(uAtSS::AbstractVector,
 
     # Change to parameters for the preequilibration simulations 
     changeExperimentalCondition!(odeProblem.p, odeProblem.u0, preEquilibrationId)
-    _odeProblem = remakeODEProblemPreSolve(odeProblem, (0.0, 1e8), convertTspan)
+    _odeProblem = remakeODEProblemPreSolve(odeProblem, Inf, solver, convertTspan)
     uAtT0 .= _odeProblem.u0
 
     # Terminate if a steady state was not reached in preequilibration simulations 
@@ -379,15 +379,14 @@ function solveODEPostEqulibrium(odeProblem::ODEProblem,
     # Here it is IMPORTANT that we copy odeProblem.p[:] else different experimental conditions will 
     # share the same parameter vector p. This will, for example, cause the lower level adjoint 
     # sensitivity interface to fail.
-    _tMax = isinf(tMax) ? 1e8 : tMax
-    _odeProblem = remakeODEProblemPreSolve(odeProblem, (0.0, _tMax), convertTspan)
+    _odeProblem = remakeODEProblemPreSolve(odeProblem, tMax, solver, convertTspan)
     _odeProblem.u0 .= odeProblem.u0[:] # This is needed due as remake does not work correctly for forward sensitivity equations
 
     # If case of adjoint sensitivity analysis we need to track the callback to get correct gradients 
     tStops = computeTStops(_odeProblem.u0, _odeProblem.p)
     callbackSet = getCallbackSet(_odeProblem, simulationInfo, experimentalId, trackCallback)
     sol = computeODESolution(_odeProblem, solver, absTol, relTol, simulationInfo.absTolSS, simulationInfo.relTolSS, 
-                             _tMax, tSave, denseSolution, callbackSet, tStops)
+                             tSave, denseSolution, callbackSet, tStops)
 
     return sol                                     
 end
@@ -410,13 +409,13 @@ function solveODENoPreEqulibrium!(odeProblem::ODEProblem,
     # Change experimental condition 
     tMax = isinf(_tMax) ? 1e8 : _tMax
     changeExperimentalCondition!(odeProblem.p, odeProblem.u0, simulationConditionId)
-    _odeProblem = remakeODEProblemPreSolve(odeProblem, (0.0, tMax), convertTspan)
+    _odeProblem = remakeODEProblemPreSolve(odeProblem, tMax, solver, convertTspan)
     _odeProblem.u0 .= odeProblem.u0[:] # Required remake does not handle Senstivity-problems correctly
     
     tStops = computeTStops(_odeProblem.u0, _odeProblem.p)
     callbackSet = getCallbackSet(_odeProblem, simulationInfo, simulationConditionId, trackCallback)
     sol = computeODESolution(_odeProblem, solver, absTol, relTol, simulationInfo.absTolSS, simulationInfo.relTolSS, 
-                             _tMax, tSave, denseSolution, callbackSet, tStops)
+                             tSave, denseSolution, callbackSet, tStops)
 
     return sol                                     
 end
@@ -428,7 +427,6 @@ function computeODESolution(odeProblem::ODEProblem,
                             relTol::Float64,
                             absTolSS::Float64, 
                             relTolSS::Float64,
-                            tMax::Float64, 
                             tSave::Vector{Float64}, 
                             denseSolution::Bool, 
                             callbackSet::SciMLBase.DECallback, 
@@ -436,7 +434,7 @@ function computeODESolution(odeProblem::ODEProblem,
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
-    if isinf(tMax) || tMax == 1e8
+    if isinf(odeProblem.tspan[2]) || odeProblem.tspan[2] == 1e8
         sol = solve(odeProblem, alg_hints=solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=denseSolution, callback=TerminateSteadyState(absTolSS, relTolSS))
     else 
         sol = solve(odeProblem, alg_hints=solver, abstol=absTol, reltol=relTol, saveat=tSave, dense=denseSolution, tstops=tStops, callback=callbackSet)   
@@ -449,7 +447,6 @@ function computeODESolution(odeProblem::ODEProblem,
                             relTol::Float64,
                             absTolSS::Float64, 
                             relTolSS::Float64,
-                            tMax::Float64, 
                             tSave::Vector{Float64}, 
                             denseSolution::Bool, 
                             callbackSet::SciMLBase.DECallback, 
@@ -457,7 +454,7 @@ function computeODESolution(odeProblem::ODEProblem,
 
     # Different funcion calls to solve are required if a solver or a Alg-hint are provided. 
     # If t_max = inf the model is simulated to steady state using the TerminateSteadyState callback.
-    if isinf(tMax) || tMax == 1e8
+    if isinf(odeProblem.tspan[2]) || odeProblem.tspan[2] == 1e8
         sol = solve(odeProblem, solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=denseSolution, callback=TerminateSteadyState(absTolSS, relTolSS))
     else
         sol = solve(odeProblem, solver, abstol=absTol, reltol=relTol, saveat=tSave, dense=denseSolution, tstops=tStops, callback=callbackSet)
@@ -491,11 +488,26 @@ function checkError(e)
 end
 
 
-function remakeODEProblemPreSolve(odeProblem::ODEProblem, tspan, convertTspan::Bool)::ODEProblem
+function remakeODEProblemPreSolve(odeProblem::ODEProblem, 
+                                  tmax::Float64, 
+                                  odeSolver::Union{Vector{Symbol}, SciMLAlgorithm},
+                                  convertTspan::Bool)::ODEProblem
 
+    # When tmax=Inf and a multistep BDF Julia method, e.g. QNDF, is used tmax must be inf, else if it is a large 
+    # number such as 1e8 the dt_min is set to a large value making the solver fail. Sundials solvers on the other 
+    # hand are not compatible with timespan = (0.0, Inf), hence for these we use timespan = (0.0, 1e8)
+    tmax::Float64 = _getTmax(tmax, odeSolver)
     if convertTspan == false
-        return remake(odeProblem, tspan = tspan, p = odeProblem.p[:], u0 = odeProblem.u0[:])
+        return remake(odeProblem, tspan = (0.0, tmax), p = odeProblem.p[:], u0 = odeProblem.u0[:])
     else
-        return remake(odeProblem, tspan = convert.(eltype(odeProblem.p), odeProblem.tspan), p = odeProblem.p[:], u0 = odeProblem.u0[:])
+        return remake(odeProblem, tspan = convert.(eltype(odeProblem.p), (0.0, tmax)), p = odeProblem.p[:], u0 = odeProblem.u0[:])
     end
+end
+
+
+function _getTmax(tmax::Float64, odeSolver::Union{CVODE_BDF, CVODE_Adams})::Float64
+    return isinf(tmax) ? 1e8 : tmax
+end
+function _getTmax(tmax::Float64, odeSolver::Union{Vector{Symbol}, SciMLAlgorithm})::Float64
+    return tmax
 end

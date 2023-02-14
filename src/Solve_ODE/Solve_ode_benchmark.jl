@@ -31,7 +31,8 @@ function solveODEModelAllConditionsBenchmark(odeProblem::ODEProblem,
                                                                                              absTol, 
                                                                                              relTol, 
                                                                                              solver, 
-                                                                                             simulationInfo.callbackSS)
+                                                                                             simulationInfo.callbackSS, 
+                                                                                             false)
 
             if _odeSolutions[preEquilibrationId[i]].retcode != :Terminated                                                                                             
                 success = false
