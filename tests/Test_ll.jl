@@ -58,7 +58,9 @@ function testGradientFiniteDifferences(petabModel::PEtabModel, solver, tol::Floa
                                        testTol::Float64=1e-3, 
                                        sensealgSS=SteadyStateAdjoint(), 
                                        sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)),
-                                       solverSSRelTol=1e-8, solverSSAbsTol=1e-10)
+                                       solverSSRelTol=1e-8, solverSSAbsTol=1e-10, 
+                                       onlyCheckAutoDiff::Bool=false,
+                                       splitOverConditions=false)
 
     # Testing the gradient via finite differences 
     petabProblem1 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
@@ -66,7 +68,7 @@ function testGradientFiniteDifferences(petabModel::PEtabModel, solver, tol::Floa
                                          odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
                                          sensealgAdjoint=sensealgAdjoint, 
                                          solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol,
-                                         sensealgAdjointSS=sensealgSS)
+                                         sensealgAdjointSS=sensealgSS, splitOverConditions=splitOverConditions)
     petabProblem2 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
                                          solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol,
                                          sensealgForwardEquations=ForwardSensitivity(), odeSolverForwardEquations=solverForwardEq)                                        
@@ -81,9 +83,11 @@ function testGradientFiniteDifferences(petabModel::PEtabModel, solver, tol::Floa
         gradientForwardEquations1 = zeros(length(θ_use))
         gradientForwardEquations2 = zeros(length(θ_use))
         petabProblem1.computeGradientForwardEquations(gradientForwardEquations1, θ_use)
-        petabProblem2.computeGradientForwardEquations(gradientForwardEquations2, θ_use)
         @test norm(gradientFinite - gradientForwardEquations1) ≤ testTol
-        @test norm(gradientFinite - gradientForwardEquations2) ≤ testTol
+        if onlyCheckAutoDiff == false
+            petabProblem2.computeGradientForwardEquations(gradientForwardEquations2, θ_use)
+            @test norm(gradientFinite - gradientForwardEquations2) ≤ testTol
+        end
     end
 
     if checkAdjoint == true
@@ -107,6 +111,7 @@ end
     petabModel = readPEtabModel(pathYML, verbose=false, forceBuildJuliaFiles=true)     
     testLogLikelihoodValue(petabModel, -58622.9145631413, Rodas4P())
     testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8, testTol=1e-1)           
+    testGradientFiniteDifferences(petabModel, Rodas4P(), 1e-8, testTol=1e-1, onlyCheckAutoDiff=true, checkForwardEquations=true, splitOverConditions=true)           
     
     # Boehm model 
     pathYML = joinpath(@__DIR__, "..", "Intermediate", "PeTab_models", "model_Boehm_JProteomeRes2014", "Boehm_JProteomeRes2014.yaml")

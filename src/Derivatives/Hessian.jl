@@ -16,29 +16,58 @@ function computeHessian!(hessian::Matrix{Float64},
                         solveOdeModelAllConditions!::Function, 
                         priorInfo::PriorInfo, 
                         chunkSize::Union{Nothing, Int64}; 
+                        splitOverConditions::Bool=false,
                         expIDSolve::Vector{Symbol} = [:all])
 
-    _evalHessian = (θ_est) -> computeCost(θ_est, odeProblem, petabModel, simulationInfo, θ_indices, 
-                                          measurementInfo, parameterInfo, changeODEProblemParameters!, 
-                                          solveOdeModelAllConditions!, priorInfo, computeHessian=true, 
-                                          expIDSolve=expIDSolve)
+    if splitOverConditions == false
+        _evalHessian = (θ_est) -> computeCost(θ_est, odeProblem, petabModel, simulationInfo, θ_indices, 
+                                              measurementInfo, parameterInfo, changeODEProblemParameters!, 
+                                              solveOdeModelAllConditions!, priorInfo, computeHessian=true, 
+                                              expIDSolve=expIDSolve)
 
-    if !isnothing(chunkSize)                                          
-        cfg = ForwardDiff.HessianConfig(_evalHessian, θ_est, ForwardDiff.Chunk(chunkSize))
-    else
-        cfg = ForwardDiff.HessianConfig(_evalHessian, θ_est, ForwardDiff.Chunk(θ_est))
-    end
-    
-    # Only try to compute hessian if we could compute the cost 
-    if all([simulationInfo.odeSolutions[id].retcode == :Success for id in simulationInfo.experimentalConditionId])
-        try 
-            ForwardDiff.hessian!(hessian, _evalHessian, θ_est, cfg)
-            hessian .= Symmetric(hessian)
-        catch
+        if !isnothing(chunkSize)                                          
+            cfg = ForwardDiff.HessianConfig(_evalHessian, θ_est, ForwardDiff.Chunk(chunkSize))
+        else
+            cfg = ForwardDiff.HessianConfig(_evalHessian, θ_est, ForwardDiff.Chunk(θ_est))
+        end
+        
+        # Only try to compute hessian if we could compute the cost 
+        if all([simulationInfo.odeSolutions[id].retcode == :Success for id in simulationInfo.experimentalConditionId])
+            try 
+                ForwardDiff.hessian!(hessian, _evalHessian, θ_est, cfg)
+                hessian .= Symmetric(hessian)
+            catch
+                hessian .= 0.0
+            end
+        else
             hessian .= 0.0
         end
-    else
+    
+    elseif splitOverConditions == true && simulationInfo.haspreEquilibrationConditionId == false
         hessian .= 0.0
+        for conditionId in simulationInfo.experimentalConditionId
+            mapConditionId = θ_indices.mapsConiditionId[conditionId]  
+            iθ_experimentalCondition = unique(vcat(θ_indices.mapODEProblem.iθDynamic, mapConditionId.iθDynamic, θ_indices.iθ_notOdeSystem))
+            θ_input = θ_est[iθ_experimentalCondition]
+            hTmp = zeros(length(θ_input), length(θ_input))
+            computeCostDynamicθExpCond = (θ_arg) -> begin
+                                                        _θ_est = convert.(eltype(θ_arg), θ_est)
+                                                        _θ_est[iθ_experimentalCondition] .= θ_arg
+                                                        return computeCost(_θ_est, odeProblem, petabModel, simulationInfo, θ_indices, 
+                                                                           measurementInfo, parameterInfo, changeODEProblemParameters!, 
+                                                                           solveOdeModelAllConditions!, priorInfo, computeHessian=true, 
+                                                                           expIDSolve=[conditionId])
+                                                    end
+            ForwardDiff.hessian!(hTmp, computeCostDynamicθExpCond, θ_input)
+            @inbounds for i in eachindex(iθ_experimentalCondition)
+                @inbounds for j in eachindex(iθ_experimentalCondition)
+                    hessian[iθ_experimentalCondition[i], iθ_experimentalCondition[j]] += hTmp[i, j]    
+                end
+            end
+        end
+
+    else splitOverConditions == true && simulationInfo.haspreEquilibrationConditionId == true
+        println("Compatabillity error : Currently we only support to split gradient compuations accross experimentalConditionId:s for models without preequilibration")
     end
 
     if priorInfo.hasPriors == true
@@ -59,6 +88,7 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
                                            solveOdeModelAllConditions!::Function, 
                                            priorInfo::PriorInfo, 
                                            chunkSize::Union{Nothing, Int64}; 
+                                           splitOverConditions::Bool=false,
                                            expIDSolve::Vector{Symbol} = [:all]) 
 
     # Avoid incorrect non-zero values 
@@ -66,24 +96,52 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
 
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
 
-    # Compute hessian for parameters which are a part of the ODE-system (dynamic parameters)
-    computeCostDynamicθ = (x) -> computeCostSolveODE(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, petabModel, 
-                                                     simulationInfo, θ_indices, measurementInfo, parameterInfo, 
-                                                     changeODEProblemParameters!, solveOdeModelAllConditions!, 
-                                                     computeHessian=true, 
-                                                     expIDSolve=expIDSolve)
+    if splitOverConditions == false
+        # Compute hessian for parameters which are a part of the ODE-system (dynamic parameters)
+        computeCostDynamicθ = (x) -> computeCostSolveODE(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, petabModel, 
+                                                        simulationInfo, θ_indices, measurementInfo, parameterInfo, 
+                                                        changeODEProblemParameters!, solveOdeModelAllConditions!, 
+                                                        computeHessian=true, 
+                                                        expIDSolve=expIDSolve)
 
-    if !isnothing(chunkSize)                                          
-        cfg = ForwardDiff.HessianConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(chunkSize))
-    else
-        cfg = ForwardDiff.HessianConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(θ_dynamic))
-    end
+        if !isnothing(chunkSize)                                          
+            cfg = ForwardDiff.HessianConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(chunkSize))
+        else
+            cfg = ForwardDiff.HessianConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(θ_dynamic))
+        end
 
-    try 
-        @views ForwardDiff.hessian!(hessian[θ_indices.iθ_dynamic, θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic, cfg)        
-    catch
+        try 
+            @views ForwardDiff.hessian!(hessian[θ_indices.iθ_dynamic, θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic, cfg)        
+        catch
+            hessian .= 0.0
+            return 
+        end
+
+    elseif splitOverConditions == true && simulationInfo.haspreEquilibrationConditionId == false
         hessian .= 0.0
-        return 
+        for conditionId in simulationInfo.experimentalConditionId
+            mapConditionId = θ_indices.mapsConiditionId[conditionId]  
+            iθ_experimentalCondition = unique(vcat(θ_indices.mapODEProblem.iθDynamic, mapConditionId.iθDynamic))
+            θ_input = θ_dynamic[iθ_experimentalCondition]
+            hTmp = zeros(length(θ_input), length(θ_input))
+            computeCostDynamicθExpCond = (θ_arg) -> begin
+                                                        _θ_dynamic = convert.(eltype(θ_arg), θ_dynamic)
+                                                        _θ_dynamic[iθ_experimentalCondition] .= θ_arg
+                                                        return computeCostSolveODE(_θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem, petabModel, 
+                                                                                   simulationInfo, θ_indices, measurementInfo, parameterInfo, 
+                                                                                   changeODEProblemParameters!, solveOdeModelAllConditions!, 
+                                                                                   computeHessian=true, expIDSolve=[conditionId])
+                                                    end
+            ForwardDiff.hessian!(hTmp, computeCostDynamicθExpCond, θ_input)                                                    
+            @inbounds for i in eachindex(iθ_experimentalCondition)
+                @inbounds for j in eachindex(iθ_experimentalCondition)
+                    hessian[iθ_experimentalCondition[i], iθ_experimentalCondition[j]] += hTmp[i, j]    
+                end
+            end
+        end
+
+    else splitOverConditions == true && simulationInfo.haspreEquilibrationConditionId == true
+        println("Compatabillity error : Currently we only support to split gradient compuations accross experimentalConditionId:s for models without preequilibration")
     end
 
     # Check if we could solve the ODE (first), and if Inf was returned (second)

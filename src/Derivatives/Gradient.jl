@@ -19,28 +19,52 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
                                   solveOdeModelAllConditions!::Function, 
                                   priorInfo::PriorInfo, 
                                   chunkSize::Union{Nothing, Int64};
+                                  splitOverConditions::Bool=false,
                                   expIDSolve::Vector{Symbol} = [:all])     
 
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
-    # Compute hessian for parameters which are a part of the ODE-system (dynamic parameters)
-    computeCostDynamicθ = (x) -> computeCostSolveODE(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, petabModel, 
-                                                     simulationInfo, θ_indices, measurementInfo, parameterInfo, 
-                                                     changeODEProblemParameters!, solveOdeModelAllConditions!, 
-                                                     computeGradientDynamicθ=true, expIDSolve=expIDSolve)
+    
+    if splitOverConditions == false
 
-    if !isnothing(chunkSize)                                                     
-        cfg = ForwardDiff.GradientConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(chunkSize))
-    else
-        cfg = ForwardDiff.GradientConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(θ_dynamic))
+        # Compute gradient for parameters which are a part of the ODE-system (dynamic parameters)
+        computeCostDynamicθ = (x) -> computeCostSolveODE(x, θ_sd, θ_observable, θ_nonDynamic, odeProblem, petabModel, 
+                                                         simulationInfo, θ_indices, measurementInfo, parameterInfo, 
+                                                         changeODEProblemParameters!, solveOdeModelAllConditions!, 
+                                                         computeGradientDynamicθ=true, expIDSolve=expIDSolve)
+    
+        if !isnothing(chunkSize)                                                     
+            cfg = ForwardDiff.GradientConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(chunkSize))
+        else
+            cfg = ForwardDiff.GradientConfig(computeCostDynamicθ, θ_dynamic, ForwardDiff.Chunk(θ_dynamic))
+        end
+
+        try 
+            @views ForwardDiff.gradient!(gradient[θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic, cfg)
+        catch
+            gradient .= 1e8
+            return
+        end
+            
+    elseif splitOverConditions == true && simulationInfo.haspreEquilibrationConditionId == false
+        gradient .= 0.0
+        for conditionId in simulationInfo.experimentalConditionId
+            mapConditionId = θ_indices.mapsConiditionId[conditionId]  
+            iθ_experimentalCondition = unique(vcat(θ_indices.mapODEProblem.iθDynamic, mapConditionId.iθDynamic))
+            θ_input = θ_dynamic[iθ_experimentalCondition]
+            computeCostDynamicθExpCond = (θ_arg) -> begin
+                                                        _θ_dynamic = convert.(eltype(θ_arg), θ_dynamic)
+                                                        _θ_dynamic[iθ_experimentalCondition] .= θ_arg
+                                                        return computeCostSolveODE(_θ_dynamic, θ_sd, θ_observable, θ_nonDynamic, odeProblem, petabModel, 
+                                                                                   simulationInfo, θ_indices, measurementInfo, parameterInfo, 
+                                                                                   changeODEProblemParameters!, solveOdeModelAllConditions!, 
+                                                                                   computeGradientDynamicθ=true, expIDSolve=[conditionId])
+                                                    end
+            gradient[iθ_experimentalCondition] .+= ForwardDiff.gradient(computeCostDynamicθExpCond, θ_input)::Vector{Float64}
+        end
+
+    else splitOverConditions == true && simulationInfo.haspreEquilibrationConditionId == true
+        println("Compatabillity error : Currently we only support to split gradient compuations accross experimentalConditionId:s for models without preequilibration")
     end
-
-    try 
-        @views ForwardDiff.gradient!(gradient[θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic, cfg)
-    catch
-        gradient .= 1e8
-        return
-    end
-
 
     # Check if we could solve the ODE (first), and if Inf was returned (second)
     if couldSolveODEModel(simulationInfo, expIDSolve) == false
