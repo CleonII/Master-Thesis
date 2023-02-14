@@ -9,11 +9,9 @@ if [ ! $currentDir == "Master-Thesis" ]; then
     exit 1
 fi
 
-# Neede to load Conda environment with Fides 
-eval "$(conda shell.bash hook)"
-conda activate PeTab
-
-runJulia="/home/sebpe/julia-1.8.5-linux-x86_64/julia-1.8.5/bin/julia --project=. --threads=1"
+# load same venv we installed packages before, no need for second anaconda environment, next two lines need to be manually adjusted with the environment used before for installing packages and the julia binary of version 1.8.5
+source /home/sgrein/julia_benchmark/pypesto_benchmark/venv/bin/activate
+runJulia="/home/sgrein/julia/julia --project=. --threads=1"
 pathBenchmarkScript="./Benchmarks/Parameter_estimation/Run_benchmark.jl"
 
 if [ $1 == "Boehm_JProteomeRes2014" ];then

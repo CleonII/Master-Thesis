@@ -281,8 +281,8 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
     end
 end
 
-
-loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
+# not required anymore
+# loadFidesFromPython("/home/sebpe/anaconda3/envs/PeTab/bin/python")
 
 
 if length(ARGS) < 3
