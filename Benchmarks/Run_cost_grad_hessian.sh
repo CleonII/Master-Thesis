@@ -37,4 +37,14 @@ if [ $1 == "Fix_parameters" ];then
 fi
 
 
+if [ $1 == "Test_chunks_shuffle" ];then
+    runJulia="/home/sebpe/julia-1.8.5-linux-x86_64/julia-1.8.5/bin/julia --project=. --threads=1"
+    pathBenchmarkScript="./Benchmarks/Cost_grad_hess/Cost_grad_hess.jl"
+    
+    # For Bachman 
+    ${runJulia} ${pathBenchmarkScript} Test_chunks_random_p Bachman Shuffle 123
+    ${runJulia} ${pathBenchmarkScript} Test_chunks_random_p Bachman Shuffle 321
+fi
+
+
 exit 0

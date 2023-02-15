@@ -106,6 +106,38 @@ function getPEtabModelNparamFixed(petabModel::PEtabModel, nParamFixate::Integer)
 end
 
 
+# Get a PEtab model with permuted parmeters 
+function getPEtabModelParamPermuted(petabModel::PEtabModel; seed=123)::PEtabModel
+    
+    Random.seed!(seed)
+    dirNew = joinpath(petabModel.dirModel, "Permuted_param" * petabModel.modelName)
+    if !isdir(dirNew)
+        mkdir(dirNew)
+    end
+
+    # Copy PEtab files to new directory 
+    pathParameters = copyFileToDest(petabModel.pathParameters, dirNew)
+    pathConditions = copyFileToDest(petabModel.pathConditions, dirNew)
+    pathObservables = copyFileToDest(petabModel.pathObservables, dirNew)
+    pathMeasurements = copyFileToDest(petabModel.pathMeasurements, dirNew)
+    pathSBML = copyFileToDest(petabModel.pathSBML, dirNew)
+    pathYAML = copyFileToDest(petabModel.pathYAML, dirNew)
+
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAML)
+
+    parameterInfo = processParameters(parametersData) 
+    measurementInfo = processMeasurements(measurementsData, observablesData) 
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
+
+    iEstimate = findall(x ->  x == 1, parametersData[!, :estimate])
+    parametersData[iEstimate, :] = parametersData[shuffle(iEstimate), :]
+    rm(pathParameters)
+    CSV.write(pathParameters, parametersData, delim = '\t')
+
+    return readPEtabModel(pathYAML)
+end
+
+
 # Will given a filePath copy the file (with the same name) to dirDest
 function copyFileToDest(filePath::String, dirDest::String)
     newPath = joinpath(dirDest, splitdir(filePath)[end])

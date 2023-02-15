@@ -383,21 +383,33 @@ if ARGS[1] == "Test_chunks_random_p"
     end
 
     dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
-    pathSave = joinpath(dirSave, "Test_chunks.csv")
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
-    Random.seed!(123)
+    if ARGS[3] == "Shuffle" && length(ARGS) == 4 
+        shuffleParameters = true
+        seed = parse(Int64, ARGS[4])
+        pathSave = joinpath(dirSave, "Test_chunks_shuffle_seed_" * ARGS[4] * ".csv")
+    else
+        shuffleParameters = false
+        seed = 123
+        Random.seed!(seed)
+    end
+
     solversCheck = [[QNDF(), "QNDF"]]
     sensealgInfo = [[:ForwardDiff, nothing, "ForwardDiff"]]
     absTol, relTol = 1e-8, 1e-8
 
     for i in eachindex(modelList)
 
-        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
-        pathYML = getPathYmlFile(dirModel)
-        petabModel = readPEtabModel(pathYML)
+        local pathYML = getPathYmlFile(joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i]))
+        if shuffleParameters == false
+            petabModel = readPEtabModel(pathYML)
+        else
+            _petabModel = readPEtabModel(pathYML)
+            petabModel = getPEtabModelParamPermuted(_petabModel, seed=seed)
+        end
         nDynamicParameters = length(getNominalODEValues(petabModel))
         chunkList = 1:nDynamicParameters
         for j in 1:30
@@ -406,6 +418,9 @@ if ARGS[1] == "Test_chunks_random_p"
                 benchmarkCostGrad(petabModel, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
                                 checkGradient=true, nRepeat=5, chunkSize=chunkList[k], iParameter=j, _θ_est=θ_est)
             end
+        end
+        if shuffleParameters == true
+            rm(petabModel.dirModel, recursive=true)
         end
     end
 end
