@@ -58,7 +58,12 @@ function computeHessian!(hessian::Matrix{Float64},
                                                                            solveOdeModelAllConditions!, priorInfo, computeHessian=true, 
                                                                            expIDSolve=[conditionId])
                                                     end
-            ForwardDiff.hessian!(hTmp, computeCostDynamicθExpCond, θ_input)
+            try
+                ForwardDiff.hessian!(hTmp, computeCostDynamicθExpCond, θ_input)
+            catch
+                hessian .= 0.0
+                return
+            end
             @inbounds for i in eachindex(iθ_experimentalCondition)
                 @inbounds for j in eachindex(iθ_experimentalCondition)
                     hessian[iθ_experimentalCondition[i], iθ_experimentalCondition[j]] += hTmp[i, j]    
@@ -132,7 +137,12 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
                                                                                    changeODEProblemParameters!, solveOdeModelAllConditions!, 
                                                                                    computeHessian=true, expIDSolve=[conditionId])
                                                     end
-            ForwardDiff.hessian!(hTmp, computeCostDynamicθExpCond, θ_input)                                                    
+            try                                                     
+                ForwardDiff.hessian!(hTmp, computeCostDynamicθExpCond, θ_input)                                                    
+            catch
+                hessian .= 0.0
+                return 
+            end
             @inbounds for i in eachindex(iθ_experimentalCondition)
                 @inbounds for j in eachindex(iθ_experimentalCondition)
                     hessian[iθ_experimentalCondition[i], iθ_experimentalCondition[j]] += hTmp[i, j]    

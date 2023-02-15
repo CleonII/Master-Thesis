@@ -59,7 +59,12 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
                                                                                    changeODEProblemParameters!, solveOdeModelAllConditions!, 
                                                                                    computeGradientDynamicθ=true, expIDSolve=[conditionId])
                                                     end
-            gradient[iθ_experimentalCondition] .+= ForwardDiff.gradient(computeCostDynamicθExpCond, θ_input)::Vector{Float64}
+            try 
+                gradient[iθ_experimentalCondition] .+= ForwardDiff.gradient(computeCostDynamicθExpCond, θ_input)::Vector{Float64}
+            catch
+                gradient .= 1e8
+                return 
+            end
         end
 
     else splitOverConditions == true && simulationInfo.haspreEquilibrationConditionId == true
