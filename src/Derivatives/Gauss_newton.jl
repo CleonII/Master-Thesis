@@ -99,6 +99,7 @@ function computeJacobianResidualsExpCond!(jacobian::AbstractMatrix,
     p = dualToFloat.(sol.prob.p)
     ∂G∂p = zeros(Float64, length(sol.prob.p))    
     ∂G∂u = zeros(Float64, nModelStates)
+    _gradient = zeros(Float64, length(θ_indices.iθ_dynamic))
     for i in eachindex(timeObserved)     
         u = dualToFloat.(sol[:, i])
         t = timeObserved[i]
@@ -107,11 +108,12 @@ function computeJacobianResidualsExpCond!(jacobian::AbstractMatrix,
         for iMeasurement in iPerTimePoint[i]
             compute∂G∂u(∂G∂u, u, p, t, 1, [[iMeasurement]])
             compute∂G∂p(∂G∂p, u, p, t, 1, [[iMeasurement]])
-            _gradient = _S'*∂G∂u 
+            _gradient .= 0.0 # Not-ideal for performance (indexing tricky though)
+            @views _gradient[iθ_experimentalCondition] .+= _S'*∂G∂u 
             
             # Thus far have have computed dY/dθ for the residuals, but for parameters on the log-scale we want dY/dθ_log. 
             # We can adjust via; dY/dθ_log = log(10) * θ * dY/dθ
-            adjustGradientTransformedParameters!((@views jacobian[iθ_experimentalCondition, iMeasurement]), _gradient, 
+            adjustGradientTransformedParameters!((@views jacobian[:, iMeasurement]), _gradient, 
                                                  ∂G∂p, θ_dynamic, θ_indices, simulationConditionId, autoDiffSensitivites=true)
                              
         end
@@ -120,8 +122,7 @@ end
 
 
 # To compute the gradient for non-dynamic parameters 
-function computeResidualsNotSolveODE(θ_dynamic::Vector{Float64},
-                                     θ_sd::AbstractVector, 
+function computeResidualsNotSolveODE(θ_sd::AbstractVector, 
                                      θ_observable::AbstractVector, 
                                      θ_nonDynamic::AbstractVector,
                                      petabModel::PEtabModel,
@@ -135,7 +136,6 @@ function computeResidualsNotSolveODE(θ_dynamic::Vector{Float64},
 
     # To be able to use ReverseDiff sdParamEstUse and obsParamEstUse cannot be overwritten. 
     # Hence new vectors have to be created.
-    θ_dynamicT = transformθ(θ_dynamic, θ_indices.θ_dynamicNames, θ_indices)
     θ_sdT = transformθ(θ_sd, θ_indices.θ_sdNames, θ_indices)
     θ_observableT = transformθ(θ_observable, θ_indices.θ_observableNames, θ_indices)
     θ_nonDynamicT = transformθ(θ_nonDynamic, θ_indices.θ_nonDynamicNames, θ_indices)
@@ -149,7 +149,7 @@ function computeResidualsNotSolveODE(θ_dynamic::Vector{Float64},
         end
 
         odeSolution = odeSolutions[experimentalConditionId]
-        sucess = computeResidualsExpCond!(residuals, odeSolution, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT,
+        sucess = computeResidualsExpCond!(residuals, odeSolution, θ_sdT, θ_observableT, θ_nonDynamicT,
                                           petabModel, experimentalConditionId, simulationInfo, θ_indices, measurementInfo, 
                                           parameterInfo)
         if sucess == false
@@ -165,7 +165,6 @@ end
 # For an experimental condition compute residuals 
 function computeResidualsExpCond!(residuals::AbstractVector, 
                                   odeSolution::ODESolution,
-                                  θ_dynamic::Vector{Float64},
                                   θ_sd::AbstractVector, 
                                   θ_observable::AbstractVector, 
                                   θ_nonDynamic::AbstractVector,
@@ -186,8 +185,9 @@ function computeResidualsExpCond!(residuals::AbstractVector,
         
         t = measurementInfo.time[iMeasurement]
         u = dualToFloat.(odeSolution[1:nModelStates, simulationInfo.iTimeODESolution[iMeasurement]])
-        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
-        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
+        p = dualToFloat.(odeSolution.prob.p)
+        hTransformed = computehTransformed(u, t, p, θ_observable, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
+        σ = computeσ(u, t, p, θ_sd, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
             
         # By default a positive ODE solution is not enforced (even though the user can provide it as option).
         # In case with transformations on the data the code can crash, hence Inf is returned in case the 

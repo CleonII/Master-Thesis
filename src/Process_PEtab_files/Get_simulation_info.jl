@@ -92,7 +92,7 @@ function processSimulationInfo(petabModel::PEtabModel,
     if terminateSSMethod == :Norm
         callbackSS = TerminateSteadyState(absTolSS, relTolSS)
     elseif terminateSSMethod == :NewtonNorm
-        callbackSS = createSSTerminateSteadyState(petabModel.odeSystem, absTolSS, relTolSS, checkNewton=true)
+        callbackSS = createSSTerminateSteadyState(petabModel.odeSystem, absTolSS, relTolSS, checkNewton=false)
     end
 
     # In case the sensitivites are computed via automatic differentitation we need to pre-allocate an 

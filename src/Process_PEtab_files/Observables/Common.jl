@@ -271,8 +271,11 @@ end
     4u[1] + 100.0u[1] + RE*u[1] + u[1]   
 """
 function replaceWholeWordWithNumberPrefix(oldString, replaceFrom, replaceTo)
-    replaceFromRegex = Regex("\\b(\\d+\\.?\\d*)*(" * replaceFrom * ")\\b")
+    replaceFromRegex = Regex("\\b(\\d+\\.?\\d*+)*(" * replaceFrom * ")\\b")
     replaceToRegex = SubstitutionString("\\1" * replaceTo )
+    sleep(0.001)
     newString = replace(oldString, replaceFromRegex => replaceToRegex)
     return newString
 end
+
+#replaceWholeWordWithNumberPrefix("217.39130434782612", "k4", "pODEProblem[13]")

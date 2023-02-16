@@ -1,8 +1,8 @@
 #u[1] = IR2, u[2] = IR2in, u[3] = Rec2, u[4] = IR1in, u[5] = Uptake1, u[6] = Uptake2, u[7] = InsulinFragments, u[8] = IR1, u[9] = Rec1, u[10] = Ins, u[11] = BoundUnspec
-#θ_dynamicNames[1] = ini_R1, θ_dynamicNames[2] = ini_R2fold, θ_dynamicNames[3] = ka1, θ_dynamicNames[4] = ka2fold, θ_dynamicNames[5] = kd1, θ_dynamicNames[6] = kd2fold, θ_dynamicNames[7] = kin, θ_dynamicNames[8] = kin2, θ_dynamicNames[9] = koff_unspec, θ_dynamicNames[10] = kon_unspec, θ_dynamicNames[11] = kout, θ_dynamicNames[12] = kout2, θ_dynamicNames[13] = kout_frag
+#pODEProblemNames[1] = ka1, pODEProblemNames[2] = ini_R2fold, pODEProblemNames[3] = kout, pODEProblemNames[4] = ini_R1, pODEProblemNames[5] = kout_frag, pODEProblemNames[6] = koff_unspec, pODEProblemNames[7] = kin, pODEProblemNames[8] = ka2fold, pODEProblemNames[9] = kin2, pODEProblemNames[10] = kd1, pODEProblemNames[11] = kon_unspec, pODEProblemNames[12] = init_Ins, pODEProblemNames[13] = kd2fold, pODEProblemNames[14] = ExtracellularMedium, pODEProblemNames[15] = kout2
 #
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :observable_IR1 
@@ -65,7 +65,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [IR2, IR2in, Rec2, IR1in, Uptake1, Uptake2, InsulinFragments, IR1, Rec1, Ins, BoundUnspec]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :observable_IR1 
 		noiseParameter1_observable_IR1 = getObsOrSdParam(θ_sd, parameterMap)

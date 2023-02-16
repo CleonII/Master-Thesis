@@ -1,8 +1,8 @@
 #u[1] = IRp, u[2] = IR, u[3] = IRins, u[4] = IRiP, u[5] = IRS, u[6] = X, u[7] = IRi, u[8] = IRSiP, u[9] = Xp
-#θ_dynamicNames[1] = k1a, θ_dynamicNames[2] = k1aBasic, θ_dynamicNames[3] = k1b, θ_dynamicNames[4] = k1c, θ_dynamicNames[5] = k1d, θ_dynamicNames[6] = k1e, θ_dynamicNames[7] = k1f, θ_dynamicNames[8] = k1g, θ_dynamicNames[9] = k1r, θ_dynamicNames[10] = k21, θ_dynamicNames[11] = k22, θ_dynamicNames[12] = k3, θ_dynamicNames[13] = km2, θ_dynamicNames[14] = km3
+#pODEProblemNames[1] = k1c, pODEProblemNames[2] = k21, pODEProblemNames[3] = insulin_bool1, pODEProblemNames[4] = k1g, pODEProblemNames[5] = insulin_dose_2, pODEProblemNames[6] = k1a, pODEProblemNames[7] = insulin_dose_1, pODEProblemNames[8] = k1aBasic, pODEProblemNames[9] = k1d, pODEProblemNames[10] = insulin_time_1, pODEProblemNames[11] = insulin_time_2, pODEProblemNames[12] = cyt, pODEProblemNames[13] = k22, pODEProblemNames[14] = insulin_bool2, pODEProblemNames[15] = default, pODEProblemNames[16] = k1r, pODEProblemNames[17] = k1f, pODEProblemNames[18] = k1b, pODEProblemNames[19] = k3, pODEProblemNames[20] = km2, pODEProblemNames[21] = k1e, pODEProblemNames[22] = k_IRSiP_DosR, pODEProblemNames[23] = km3
 #
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :IR1_P 
@@ -56,7 +56,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [IRp, IR, IRins, IRiP, IRS, X, IRi, IRSiP, Xp]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :IR1_P 
 		noiseParameter1_IR1_P = getObsOrSdParam(θ_sd, parameterMap)

@@ -165,7 +165,7 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
     # Compute hessian for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
                                                              petabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveAutoDiff=true)
@@ -232,9 +232,9 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
     # Compute hessian for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeResidualsNotODESystemθ = (x) -> computeResidualsNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], 
-                                                x[iθ_nonDynamic], petabModel, simulationInfo, θ_indices, 
-                                                measurementInfo, parameterInfo, expIDSolve=expIDSolve)
+    computeResidualsNotODESystemθ = (x) -> computeResidualsNotSolveODE(x[iθ_sd], x[iθ_observable], 
+                                                                       x[iθ_nonDynamic], petabModel, simulationInfo, θ_indices, 
+                                                                       measurementInfo, parameterInfo, expIDSolve=expIDSolve)
     @views ForwardDiff.jacobian!(jacobian[iθ_notOdeSystem, :]', computeResidualsNotODESystemθ, θ_est[iθ_notOdeSystem])
 
     if priorInfo.hasPriors == true

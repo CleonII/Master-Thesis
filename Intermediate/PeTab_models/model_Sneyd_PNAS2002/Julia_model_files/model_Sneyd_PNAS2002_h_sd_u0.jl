@@ -1,8 +1,8 @@
 #u[1] = IPR_S, u[2] = IPR_I2, u[3] = IPR_R, u[4] = IPR_O, u[5] = IPR_I1, u[6] = IPR_A
-#θ_dynamicNames[1] = k1, θ_dynamicNames[2] = k2, θ_dynamicNames[3] = k3, θ_dynamicNames[4] = k4, θ_dynamicNames[5] = k_1, θ_dynamicNames[6] = k_2, θ_dynamicNames[7] = k_3, θ_dynamicNames[8] = k_4, θ_dynamicNames[9] = l2, θ_dynamicNames[10] = l4, θ_dynamicNames[11] = l6, θ_dynamicNames[12] = l_2, θ_dynamicNames[13] = l_4, θ_dynamicNames[14] = l_6
+#pODEProblemNames[1] = l_4, pODEProblemNames[2] = k_4, pODEProblemNames[3] = IP3, pODEProblemNames[4] = k4, pODEProblemNames[5] = k_2, pODEProblemNames[6] = l2, pODEProblemNames[7] = l_2, pODEProblemNames[8] = default, pODEProblemNames[9] = l_6, pODEProblemNames[10] = k1, pODEProblemNames[11] = k_3, pODEProblemNames[12] = l6, pODEProblemNames[13] = membrane, pODEProblemNames[14] = k3, pODEProblemNames[15] = l4, pODEProblemNames[16] = Ca, pODEProblemNames[17] = k2, pODEProblemNames[18] = k_1
 #
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :open_probability 
@@ -39,7 +39,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [IPR_S, IPR_I2, IPR_R, IPR_O, IPR_I1, IPR_A]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :open_probability 
 		noiseParameter1_open_probability = getObsOrSdParam(θ_sd, parameterMap)

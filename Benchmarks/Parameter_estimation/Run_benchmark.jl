@@ -81,8 +81,8 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                       nStartGuess::Integer;
                                       algList=[:IpoptAutoHess, :IpoptBlockAutoDiff, :IpoptLBFGS, :OptimIPNewtonAutoHess, :OptimIPNewtonBlockAutoDiff, :OptimLBFGS, :NLoptLBFGS, :FidesAutoHess, :FidesBlockAutoHess, :FidesBFGS], 
                                       terminateSSMethod=:Norm, 
-                                      solverSSRelTol::Float64=1e-8,
-                                      solverSSAbsTol::Float64=1e-10, 
+                                      solverSSRelTol::Float64=1e-6,
+                                      solverSSAbsTol::Float64=1e-6, 
                                       reuseS::Bool=true, 
                                       splitOverConditions::Bool=false)
 
@@ -348,21 +348,20 @@ if ARGS[1] == "Weber_BMC2015"
     benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest, terminateSSMethod=:Norm) 
 end
 
-pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Bachmann_MSB2011", "Bachmann_MSB2011.yaml")
-petabModel = readPEtabModel(pathYML, verbose=true)
-benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", 1e-8, 1e-8, 1000; algList=[:FidesBFGS])
 
 if ARGS[1] == "Bachmann_MSB2011"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Bachmann_MSB2011", "Bachmann_MSB2011.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, Rodas4P(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest)
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
 
 
 if ARGS[1] == "Brannmark_JBC2010"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Brannmark_JBC2010", "Brannmark_JBC2010.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=true)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=true)
 end
 
 

@@ -36,4 +36,8 @@ if [ $1 == "Beer_MolBioSystems2014" ];then
     ${runJulia} ${pathBenchmarkScript} Beer_MolBioSystems2014 $2 $3
 fi
 
+if [ $1 == "Brannmark_JBC2010" ];then
+    ${runJulia} ${pathBenchmarkScript} Brannmark_JBC2010 $2 $3
+fi
+
 exit 0

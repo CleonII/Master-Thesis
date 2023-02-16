@@ -1,22 +1,22 @@
 #u[1] = STAT5A, u[2] = pApA, u[3] = nucpApB, u[4] = nucpBpB, u[5] = STAT5B, u[6] = pApB, u[7] = nucpApA, u[8] = pBpB
-#θ_dynamicNames[1] = Epo_degradation_BaF3, θ_dynamicNames[2] = k_exp_hetero, θ_dynamicNames[3] = k_exp_homo, θ_dynamicNames[4] = k_imp_hetero, θ_dynamicNames[5] = k_imp_homo, θ_dynamicNames[6] = k_phos
+#pODEProblemNames[1] = ratio, pODEProblemNames[2] = k_imp_homo, pODEProblemNames[3] = k_exp_hetero, pODEProblemNames[4] = cyt, pODEProblemNames[5] = k_phos, pODEProblemNames[6] = specC17, pODEProblemNames[7] = Epo_degradation_BaF3, pODEProblemNames[8] = k_exp_homo, pODEProblemNames[9] = nuc, pODEProblemNames[10] = k_imp_hetero
 ##parameterInfo.nominalValue[7] = ratio_C 
 #parameterInfo.nominalValue[11] = specC17_C 
 
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :pSTAT5A_rel 
-		return ( 100 * u[6] + 200 * u[2] * parameterInfo.nominalValue[11] ) / ( u[6] + u[1] * parameterInfo.nominalValue[11] + 2 * u[2] * parameterInfo.nominalValue[11] ) 
+		return ( 100 * u[6] + 200 * u[2] * pODEProblem[6] ) / ( u[6] + u[1] * pODEProblem[6] + 2 * u[2] * pODEProblem[6] ) 
 	end
 
 	if observableId == :pSTAT5B_rel 
-		return - ( 100 * u[6] - 200 * u[8] * ( parameterInfo.nominalValue[11] - 1 ) ) / ( ( u[5] * ( parameterInfo.nominalValue[11] - 1 ) - u[6] ) + 2 * u[8] * ( parameterInfo.nominalValue[11] - 1 ) ) 
+		return - ( 100 * u[6] - 200 * u[8] * ( pODEProblem[6] - 1 ) ) / ( ( u[5] * ( pODEProblem[6] - 1 ) - u[6] ) + 2 * u[8] * ( pODEProblem[6] - 1 ) ) 
 	end
 
 	if observableId == :rSTAT5A_rel 
-		return ( 100 * u[6] + 100 * u[1] * parameterInfo.nominalValue[11] + 200 * u[2] * parameterInfo.nominalValue[11] ) / ( 2 * u[6] + u[1] * parameterInfo.nominalValue[11] + 2 * u[2] * parameterInfo.nominalValue[11] - u[5] * ( parameterInfo.nominalValue[11] - 1 ) - 2 * u[8] * ( parameterInfo.nominalValue[11] - 1 ) ) 
+		return ( 100 * u[6] + 100 * u[1] * pODEProblem[6] + 200 * u[2] * pODEProblem[6] ) / ( 2 * u[6] + u[1] * pODEProblem[6] + 2 * u[2] * pODEProblem[6] - u[5] * ( pODEProblem[6] - 1 ) - 2 * u[8] * ( pODEProblem[6] - 1 ) ) 
 	end
 
 end
@@ -53,7 +53,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [STAT5A, pApA, nucpApB, nucpBpB, STAT5B, pApB, nucpApA, pBpB]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :pSTAT5A_rel 
 		noiseParameter1_pSTAT5A_rel = getObsOrSdParam(θ_sd, parameterMap)

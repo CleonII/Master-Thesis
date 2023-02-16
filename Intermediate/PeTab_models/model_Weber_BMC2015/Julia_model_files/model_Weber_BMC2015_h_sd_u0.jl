@@ -1,12 +1,12 @@
 #u[1] = CERTERa, u[2] = PI4K3B, u[3] = CERT, u[4] = CERTTGNa, u[5] = PKDDAGa, u[6] = PKD, u[7] = PI4K3Ba
-#θ_dynamicNames[1] = a11, θ_dynamicNames[2] = a12, θ_dynamicNames[3] = a21, θ_dynamicNames[4] = a22, θ_dynamicNames[5] = a31, θ_dynamicNames[6] = a32, θ_dynamicNames[7] = a33, θ_dynamicNames[8] = m11, θ_dynamicNames[9] = m22, θ_dynamicNames[10] = m31, θ_dynamicNames[11] = m33, θ_dynamicNames[12] = p11, θ_dynamicNames[13] = p12, θ_dynamicNames[14] = p13, θ_dynamicNames[15] = p21, θ_dynamicNames[16] = p22, θ_dynamicNames[17] = p31, θ_dynamicNames[18] = p32, θ_dynamicNames[19] = p33, θ_dynamicNames[20] = pu3, θ_dynamicNames[21] = pu4, θ_dynamicNames[22] = pu5, θ_dynamicNames[23] = pu6, θ_dynamicNames[24] = s12, θ_dynamicNames[25] = s21, θ_dynamicNames[26] = s31
+#pODEProblemNames[1] = a21, pODEProblemNames[2] = m33, pODEProblemNames[3] = u4_bool1, pODEProblemNames[4] = u5_bool1, pODEProblemNames[5] = kb_NB142_70_dose, pODEProblemNames[6] = a22, pODEProblemNames[7] = kb_NB142_70_time, pODEProblemNames[8] = p12, pODEProblemNames[9] = p33, pODEProblemNames[10] = s31, pODEProblemNames[11] = PdBu_dose, pODEProblemNames[12] = a12, pODEProblemNames[13] = p22, pODEProblemNames[14] = a33, pODEProblemNames[15] = p13, pODEProblemNames[16] = cyt, pODEProblemNames[17] = pu5, pODEProblemNames[18] = u6_bool1, pODEProblemNames[19] = pu2, pODEProblemNames[20] = p31, pODEProblemNames[21] = pu4, pODEProblemNames[22] = PdBu_time, pODEProblemNames[23] = s12, pODEProblemNames[24] = m11, pODEProblemNames[25] = m31, pODEProblemNames[26] = u2, pODEProblemNames[27] = Ect_Expr_PI4K3beta_flag, pODEProblemNames[28] = a11, pODEProblemNames[29] = p32, pODEProblemNames[30] = p21, pODEProblemNames[31] = pu6, pODEProblemNames[32] = s21, pODEProblemNames[33] = pu3, pODEProblemNames[34] = m22, pODEProblemNames[35] = p11, pODEProblemNames[36] = Ect_Expr_CERT_flag, pODEProblemNames[37] = a31, pODEProblemNames[38] = u3_bool1, pODEProblemNames[39] = a32
 ##parameterInfo.nominalValue[20] = pu2_C 
 #parameterInfo.nominalValue[33] = std_yPKDt_C 
 #parameterInfo.nominalValue[34] = std_yPI4K3Bt_C 
 #parameterInfo.nominalValue[35] = std_yCERTt_C 
 
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :yCERTpRN24 
@@ -78,7 +78,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [CERTERa, PI4K3B, CERT, CERTTGNa, PKDDAGa, PKD, PI4K3Ba]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :yCERTpRN24 
 		noiseParameter1_yCERTpRN24 = getObsOrSdParam(θ_sd, parameterMap)

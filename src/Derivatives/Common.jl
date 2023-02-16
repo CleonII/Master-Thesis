@@ -51,8 +51,8 @@ function compute∂G∂_(∂G∂_,
         ∂h∂_ .= 0.0
         ∂σ∂_ .= 0.0
 
-        hTransformed = computehTransformed(u, t, θ_dynamic, θ_observable, θ_nonDynamic, petabModel, iMeasurementData, measurementInfo, θ_indices, parameterInfo)
-        σ = computeσ(u, t, θ_dynamic, θ_sd, θ_nonDynamic, petabModel, iMeasurementData, measurementInfo, θ_indices, parameterInfo)
+        hTransformed = computehTransformed(u, t, p, θ_observable, θ_nonDynamic, petabModel, iMeasurementData, measurementInfo, θ_indices, parameterInfo)
+        σ = computeσ(u, t, p, θ_sd, θ_nonDynamic, petabModel, iMeasurementData, measurementInfo, θ_indices, parameterInfo)
 
         # Maps needed to correctly extract the right SD and observable parameters 
         mapθ_sd = θ_indices.mapθ_sd[iMeasurementData]
@@ -110,12 +110,15 @@ function adjustGradientTransformedParameters!(gradient::Union{AbstractVector, Su
 
     mapConditionId = θ_indices.mapsConiditionId[simulationConditionId]                                 
     
+    #iθ_experimentalCondition = vcat(θ_indices.mapODEProblem.iθDynamic, mapConditionId.iθDynamic)    
+    
     # In case we compute the sensitivtes via automatic differentation the parameters in _gradient=S'*∂G∂u will appear in the 
     # same order as they appear in θ_est. In case we do not compute sensitivtes via autodiff, or do adjoint sensitity analysis, 
     # the parameters in _gradient=S'∂G∂u appear in the same order as in odeProblem.p.
     if autoDiffSensitivites == true && adjoint == false
         _gradient1 = _gradient[θ_indices.mapODEProblem.iθDynamic] .+ ∂G∂p[θ_indices.mapODEProblem.iODEProblemθDynamic]
         _gradient2 = _gradient[unique(mapConditionId.iθDynamic)] 
+
     elseif adjoint == false
         _gradient1 = _gradient[θ_indices.mapODEProblem.iODEProblemθDynamic] .+ ∂G∂p[θ_indices.mapODEProblem.iODEProblemθDynamic]
         _gradient2 = _gradient[mapConditionId.iODEProblemθDynamic] .+ ∂G∂p[mapConditionId.iODEProblemθDynamic]
@@ -156,12 +159,13 @@ function adjustGradientTransformedParameters!(gradient::Union{AbstractVector, Su
                                                                       θ_dynamic[_iθDynamic], 
                                                                       θ_indices.θ_dynamicNames[_iθDynamic], 
                                                                       θ_indices)     
-        out = _adjustGradientTransformedParameters(∂G∂p,
+        out = _adjustGradientTransformedParameters(∂G∂p[mapConditionId.iODEProblemθDynamic],
                                                    θ_dynamic[mapConditionId.iθDynamic], 
                                                    θ_indices.θ_dynamicNames[mapConditionId.iθDynamic], 
-                                                   θ_indices)                                                                           
+                                                   θ_indices)    
+
         for i in eachindex(mapConditionId.iODEProblemθDynamic)
-            gradient[mapConditionId.iθDynamic[i]] += out[mapConditionId.iODEProblemθDynamic[i]]
+            gradient[mapConditionId.iθDynamic[i]] += out[i]
         end
     end
 end

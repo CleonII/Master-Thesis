@@ -84,7 +84,7 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
     # Compute hessian for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
                                                              petabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveAutoDiff=true)
@@ -130,7 +130,7 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
     # Compute gradient for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
                                                              petabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveForward=true)
@@ -181,7 +181,7 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
     # Compute gradient for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
                                                              petabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo, expIDSolve=expIDSolve, 
                                                              computeGradientNotSolveAdjoint=true)
@@ -219,7 +219,7 @@ function computeGradientZygote(gradient::Vector{Float64},
     # Compute gradient for parameters which are not in ODE-system. Important to keep in mind that Sd- and observable 
     # parameters can overlap in θ_est.
     iθ_sd, iθ_observable, iθ_nonDynamic, iθ_notOdeSystem = getIndicesParametersNotInODESystem(θ_indices)
-    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(θ_dynamic, x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
+    computeCostNotODESystemθ = (x) -> computeCostNotSolveODE(x[iθ_sd], x[iθ_observable], x[iθ_nonDynamic], 
                                                              petabModel, simulationInfo, θ_indices, measurementInfo, 
                                                              parameterInfo)
     @views ReverseDiff.gradient!(gradient[iθ_notOdeSystem], computeCostNotODESystemθ, θ_est[iθ_notOdeSystem])

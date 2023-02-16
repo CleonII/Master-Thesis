@@ -60,8 +60,9 @@ function _computeCostZygote(θ_dynamic,
             return Inf
         end
 
-        cost += computeCostExpCond(odeSolution, θ_dynamicT, θ_sdT, θ_observableT, θ_nonDynamicT, petabModel, 
-                                   experimentalConditionId, θ_indices, measurementInfo, parameterInfo, simulationInfo)
+        cost += computeCostExpCond(odeSolution, _p, θ_sdT, θ_observableT, θ_nonDynamicT, petabModel, 
+                                   experimentalConditionId, θ_indices, measurementInfo, parameterInfo, simulationInfo, 
+                                   computeGradientθDynamicZygote=true)
 
         if isinf(cost)
             return cost

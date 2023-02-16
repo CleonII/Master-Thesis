@@ -1,8 +1,8 @@
 #u[1] = b10, u[2] = bio, u[3] = ohbio, u[4] = zea, u[5] = bcry, u[6] = ohb10, u[7] = bcar
-#θ_dynamicNames[1] = init_b10_1, θ_dynamicNames[2] = init_bcar1, θ_dynamicNames[3] = init_bcar2, θ_dynamicNames[4] = init_bcry_1, θ_dynamicNames[5] = init_ohb10_1, θ_dynamicNames[6] = init_zea_1, θ_dynamicNames[7] = k5, θ_dynamicNames[8] = kb1, θ_dynamicNames[9] = kb2, θ_dynamicNames[10] = kc1, θ_dynamicNames[11] = kc2, θ_dynamicNames[12] = kc4, θ_dynamicNames[13] = szea
+#pODEProblemNames[1] = kc2_multiplier, pODEProblemNames[2] = init_zea, pODEProblemNames[3] = kc4_multiplier, pODEProblemNames[4] = cyt, pODEProblemNames[5] = k5_multiplier, pODEProblemNames[6] = kc1_multiplier, pODEProblemNames[7] = init_b10, pODEProblemNames[8] = init_bcry, pODEProblemNames[9] = kb1_multiplier, pODEProblemNames[10] = kb2_multiplier, pODEProblemNames[11] = kc1, pODEProblemNames[12] = kc4, pODEProblemNames[13] = init_ohb10, pODEProblemNames[14] = init_bcar, pODEProblemNames[15] = kc2, pODEProblemNames[16] = kb2, pODEProblemNames[17] = k5, pODEProblemNames[18] = kb1
 #
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :ob10 
@@ -61,7 +61,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [b10, bio, ohbio, zea, bcry, ohb10, bcar]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :ob10 
 		noiseParameter1_ob10 = getObsOrSdParam(θ_sd, parameterMap)

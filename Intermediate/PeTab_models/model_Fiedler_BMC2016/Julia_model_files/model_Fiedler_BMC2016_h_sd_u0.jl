@@ -1,11 +1,11 @@
 #u[1] = RAF, u[2] = MEK, u[3] = pMEK, u[4] = pERK, u[5] = pRAF, u[6] = ERK
-#θ_dynamicNames[1] = K_1, θ_dynamicNames[2] = K_2, θ_dynamicNames[3] = K_3, θ_dynamicNames[4] = k10, θ_dynamicNames[5] = k11, θ_dynamicNames[6] = k2, θ_dynamicNames[7] = k3, θ_dynamicNames[8] = k4, θ_dynamicNames[9] = k5, θ_dynamicNames[10] = k6, θ_dynamicNames[11] = tau1, θ_dynamicNames[12] = tau2
+#pODEProblemNames[1] = ERK_total, pODEProblemNames[2] = UO126, pODEProblemNames[3] = k10, pODEProblemNames[4] = RAF_total, pODEProblemNames[5] = K_3, pODEProblemNames[6] = cyt, pODEProblemNames[7] = k4, pODEProblemNames[8] = Sorafenib, pODEProblemNames[9] = K_2, pODEProblemNames[10] = k6, pODEProblemNames[11] = k11, pODEProblemNames[12] = tau1, pODEProblemNames[13] = MEK_total, pODEProblemNames[14] = K_1, pODEProblemNames[15] = k3, pODEProblemNames[16] = tau2, pODEProblemNames[17] = k5, pODEProblemNames[18] = k2
 ##parameterInfo.nominalValue[1] = ERK_total_C 
 #parameterInfo.nominalValue[5] = MEK_total_C 
 #parameterInfo.nominalValue[6] = RAF_total_C 
 
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :pErk 
@@ -48,7 +48,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [RAF, MEK, pMEK, pERK, pRAF, ERK]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :pErk 
 		noiseParameter1_pErk, noiseParameter2_pErk = getObsOrSdParam(θ_sd, parameterMap)

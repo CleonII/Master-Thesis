@@ -1,8 +1,8 @@
 #u[1] = Naive, u[2] = Pathogen, u[3] = LateEffector, u[4] = EarlyEffector, u[5] = Memory
-#θ_dynamicNames[1] = delta_EL, θ_dynamicNames[2] = delta_LM, θ_dynamicNames[3] = delta_NE, θ_dynamicNames[4] = mu_EE, θ_dynamicNames[5] = mu_LE, θ_dynamicNames[6] = mu_LL, θ_dynamicNames[7] = mu_N, θ_dynamicNames[8] = mu_P, θ_dynamicNames[9] = mu_PE, θ_dynamicNames[10] = mu_PL, θ_dynamicNames[11] = rho_E, θ_dynamicNames[12] = rho_P
+#pODEProblemNames[1] = mu_LL, pODEProblemNames[2] = delta_NE, pODEProblemNames[3] = mu_PE, pODEProblemNames[4] = mu_P, pODEProblemNames[5] = mu_PL, pODEProblemNames[6] = delta_EL, pODEProblemNames[7] = mu_EE, pODEProblemNames[8] = default, pODEProblemNames[9] = mu_N, pODEProblemNames[10] = rho_E, pODEProblemNames[11] = delta_LM, pODEProblemNames[12] = rho_P, pODEProblemNames[13] = mu_LE
 #
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :observable_EarlyEffector 
@@ -49,7 +49,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [Naive, Pathogen, LateEffector, EarlyEffector, Memory]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :observable_EarlyEffector 
 		noiseParameter1_observable_EarlyEffector = getObsOrSdParam(θ_sd, parameterMap)

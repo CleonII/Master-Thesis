@@ -1,8 +1,8 @@
 #u[1] = X_protein, u[2] = GFP_mRNA, u[3] = Y_mRNA, u[4] = X_mRNA, u[5] = Z_mRNA, u[6] = Z_protein, u[7] = Y_protein, u[8] = GFP
-#θ_dynamicNames[1] = KM, θ_dynamicNames[2] = eff, θ_dynamicNames[3] = eff_GFP, θ_dynamicNames[4] = init_GFP, θ_dynamicNames[5] = init_GFP_mRNA, θ_dynamicNames[6] = init_X_mRNA, θ_dynamicNames[7] = init_X_protein, θ_dynamicNames[8] = init_Y_mRNA, θ_dynamicNames[9] = init_Y_protein, θ_dynamicNames[10] = init_Z_mRNA, θ_dynamicNames[11] = init_Z_protein, θ_dynamicNames[12] = n_Hill, θ_dynamicNames[13] = tau_mRNA, θ_dynamicNames[14] = tau_mRNA_GFP, θ_dynamicNames[15] = tau_prot, θ_dynamicNames[16] = tau_prot_GFP, θ_dynamicNames[17] = tps_active, θ_dynamicNames[18] = tps_repr
+#pODEProblemNames[1] = tau_mRNA, pODEProblemNames[2] = tps_repr, pODEProblemNames[3] = init_GFP, pODEProblemNames[4] = n_Hill, pODEProblemNames[5] = init_Y_mRNA, pODEProblemNames[6] = init_Z_mRNA, pODEProblemNames[7] = init_X_protein, pODEProblemNames[8] = init_Y_protein, pODEProblemNames[9] = tau_mRNA_GFP, pODEProblemNames[10] = eff, pODEProblemNames[11] = init_Z_protein, pODEProblemNames[12] = tau_prot_GFP, pODEProblemNames[13] = eff_GFP, pODEProblemNames[14] = tps_active, pODEProblemNames[15] = init_GFP_mRNA, pODEProblemNames[16] = KM, pODEProblemNames[17] = init_X_mRNA, pODEProblemNames[18] = tau_prot, pODEProblemNames[19] = cell
 #
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :fluorescence 
@@ -44,7 +44,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [X_protein, GFP_mRNA, Y_mRNA, X_mRNA, Z_mRNA, Z_protein, Y_protein, GFP]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :fluorescence 
 		noiseParameter1_fluorescence = getObsOrSdParam(θ_sd, parameterMap)

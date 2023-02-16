@@ -37,7 +37,7 @@ function create_σ_h_u0_File(modelName::String,
     # Indices for keeping track of parameters in θ
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, odeSystem, experimentalConditions)
     
-    create_h_Function(modelName, dirJulia, modelStateNames, parameterInfo, string.(θ_indices.θ_dynamicNames), 
+    create_h_Function(modelName, dirJulia, modelStateNames, parameterInfo, pODEProblemNames, 
                       string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
     verbose == true && @printf("Done with h function\n")
     
@@ -47,7 +47,7 @@ function create_σ_h_u0_File(modelName::String,
     create_u0_Function(modelName, dirJulia, parameterInfo, pODEProblemNames, stateMap, inPlace=false)
     verbose == true && @printf("Done with u0 not in-place function\n")
 
-    create_σ_Function(modelName, dirJulia, parameterInfo, modelStateNames, string.(θ_indices.θ_dynamicNames), string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
+    create_σ_Function(modelName, dirJulia, parameterInfo, modelStateNames, pODEProblemNames, string.(θ_indices.θ_nonDynamicNames), observablesData, SBMLDict)
     verbose == true && @printf("Done with σ function\n")
 end
 
@@ -69,14 +69,14 @@ function create_h_Function(modelName::String,
                            dirModel::String, 
                            modelStateNames::Vector{String}, 
                            parameterInfo::ParametersInfo, 
-                           θ_dynamicNames::Vector{String}, 
+                           pODEProblemNames::Vector{String}, 
                            θ_nonDynamicNames::Vector{String},
                            observablesData::DataFrame,
                            SBMLDict::Dict)
 
     io = open(dirModel * "/" * modelName * "_h_sd_u0.jl", "w")
     modelStateStr, θ_dynamicStr, θ_nonDynamicStr, constantParametersStr = createTopOfFunction_h(modelStateNames, parameterInfo, 
-                                                                                                θ_dynamicNames, θ_nonDynamicNames)
+                                                                                                pODEProblemNames, θ_nonDynamicNames)
 
     # Write the formula for each observable in Julia syntax
     observableIds = string.(observablesData[!, "observableId"])
@@ -93,8 +93,8 @@ function create_h_Function(modelName::String,
         formula = replaceExplicitVariableWithRule(_formula, SBMLDict)
 
         # Translate the formula for the observable to Julia syntax 
-        _juliaFormula = petabFormulaToJulia(formula, modelStateNames, parameterInfo, θ_dynamicNames, θ_nonDynamicNames)
-        juliaFormula = replaceVariablesWithArrayIndex(_juliaFormula, modelStateNames, parameterInfo, θ_dynamicNames, θ_nonDynamicNames)
+        _juliaFormula = petabFormulaToJulia(formula, modelStateNames, parameterInfo, pODEProblemNames, θ_nonDynamicNames)
+        juliaFormula = replaceVariablesWithArrayIndex(_juliaFormula, modelStateNames, parameterInfo, pODEProblemNames, θ_nonDynamicNames, pODEProblem=true)
         observableStr *= "\t\t" * "return " * juliaFormula * "\n" * "\tend\n\n"
     end
 
@@ -104,7 +104,7 @@ function create_h_Function(modelName::String,
     write(io, θ_nonDynamicStr)
     write(io, constantParametersStr)
     write(io, "\n")
-    write(io, "function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+    write(io, "function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real \n")
     write(io, observableStr)
@@ -123,7 +123,7 @@ end
 """
 function createTopOfFunction_h(modelStateNames::Vector{String}, 
                                parameterInfo::ParametersInfo, 
-                               θ_dynamicNames::Vector{String}, 
+                               pODEProblemNames::Vector{String}, 
                                θ_nonDynamicNames::Vector{String})
                    
     modelStateStr = "#"
@@ -134,8 +134,8 @@ function createTopOfFunction_h(modelStateNames::Vector{String},
     modelStateStr *= "\n"
     
     θ_dynamicStr = "#"
-    for i in eachindex(θ_dynamicNames)
-        θ_dynamicStr *= "θ_dynamicNames[" * string(i) * "] = " * θ_dynamicNames[i] * ", "
+    for i in eachindex(pODEProblemNames)
+        θ_dynamicStr *= "pODEProblemNames[" * string(i) * "] = " * pODEProblemNames[i] * ", "
     end
     θ_dynamicStr = θ_dynamicStr[1:end-2] # Remove last non needed ", "
     θ_dynamicStr *= "\n"
@@ -243,7 +243,7 @@ end
                       dirModel::String, 
                       parameterInfo::ParametersInfo, 
                       modelStateNames::Vector{String}, 
-                      θ_dynamicNames::Vector{String}, 
+                      pODEProblemNames::Vector{String}, 
                       θ_nonDynamicNames::Vector{String},
                       observablesData::DataFrame,
                       SBMLDict::Dict)
@@ -255,7 +255,7 @@ function create_σ_Function(modelName::String,
                            dirModel::String, 
                            parameterInfo::ParametersInfo, 
                            modelStateNames::Vector{String}, 
-                           θ_dynamicNames::Vector{String}, 
+                           pODEProblemNames::Vector{String}, 
                            θ_nonDynamicNames::Vector{String},
                            observablesData::DataFrame,
                            SBMLDict::Dict)
@@ -277,12 +277,12 @@ function create_σ_Function(modelName::String,
         formula = replaceExplicitVariableWithRule(_formula, SBMLDict)
 
         # Translate the formula for the observable to Julia syntax 
-        _juliaFormula = petabFormulaToJulia(formula, modelStateNames, parameterInfo, θ_dynamicNames, θ_nonDynamicNames)
-        juliaFormula = replaceVariablesWithArrayIndex(_juliaFormula, modelStateNames, parameterInfo, θ_dynamicNames, θ_nonDynamicNames)
+        _juliaFormula = petabFormulaToJulia(formula, modelStateNames, parameterInfo, pODEProblemNames, θ_nonDynamicNames)
+        juliaFormula = replaceVariablesWithArrayIndex(_juliaFormula, modelStateNames, parameterInfo, pODEProblemNames, θ_nonDynamicNames, pODEProblem=true)
         observableStr *= "\t\t" * "return " * juliaFormula * "\n" * "\tend\n\n"
     end
 
-    write(io, "function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+    write(io, "function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real \n")
     write(io, observableStr)
     write(io, "end")

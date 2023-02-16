@@ -62,7 +62,7 @@ function readPEtabModel(pathYAML::String;
                         ifElseToEvent::Bool=true, 
                         jlFile=false)::PEtabModel
 
-    pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName = readPEtabYamlFile(pathYAML,jlFile=jlFile)                    
+    pathSBML, pathParameters, pathConditions, pathObservables, pathMeasurements, dirJulia, dirModel, modelName = readPEtabYamlFile(pathYAML, jlFile=jlFile)                    
     
     if jlFile == false
         
@@ -82,7 +82,7 @@ function readPEtabModel(pathYAML::String;
         end
 
     else
-        jlDir = joinpath(dirModel,"Julia_model_files")
+        jlDir = joinpath(dirModel, "Julia_model_files")
         modelDict, pathModelJlFile = JLToModellingToolkit(modelName, jlDir, ifElseToEvent=ifElseToEvent)
     end
 
