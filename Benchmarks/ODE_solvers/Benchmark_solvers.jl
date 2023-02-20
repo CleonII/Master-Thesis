@@ -151,6 +151,8 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                                 solversCheck="all",
                                 nTimesRepat::UInt=UInt(3), 
                                 tolsCheck=[(1e-6, 1e-6), (1e-9, 1e-9), (1e-12, 1e-12)], 
+                                absTolSS::Float64=1e-10,
+                                relTolSS::Float64=1e-8,
                                 _θ_dynamic=nothing,
                                 checkAccuracy::Bool=true)
 
@@ -160,14 +162,14 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    simulationInfo = processSimulationInfo(petabModel, measurementInfo, parameterInfo, absTolSS=1e-10, relTolSS=1e-8)
+    simulationInfo = processSimulationInfo(petabModel, measurementInfo, parameterInfo, absTolSS=absTolSS, relTolSS=relTolSS)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
      
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, parameterInfo)
  
     # The time-span 5e3 is overwritten when performing actual forward simulations 
-    _odeProblem = ODEProblem(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true, sparse=sparseJacobian)
+    _odeProblem = ODEProblem{true, SciMLBase.FullSpecialize}(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true, sparse=sparseJacobian)
     odeProblem = remake(_odeProblem, p = convert.(Float64, _odeProblem.p), u0 = convert.(Float64, _odeProblem.u0))
     # In case we have provided a random start-guess
     if isnothing(_θ_dynamic)
@@ -258,6 +260,8 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                                      nParam = length(petabModel.parameterNames),
                                      reltol = relTol, 
                                      abstol = absTol, 
+                                     absTolSS=absTolSS,
+                                     relTolSS=relTolSS,
                                      success = canSolveModel, 
                                      runTime = runTime, 
                                      sqDiff = sqDiffSolver, 
@@ -282,6 +286,8 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                                      nParam = length(petabModel.parameterNames),
                                      reltol = absTol, 
                                      abstol = relTol, 
+                                     absTolSS=absTolSS,
+                                     relTolSS=relTolSS,
                                      success = false, 
                                      runTime = NaN,
                                      sqDiff = Inf, 
@@ -393,6 +399,39 @@ if ARGS[1] == "Test_random_parameter"
             runBenchmarkOdeSolvers(petabModel, pathSave, false, nTimesRepat=UInt(1), 
                                    solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false, 
                                    _θ_dynamic=θ_dynamic)    
+        end
+    end
+end
+
+
+# Test set of stiff and non-stiff solvers for random parameters values 
+if ARGS[1] == "Test_random_parameter_pre_eq"
+
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers")
+    pathSave = joinpath(dirSave, "Random_parameters_pre_eq.csv")
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+
+    modelList = ["model_Brannmark_JBC2010", "model_Isensee_JCB2018", "model_Weber_BMC2015", "model_Zheng_PNAS2012"]
+    solversCheck = ["FBDF", "Rodas5", "QNDF", "Rodas4P", "CVODE_BDF_default", "Vern7", "Tsit5", "Vern6", "Vern7Rodas4P"]
+    tolsTry = [(1e-8, 1e-8)]            
+    tolsSSTry = [(1e-6, 1e-6), (1e-8, 1e-8), (1e-10, 1e-10)]
+    for i in eachindex(modelList)
+        for k in eachindex(tolsSSTry)
+
+            dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+            pathYML = getPathYmlFile(dirModel)
+            petabModel = readPEtabModel(pathYML)
+            absTolSS, relTolSS = tolsSSTry[k]
+
+            # 100 random vector 
+            for j in 1:100
+                θ_dynamic = getRandomModelParameters(petabModel, Rodas4P(), j)
+                runBenchmarkOdeSolvers(petabModel, pathSave, false, nTimesRepat=UInt(1), 
+                                    solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false, 
+                                    _θ_dynamic=θ_dynamic, absTolSS=absTolSS, relTolSS=relTolSS)    
+            end
         end
     end
 end

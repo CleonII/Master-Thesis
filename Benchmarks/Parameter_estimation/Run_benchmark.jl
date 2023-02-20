@@ -361,7 +361,7 @@ if ARGS[1] == "Brannmark_JBC2010"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Brannmark_JBC2010", "Brannmark_JBC2010.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=true)
-    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=true)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=false)
 end
 
 
