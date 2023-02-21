@@ -392,3 +392,11 @@ if ARGS[1] == "Sneyd_PNAS2002"
     petabModel = readPEtabModel(pathYML, verbose=true)
     benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest)
 end
+
+
+if ARGS[1] == "Bruno_JExpBot2016"
+    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Bruno_JExpBot2016", "Bruno_JExpBot2016.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=true)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
+end
