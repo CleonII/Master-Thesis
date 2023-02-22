@@ -76,7 +76,7 @@ function create∂h∂_Function(modelName::String,
         pObservebleStr *= "\tif observableId == " * ":" * observableIds[i] * "" * " \n"
         uObservebleStr *= "\tif observableId == " * ":" * observableIds[i] * "" * " \n"
         
-        _formula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
+        _formula = filter(x -> !isspace(x), string(observablesData[i, "observableFormula"]))
         formula = replaceExplicitVariableWithRule(_formula, SBMLDict)
         juliaFormula = petabFormulaToJulia(formula, modelStateNames, parameterInfo, pODEProblemNames, θ_nonDynamicNames)
         
@@ -189,14 +189,14 @@ function createTopOf∂h∂_Function(modelStateNames::Vector{String},
     for i in eachindex(observableIds)
 
         # Extract observable parameters 
-        _formula = filter(x -> !isspace(x), String(observablesData[i, "observableFormula"]))
+        _formula = filter(x -> !isspace(x), string(observablesData[i, "observableFormula"]))
         observableParameters = getObservableParametersStr(_formula)
         if !isempty(observableParameters)
             variablesStr *= observableParameters * ", "   
         end 
 
         # Extract noise parameters 
-        _formula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
+        _formula = filter(x -> !isspace(x), string(observablesData[i, "noiseFormula"]))
         noiseParameters = getNoiseParametersStr(_formula)
         if !isempty(noiseParameters)
             variablesStr *= noiseParameters * ", "   
@@ -243,7 +243,7 @@ function create∂σ∂_Function(modelName::String,
         pObservebleStr *= "\tif observableId == " * ":" * observableIds[i] * "" * " \n"
         uObservebleStr *= "\tif observableId == " * ":" * observableIds[i] * "" * " \n"
         
-        _formula = filter(x -> !isspace(x), String(observablesData[i, "noiseFormula"]))
+        _formula = filter(x -> !isspace(x), string(observablesData[i, "noiseFormula"]))
         formula = replaceExplicitVariableWithRule(_formula, SBMLDict)
         juliaFormula = petabFormulaToJulia(formula, modelStateNames, parameterInfo, pODEProblemNames, θ_nonDynamicNames)
 

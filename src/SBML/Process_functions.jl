@@ -192,9 +192,22 @@ function getSBMLFuncFormula(mathSBML, libsbml)
     expressionStop = findlast(')', mathAsString)-1
     StrippedMathAsString = mathAsString[expressionStart:expressionStop]
         
-    # The actual math formula is given between the last , and end paranthesis 
-    functionFormula = lstrip(split(StrippedMathAsString, ',')[end])
+    # Step through each comma and look backwards. 
+    # If the only match is a single word it is an input parameter for lambda
+    # if not it is the function formula.
+    # The formula offset is initialized as the position of the final comma 
+    # so that if the formula actually is just a single word, it will still be found.
+    mtcOffset = findlast(',', StrippedMathAsString)+1
 
+    splitByComma = Regex("[^,]+")
+    isSingleWord = Regex("^\\s*\\b\\w+\\b\\s*\$")
+    for mtc in eachmatch(splitByComma, StrippedMathAsString)
+        if !occursin(isSingleWord, mtc.match)
+            mtcOffset = mtc.offset
+            break
+        end
+    end
+    functionFormula = StrippedMathAsString[mtcOffset:end]
     functionFormula = removePowFunctions(functionFormula)
 
     return functionFormula
