@@ -547,9 +547,9 @@ function writeODEModelToFile(modelDict, pathJlFile, modelName)
     println(modelFile, "    ### Derivatives ###")
     println(modelFile, "    eqs = [")
     for (sIndex, key) in enumerate(keys(modelDict["states"]))
-        # If the state is not part of any reaction we set its value to the initial amount 
+        # If the state is not part of any reaction we set its value to zero.
         if occursin(Regex("~\\s*\$"),modelDict["derivatives"][key])
-            modelDict["derivatives"][key] *= string(model[:getElementBySId](key)[:getInitialAmount]())
+            modelDict["derivatives"][key] *= "0.0"
         end
         if sIndex == 1
             print(modelFile, "    " * modelDict["derivatives"][key])
