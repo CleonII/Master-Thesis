@@ -28,7 +28,7 @@ function XmlToModellingToolkit(pathXml::String, pathJlFile::AbstractString, mode
     modelDict = buildODEModelDictionary(libsbml, model, ifElseToEvent)
 
     if writeToFile
-        writeODEModelToFile(modelDict, pathJlFile, modelName)
+        writeODEModelToFile(modelDict, model, pathJlFile, modelName)
     end
 
     return modelDict
@@ -451,7 +451,7 @@ end
     the resulting file in dirModel with name modelName.jl. 
 
 """
-function writeODEModelToFile(modelDict, pathJlFile, modelName)
+function writeODEModelToFile(modelDict, model, pathJlFile, modelName)
     ### Writing to file 
     modelFile = open(pathJlFile, "w")
 
