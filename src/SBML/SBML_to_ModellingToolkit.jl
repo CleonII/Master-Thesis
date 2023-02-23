@@ -389,6 +389,17 @@ function buildODEModelDictionary(libsbml, model, ifElseToEvent::Bool)
     for (reac, formula) in reactions
         products = [(p[:species], p[:getStoichiometry]()) for p in reac[:getListOfProducts]()]
         reactants = [(r[:species], r[:getStoichiometry]()) for r in reac[:getListOfReactants]()]
+
+        ## Replaces kinetic law parameters with their values (where-statements).
+        klparameters = reac[:getKineticLaw]()[:getListOfParameters]()
+        if length(klparameters) > 0
+            for klpar in klparameters
+                parameterName = klpar[:getId]()
+                parameterValue = klpar[:getValue]()
+                formula = replaceWholeWord(formula, parameterName, parameterValue)
+            end
+        end
+
         formula = rewriteDerivatives(formula, modelDict, baseFunctions)
         for (rName, rStoich) in reactants
             rComp = model[:getSpecies](rName)[:getCompartment]()
@@ -536,6 +547,10 @@ function writeODEModelToFile(modelDict, pathJlFile, modelName)
     println(modelFile, "    ### Derivatives ###")
     println(modelFile, "    eqs = [")
     for (sIndex, key) in enumerate(keys(modelDict["states"]))
+        # If the state is not part of any reaction we set its value to the initial amount 
+        if occursin(Regex("~\\s*\$"),modelDict["derivatives"][key])
+            modelDict["derivatives"][key] *= string(model[:getElementBySId](key)[:getInitialAmount]())
+        end
         if sIndex == 1
             print(modelFile, "    " * modelDict["derivatives"][key])
         else
