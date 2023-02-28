@@ -140,7 +140,9 @@ function identifyCondSpecificDynanmicθ(odeSystem::ODESystem,
                                        parameterInfo::ParametersInfo, 
                                        experimentalConditionsFile::DataFrame)::Vector{Symbol}
 
-    allODESystemParameters = Symbol.(string.(parameters(odeSystem)))
+    allODESystemParameters = string.(parameters(odeSystem))
+    modelStateNames = string.(states(odeSystem))
+    modelStateNames = replace.(modelStateNames, "(t)" => "")
     parametersToEstimate = parameterInfo.parameterId[parameterInfo.estimate]
 
     # List of parameters which have specific values for specific experimental conditions, these can be extracted 
@@ -151,7 +153,7 @@ function identifyCondSpecificDynanmicθ(odeSystem::ODESystem,
     iStart = colNames[2] == "conditionName" ? 3 : 2 # Sometimes PEtab file does not include column conditionName
     for i in iStart:ncol(experimentalConditionsFile)
 
-        if Symbol(colNames[i]) ∉ allODESystemParameters
+        if colNames[i] ∉ allODESystemParameters && colNames[i] ∉ modelStateNames
             println("Problem : Parameter ", colNames[i], " should be in the ODE model as it dicates an experimental condition")
         end
 
@@ -244,7 +246,8 @@ function getMapsConditionId(odeSystem::ODESystem,
 
     θ_dynamicNames = string.(_θ_dynamicNames)
     nConditions = nrow(experimentalConditionsFile)
-    modelStateNames = replace.(string.(states(odeSystem), "(t)" => ""))
+    modelStateNames = string.(states(odeSystem))
+    modelStateNames = replace.(modelStateNames, "(t)" => "")
     allODESystemParameters = string.(parameters(odeSystem))
 
     iStart = "conditionName" in names(experimentalConditionsFile) ? 3 : 2 # conditionName is optional in PEtab file 
@@ -267,17 +270,20 @@ function getMapsConditionId(odeSystem::ODESystem,
         rowI = string.(collect(experimentalConditionsFile[i, iStart:end]))
         for j in eachindex(rowI)
         
-            # When the experimental condition parameters is a number (Float) it can either set the value 
-            # for an ODEProblem parameter or state 
+            # When the experimental condition parameters is a number (Float) it can sets the values for a problem parameters, 
+            # but to get correct gradients we need to track if we are changing a state 
             if isNumber(rowI[j]) 
                 if conditionSpecificVariables[j] ∈ allODESystemParameters
                     constantParameters = vcat(constantParameters, parse(Float64, rowI[j]))
                     iODEProblemConstantParameters = vcat(iODEProblemConstantParameters, findfirst(x -> x == conditionSpecificVariables[j], allODESystemParameters))
+
+                # Here to set gradients accurately                     
                 elseif conditionSpecificVariables[j] ∈ modelStateNames
-                    constantsStates = vcat(constantsStates, parse(Float64, rowI[j]))
-                    iODEProblemConstantStates = vcat(iODEProblemConstantStates, findfirst(x -> x == conditionSpecificVariables[j], modelStateNames))
+                    constantParameters = vcat(constantParameters, parse(Float64, rowI[j]))
+                    iODEProblemConstantParameters = vcat(iODEProblemConstantParameters, findfirst(x -> x == "__init__" * conditionSpecificVariables[j] * "__", allODESystemParameters))
+
                 else
-                    println("Error : Cannot build map for experimental condition ", conditionSpecificVariables[j])
+                    println("Error : Cannot build map for experimental condition variable", conditionSpecificVariables[j])
                 end
                 continue
             end

@@ -29,6 +29,7 @@ function computeGradientAdjointDynamicθ(gradient::Vector{Float64},
     success = solveOdeModelAllConditions!(simulationInfo.odeSolutionsDerivatives, _odeProblem, θ_dynamicT, expIDSolve)
     if success != true
         gradient .= 1e8
+        println("Failed to solve forward equations for adjoint")
         return
     end
 
@@ -101,7 +102,7 @@ function generateVJPSSFunction(simulationInfo::SimulationInfo,
                                                             p=p, 
                                                             sensealg=sensealgSS)[:]), odeProblem.p)
                                                 
-        _evalVJPSS[i] = _evalVJPSSi
+        _evalVJPSS[i] = (du) -> begin return _evalVJPSSi(du)[1] end
     end
 
     evalVJPSS = Tuple(f for f in _evalVJPSS)
@@ -127,17 +128,64 @@ function generateVJPSSFunction(simulationInfo::SimulationInfo,
     _evalVJPSS = Vector{Function}(undef, length(preEquilibrationConditionId))
     for i in eachindex(preEquilibrationConditionId)
         
-        # As we already have solved for steady state once and know the steady state time we here 
-        # build a problem where we simulate exactly to said steady state.
-        preEqulibriumOdeSolution = simulationInfo.odePreEqulibriumSolutions[preEquilibrationConditionId[i]]
-        odeProblemPullback = remake(preEqulibriumOdeSolution.prob, tspan=(0.0, preEqulibriumOdeSolution.t[end]))
-        ySS, _evalVJPSSi = Zygote.pullback((p) -> solve(odeProblemPullback, odeSolver, p=p, abstol=solverAbsTol, reltol=solverRelTol, sensealg=sensealgSS)[:, end], preEqulibriumOdeSolution.prob.p)
-                                                
+        # Sets up a function which takes du and solves the Adjoint ODE system with du 
+        # as starting point. This is a temporary ugly solution as there are some problems
+        # with retcode Terminated and using CVODE_BDF
+        _sol = simulationInfo.odePreEqulibriumSolutions[preEquilibrationConditionId[i]]
+        _prob = remake(_sol.prob, tspan=(0.0, _sol.t[end]))
+        sol = solve(_prob, odeSolver, abstol=solverAbsTol, reltol=solverRelTol)
+
+        _evalVJPSSi = (du) -> computeVJPSS(du, sol, odeSolver, sensealgSS, solverRelTol, solverAbsTol)
         _evalVJPSS[i] = _evalVJPSSi
     end
 
     evalVJPSS = Tuple(f for f in _evalVJPSS)
     return NamedTuple{Tuple(name for name in preEquilibrationConditionId)}(evalVJPSS)
+end
+
+
+# Compute the adjoint VJP for steady state simulated models via QuadratureAdjoint and InterpolatingAdjoint
+# by, given du as initial values, solve the adjoint integral. 
+# TODO : Add interface for SteadyStateAdjoint
+function computeVJPSS(du::AbstractVector,
+                      _sol::ODESolution, 
+                      odeSolver::SciMLAlgorithm,
+                      sensealg::QuadratureAdjoint, 
+                      relTol::Float64, 
+                      absTol::Float64)
+
+    adj_prob, rcb = ODEAdjointProblem(_sol, sensealg, odeSolver, [_sol.t[end]], compute∂g∂uEmpty, nothing,
+                                      nothing, nothing, nothing, Val(true))
+    adj_prob.u0 .= du    
+    adj_sol = solve(adj_prob, odeSolver; abstol = absTol, reltol = relTol,
+                    save_everystep = true, save_start = true)                                  
+    integrand = AdjointSensitivityIntegrand(_sol, adj_sol, sensealg, nothing)
+    res, err = SciMLSensitivity.quadgk(integrand, _sol.prob.tspan[1], _sol.t[end],
+                                       atol = absTol, rtol = relTol)
+    return res'                                                                             
+end
+function computeVJPSS(du::AbstractVector,
+                      _sol::ODESolution, 
+                      odeSolver::SciMLAlgorithm, 
+                      sensealg::InterpolatingAdjoint, 
+                      relTol::Float64, 
+                      absTol::Float64)
+
+    nModelStates = length(_sol.prob.u0)                      
+    adj_prob, rcb = ODEAdjointProblem(_sol, sensealg, odeSolver, [_sol.t[end]], compute∂g∂uEmpty, nothing,
+                                      nothing, nothing, nothing, Val(true))
+    
+    adj_prob.u0[1:nModelStates] .= du[1:nModelStates]
+
+    adj_sol = solve(adj_prob, odeSolver; abstol = absTol, reltol = relTol,
+                    save_everystep = true, save_start = true)
+    out = adj_sol[end][(nModelStates+1):end]
+    return out
+end
+
+
+function compute∂g∂uEmpty(out, u, p, t, i)
+    out .= 0.0
 end
 
 
@@ -167,7 +215,7 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
     # adjoitn ODE                                        
     iPerTimePoint = simulationInfo.iPerTimePoint[experimentalConditionId]                                        
     timeObserved = simulationInfo.timeObserved[experimentalConditionId]
-    callback = simulationInfo.callbacks[experimentalConditionId]
+    callback = simulationInfo.trackedCallbacks[experimentalConditionId]
 
     # Pre allcoate vectors needed for computations 
     ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, petabModel) 
@@ -197,7 +245,9 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
 
         status = __adjoint_sensitivities!(du, dp, sol, sensealg, timeObserved, odeSolver, 
                                           solverAbsTol, solverRelTol, callback, compute∂G∂u)
-        status == false && return false
+        if status == false
+            println("Failed to solve adjoint system")
+        end
     else
         compute∂G∂u(du, sol[1], sol.prob.p, 0.0, 1)
         onlyObsAtZero = true
@@ -225,10 +275,10 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
         _gradient = dp .+ du'*St0
 
     else
-        # In case we simulate to a stady state we need to compute a VJP. We use 
-        # Zygote pullback to avoid having to having build the Jacobian, rather 
-        # we create the yBar function required for the vector Jacobian product.
-        _gradient = (dp .+ (evalVJPSS(du)[1])')[:]
+        # In case we simulate to a stady state we need to compute a VJP. For the 
+        # adjoint method we either have to solve a linear system (fastest for well conditioned Jacobian), 
+        # or solve the adjoint equaiton λ using du as initial value
+        _gradient = (dp' .+ evalVJPSS(du))
     end
 
     # Thus far have have computed dY/dθ, but for parameters on the log-scale we want dY/dθ_log. We can adjust via;
