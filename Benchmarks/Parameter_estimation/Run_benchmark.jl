@@ -146,9 +146,9 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
     FidesAutoHessBlock = setUpFides(petabProblem, :blockAutoDiff; verbose=0, 
                                     options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
-    FidesGN = setUpFides(petabProblem, :GaussNewton; verbose=1, 
+    FidesGN = setUpFides(petabProblem, :GaussNewton; verbose=0, 
                          options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)                                    
-    FidesBFGS = setUpFides(petabProblem, :None; verbose=1,
+    FidesBFGS = setUpFides(petabProblem, :None; verbose=0,
                            fidesHessApprox=py"fides.hessian_approximation.BFGS()"o, 
                            options=py"{'maxiter' : 1000, 'fatol' : 0.0, 'frtol' : 1e-8, 'xtol' : 0.0, 'gatol' : 1e-6, 'grtol' : 0.0}"o)
 
@@ -345,7 +345,8 @@ end
 if ARGS[1] == "Weber_BMC2015"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Weber_BMC2015", "Weber_BMC2015.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest, terminateSSMethod=:Norm) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
 
 

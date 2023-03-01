@@ -44,4 +44,8 @@ if [ $1 == "Bruno_JExpBot2016" ];then
     ${runJulia} ${pathBenchmarkScript} Bruno_JExpBot2016 $2 $3
 fi
 
+if [ $1 == "Weber_BMC2015" ];then
+    ${runJulia} ${pathBenchmarkScript} Weber_BMC2015 $2 $3
+fi
+
 exit 0
