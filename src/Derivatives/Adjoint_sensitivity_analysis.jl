@@ -247,6 +247,7 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
                                           solverAbsTol, solverRelTol, callback, compute∂G∂u)
         if status == false
             println("Failed to solve adjoint system")
+            return false
         end
     else
         compute∂G∂u(du, sol[1], sol.prob.p, 0.0, 1)

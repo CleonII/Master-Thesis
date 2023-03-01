@@ -51,7 +51,7 @@ function getPEtabProblem(petabModel::PEtabModel,
         computeGradient = petabProblem.computeGradientZygote
         return petabProblem, computeGradient
     elseif gradientMethod == :Adjoint
-        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, sensealgAdjoint=sensealg, odeSolverAdjoint=odeSolver, solverAdjointAbsTol=absTol, solverAdjointRelTol=relTol, sparseJacobian=sparseJacobian)
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, sensealgAdjoint=sensealg, sensealgAdjointSS=sensealg, odeSolverAdjoint=odeSolver, solverAdjointAbsTol=absTol, solverAdjointRelTol=relTol, sparseJacobian=sparseJacobian)
         computeGradient = petabProblem.computeGradientAdjoint
         return petabProblem, computeGradient
     elseif gradientMethod == :ForwardDiff
@@ -120,6 +120,11 @@ function benchmarkCostGrad(petabModel::PEtabModel,
             println("Will not run Zygote")
             return
         end
+        # Enzyme does not currently handle callbacks 
+        if petabModel.modelName == "model_Isensee_JCB2018" && (methodInfo == "InterpolatingAdjoint(autojacvec=EnzymeVJP())" || methodInfo == "QuadratureAdjoint(autojacvec=EnzymeVJP())")
+            return 
+        end
+
         # Callbacks are not handled well at all by the lower level interface 
         if petabModel.modelName ∈ ["model_Fujita_SciSignal2010", "model_Beer_MolBioSystems2014"] && gradientMethod == :Adjoint
             println("Will not run Zygote")
@@ -234,6 +239,43 @@ if ARGS[1] == "No_pre_eq_models"
         benchmarkCostGrad(petabModel, [:ForwardEquations, ForwardSensitivity(), "ForEq_ForwardSensitivity"], 
                           CVODE_BDF(), "CVODE_BDF", pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
     end
+end
+
+
+if ARGS[1] == "Test_adjoint"
+
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
+    pathSave = joinpath(dirSave, "Test_adjoint.csv")
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+    modelTest = ARGS[2]
+
+
+    modelList = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011",  "model_Lucarelli_CellSystems2018", "model_Isensee_JCB2018", "Smith_BMCSystBiol2013"]
+                            
+    odeSolvers = [Rodas5P(), QNDF(), CVODE_BDF()]
+    odeSolversName = ["Rodas5P", "QNDF", "CVODE_BDF"]                 
+    sensealgsCheck = [[:ForwardDiff, nothing, "ForwardDiff"], 
+                      [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), "InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true))"],
+                      [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), "InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false))"],
+                      [:Adjoint, InterpolatingAdjoint(autojacvec=EnzymeVJP()), "InterpolatingAdjoint(autojacvec=EnzymeVJP())"], 
+                      [:Adjoint, QuadratureAdjoint(abstol=1e-8, reltol=1e-8, autojacvec=ReverseDiffVJP(true)), "QuadratureAdjoint(autojacvec=ReverseDiffVJP(true))"],
+                      [:Adjoint, QuadratureAdjoint(abstol=1e-8, reltol=1e-8, autojacvec=ReverseDiffVJP(false)), "QuadratureAdjoint(autojacvec=ReverseDiffVJP(false))"], 
+                      [:Adjoint, QuadratureAdjoint(abstol=1e-8, reltol=1e-8, autojacvec=EnzymeVJP()), "QuadratureAdjoint(autojacvec=EnzymeVJP())"]]
+
+    absTol, relTol = 1e-8, 1e-8                      
+    dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelTest)
+    pathYML = getPathYmlFile(dirModel)
+    petabModel = readPEtabModel(pathYML)
+    for j in eachindex(odeSolvers)
+    
+        # Check Gradient 
+        for sensealgInfo in sensealgsCheck
+            benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=5)
+        end
+    end
+
 end
 
 
