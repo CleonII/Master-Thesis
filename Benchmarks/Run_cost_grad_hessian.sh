@@ -49,4 +49,16 @@ if [ $1 == "Test_adjoint" ];then
 fi
 
 
+if [ $1 == "Test_adjoint_random" ];then
+    runJulia="/home/sebpe/julia-1.8.5-linux-x86_64/julia-1.8.5/bin/julia --project=. --threads=1"
+    pathBenchmarkScript="./Benchmarks/Cost_grad_hess/Cost_grad_hess.jl"
+    
+    # For Bachman 
+    ${runJulia} ${pathBenchmarkScript} Test_adjoint_random_p model_Boehm_JProteomeRes2014
+    ${runJulia} ${pathBenchmarkScript} Test_adjoint_random_p model_Bachmann_MSB2011
+    ${runJulia} ${pathBenchmarkScript} Test_adjoint_random_p model_Lucarelli_CellSystems2018
+    ${runJulia} ${pathBenchmarkScript} Test_adjoint_random_p model_Isensee_JCB2018
+fi
+
+
 exit 0

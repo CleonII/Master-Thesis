@@ -13,6 +13,7 @@ using SciMLSensitivity
 using Zygote
 using Symbolics
 using Sundials
+using FiniteDifferences
 using YAML
 using BenchmarkTools
 
@@ -58,6 +59,10 @@ function getPEtabProblem(petabModel::PEtabModel,
         petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sparseJacobian=sparseJacobian, chunkSize=chunkSize)
         computeGradient = petabProblem.computeGradientAutoDiff
         return petabProblem, computeGradient
+    elseif gradientMethod == :FiniteDifferences
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol)
+        computeGradient = (gradient, x) -> begin gradient .= FiniteDifferences.grad(central_fdm(4, 1), petabProblem.computeCost, x)[1] end
+        return petabProblem, computeGradient
     end
 end
 
@@ -90,6 +95,7 @@ function benchmarkCostGrad(petabModel::PEtabModel,
                            chunkSize=nothing, 
                            iParameter=0,
                            _θ_est=nothing,
+                           pathSaveGradient=nothing,
                            shouldSave::Bool=true)
 
     println("Running model ", petabModel.modelName)
@@ -193,6 +199,22 @@ function benchmarkCostGrad(petabModel::PEtabModel,
     elseif shouldSave == true
         CSV.write(pathFileSave, dataSave)
     end
+
+    if !isnothing(pathSaveGradient)
+        dataSave = DataFrame(reshape(gradient, 1, length(gradient)), :auto)
+        rename!(dataSave, petabProblem.θ_estNames)
+        dataSave[!, :Method_info] .= methodInfo
+        dataSave[!, :Model] .= petabModel.modelName
+        dataSave[!, :absTol] .= absTol
+        dataSave[!, :relTol] .= relTol
+        dataSave[!, :I_parameter] .= iParameter
+        dataSave[!, :solver] .= odeSolverName
+        if isfile(pathSaveGradient)
+            CSV.write(pathSaveGradient, dataSave, append = true)
+        else
+            CSV.write(pathSaveGradient, dataSave)
+        end
+    end
 end
 
 
@@ -250,9 +272,6 @@ if ARGS[1] == "Test_adjoint"
         mkpath(dirSave)
     end
     modelTest = ARGS[2]
-
-
-    modelList = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011",  "model_Lucarelli_CellSystems2018", "model_Isensee_JCB2018", "Smith_BMCSystBiol2013"]
                             
     odeSolvers = [Rodas5P(), QNDF(), CVODE_BDF()]
     odeSolversName = ["Rodas5P", "QNDF", "CVODE_BDF"]                 
@@ -275,7 +294,46 @@ if ARGS[1] == "Test_adjoint"
             benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=5)
         end
     end
+end
 
+
+if ARGS[1] == "Test_adjoint_random_p"
+
+    Random.seed!(123)
+
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
+    pathSave = joinpath(dirSave, "Test_adjoint_random.csv")
+    pathSaveGradient = joinpath(dirSave, "Test_adjoint_random_gradient.csv")
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+    modelTest = ARGS[2]
+                            
+    odeSolvers = [CVODE_BDF()]
+    odeSolversName = ["CVODE_BDF"]                 
+    sensealgsCheck = [[:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), "InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true))"],
+                      [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), "InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false))"],
+                      [:Adjoint, InterpolatingAdjoint(autojacvec=EnzymeVJP()), "InterpolatingAdjoint(autojacvec=EnzymeVJP())"], 
+                      [:Adjoint, QuadratureAdjoint(abstol=1e-8, reltol=1e-8, autojacvec=ReverseDiffVJP(true)), "QuadratureAdjoint(autojacvec=ReverseDiffVJP(true))"],
+                      [:Adjoint, QuadratureAdjoint(abstol=1e-8, reltol=1e-8, autojacvec=ReverseDiffVJP(false)), "QuadratureAdjoint(autojacvec=ReverseDiffVJP(false))"], 
+                      [:Adjoint, QuadratureAdjoint(abstol=1e-8, reltol=1e-8, autojacvec=EnzymeVJP()), "QuadratureAdjoint(autojacvec=EnzymeVJP())"]]
+
+    absTol, relTol = 1e-8, 1e-8                      
+    dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelTest)
+    pathYML = getPathYmlFile(dirModel)
+    petabModel = readPEtabModel(pathYML)
+    for i in 1:50
+        θ_est = getRandomModelParameters(petabModel, Rodas5P(), i, odeSolvers=false)
+        for j in eachindex(odeSolvers)
+            # Check Gradient 
+            for sensealgInfo in sensealgsCheck
+                benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=5, pathSaveGradient=pathSaveGradient, _θ_est=θ_est, iParameter=i)
+            end            
+        end
+         
+        benchmarkCostGrad(petabModel, [:ForwardDiff, nothing, "ForwardDiff"], Rodas5P(), "Rodas5P", pathSave, absTol, relTol, checkGradient=true, nRepeat=5, pathSaveGradient=pathSaveGradient, _θ_est=θ_est, iParameter=i)
+        benchmarkCostGrad(petabModel, [:FiniteDifferences, nothing, "FiniteDifferences"], Rodas5P(), "Rodas5P", pathSave, absTol, relTol, checkGradient=true, nRepeat=1, pathSaveGradient=pathSaveGradient, _θ_est=θ_est, iParameter=i)
+    end
 end
 
 
