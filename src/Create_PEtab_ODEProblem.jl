@@ -48,7 +48,7 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
         jobs, results = setUpProcesses(petabModel, odeSolver, solverAbsTol, solverRelTol, odeSolverAdjoint, sensealgAdjoint,
                                        sensealgAdjointSS, solverAdjointAbsTol, solverAdjointRelTol, odeSolverForwardEquations, 
                                        sensealgForwardEquations, parameterInfo, measurementInfo, simulationInfo, θ_indices, 
-                                       priorInfo, odeProblem, chunkSize)
+                                       priorInfo, odeProblem, chunkSize, reuseS)
     else
         jobs, results = nothing, nothing
     end

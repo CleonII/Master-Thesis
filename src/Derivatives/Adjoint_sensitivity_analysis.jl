@@ -217,6 +217,8 @@ function computeGradientAdjointExpCond!(gradient::Vector{Float64},
     timeObserved = simulationInfo.timeObserved[experimentalConditionId]
     callback = simulationInfo.trackedCallbacks[experimentalConditionId]
 
+    println("Condition ID = ", experimentalConditionId)
+
     # Pre allcoate vectors needed for computations 
     ∂h∂u, ∂σ∂u, ∂h∂p, ∂σ∂p = allocateObservableFunctionDerivatives(sol, petabModel) 
     
@@ -315,6 +317,7 @@ function __adjoint_sensitivities!(_du::AbstractVector,
     if adj_sol.retcode != :Success                    
         _du .= 0.0
         _dp .= 0.0
+        println("Return code = ", adj_sol.retcode)
         return false
     end
 
@@ -369,6 +372,7 @@ function __adjoint_sensitivities!(_du::AbstractVector,
     if adj_sol.retcode != :Success                    
         _du .= 0.0
         _dp .= 0.0
+        println("Return code = ", adj_sol.retcode)
         return false
     end                    
 

@@ -25,6 +25,8 @@ function runProcess(jobs, results)
     put!(results, tuple(:Done))
     odeSolverForwardEquations, sensealgForwardEquations, chunkSize = take!(jobs)
     put!(results, tuple(:Done))
+    reuseS = take!(jobs)[1]
+    put!(results, tuple(:Done))
     println("Done loading solver and gradient options for ", myid())
 
     expIDs::Vector{Symbol} = take!(jobs)[1]
@@ -52,7 +54,7 @@ function runProcess(jobs, results)
     computeHessianBlock = setUpHessian(:BlockAutoDiff, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
                                         θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIDs)                                  
     computeHessianGN = setUpHessian(:GaussNewton, odeProblem, odeSolver, solverAbsTol, solverRelTol, petabModel, simulationInfo,
-                                    θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIDs, reuseS=false)                                                                          
+                                    θ_indices, measurementInfo, parameterInfo, priorInfo, chunkSize, expIDs, reuseS=reuseS)                                                                          
 
     put!(results, tuple(:Done))  
     gradient = zeros(Float64, length(θ_indices.θ_estNames))

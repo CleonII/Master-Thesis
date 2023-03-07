@@ -18,7 +18,8 @@ function setUpProcesses(petabModel::PEtabModel,
                         θ_indices::ParameterIndices, 
                         pirorInfo::PriorInfo,
                         odeProblem::ODEProblem, 
-                        chunkSize::Union{Int64, Nothing})                              
+                        chunkSize::Union{Int64, Nothing}, 
+                        reuseS::Bool)
 
     println("Setting up cost, grad, and hessian to be computed on several processes using Distributed.jl")
 
@@ -87,6 +88,15 @@ function setUpProcesses(petabModel::PEtabModel,
         end
     end
 
+    # Send whether or not sensitivity matrix should be reused 
+    for i in 1:nProcs
+        @async put!(jobs[i], tuple(reuseS)) 
+        status = take!(results[i])[1]
+        if status != :Done
+            println("Error : Could not send reuse S information ", procs()[i])
+        end
+    end
+
     # Send experimental ID:s process each process works with 
     for i in 1:nProcs
         @async put!(jobs[i], tuple(idsEachProcess[i])) 
@@ -128,7 +138,9 @@ function loadPackages()
     @eval @everywhere begin 
                         macro LoadLib()
                             quote
-                                using DifferentialEquations
+                                using SciMLBase
+                                using OrdinaryDiffEq
+                                using Sundials
                                 using ModelingToolkit
                                 using DataFrames
                                 using LinearAlgebra

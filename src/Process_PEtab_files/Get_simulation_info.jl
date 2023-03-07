@@ -155,7 +155,7 @@ end
 
 function computeTimeMax(preEquilibrationConditionId::Symbol, simulationConditionId::Symbol, measurementInfo::MeasurementsInfo)::Float64
     iTimePoints = _computeTimeIndices(preEquilibrationConditionId, simulationConditionId, measurementInfo)
-    return Float64(maximum(measurementInfo.time[iTimePoints]))
+    return Float64(maximum(measurementInfo.time[iTimePoints])) + 10.0
 end
 
 
