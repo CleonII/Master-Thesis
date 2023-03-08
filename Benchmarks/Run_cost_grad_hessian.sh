@@ -61,4 +61,24 @@ if [ $1 == "Test_adjoint_random" ];then
 fi
 
 
+if [ $1 == "Gradient_cost_small_models" ];then
+    runJulia="/home/sebpe/julia-1.8.5-linux-x86_64/julia-1.8.5/bin/julia --project=. --threads=1"
+    pathBenchmarkScript="./Benchmarks/Cost_grad_hess/Cost_grad_hess.jl"
+    
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Beer_MolBioSystems2014
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Boehm_JProteomeRes2014
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Bachmann_MSB2011
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Bruno_JExpBot2016
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Crauste_CellSystems2017
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Elowitz_Nature2000
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Fiedler_BMC2016
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Fujita_SciSignal2010
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Lucarelli_CellSystems2018
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Sneyd_PNAS2002
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Weber_BMC2015
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Brannmark_JBC2010
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Isensee_JCB2018
+    ${runJulia} ${pathBenchmarkScript} Gradient_cost_small_models model_Zheng_PNAS2012
+fi
+
 exit 0

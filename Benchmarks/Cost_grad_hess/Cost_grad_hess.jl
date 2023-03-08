@@ -41,26 +41,29 @@ function getPEtabProblem(petabModel::PEtabModel,
                          absTol::Float64,
                          relTol::Float64, 
                          sparseJacobian::Bool, 
+                         splitOverConditions::Bool,
                          chunkSize::Union{Int64, Nothing})
 
+    solverSSRelTol = relTol / 100.0
+    solverSSAbsTol = absTol / 100.0
     if gradientMethod == :ForwardEquations
-        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sensealgForwardEquations = sensealg, odeSolverForwardEquations=odeSolver, sparseJacobian=sparseJacobian, chunkSize=chunkSize)
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sensealgForwardEquations = sensealg, odeSolverForwardEquations=odeSolver, sparseJacobian=sparseJacobian, chunkSize=chunkSize, solverSSAbsTol=solverSSAbsTol, solverSSRelTol=solverSSRelTol, splitOverConditions=splitOverConditions)
         computeGradient = petabProblem.computeGradientForwardEquations
         return petabProblem, computeGradient
     elseif gradientMethod == :Zygote
-        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sensealgZygote=sensealg, sparseJacobian=sparseJacobian)
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sensealgZygote=sensealg, sparseJacobian=sparseJacobian, solverSSAbsTol=solverSSAbsTol, solverSSRelTol=solverSSRelTol, splitOverConditions=splitOverConditions)
         computeGradient = petabProblem.computeGradientZygote
         return petabProblem, computeGradient
     elseif gradientMethod == :Adjoint
-        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, sensealgAdjoint=sensealg, sensealgAdjointSS=sensealg, odeSolverAdjoint=odeSolver, solverAdjointAbsTol=absTol, solverAdjointRelTol=relTol, sparseJacobian=sparseJacobian)
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, sensealgAdjoint=sensealg, sensealgAdjointSS=sensealg, odeSolverAdjoint=odeSolver, solverAdjointAbsTol=absTol, solverAdjointRelTol=relTol, sparseJacobian=sparseJacobian, solverSSAbsTol=solverSSAbsTol, solverSSRelTol=solverSSRelTol, splitOverConditions=splitOverConditions)
         computeGradient = petabProblem.computeGradientAdjoint
         return petabProblem, computeGradient
     elseif gradientMethod == :ForwardDiff
-        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sparseJacobian=sparseJacobian, chunkSize=chunkSize)
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sparseJacobian=sparseJacobian, chunkSize=chunkSize, solverSSAbsTol=solverSSAbsTol, solverSSRelTol=solverSSRelTol, splitOverConditions=splitOverConditions)
         computeGradient = petabProblem.computeGradientAutoDiff
         return petabProblem, computeGradient
     elseif gradientMethod == :FiniteDifferences
-        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol)
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, solverSSAbsTol=solverSSAbsTol, solverSSRelTol=solverSSRelTol, splitOverConditions=splitOverConditions)
         computeGradient = (gradient, x) -> begin gradient .= FiniteDifferences.grad(central_fdm(4, 1), petabProblem.computeCost, x)[1] end
         return petabProblem, computeGradient
     end
@@ -116,8 +119,15 @@ function benchmarkCostGrad(petabModel::PEtabModel,
 
     if checkGradient == true
         whatCompute = "Gradient"
+
+        if petabModel.modelName == "Run_cost_grad_hessian.sh"
+            splitOverConditions = true
+        else
+            splitOverConditions = false
+        end
+
         gradientMethod, sensealg, methodInfo = gradientInfo
-        petabProblem, computeGradient = getPEtabProblem(petabModel, gradientMethod, sensealg, odeSolver, absTol, relTol, sparseJacobian, chunkSize)
+        petabProblem, computeGradient = getPEtabProblem(petabModel, gradientMethod, sensealg, odeSolver, absTol, relTol, sparseJacobian, splitOverConditions, chunkSize)
 
         # Use nominal parameter vector 
         gradient = zeros(length(θ_est))
@@ -218,48 +228,34 @@ function benchmarkCostGrad(petabModel::PEtabModel,
 end
 
 
-if ARGS[1] == "No_pre_eq_models"
+if ARGS[1] == "Gradient_cost_small_models"
 
     dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
-    pathSave = joinpath(dirSave, "No_preequlibrium.csv")
+    pathSave = joinpath(dirSave, "Gradient_cost_small_models.csv")
     if !isdir(dirSave)
         mkpath(dirSave)
     end
-
-    modelList = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011", "model_Beer_MolBioSystems2014", 
-                 "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
-                 "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
-                 "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]
+    modelTest = ARGS[2]
                             
-
-    odeSolvers = [Rodas5(), KenCarp4(), QNDF(), AutoVern7(Rodas5())]
-    odeSolversName = ["Rodas5", "KenCarp4", "QNDF", "Vern7(Rodas5)"]                 
+    odeSolvers = [Rodas5P(), KenCarp47(), QNDF(), AutoVern7(Rodas5P())]
+    odeSolversName = ["Rodas5P", "KenCarp47", "QNDF", "Vern7(Rodas5P)"]                 
     sensealgsCheck = [[:ForwardDiff, nothing, "ForwardDiff"], 
-                      [:ForwardEquations, :AutoDiffForward, "ForEq_AutoDiff"],
-                      [:Zygote, ForwardDiffSensitivity(), "Zygote_ForwardDiffSensitivity"], 
-                      [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP()), "Adj_InterpolatingAdjoint(autojacvec=ReverseDiffVJP())"], 
-                      [:Adjoint, QuadratureAdjoint(autojacvec=ReverseDiffVJP()), "Adj_QuadratureAdjoint(autojacvec=ReverseDiffVJP())"], 
-                      [:Adjoint, QuadratureAdjoint(autodiff=false, autojacvec=false), "Adj_QuadratureAdjoint(autodiff=false, autojacvec=false)"]]
+                      [:ForwardEquations, :AutoDiffForward, "ForEq_AutoDiff"]]
 
     absTol, relTol = 1e-8, 1e-8                      
-    for i in eachindex(modelList)
-        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
-        pathYML = getPathYmlFile(dirModel)
-        petabModel = readPEtabModel(pathYML)
-        for j in eachindex(odeSolvers)
+    dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelTest)
+    pathYML = getPathYmlFile(dirModel)
+    petabModel = readPEtabModel(pathYML)
+    for j in eachindex(odeSolvers)
         
-            # Check cost 
-            benchmarkCostGrad(petabModel, nothing, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkCost=true, nRepeat=10)
+        # Check cost 
+        benchmarkCostGrad(petabModel, nothing, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkCost=true, nRepeat=10)
 
-            # Check Gradient 
-            for sensealgInfo in sensealgsCheck
-                benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
-            end
+        # Check forward gradient via two different approaches 
+        for sensealgInfo in sensealgsCheck
+            benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
         end
-
-        # For fun Check CVODE_BDF
-        benchmarkCostGrad(petabModel, [:ForwardEquations, ForwardSensitivity(), "ForEq_ForwardSensitivity"], 
-                          CVODE_BDF(), "CVODE_BDF", pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
+        
     end
 end
 
