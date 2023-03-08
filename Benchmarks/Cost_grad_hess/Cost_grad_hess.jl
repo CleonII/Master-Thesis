@@ -178,15 +178,21 @@ function benchmarkCostGrad(petabModel::PEtabModel,
         end
 
     elseif checkHessian == true
+
+        if petabModel.modelName == "Run_cost_grad_hessian.sh"
+            splitOverConditions = true
+        else
+            splitOverConditions = false
+        end
             
         whatCompute = "Hessian"
         methodInfo = "ForwardDiff"
-        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, absTol=absTol, relTol=relTol, sparseJacobian=sparseJacobian)
+        petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=absTol, solverRelTol=relTol, sparseJacobian=sparseJacobian, splitOverConditions=splitOverConditions, solverSSAbsTol=absTol/100.0, solverSSRelTol=relTol/100.0)
         hessian = zeros(length(θ_est), length(θ_est))
         cost = petabProblem.computeCost(θ_est)
         if !isinf(cost)
             bHess = @benchmark $petabProblem.computeHessian($hessian, $θ_est) samples=(nRepeat+1) seconds=1e5 evals=1
-            runTime .= bHess.times
+            runTime .= bHess.times[2:end] .* 1e-9
         else
             runTime .= Inf
         end
@@ -256,6 +262,34 @@ if ARGS[1] == "Gradient_cost_small_models"
             benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
         end
         
+    end
+end
+
+
+if ARGS[1] == "Hessian_cost_small_models"
+
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
+    pathSave = joinpath(dirSave, "Hessian_cost_small_models.csv")
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+    modelTest = ARGS[2]
+                            
+    odeSolvers = [Rodas5P(), KenCarp47(), QNDF(), AutoVern7(Rodas5P())]
+    odeSolversName = ["Rodas5P", "KenCarp47", "QNDF", "Vern7(Rodas5P)"]                 
+
+    absTol, relTol = 1e-8, 1e-8                      
+    dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelTest)
+    pathYML = getPathYmlFile(dirModel)
+    petabModel = readPEtabModel(pathYML)
+    for j in eachindex(odeSolvers)
+        
+        # Check cost 
+        benchmarkCostGrad(petabModel, nothing, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkCost=true, nRepeat=10)
+
+        # Check hessian 
+        benchmarkCostGrad(petabModel, nothing, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkHessian=true, nRepeat=3)
+
     end
 end
 
