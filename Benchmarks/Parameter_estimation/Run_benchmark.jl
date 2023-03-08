@@ -84,12 +84,13 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                       solverSSRelTol::Float64=1e-6,
                                       solverSSAbsTol::Float64=1e-6, 
                                       reuseS::Bool=true, 
+                                      numberOfprocesses=1,
                                       splitOverConditions::Bool=false)
 
     petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=absTol, solverRelTol=relTol, terminateSSMethod=terminateSSMethod, 
                                         solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol, 
                                         reuseS=reuseS, sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver, 
-                                        splitOverConditions=splitOverConditions)
+                                        splitOverConditions=splitOverConditions, numberOfprocesses=numberOfprocesses)
     θ_estNames = string.(petabProblem.θ_estNames)
 
     pathCube = joinpath(petabModel.dirJulia, "Cube_benchmark.csv")
@@ -328,6 +329,14 @@ if ARGS[1] == "Boehm_JProteomeRes2014"
 end
 
 
+if ARGS[1] == "Zheng_PNAS2012"
+    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Zheng_PNAS2012", "Zheng_PNAS2012.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=true)     
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
+end
+
+
 if ARGS[1] == "Elowitz_Nature2000"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Elowitz_Nature2000", "Elowitz_Nature2000.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
@@ -341,6 +350,15 @@ if ARGS[1] == "Crauste_CellSystems2017"
     benchmarkParameterEstimation(petabModel, AutoVern7(Rodas5()), "Vern7(Rodas5)", 1e-12, 1e-12, nMultiStarts, algList=optmizersTest) 
 end
 
+
+if ARGS[1] == "Lucarelli_CellSystems2018"
+    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Lucarelli_CellSystems2018", "Lucarelli_CellSystems2018.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=true)
+    removeAllProcs()
+    addprocs(1, exeflags="--project=.")
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], numberOfprocesses=2) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false, numberOfprocesses=2) 
+end
 
 if ARGS[1] == "Weber_BMC2015"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Weber_BMC2015", "Weber_BMC2015.yaml")

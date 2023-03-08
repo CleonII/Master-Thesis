@@ -48,4 +48,8 @@ if [ $1 == "Weber_BMC2015" ];then
     ${runJulia} ${pathBenchmarkScript} Weber_BMC2015 $2 $3
 fi
 
+if [ $1 == "Zheng_PNAS2012" ];then
+    ${runJulia} ${pathBenchmarkScript} Zheng_PNAS2012 $2 $3
+fi
+
 exit 0
