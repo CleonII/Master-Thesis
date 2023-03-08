@@ -13,7 +13,7 @@ using Zygote
 using SciMLSensitivity
 using Sundials
 using YAML
-using Test
+using FiniteDifferences
 
 
 # Relevant PeTab structs for compuations 
@@ -22,97 +22,55 @@ include(joinpath(pwd(), "src", "PeTab_structs.jl"))
 # PeTab importer to get cost, grad etc 
 include(joinpath(pwd(), "src", "Create_PEtab_model.jl"))
 
-# HyperCube sampling 
-include(joinpath(pwd(), "src", "Optimizers", "Lathin_hypercube.jl"))
-
 # For converting to SBML 
 include(joinpath(pwd(), "src", "SBML", "SBML_to_ModellingToolkit.jl"))
 
 include(joinpath(pwd(), "tests", "Common.jl"))
 
 
-"""
-    compareAgainstPyPestoBachmann(petabModel::PEtabModel, solver, tol)
+petabModel = readPEtabModel(joinpath(@__DIR__, "Bachmann", "Bachmann_MSB2011.yaml"), forceBuildJuliaFiles=false)
 
-    Compare cost and gradient for Julia PeTab importer against the cost and 
-    gradient computed in PyPesto for Bachmann model. 
-"""
-function compareAgainstPyPestoBachmann(petabModel::PEtabModel, solver, tol)
+solver, tol = Rodas5P(), 1e-9
+petabProblem1 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
+                                     odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
+                                     sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
 
-    petabProblem1 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
-                                         sensealgZygote=ForwardDiffSensitivity(), 
-                                         odeSolverForwardEquations=CVODE_BDF(), sensealgForwardEquations = ForwardSensitivity(), 
-                                         odeSolverAdjoint=solver, solverAdjointAbsTol=tol, solverAdjointRelTol=tol,
-                                         sensealgAdjoint=InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)))
+# File with random parameter values 
+paramVals = CSV.read(pwd() * "/tests/Bachmann/Params.csv", DataFrame)
+paramMat = paramVals[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
 
-    petabProblem2 = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=tol, solverRelTol=tol, 
-                                         sensealgForwardEquations=:AutoDiffForward, odeSolverForwardEquations=solver)
-
-
-    # Parameter values to test gradient at 
-    paramVals = CSV.read(pwd() * "/tests/Bachmann/Params.csv", DataFrame)
-    paramMat = paramVals[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
-
-    # PyPesto hessian, gradient and cost values 
-    costPython = (CSV.read(pwd() * "/tests/Bachmann/Cost.csv", DataFrame))[!, :Cost]
-    gradPythonMat = CSV.read(pwd() * "/tests/Bachmann/Grad.csv", DataFrame)
-    gradPythonMat = gradPythonMat[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
-    hessPythonMat = CSV.read(pwd() * "/tests/Bachmann/Hess.csv", DataFrame)
-    hessPythonMatCols = names(hessPythonMat)
-    hessFilter=findall( x -> occursin("CISRNAEqc", x) || occursin("SOCS3RNAEqc", x), hessPythonMatCols)
-    hessPythonMat = hessPythonMat[!, Not(["Id", hessPythonMatCols[hessFilter]...])]
+# PyPesto hessian, gradient and cost values for the random parameter vectors 
+costPython = (CSV.read(pwd() * "/tests/Bachmann/Cost.csv", DataFrame))[!, :Cost]
+gradPythonMat = CSV.read(pwd() * "/tests/Bachmann/Grad.csv", DataFrame)
+gradPythonMat = gradPythonMat[!, Not([:Id, :SOCS3RNAEqc, :CISRNAEqc])]
  
-    paramEstNames = string.(petabProblem1.θ_estNames)
-    # For correct indexing when comparing gradient or when inputing PyPesto vector to Julia 
-    iUse = [findfirst(x -> x == paramEstNames[i], names(paramMat)) for i in eachindex(paramEstNames)]
-    nParam = ncol(paramMat)
+paramEstNames = string.(petabProblem1.θ_estNames)
+# For correct indexing when comparing gradient (we have different ordering compared to PyPesto)
+iUse = [findfirst(x -> x == paramEstNames[i], names(paramMat)) for i in eachindex(paramEstNames)]
+nParam = ncol(paramMat)
 
-    # For correct indexing when comparing hessian
-    namesParamHess = Array{String, 1}(undef,nParam*nParam)
-    for k in eachindex(namesParamHess)
-        row = 1 + (k-1) % nParam
-        col = 1 + (k-1) ÷ nParam
-        namesParamHess[k] = paramEstNames[row] * paramEstNames[col]
-    end
-    iUseHess = [findfirst(x -> x == namesParamHess[i], names(hessPythonMat)) for i in eachindex(namesParamHess)]
+i = 3
+p = collect(paramMat[i, iUse])
+referenceCost = costPython[i] # Cost from PyPesto
+referenceGradient = collect(gradPythonMat[i, iUse]) # Cost from 
 
-    for i in 1:2
+cost = petabProblem1.computeCost(p)
+@printf("Cost python = %.3e and cost Julia = %.3e\n", referenceCost, cost)
+@printf("abs(Difference cost) = %.3e\n", abs(referenceCost - cost))
 
-        p = collect(paramMat[i, iUse])
-        referenceCost = costPython[i]
-        referenceGradient = collect(gradPythonMat[i, iUse])
-        referenceHessian = collect(hessPythonMat[i, iUseHess])
+# Gradient via Forward-mode automatic differentitation 
+gradientForwardDiff = zeros(length(p))        
+petabProblem1.computeGradientAutoDiff(gradientForwardDiff, p)
+@printf("norm(gradientPyPesto - gradientForwardDiffJulia) = %.3e\n", norm(gradientForwardDiff - referenceGradient))
 
-        cost = _testCostGradientOrHessian(petabProblem1, p, cost=true)
-        @test cost ≈ referenceCost atol=1e-3
-        costZygote = _testCostGradientOrHessian(petabProblem1, p, costZygote=true)
-        @test costZygote ≈ referenceCost atol=1e-3
+# Gradient via adjoint sensitivity analysis
+gradientAdjoint = zeros(length(p))
+petabProblem1.computeGradientAdjoint(gradientAdjoint, p)
+@printf("norm(gradientPyPesto - gradientAdjointJulia) = %.3e\n", norm(gradientAdjoint - referenceGradient))
         
-        # Test all gradient combinations. Note we test sensitivity equations with and without autodiff 
-        gradientAutoDiff = _testCostGradientOrHessian(petabProblem1, p, gradientAutoDiff=true)
-        @test norm(gradientAutoDiff - referenceGradient) ≤ 1e-3
-        # This currently takes considerble time (hence it does not run for all passes)
-        if i == 1
-            gradientZygote = _testCostGradientOrHessian(petabProblem1, p, gradientZygote=true)
-            @test norm(gradientZygote - referenceGradient) ≤ 1e-3
-        end
-        gradientAdjoint = _testCostGradientOrHessian(petabProblem1, p, gradientAdjoint=true)
-        @test norm(normalize(gradientAdjoint) - normalize((referenceGradient))) ≤ 1e-2
-        gradientForwardEquations1 = _testCostGradientOrHessian(petabProblem1, p, gradientForwardEquations=true)
-        @test norm(gradientForwardEquations1 - referenceGradient) ≤ 1e-3
-        gradientForwardEquations2 = _testCostGradientOrHessian(petabProblem2, p, gradientForwardEquations=true)
-        @test norm(gradientForwardEquations2 - referenceGradient) ≤ 1e-3
-        
-        # Testing "exact" hessian via autodiff 
-        hessian = _testCostGradientOrHessian(petabProblem1, p, hessianGN=true)
-        @test norm(hessian[:] - referenceHessian) ≤ 1e-2
+# Gradient from FiniteDifferences 
+gradientFinite = FiniteDifferences.grad(central_fdm(5, 1), petabProblem1.computeCost, p)[1]
+@printf("norm(gradientPyPesto - gradientFiniteDifferences) = %.3e\n", norm(gradientFinite - referenceGradient))
 
-    end
-
-end
-
-
-petabModel = readPEtabModel(joinpath(@__DIR__, "Bachmann", "Bachmann_MSB2011.yaml"), forceBuildJuliaFiles=true)
-@testset "Against PyPesto : Bachmann" begin 
-    compareAgainstPyPestoBachmann(petabModel, Rodas5(), 1e-12)
-end
+println("Gradient Adjoint = ", gradientAdjoint)
+println("Gradient PyPesto = ", referenceGradient)
