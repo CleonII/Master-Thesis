@@ -337,6 +337,14 @@ if ARGS[1] == "Zheng_PNAS2012"
 end
 
 
+if ARGS[1] == "Sneyd_PNAS2002"
+    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Sneyd_PNAS2002", "Sneyd_PNAS2002.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=true)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
+end
+
+
 if ARGS[1] == "Elowitz_Nature2000"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Elowitz_Nature2000", "Elowitz_Nature2000.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
@@ -357,8 +365,9 @@ if ARGS[1] == "Lucarelli_CellSystems2018"
     removeAllProcs()
     addprocs(1, exeflags="--project=.")
     benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], numberOfprocesses=2) 
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false, numberOfprocesses=2) 
+    benchmarkParameterEstimation(petabgModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false, numberOfprocesses=2) 
 end
+
 
 if ARGS[1] == "Weber_BMC2015"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Weber_BMC2015", "Weber_BMC2015.yaml")
@@ -389,13 +398,6 @@ if ARGS[1] == "Fujita_SciSignal2010"
     petabModel = readPEtabModel(pathYML, verbose=true)
     benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
     benchmarkParameterEstimation(petabModel, Rodas5(), "Rodas5", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
-end
-
-
-if ARGS[1] == "Zheng_PNAS2012"
-    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Zheng_PNAS2012", "Zheng_PNAS2012.yaml")
-    petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest)
 end
 
 

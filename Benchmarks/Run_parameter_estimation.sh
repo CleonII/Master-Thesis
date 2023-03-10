@@ -52,4 +52,8 @@ if [ $1 == "Zheng_PNAS2012" ];then
     ${runJulia} ${pathBenchmarkScript} Zheng_PNAS2012 $2 $3
 fi
 
+if [ $1 == "Sneyd_PNAS2002" ];then
+    ${runJulia} ${pathBenchmarkScript} Sneyd_PNAS2002 $2 $3
+fi
+
 exit 0
