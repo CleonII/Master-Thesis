@@ -499,25 +499,13 @@ end
 
 if ARGS[1] == "Test_chunks_random_p"
 
-    if length(ARGS) == 1
-        modelList = ["model_Bachmann_MSB2011", "model_Lucarelli_CellSystems2018"]
-    elseif ARGS[2] == "Bachman"
-        modelList = ["model_Bachmann_MSB2011"]
-    elseif ARGS[2] == "Lucarelli"
-        modelList = ["model_Lucarelli_CellSystems2018"]
-    elseif ARGS[2] == "Isensee"
-        modelList = ["model_Isensee_JCB2018"]            
-    else
-        println("ARGS must either be of length 2, or the second argument must be Bachman or Lucarelli not ", ARGS[2])
-        exit(1)
-    end
-
+    modelUse = ARGS[2]
     dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
     if !isdir(dirSave)
         mkpath(dirSave)
     end
 
-    if ARGS[3] == "Shuffle" && length(ARGS) == 4 
+    if length(ARGS) > 2 && ARGS[3] == "Shuffle" 
         shuffleParameters = true
         seed = parse(Int64, ARGS[4])
         pathSave = joinpath(dirSave, "Test_chunks_shuffle_seed_" * ARGS[4] * ".csv")
@@ -525,32 +513,41 @@ if ARGS[1] == "Test_chunks_random_p"
         shuffleParameters = false
         seed = 123
         Random.seed!(seed)
+        pathSave = joinpath(dirSave, "Test_chunks.csv")
     end
+
+    pathYML = getPathYmlFile(joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelUse))
 
     solversCheck = [[QNDF(), "QNDF"]]
     sensealgInfo = [[:ForwardDiff, nothing, "ForwardDiff"]]
     absTol, relTol = 1e-8, 1e-8
 
-    for i in eachindex(modelList)
+    if shuffleParameters == false
+        petabModel = readPEtabModel(pathYML)
+    else
+        _petabModel = readPEtabModel(pathYML)
+        petabModel = getPEtabModelParamPermuted(_petabModel, seed=seed)
+    end
+    nDynamicParameters = length(getNominalODEValues(petabModel))
+    chunkList = 1:nDynamicParameters
+    for j in 1:30
 
-        local pathYML = getPathYmlFile(joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i]))
-        if shuffleParameters == false
-            petabModel = readPEtabModel(pathYML)
+        # For j = 1 the nominal (reported) parameter vector is used 
+        if j == 1
+            θ_est = getNominalθ(petabModel)
         else
-            _petabModel = readPEtabModel(pathYML)
-            petabModel = getPEtabModelParamPermuted(_petabModel, seed=seed)
-        end
-        nDynamicParameters = length(getNominalODEValues(petabModel))
-        chunkList = 1:nDynamicParameters
-        for j in 1:30
             θ_est = getRandomModelParameters(petabModel, Rodas4P(), j, odeSolvers=false)
-            for k in eachindex(chunkList)
-                benchmarkCostGrad(petabModel, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
-                                checkGradient=true, nRepeat=5, chunkSize=chunkList[k], iParameter=j, _θ_est=θ_est)
-            end
         end
-        if shuffleParameters == true
-            rm(petabModel.dirModel, recursive=true)
+
+        # Store nominal value 
+        benchmarkCostGrad(petabModel, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
+                         checkGradient=true, nRepeat=5, iParameter=j, _θ_est=θ_est)
+        for k in eachindex(chunkList)
+            benchmarkCostGrad(petabModel, sensealgInfo[1], QNDF(), "QNDF", pathSave, absTol, relTol, 
+                              checkGradient=true, nRepeat=5, chunkSize=chunkList[k], iParameter=j, _θ_est=θ_est)
         end
+    end
+    if shuffleParameters == true
+        rm(petabModel.dirModel, recursive=true)
     end
 end
