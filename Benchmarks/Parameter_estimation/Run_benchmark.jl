@@ -404,14 +404,8 @@ end
 if ARGS[1] == "Schwen_PONE2014"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Schwen_PONE2014", "Schwen_PONE2014.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest)
-end
-
-
-if ARGS[1] == "Sneyd_PNAS2002"
-    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Sneyd_PNAS2002", "Sneyd_PNAS2002.yaml")
-    petabModel = readPEtabModel(pathYML, verbose=true)
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false)
 end
 
 

@@ -237,25 +237,23 @@ function computeGaussNewtonHessianApproximation!(out::Matrix{Float64},
                                                                        measurementInfo, parameterInfo, expIDSolve=expIDSolve)
     @views ForwardDiff.jacobian!(jacobian[iθ_notOdeSystem, :]', computeResidualsNotODESystemθ, θ_est[iθ_notOdeSystem])
 
-    if priorInfo.hasPriors == true
-        println("Warning : With Gauss Newton we do not support priors")
-    end
-
     # In case of testing we might want to return the jacobian, else we are interested in the Guass-Newton approximaiton.
     if returnJacobian == false
         out .= jacobian * jacobian'
+        if priorInfo.hasPriors == true
+            computeHessianPrior!(out, θ_est, θ_indices, priorInfo)
+        end
     else
         out .= jacobian
     end
 end
 
 
-
 # Compute prior contribution to log-likelihood, note θ in on the parameter scale (e.g might be on log-scale)
-function computeHessianPrior!(hessian::AbstractVector, 
-                              θ::AbstractVector, 
+function computeHessianPrior!(hessian::AbstractMatrix{T}, 
+                              θ::AbstractVector{T}, 
                               θ_indices::ParameterIndices, 
-                              priorInfo::PriorInfo)
+                              priorInfo::PriorInfo) where T
 
     _evalPriors = (θ_est) -> begin
                                 θ_estT =  transformθ(θ_est, θ_indices.θ_estNames, θ_indices)

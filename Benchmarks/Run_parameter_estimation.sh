@@ -60,4 +60,8 @@ if [ $1 == "Lucarelli_CellSystems2018" ];then
     ${runJulia} ${pathBenchmarkScript} Lucarelli_CellSystems2018 $2 $3
 fi
 
+if [ $1 == "Schwen_PONE2014" ];then
+    ${runJulia} ${pathBenchmarkScript} Schwen_PONE2014 $2 $3
+fi
+
 exit 0
