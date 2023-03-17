@@ -149,18 +149,22 @@ end
 function asTrigger(triggerFormula)
     if "geq" == triggerFormula[1:3]
         strippedFormula = triggerFormula[5:end-1]
+        separatorUse = "≥"
     elseif "gt" == triggerFormula[1:2]
         strippedFormula = triggerFormula[4:end-1]
+        separatorUse = "≥"
     elseif "leq" == triggerFormula[1:3]
         strippedFormula = triggerFormula[5:end-1]
+        separatorUse = "≤"
     elseif "lt" == triggerFormula[1:2]
         strippedFormula = triggerFormula[4:end-1]
+        separatorUse = "≤"
     end
     parts = splitBetween(strippedFormula, ',')
     if occursin("time", parts[1])
         parts[1] = replaceWholeWord(parts[1], "time", "t")
     end
-    expression = "[" * parts[1] * " ~ " * parts[2] * "]"
+    expression = parts[1] * " " * separatorUse * " " * parts[2] 
     return expression
 end
 
@@ -265,6 +269,8 @@ function buildODEModelDictionary(libsbml, model, ifElseToEvent::Bool)
     # vi) Model derivatives (derivatives defined by the SBML model)
     modelDict = Dict()    
     modelDict["states"] = Dict()
+    modelDict["hasOnlySubstanceUnits"] = Dict()
+    modelDict["isBoundaryCondition"] = Dict()
     modelDict["parameters"] = Dict()
     modelDict["nonConstantParameters"] = Dict()
     modelDict["modelFunctions"] = Dict()
@@ -279,6 +285,7 @@ function buildODEModelDictionary(libsbml, model, ifElseToEvent::Bool)
     modelDict["numOfParameters"] = Dict()
     modelDict["numOfSpecies"] = Dict()
     modelDict["boolVariables"] = Dict()
+    modelDict["events"] = Dict()
     # Mathemathical base functions (can be expanded if needed)
     baseFunctions = ["exp", "log", "log2", "log10", "sin", "cos", "tan", "pi"]
     stringOfEvents = ""
@@ -299,8 +306,14 @@ function buildODEModelDictionary(libsbml, model, ifElseToEvent::Bool)
         else
             modelDict["states"][stateId] = string(spec[:getInitialAmount]())
         end
-
+        modelDict["hasOnlySubstanceUnits"][stateId] = spec[:getHasOnlySubstanceUnits]()
+        modelDict["isBoundaryCondition"][stateId] = spec[:getBoundaryCondition]()
         modelDict["derivatives"][stateId] = "D(" * stateId * ") ~ " # ModellingToolkitSyntax
+
+        # In case being a boundary condition the state in question is assumed to only be changed via user input 
+        if modelDict["isBoundaryCondition"][stateId] == true
+           modelDict["derivatives"][stateId] * "0.0" 
+        end
     end
 
     # Extract model parameters and their default values
@@ -324,41 +337,24 @@ function buildODEModelDictionary(libsbml, model, ifElseToEvent::Bool)
     end
 
     ### Define events
-    stringOfEvents = ""
+    # Later by the process callback function these events are rewritten to if possible DiscreteCallback:s 
     for (eIndex, event) in enumerate(model[:getListOfEvents]())
-
-        println("Model has an event :o :o")
-
         eventName = event[:getName]()
         trigger = event[:getTrigger]()
         triggerMath = trigger[:getMath]()
         triggerFormula = asTrigger(libsbml[:formulaToString](triggerMath))
-        eventAsString = ""
-        for (eaIndex, eventAssignment) in enumerate(event[:getListOfEventAssignments]())
+        eventAsString = Vector{String}(undef, length(event[:getListOfEventAssignments]()))
+        eventAssign = Vector{String}(undef, length(event[:getListOfEventAssignments]()))
+        for (eaIndex, eventAssignment) in enumerate(event[:getListOfEventAssignments]())    
             variableName = eventAssignment[:getVariable]()
-            # if the variable in the event is not set as a variable, make it so and remove it as a parameter or constant
-            if variableName in keys(parameterDict)
-                modelDict["nonConstantParameters"][variableName] = parameterDict[variableName]
-                delete!(parameterDict, variableName)
-            end
-
             eventMath = eventAssignment[:getMath]()
             eventMathAsString = libsbml[:formulaToString](eventMath)
+            eventAssign[eaIndex] = variableName
+            eventAsString[eaIndex] = eventMathAsString
+        end
 
-            # Add the event 
-            if eaIndex == 1
-                eventAsString = "[" * variableName * " ~ " * eventMathAsString
-            else
-                eventAsString = eventAsString * ", " * variableName * " ~ " * eventMathAsString
-            end
-        end
-        eventAsString = eventAsString * "]"
-        fullEvent = triggerFormula * " => " * eventAsString
-        if eIndex == 1
-            stringOfEvents = fullEvent
-        else
-            stringOfEvents = stringOfEvents * ", " * fullEvent
-        end
+        eventName = isempty(eventName) ? "event" * string(eIndex) : eventName
+        modelDict["events"][eventName] = [triggerFormula, eventAssign .* " = " .* eventAsString]
     end
 
     # Extract model rules. Each rule-type is processed differently.
@@ -402,12 +398,17 @@ function buildODEModelDictionary(libsbml, model, ifElseToEvent::Bool)
 
         formula = rewriteDerivatives(formula, modelDict, baseFunctions)
         for (rName, rStoich) in reactants
+            modelDict["isBoundaryCondition"][rName] == true && continue # Constant state 
             rComp = model[:getSpecies](rName)[:getCompartment]()
-            modelDict["derivatives"][rName] = modelDict["derivatives"][rName] * "-" * string(rStoich) * " * ( 1 /" * rComp * " ) * (" * formula * ")"
+            # Check whether or not we should scale by compartment or not 
+            compartmentScaling = modelDict["hasOnlySubstanceUnits"][rName] == true ? " * " : " * ( 1 /" * rComp * " ) * "
+            modelDict["derivatives"][rName] = modelDict["derivatives"][rName] * "-" * string(rStoich) * compartmentScaling * "(" * formula * ")"
         end
         for (pName, pStoich) in products
+            modelDict["isBoundaryCondition"][pName] == true && continue # Constant state 
             pComp = model[:getSpecies](pName)[:getCompartment]()
-            modelDict["derivatives"][pName] = modelDict["derivatives"][pName] * "+" * string(pStoich) * " * ( 1 /" * pComp * " ) * (" * formula * ")"
+            compartmentScaling = modelDict["hasOnlySubstanceUnits"][pName] == true ? " * " : " * ( 1 /" * pComp * " ) * "
+            modelDict["derivatives"][pName] = modelDict["derivatives"][pName] * "+" * string(pStoich) * compartmentScaling * "(" * formula * ")"
         end
     end
 

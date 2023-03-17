@@ -1,6 +1,8 @@
 # Function generating callbacksets for time-depedent SBML piecewise expressions, as callbacks are more efficient than 
 # using ifelse (e.g better integration stabillity)
 function createCallbacksForTimeDepedentPiecewise(odeSystem::ODESystem, 
+                                                 parameterMap, 
+                                                 stateMap,
                                                  SBMLDict::Dict, 
                                                  modelName::String, 
                                                  pathYAML::String, 
@@ -15,7 +17,7 @@ function createCallbacksForTimeDepedentPiecewise(odeSystem::ODESystem,
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAML, jlFile = jlFile)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, odeSystem, experimentalConditions)                                                  
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, odeSystem, parameterMap, stateMap, experimentalConditions)                                                  
 
     # In case of no-callbacks the function for getting callbacks will be empty, likewise for the function 
     # which compute tstops (callback-times)     
@@ -23,19 +25,33 @@ function createCallbacksForTimeDepedentPiecewise(odeSystem::ODESystem,
     stringWriteFunctions = ""
     stringWriteTstops = "function computeTstops(u::AbstractVector, p::AbstractVector)\n"
 
-    # In case we do not have any events 
-    if isempty(SBMLDict["boolVariables"])
+    # In case we do not have any events or picewise
+    if isempty(SBMLDict["boolVariables"]) && isempty(SBMLDict["events"])
         callbackNames = ""
         checkIfActivatedT0Names = ""
         stringWriteTstops *= "\t return Float64[]\nend"
     else
+        # Rewrite piecewise and events to callbacks 
         for key in keys(SBMLDict["boolVariables"])
             functionsStr, callbackStr =  createCallback(key, SBMLDict, pODEProblemNames, modelStateNames) 
             stringWriteCallbacks *= callbackStr * "\n"
             stringWriteFunctions *= functionsStr * "\n"
         end
-        callbackNames = prod(["cb_" * key * ", " for key in keys(SBMLDict["boolVariables"])])[1:end-2]
-        checkIfActivatedT0Names = prod(["isActiveAtTime0_" * key * "!, " for key in keys(SBMLDict["boolVariables"])])[1:end-2]
+        for key in keys(SBMLDict["events"])
+            functionsStr, callbackStr = createCallbackForEvent(key, SBMLDict, pODEProblemNames, modelStateNames)
+            stringWriteCallbacks *= callbackStr * "\n"
+            stringWriteFunctions *= functionsStr * "\n"
+        end
+        
+        _callbackNames = vcat([key for key in keys(SBMLDict["boolVariables"])], [key for key in keys(SBMLDict["events"])])
+        callbackNames = prod(["cb_" * name * ", " for name in _callbackNames])[1:end-2]
+
+        # Only relevant for picewise expressions 
+        if !isempty(SBMLDict["boolVariables"])
+            checkIfActivatedT0Names = prod(["isActiveAtTime0_" * key * "!, " for key in keys(SBMLDict["boolVariables"])])[1:end-2]
+        else
+            checkIfActivatedT0Names = ""
+        end
 
         stringWriteTstops *= "\t return " * createFuncionForTstops(SBMLDict, modelStateNames, pODEProblemNames, θ_indices) * "\nend"
     end
@@ -117,6 +133,60 @@ function createCallback(callbackName::String,
 end
 
 
+function createCallbackForEvent(eventName::String, 
+                                SBMLDict::Dict, 
+                                pODEProblemNames::Vector{String}, 
+                                modelStateNames::Vector{String})
+
+    _conditionFormula, affects = SBMLDict["events"][eventName]
+    hasModelStates = conditionHasStates(_conditionFormula, modelStateNames)
+    discreteEvent = hasModelStates == true ? false : true
+
+    # If the event trigger does not contain a model state but fixed parameters it can at a maximum be triggered once.
+    if hasModelStates == false
+        _conditionFormula = replace(_conditionFormula, "≤" => "==")
+        _conditionFormula = replace(_conditionFormula, "≥" => "==")
+    end
+
+    # TODO : Refactor and merge functionality with above 
+    for i in eachindex(modelStateNames)
+        _conditionFormula = replaceWholeWord(_conditionFormula, modelStateNames[i], "u["*string(i)*"]")
+    end
+    for i in eachindex(pODEProblemNames)
+        _conditionFormula = replaceWholeWord(_conditionFormula, pODEProblemNames[i], "integrator.p["*string(i)*"]")
+    end
+
+    # Build the condition statement used in the jl function 
+    conditionStr = "\nfunction condition_" * eventName * "(u, t, integrator)\n"
+    conditionStr *= "\t" * _conditionFormula * "\nend\n"
+
+    # Building the affect function (which can act on states and/or parameters)
+    whichParameter = findfirst(x -> x == eventName, pODEProblemNames)
+    affectStr = "function affect_" * eventName * "!(integrator)\n"
+    for i in eachindex(affects)
+        affectStr *= "\t" * affects[i] * '\n'
+    end
+    affectStr *= "end"
+    for i in eachindex(modelStateNames)
+        affectStr = replaceWholeWord(affectStr, modelStateNames[i], "integrator.u["*string(i)*"]")
+    end
+    for i in eachindex(pODEProblemNames)
+        affectStr = replaceWholeWord(affectStr, pODEProblemNames[i], "integrator.p["*string(i)*"]")
+    end
+
+    # Build the callback 
+    if discreteEvent == false
+        callbackStr = "\tcb_" * eventName * " = ContinuousCallback(" * "condition_" * eventName * ", " * "affect_" * eventName * "!, "
+    else
+        callbackStr = "\tcb_" * eventName * " = DiscreteCallback(" * "condition_" * eventName * ", " * "affect_" * eventName * "!, "
+    end
+    callbackStr *= "save_positions=(false, false))\n" # So we do not get problems with saveat in the ODE solver 
+
+    functionsStr = conditionStr * '\n' * affectStr * '\n' 
+
+    return functionsStr, callbackStr
+end
+
 # Function computing t-stops (time for events) for piecewise expressions using the symbolics package 
 # to symboically solve for where the condition is zero.
 function createFuncionForTstops(SBMLDict::Dict, 
@@ -124,13 +194,13 @@ function createFuncionForTstops(SBMLDict::Dict,
                                 pODEProblemNames::Vector{String}, 
                                 θ_indices::ParameterIndices)
 
-    tstopsStr = Vector{String}(undef, length(keys(SBMLDict["boolVariables"])))
-    tstopsStrAlt = Vector{String}(undef, length(keys(SBMLDict["boolVariables"])))
     convertTspan = false
+    conditionFormulas = vcat([SBMLDict["boolVariables"][key][1] for key in keys(SBMLDict["boolVariables"])], [SBMLDict["events"][key][1] for key in keys(SBMLDict["events"])])
+    tstopsStr = Vector{String}(undef, length(conditionFormulas))
+    tstopsStrAlt = Vector{String}(undef, length(conditionFormulas))
     i = 1
-    for key in keys(SBMLDict["boolVariables"])
+    for conditionFormula in conditionFormulas
 
-        conditionFormula = SBMLDict["boolVariables"][key][1]
         # In case the activation formula contains a state we cannot precompute the t-stop time as it depends on 
         # the actual ODE solution.
         if conditionHasStates(conditionFormula, modelStateNames) 
@@ -153,6 +223,8 @@ function createFuncionForTstops(SBMLDict::Dict,
         # Note - below order counts (e.g having < first results in ~= incase what actually stands is <=)
         conditionFormula = replace(conditionFormula, "<=" => "~")
         conditionFormula = replace(conditionFormula, ">=" => "~")
+        conditionFormula = replace(conditionFormula, "≤" => "~")
+        conditionFormula = replace(conditionFormula, "≥" => "~")
         conditionFormula = replace(conditionFormula, "<" => "~")
         conditionFormula = replace(conditionFormula, ">" => "~")
         conditionSymbolic = eval(Meta.parse(conditionFormula))
@@ -215,7 +287,7 @@ end
 # Function checking if the condition of the picewise conditions depends on a parameter which is to be estimated. 
 # In case of true the time-span need to be converted to Dual when computing the gradient (or hessian) of the 
 # the model via automatic differentitation 
-function shouldConvertTspan(pathYAML::String, SBMLDict::Dict, odeSystem::ODESystem, jlFile::Bool)::Bool
+function shouldConvertTspan(pathYAML::String, SBMLDict::Dict, odeSystem::ODESystem, parameterMap, stateMap, jlFile::Bool)::Bool
 
     pODEProblemNames = string.(parameters(odeSystem))
     
@@ -224,7 +296,7 @@ function shouldConvertTspan(pathYAML::String, SBMLDict::Dict, odeSystem::ODESyst
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAML, jlFile = jlFile)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, odeSystem, experimentalConditions)                                                  
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, odeSystem, parameterMap, stateMap, experimentalConditions)                                                  
 
     for key in keys(SBMLDict["boolVariables"])
 

@@ -108,8 +108,8 @@ function readPEtabModel(pathYAML::String;
         if !@isdefined(modelDict)
             modelDict = XmlToModellingToolkit(pathSBML, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
-        create_σ_h_u0_File(modelName, pathYAML, dirJulia, odeSystem, stateMap, modelDict, verbose=verbose, jlFile=jlFile)
-        createDerivative_σ_h_File(modelName, pathYAML, dirJulia, odeSystem, modelDict, verbose=verbose, jlFile=jlFile)
+        create_σ_h_u0_File(modelName, pathYAML, dirJulia, odeSystem, parameterMap, stateMap, modelDict, verbose=verbose, jlFile=jlFile)
+        createDerivative_σ_h_File(modelName, pathYAML, dirJulia, odeSystem, parameterMap, stateMap, modelDict, verbose=verbose, jlFile=jlFile)
     else
         verbose == true && @printf("File for h, u0 and σ exists will not rebuild it\n")
     end
@@ -124,7 +124,7 @@ function readPEtabModel(pathYAML::String;
         if !@isdefined(modelDict)
             modelDict = XmlToModellingToolkit(pathSBML, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
         end
-        createCallbacksForTimeDepedentPiecewise(odeSystem, modelDict, modelName, pathYAML, dirJulia, jlFile = jlFile)
+        createCallbacksForTimeDepedentPiecewise(odeSystem, parameterMap, stateMap, modelDict, modelName, pathYAML, dirJulia, jlFile = jlFile)
     end
     include(pathCallback)
     exprCallback = Expr(:call, Symbol("getCallbacks_" * modelName))
@@ -135,7 +135,7 @@ function readPEtabModel(pathYAML::String;
     if !@isdefined(modelDict)
         modelDict = XmlToModellingToolkit(pathSBML, pathModelJlFile, modelName, writeToFile=false, ifElseToEvent=ifElseToEvent)
     end
-    convertTspan = shouldConvertTspan(pathYAML, modelDict, odeSystem, jlFile)
+    convertTspan = shouldConvertTspan(pathYAML, modelDict, odeSystem, parameterMap, stateMap, jlFile)
 
     petabModel = PEtabModel(modelName,
                             compute_h,
@@ -233,6 +233,7 @@ function addParameterForConditionSpecificInitialValues(pathJuliaFile::String,
     # In case we have conditions mapping to initial values
     whichStates = (colNames[iStart:end])[findall(x -> x ∈ stateNames, colNames[iStart:end])]
     newParameterNames = "__init__" .* whichStates .* "__"
+    newParameterValues = Vector{String}(undef, length(newParameterNames))
 
     # In case the funciton already has been rewritten return 
     if any(x -> x ∈ parameterNames, newParameterNames)
@@ -264,6 +265,9 @@ function addParameterForConditionSpecificInitialValues(pathJuliaFile::String,
         # Move through state array 
         for j in eachindex(whichStates)
             if startsWithx(lineNoWhiteSpace, whichStates[j])
+                # Extract the default value 
+                _, defaultValue = split(lineNoWhiteSpace, "=>")
+                newParameterValues[j] = defaultValue[1:end-1]
                 functionLineByLine[i] = "\t" * whichStates[j] * " => " * newParameterNames[j] * ","
             end
         end
@@ -278,7 +282,8 @@ function addParameterForConditionSpecificInitialValues(pathJuliaFile::String,
         functionLineByLineNew[i] = functionLineByLine[k]
         k += 1
     end
-    functionLineByLineNew[linesAdd] .= "\t" .* newParameterNames .* " => 0.0,"
+    # We need to capture default values 
+    functionLineByLineNew[linesAdd] .= "\t" .* newParameterNames .* " => " .* newParameterValues .* ","
 
     newFunctionString = functionLineByLineNew[1]
     newFunctionString *= prod(row * "\n" for row in functionLineByLineNew[2:end])

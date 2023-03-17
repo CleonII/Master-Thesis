@@ -5,10 +5,19 @@
     constant accross experimental conditions, and parameters specific to experimental conditions.
 =#
 
+function computeIndicesθ(parameterInfo::ParametersInfo, 
+                         measurementsInfo::MeasurementsInfo, 
+                         petabModel::PEtabModel)::ParameterIndices
+    
+    experimentalConditionsFile = CSV.read(petabModel.pathConditions, DataFrame)
+    return computeIndicesθ(parameterInfo, measurementsInfo, petabModel.odeSystem, petabModel.parameterMap, petabModel.stateMap, experimentalConditionsFile)
 
+end
 function computeIndicesθ(parameterInfo::ParametersInfo, 
                          measurementsInfo::MeasurementsInfo, 
                          odeSystem::ODESystem, 
+                         paramterMap, 
+                         stateMap,
                          experimentalConditionsFile::DataFrame)::ParameterIndices
 
     θ_observableNames, θ_sdNames, θ_nonDynamicNames, θ_dynamicNames = computeθNames(parameterInfo, measurementsInfo, 
@@ -37,7 +46,7 @@ function computeIndicesθ(parameterInfo::ParametersInfo,
     mapODEProblem::MapODEProblem = MapODEProblem(iθDynamic, iODEProblemθDynamic)
 
     # Set up a map for changing between experimental conditions 
-    mapsConditionId = getMapsConditionId(odeSystem, parameterInfo, experimentalConditionsFile, θ_dynamicNames)
+    mapsConditionId = getMapsConditionId(odeSystem, paramterMap, stateMap, parameterInfo, experimentalConditionsFile, θ_dynamicNames)
 
     # Set up a named tuple tracking the transformation of each parameter 
     _θ_scale = [parameterInfo.parameterScale[findfirst(x -> x == θ_name, parameterInfo.parameterId)] for θ_name in θ_estNames]
@@ -240,6 +249,8 @@ end
 
 # A map to accurately map parameters for a specific experimental conditionId to the ODE-problem
 function getMapsConditionId(odeSystem::ODESystem,
+                            parameterMap, 
+                            stateMap,
                             parameterInfo::ParametersInfo, 
                             experimentalConditionsFile::DataFrame, 
                             _θ_dynamicNames::Vector{Symbol})::NamedTuple
@@ -272,7 +283,7 @@ function getMapsConditionId(odeSystem::ODESystem,
         
             # When the experimental condition parameters is a number (Float) it can sets the values for a problem parameters, 
             # but to get correct gradients we need to track if we are changing a state 
-            if isNumber(rowI[j]) 
+            if isNumber(rowI[j])
                 if conditionSpecificVariables[j] ∈ allODESystemParameters
                     constantParameters = vcat(constantParameters, parse(Float64, rowI[j]))
                     iODEProblemConstantParameters = vcat(iODEProblemConstantParameters, findfirst(x -> x == conditionSpecificVariables[j], allODESystemParameters))
@@ -303,8 +314,24 @@ function getMapsConditionId(odeSystem::ODESystem,
                 continue
             end
 
-            # If we reach this far something is off
-            strWrite = "Could not map parameters for condition ", conditionIdNames[i], " for parameter ", rowI[j]
+            # In case rowI is missing (specifically NaN) the default SBML-file value should be used. To tis end we need to 
+            # have access to the parameter and state map to handle both states and parameters. Then must fix such that __init__ parameters 
+            # take on the correct value. 
+            # TODO : Make function able to handle when default value is a parameter value 
+            if rowI[j] == "missing"
+                valueDefault = getDefaultValueFromMaps(string(conditionSpecificVariables[j]), parameterMap, stateMap)
+                constantParameters = vcat(constantParameters, valueDefault)
+                if conditionSpecificVariables[j] ∈ allODESystemParameters
+                    iODEProblemConstantParameters = vcat(iODEProblemConstantParameters, findfirst(x -> x == conditionSpecificVariables[j], allODESystemParameters))
+                # Here to set gradients accurately                     
+                elseif conditionSpecificVariables[j] ∈ modelStateNames
+                    iODEProblemConstantParameters = vcat(iODEProblemConstantParameters, findfirst(x -> x == "__init__" * conditionSpecificVariables[j] * "__", allODESystemParameters))
+                end
+                continue
+            end
+
+            # If we reach this far something is off and an error must be thrown 
+            strWrite = "Could not map parameters for condition " * string(conditionIdNames[i]) * " for parameter " * string(rowI[j])
             throw(PEtabFileError(strWrite))
         end
 
@@ -318,4 +345,30 @@ function getMapsConditionId(odeSystem::ODESystem,
 
     mapsConditionId = Tuple(element for element in _mapsConditionId)
     return NamedTuple{Tuple(conditionId for conditionId in conditionIdNames)}(mapsConditionId)
+end
+
+
+function getDefaultValueFromMaps(whichParameterOrState, parameterMap, stateMap)
+    parameterMapNames = string.([parameterMap[i].first for i in eachindex(parameterMap)])
+    stateMapNames = replace.(string.([stateMap[i].first for i in eachindex(stateMap)]), "(t)" => "")
+
+    # Parameters are only allowed to map to concrete values 
+    if whichParameterOrState ∈ parameterMapNames
+        whichIndex = findfirst(x -> x == whichParameterOrState, parameterMapNames)
+        return parse(Float64, string(parameterMap[whichIndex].second))
+    end
+
+    # States can by default map to a parameter, thus we should put the default value of that 
+    # parameter 
+    if whichParameterOrState ∈ stateMapNames
+        whichIndex = findfirst(x -> x == whichParameterOrState, stateMapNames)
+        valueMapTo = string(stateMap[whichIndex].second)
+        # Map into the underlaying parameter value 
+        if valueMapTo ∈ parameterMapNames
+            whichIndexParameter = findfirst(x -> x == valueMapTo, parameterMapNames)
+            return parse(Float64, string(parameterMap[whichIndexParameter].second))
+        else
+            return parse(Float64, string(stateMap[whichIndex].second))
+        end
+    end
 end

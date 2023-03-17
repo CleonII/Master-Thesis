@@ -28,7 +28,7 @@ function setUpPEtabODEProblem(petabModel::PEtabModel,
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
     simulationInfo = processSimulationInfo(petabModel, measurementInfo, parameterInfo, sensealg=sensealgAdjoint, absTolSS=solverSSAbsTol, relTolSS=solverSSRelTol, terminateSSMethod=terminateSSMethod, sensealgForwardEquations=sensealgForwardEquations)
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
     
     # Set up potential prior for the parameters to estimate 
     priorInfo = processPriors(θ_indices, parametersData)

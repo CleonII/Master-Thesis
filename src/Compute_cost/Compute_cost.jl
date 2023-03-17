@@ -204,7 +204,6 @@ function computeCostExpCond(odeSolution::ODESolution,
 
         hTransformed = computehTransformed(u, t, p, θ_observable, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
         σ = computeσ(u, t, p, θ_sd, θ_nonDynamic, petabModel, iMeasurement, measurementInfo, θ_indices, parameterInfo)
-            
         # By default a positive ODE solution is not enforced (even though the user can provide it as option).
         # In case with transformations on the data the code can crash, hence Inf is returned in case the 
         # model data transformation can not be perfomred. 
