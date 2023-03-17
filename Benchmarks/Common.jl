@@ -27,7 +27,7 @@ function getRandomModelParameters(petabModel::PEtabModel,
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
     if odeSolvers == true
         transformθ!(θ_est, θ_indices.θ_estNames, θ_indices)
@@ -44,7 +44,7 @@ function getNominalθ(petabModel::PEtabModel)
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
     θ_estNames = θ_indices.θ_estNames               
     θ_nominal = [parameterInfo.nominalValue[findfirst(x -> x == θ_estNames[i], parameterInfo.parameterId)] for i in eachindex(θ_estNames)]
@@ -60,7 +60,7 @@ function getNominalODEValues(petabModel::PEtabModel)
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
     θ_estNames = θ_indices.θ_estNames
     paramVecNominal = [parameterInfo.nominalValue[findfirst(x -> x == θ_estNames[i], parameterInfo.parameterId)] for i in eachindex(θ_estNames)]
@@ -91,7 +91,7 @@ function getPEtabModelNparamFixed(petabModel::PEtabModel, nParamFixate::Integer)
 
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
     parameterToFixate = string.(sample(θ_indices.θ_dynamicNames, nParamFixate, replace=false))
     for i in 1:nrow(parametersData)
@@ -127,7 +127,7 @@ function getPEtabModelParamPermuted(petabModel::PEtabModel; seed=123)::PEtabMode
 
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
     iEstimate = findall(x ->  x == 1, parametersData[!, :estimate])
     parametersData[iEstimate, :] = parametersData[shuffle(iEstimate), :]

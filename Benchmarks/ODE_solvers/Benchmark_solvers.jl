@@ -67,7 +67,8 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
                   RadauIIA3(), "RadauIIA3", "stiff", "OrdinaryDiffEq", "FIRK",
                   RadauIIA5(), "RadauIIA5", "stiff", "OrdinaryDiffEq", "FIRK",
                   AutoTsit5(Rosenbrock23()), "Tsit5Rosenbrock23", "composite", "OrdinaryDiffEq", "composite",
-                  AutoVern7(Rodas5()), "Vern7Rodas5", "composite", "OrdinaryDiffEq", "composite",
+                  AutoVern7(Rodas5P()), "Vern7Rodas5P", "composite", "OrdinaryDiffEq", "composite",
+                  AutoVern9(Rodas5P()), "Vern9Rodas5P", "composite", "OrdinaryDiffEq", "composite",
                   AutoVern7(Rodas4P()), "Vern7Rodas4P", "composite", "OrdinaryDiffEq", "composite",
                   AutoVern9(Rodas4P()), "Vern9Rodas4P", "composite", "OrdinaryDiffEq", "composite",
                   CVODE_BDF(), "CVODE_BDF_default", "stiff", "Sundials", "Multistep_bdf",
@@ -88,9 +89,6 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
                   Rodas4P(linsolve=lSolver2), "Rodas4P_FastLU", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                   QNDF(linsolve=lSolver2), "QNDF_FastLU", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
                   QNDF(linsolve=lSolver3), "QNDF_GMRES", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
-                  ImplicitDeuflhardExtrapolation(threading = true), "IDeuflar_Thread", "stiff", "OrdinaryDiffEq", "PIEP",
-                  ImplicitHairerWannerExtrapolation(threading = true), "IWanner_Thread", "stiff", "OrdinaryDiffEq", "PIEP",
-                  ImplicitEulerExtrapolation(threading = true), "IEuler_Thread", "stiff", "OrdinaryDiffEq", "PIEP",
                   ImplicitDeuflhardExtrapolation(threading = false), "IDeuflar", "stiff", "OrdinaryDiffEq", "PIEP",
                   ImplicitHairerWannerExtrapolation(threading = false), "IWanner", "stiff", "OrdinaryDiffEq", "PIEP",
                   ImplicitEulerExtrapolation(threading = false), "IEuler", "stiff", "OrdinaryDiffEq", "PIEP",
@@ -163,7 +161,7 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
     parameterInfo = processParameters(parametersData) 
     measurementInfo = processMeasurements(measurementsData, observablesData) 
     simulationInfo = processSimulationInfo(petabModel, measurementInfo, parameterInfo, absTolSS=absTolSS, relTolSS=relTolSS)
-    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel.odeSystem, experimentalConditions)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
      
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters 
     setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, parameterInfo)
@@ -414,7 +412,7 @@ if ARGS[1] == "Test_random_parameter_pre_eq"
     end
 
     modelList = ["model_Brannmark_JBC2010", "model_Isensee_JCB2018", "model_Weber_BMC2015", "model_Zheng_PNAS2012"]
-    solversCheck = ["FBDF", "Rodas5", "QNDF", "Rodas4P", "CVODE_BDF_default", "Vern7", "Tsit5", "Vern6", "Vern7Rodas4P"]
+    solversCheck = ["FBDF", "Rodas5P", "QNDF", "Rodas4P", "CVODE_BDF_default", "Vern7", "Tsit5", "Vern6", "Vern7Rodas5P"]
     tolsTry = [(1e-8, 1e-8)]            
     tolsSSTry = [(1e-6, 1e-6), (1e-8, 1e-8), (1e-10, 1e-10)]
     for i in eachindex(modelList)
