@@ -20,7 +20,7 @@ function computeCost(θ_est::AbstractVector,
 
     if priorInfo.hasPriors == true && computeHessian == false  
         θ_estT = transformθ(θ_est, θ_indices.θ_estNames, θ_indices)
-        cost += computePriors(θ_est, θ_estT, θ_indices.θ_estNames, priorInfo)
+        cost -= computePriors(θ_est, θ_estT, θ_indices.θ_estNames, priorInfo)
     end
 
     return cost
