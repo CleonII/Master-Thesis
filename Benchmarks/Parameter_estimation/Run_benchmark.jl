@@ -415,3 +415,11 @@ if ARGS[1] == "Bruno_JExpBot2016"
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
+
+
+if ARGS[1] == "Elowitz_Nature2000"
+    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Elowitz_Nature2000", "Elowitz_Nature2000.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=true)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
+end
