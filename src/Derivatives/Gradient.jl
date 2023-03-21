@@ -41,7 +41,7 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
         try 
             @views ForwardDiff.gradient!(gradient[θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic, cfg)
         catch
-            gradient .= 1e8
+            gradient .= Inf
             return
         end
             
@@ -62,7 +62,7 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
             try 
                 gradient[iθ_experimentalCondition] .+= ForwardDiff.gradient(computeCostDynamicθExpCond, θ_input)::Vector{Float64}
             catch
-                gradient .= 1e8
+                gradient .= Inf
                 return 
             end
         end
@@ -77,7 +77,7 @@ function computeGradientAutoDiff!(gradient::Vector{Float64},
         return
     end
     if all(gradient[θ_indices.iθ_dynamic] .== 0.0)
-        gradient .= 1e8
+        gradient .= Inf
         return 
     end
 
@@ -123,7 +123,7 @@ function computeGradientForwardEquations!(gradient::Vector{Float64},
 
     # Happens when at least one forward pass fails and I set the gradient to 1e8 
     if all(gradientDyanmicθ .== 1e8)
-        gradient .= 1e8
+        gradient .= Inf
         return 
     end
 
@@ -174,7 +174,7 @@ function computeGradientAdjointEquations!(gradient::Vector{Float64},
 
     # Happens when at least one forward pass fails and I set the gradient to 1e8 
     if all(gradientDyanmicθ .== 1e8)
-        gradient .= 1e8
+        gradient .= Inf
         return 
     end
 

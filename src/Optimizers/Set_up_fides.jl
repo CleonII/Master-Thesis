@@ -120,6 +120,11 @@ function fidesObjHess(p, evalF::Function, evalGradF::Function, evalHessF::Functi
     fVal = evalF(p)
     fGradVal = evalGradF(p)
     fHessVal = evalHessF(p)
+    if isinf(fVal) || any(isinf.(fGradVal)) || any(isinf.(fHessVal))
+        fVal = Inf
+        fGradVal .= Inf
+        fHessVal .= Inf
+    end
     return (fVal, fGradVal, fHessVal)
 end
 
@@ -128,6 +133,12 @@ end
 function fidesObjApprox(p, evalF::Function, evalGradF::Function)
     fVal = evalF(p)
     fGradVal = evalGradF(p)
+
+    if isinf(fVal) || any(isinf.(fGradVal))
+        fVal = Inf
+        fGradVal .= Inf
+    end
+
     return (fVal, fGradVal)
 end
 

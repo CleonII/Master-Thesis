@@ -37,14 +37,14 @@ function computeHessian!(hessian::Matrix{Float64},
                 ForwardDiff.hessian!(hessian, _evalHessian, θ_est, cfg)
                 hessian .= Symmetric(hessian)
             catch
-                hessian .= 0.0
+                hessian .= Inf
             end
         else
-            hessian .= 0.0
+            hessian .= Inf
         end
     
     elseif splitOverConditions == true && simulationInfo.haspreEquilibrationConditionId == false
-        hessian .= 0.0
+        hessian .= Inf
         for conditionId in simulationInfo.experimentalConditionId
             mapConditionId = θ_indices.mapsConiditionId[conditionId]  
             iθ_experimentalCondition = unique(vcat(θ_indices.mapODEProblem.iθDynamic, mapConditionId.iθDynamic, θ_indices.iθ_notOdeSystem))
@@ -61,7 +61,7 @@ function computeHessian!(hessian::Matrix{Float64},
             try
                 ForwardDiff.hessian!(hTmp, computeCostDynamicθExpCond, θ_input)
             catch
-                hessian .= 0.0
+                hessian .= Inf
                 return
             end
             @inbounds for i in eachindex(iθ_experimentalCondition)
@@ -97,7 +97,7 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
                                            expIDSolve::Vector{Symbol} = [:all]) 
 
     # Avoid incorrect non-zero values 
-    hessian .= 0.0
+    hessian .= 0
 
     θ_dynamic, θ_observable, θ_sd, θ_nonDynamic = splitParameterVector(θ_est, θ_indices) 
 
@@ -118,12 +118,12 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
         try 
             @views ForwardDiff.hessian!(hessian[θ_indices.iθ_dynamic, θ_indices.iθ_dynamic], computeCostDynamicθ, θ_dynamic, cfg)        
         catch
-            hessian .= 0.0
+            hessian .= Inf
             return 
         end
 
     elseif splitOverConditions == true && simulationInfo.haspreEquilibrationConditionId == false
-        hessian .= 0.0
+        hessian .= Inf
         for conditionId in simulationInfo.experimentalConditionId
             mapConditionId = θ_indices.mapsConiditionId[conditionId]  
             iθ_experimentalCondition = unique(vcat(θ_indices.mapODEProblem.iθDynamic, mapConditionId.iθDynamic))
@@ -140,7 +140,7 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
             try                                                     
                 ForwardDiff.hessian!(hTmp, computeCostDynamicθExpCond, θ_input)                                                    
             catch
-                hessian .= 0.0
+                hessian .= Inf
                 return 
             end
             @inbounds for i in eachindex(iθ_experimentalCondition)
@@ -156,7 +156,7 @@ function computeHessianBlockApproximation!(hessian::Matrix{Float64},
 
     # Check if we could solve the ODE (first), and if Inf was returned (second)
     if couldSolveODEModel(simulationInfo, expIDSolve) == false
-        hessian .= 0.0
+        hessian .= Inf
     end
     if all(hessian[θ_indices.iθ_dynamic, θ_indices.iθ_dynamic] .== 0.0)
         return 
