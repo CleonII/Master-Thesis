@@ -481,7 +481,7 @@ function computeODESolution(odeProblem::ODEProblem,
     if isinf(odeProblem.tspan[2]) || odeProblem.tspan[2] == 1e8
         sol = solve(odeProblem, solver, abstol=absTol, reltol=relTol, save_on=false, save_end=true, dense=denseSolution, callback=TerminateSteadyState(absTolSS, relTolSS))
     else
-        sol = solve(odeProblem, solver, abstol=absTol, reltol=relTol, saveat=tSave, dense=denseSolution, tstops=tStops, callback=callbackSet, dtmin=1e-16)
+        sol = solve(odeProblem, solver, abstol=absTol, reltol=relTol, saveat=tSave, dense=denseSolution, tstops=tStops, callback=callbackSet, maxiters=Int(1e4))
     end
     return sol
 end
