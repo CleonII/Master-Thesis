@@ -353,7 +353,11 @@ if ARGS[1] == "Test_adjoint_random_p"
     pathYML = getPathYmlFile(dirModel)
     petabModel = readPEtabModel(pathYML)
     for i in 1:50
-        θ_est = getRandomModelParameters(petabModel, Rodas5P(), i, odeSolvers=false)
+        if i == 1
+            θ_est = getNominalθ(petabModel)
+        else
+            θ_est = getRandomModelParameters(petabModel, Rodas5P(), i, odeSolvers=false)
+        end
         for j in eachindex(odeSolvers)
             # Check Gradient 
             for sensealgInfo in sensealgsCheck
