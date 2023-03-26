@@ -68,4 +68,8 @@ if [ $1 == "Elowitz_Nature2000" ];then
     ${runJulia} ${pathBenchmarkScript} Elowitz_Nature2000 $2 $3
 fi
 
+if [ $1 == "Crauste_CellSystems2017" ];then
+    ${runJulia} ${pathBenchmarkScript} Crauste_CellSystems2017 $2 $3
+fi
+
 exit 0
