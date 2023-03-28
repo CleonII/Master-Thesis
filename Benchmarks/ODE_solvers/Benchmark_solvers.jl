@@ -63,6 +63,7 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
                   FBDF(), "FBDF", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
                   Trapezoid(), "Trapezoid", "stiff", "OrdinaryDiffEq", "SDIRK",
                   KenCarp4(), "KenCarp4", "stiff", "OrdinaryDiffEq", "SDIRK",
+                  KenCarp47(), "KenCarp47", "stiff", "OrdinaryDiffEq", "SDIRK",
                   Kvaerno5(), "Kvaerno5", "stiff", "OrdinaryDiffEq", "SDIRK",
                   RadauIIA3(), "RadauIIA3", "stiff", "OrdinaryDiffEq", "FIRK",
                   RadauIIA5(), "RadauIIA5", "stiff", "OrdinaryDiffEq", "FIRK",
@@ -82,12 +83,22 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
                   [:stiff], "stiffHint", "hint", "OrdinaryDiffEq", "hint",
                   RadauIIA5(linsolve=lSolver1), "RadauIIA5_RFLUF", "stiff", "OrdinaryDiffEq", "FIRK",
                   Rodas5(linsolve=lSolver1), "Rodas5_RFLUF", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  Rodas5P(linsolve=lSolver1), "Rodas5P_RFLUF", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                   Rodas4P(linsolve=lSolver1), "Rodas4P_RFLUF", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                   QNDF(linsolve=lSolver1), "QNDF_RFLUF", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                  FBDF(linsolve=lSolver1), "FBDF_RFLUF", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                  Kvaerno5(linsolve=lSolver1), "Kvaerno5_RFLUF", "stiff", "OrdinaryDiffEq", "SDIRK",
+                  KenCarp4(linsolve=lSolver1), "KenCarp4_RFLUF", "stiff", "OrdinaryDiffEq", "SDIRK",
+                  KenCarp47(linsolve=lSolver1), "KenCarp47_RFLUF", "stiff", "OrdinaryDiffEq", "SDIRK",
                   RadauIIA5(linsolve=lSolver2), "RadauIIA5_FastLU", "stiff", "OrdinaryDiffEq", "FIRK",
                   Rodas5(linsolve=lSolver2), "Rodas5_FastLU", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  Rodas5P(linsolve=lSolver2), "Rodas5P_FastLU", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                   Rodas4P(linsolve=lSolver2), "Rodas4P_FastLU", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                  Kvaerno5(linsolve=lSolver2), "Kvaerno5_FastLU", "stiff", "OrdinaryDiffEq", "SDIRK",
                   QNDF(linsolve=lSolver2), "QNDF_FastLU", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                  FBDF(linsolve=lSolver2), "FBDF_FastLU", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                  KenCarp4(linsolve=lSolver2), "KenCarp4_FastLU", "stiff", "OrdinaryDiffEq", "SDIRK",
+                  KenCarp47(linsolve=lSolver2), "KenCarp47_FastLU", "stiff", "OrdinaryDiffEq", "SDIRK",
                   QNDF(linsolve=lSolver3), "QNDF_GMRES", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
                   ImplicitDeuflhardExtrapolation(threading = false), "IDeuflar", "stiff", "OrdinaryDiffEq", "PIEP",
                   ImplicitHairerWannerExtrapolation(threading = false), "IWanner", "stiff", "OrdinaryDiffEq", "PIEP",
@@ -103,19 +114,28 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
     lSolver2 = KrylovJL_GMRES()
     solverListSparse = [RadauIIA5(), "RadauIIA5_S", "stiff", "OrdinaryDiffEq", "FIRK",
                         Rodas5(), "Rodas5_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        Rodas5P(), "Rodas5P_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                         Rodas4P(), "Rodas4P_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                         QNDF(), "QNDF_S", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
                         KenCarp4(), "KenCarp4_S", "stiff", "OrdinaryDiffEq", "SDIRK",
+                        KenCarp47(), "KenCarp47_S", "stiff", "OrdinaryDiffEq", "SDIRK",
+                        Kvaerno5(), "Kvaerno5_S", "stiff", "OrdinaryDiffEq", "SDIRK",
                         FBDF(), "FBDF_S", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
                         Rosenbrock23(), "Rosenbrock23_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                         Rodas4(), "Rodas4_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                         TRBDF2(), "TRBDF2_S", "stiff", "OrdinaryDiffEq", "SDIRK",
                         RadauIIA5(linsolve=lSolver1), "RadauIIA5_KLU_S", "stiff", "OrdinaryDiffEq", "FIRK",
                         Rodas5(linsolve=lSolver1), "Rodas5_KLU_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        Rodas5P(linsolve=lSolver1), "Rodas5P_KLU_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                         Rodas4P(linsolve=lSolver1), "Rodas4P_KLU_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                         QNDF(linsolve=lSolver1), "QNDF_KLU_S", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
+                        Kvaerno5(linsolve=lSolver1), "Kvaerno5_KLU_S", "stiff", "OrdinaryDiffEq", "SDIRK",
+                        KenCarp4(linsolve=lSolver1), "KenCarp4_KLU_S", "stiff", "OrdinaryDiffEq", "SDIRK",
+                        KenCarp47(linsolve=lSolver1), "KenCarp47_KLU_S", "stiff", "OrdinaryDiffEq", "SDIRK",
+                        FBDF(linsolve=lSolver1), "FBDF_KLU_S", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
                         RadauIIA5(linsolve=lSolver2), "RadauIIA5_GMRES_S", "stiff", "OrdinaryDiffEq", "FIRK",
                         Rodas5(linsolve=lSolver2), "Rodas5_GMRES_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
+                        Rodas5P(linsolve=lSolver2), "Rodas5P_GMRES_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                         Rodas4P(linsolve=lSolver2), "Rodas4P_GMRES_S", "stiff", "OrdinaryDiffEq", "Rosenbrock",
                         QNDF(linsolve=lSolver2), "QNDF_GMRES_S", "stiff", "OrdinaryDiffEq", "Multistep_bdf",
                         CVODE_BDF(linear_solver=:GMRES), "CVODE_BDF_GMRES_S", "stiff", "Sundials", "Multistep_bdf",
@@ -130,7 +150,7 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
         return solverListSparse
 
     elseif sparseJacobian == true && solversCheck != "all"
-        iUse = [findfirst(x -> x == solversCheck[i], solverListSparse[2, :]) for i in eachindex(solversCheck)]
+        iUse = findall(x -> x ∈ solversCheckSparse, solverListSparse[2, :])
         return solverListSparse[:, iUse]
 
     elseif sparseJacobian == false && solversCheck == "all"
@@ -152,7 +172,8 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                                 absTolSS::Float64=1e-10,
                                 relTolSS::Float64=1e-8,
                                 _θ_dynamic=nothing,
-                                checkAccuracy::Bool=true)
+                                checkAccuracy::Bool=true, 
+                                index_param=0)
 
     println("Working with model ", petabModel.modelName)
 
@@ -264,7 +285,8 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                                      runTime = runTime, 
                                      sqDiff = sqDiffSolver, 
                                      iteration = 1:nTimesRepat, 
-                                     solverCategory = solverCategory)
+                                     solverCategory = solverCategory, 
+                                     index_param = index_param)
                 if isfile(pathFileSave)
                     CSV.write(pathFileSave, dataSave, append = true)
                 else
@@ -290,7 +312,8 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                                      runTime = NaN,
                                      sqDiff = Inf, 
                                      iteration = 1:nTimesRepat, 
-                                     solverCategory = solverCategory)                
+                                     solverCategory = solverCategory, 
+                                     index_param = index_param)                
                 if isfile(pathFileSave)
                     CSV.write(pathFileSave, dataSave, append = true)
                 else
@@ -336,34 +359,39 @@ if ARGS[1] == "Test_all"
 end
 
 
-if ARGS[1] == "Large_models"
+if ARGS[1] == "Large_models_random_p"
 
     dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers")
-    pathSave = joinpath(dirSave, "Large_models.csv") 
+    pathSave = joinpath(dirSave, "Large_models_random_p.csv") 
     if !isdir(dirSave)
         mkpath(dirSave)
     end
+    modelTest = ARGS[2]
+    tolsTry = [(1e-8, 1e-8)]          
 
-    modelList = ["model_Chen_MSB2009"]
-    tolsTry = [(1e-6, 1e-6)]            
-    solversCheck = ["KenCarp4", "QNDF", "TRBDF2", "FBDF", "Rodas4P", "CVODE_BDF_default"]
+    solversCheck = ["KenCarp47", "KenCarp4", "Kvaerno5", "QNDF", "TRBDF2", "FBDF", "Rodas5P", "CVODE_BDF_default", 
+                    "KenCarp47_RFLUF", "KenCarp4_RFLUF", "Kvaerno5_RFLUF", "QNDF_RFLUF", "FBDF_RFLUF", "Rodas5P_RFLUF", 
+                    "KenCarp47_FastLU", "KenCarp4_FastLU", "Kvaerno5_FastLU", "QNDF_FastLU", "FBDF_FastLU", "Rodas5P_FastLU"]
+    solversCheckSparse = ["KenCarp47_S", "KenCarp4_S", "Kvaerno5_S", "QNDF_S", "TRBDF2_S", "FBDF_S", "Rodas5P_S", "CVODE_BDF_KLU_S", 
+                          "KenCarp47_KLU_S", "KenCarp4_KLU_S", "Kvaerno5_KLU_S", "QNDF_KLU_S", "FBDF_KLU_S", "Rodas5P_KLU_S"]
 
-    for i in eachindex(modelList)
-        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
-        pathYML = getPathYmlFile(dirModel)
-        petabModel = readPEtabModel(pathYML)
+    dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelTest)
+    pathYML = getPathYmlFile(dirModel)
+    petabModel = readPEtabModel(pathYML)
 
-        runBenchmarkOdeSolvers(petabModel, pathSave, false, nTimesRepat=UInt(3), solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false)    
-    end
-
-    # Now try with sparse Jacobian 
-    solversCheckSparse = ["KenCarp4_S", "QNDF_S", "TRBDF2_S", "FBDF_S", "Rodas4P_S", "CVODE_BDF_KLU_S"]
-    for i in eachindex(modelList)
-        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
-        pathYML = getPathYmlFile(dirModel)
-        petabModel = readPEtabModel(pathYML)
-
-        runBenchmarkOdeSolvers(petabModel, pathSave, true, nTimesRepat=UInt(3), solversCheck=solversCheckSparse, tolsCheck=tolsTry, checkAccuracy=false)    
+    # 50 random vector 
+    for j in 1:50
+        if j == 1
+            θ_dynamic = getNominalODEValues(petabModel)
+        else
+            θ_dynamic = getRandomModelParameters(petabModel, Rodas4P(), j)
+        end
+        runBenchmarkOdeSolvers(petabModel, pathSave, false, nTimesRepat=UInt(3), 
+                               solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false, 
+                               _θ_dynamic=θ_dynamic, index_param=j)    
+        runBenchmarkOdeSolvers(petabModel, pathSave, true, nTimesRepat=UInt(3), 
+                               solversCheck=solversCheckSparse, tolsCheck=tolsTry, checkAccuracy=false, 
+                               _θ_dynamic=θ_dynamic, index_param=j)    
     end
 end
 
@@ -433,3 +461,11 @@ if ARGS[1] == "Test_random_parameter_pre_eq"
         end
     end
 end
+
+
+solversCheck = ["KenCarp47", "KenCarp4", "Kvaerno5", "QNDF", "TRBDF2", "FBDF", "Rodas5P", "CVODE_BDF_default", 
+                "KenCarp47_RFLUF", "KenCarp4_RFLUF", "Kvaerno5_RFLUF", "QNDF_RFLUF", "TRBDF2_RFLUF", "FBDF_RFLUF", "Rodas5P_RFLUF", 
+                "KenCarp47_FastLU", "KenCarp4_FastLU", "Kvaerno5_FastLU", "QNDF_FastLU", "TRBDF2_FastLU", "FBDF_FastLU", "Rodas5P_FastLU"]
+solversCheckSparse = ["KenCarp47_S", "KenCarp4_S", "Kvaerno5_S", "QNDF_S", "FBDF_S", "Rodas5P_S", "CVODE_BDF_KLU_S", 
+                      "KenCarp47_KLU_S", "KenCarp4_KLU_S", "Kvaerno5_KLU_S", "QNDF_KLU_S", "FBDF_KLU_S", "Rodas5P_KLU_S"]
+foo = getSolverInfo(true, solversCheckSparse)

@@ -10,7 +10,24 @@ eval "$(conda shell.bash hook)"
 conda activate PeTab
 
 runJulia="/home/sebpe/julia-1.8.5-linux-x86_64/julia-1.8.5/bin/julia --project=. --threads=1"
-echo "Testing all models"
-${runJulia} Benchmarks/ODE_solvers/Benchmark_solvers.jl Test_all
-echo "Testing random parameters"
-${runJulia} Benchmarks/ODE_solvers/Benchmark_solvers.jl Test_random_parameter
+
+if [ $1 == "Test_all" ];then
+    echo "Testing all models"
+    ${runJulia} Benchmarks/ODE_solvers/Benchmark_solvers.jl Test_all
+fi
+
+
+if [ $1 == "Test_random_parameters" ];then
+    echo "Testing random parameter for a subset of models"
+    ${runJulia} Benchmarks/ODE_solvers/Benchmark_solvers.jl Test_random_parameter
+fi
+
+
+if [ $1 == "Test_random_parameters_big_models" ];then
+    echo "Testing random parameter for big models"
+    ${runJulia} Benchmarks/ODE_solvers/Benchmark_solvers.jl Large_models_random_p model_Bachmann_MSB2011
+    ${runJulia} Benchmarks/ODE_solvers/Benchmark_solvers.jl Large_models_random_p model_Lucarelli_CellSystems2018
+    ${runJulia} Benchmarks/ODE_solvers/Benchmark_solvers.jl Large_models_random_p model_Isensee_JCB2018
+    ${runJulia} Benchmarks/ODE_solvers/Benchmark_solvers.jl Large_models_random_p Smith_BMCSystBiol2013
+    ${runJulia} Benchmarks/ODE_solvers/Benchmark_solvers.jl Large_models_random_p model_Chen_MSB2009
+fi
