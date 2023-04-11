@@ -417,3 +417,13 @@ if ARGS[1] == "Elowitz_Nature2000"
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN]) 
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
+
+
+if ARGS[1] == "Isensee_JCB2018"
+    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Isensee_JCB2018", "Isensee_JCB2018.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=true)
+    removeAllProcs()
+    addprocs(1, exeflags="--project=.")
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], numberOfprocesses=2, terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=true) 
+    benchmarkParameterEstimation(petabgModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], numberOfprocesses=2, terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=false) 
+end

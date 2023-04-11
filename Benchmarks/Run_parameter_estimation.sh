@@ -72,4 +72,8 @@ if [ $1 == "Crauste_CellSystems2017" ];then
     ${runJulia} ${pathBenchmarkScript} Crauste_CellSystems2017 $2 $3
 fi
 
+if [ $1 == "Isensee_JCB2018" ];then
+    ${runJulia} ${pathBenchmarkScript} Isensee_JCB2018 $2 $3
+fi
+
 exit 0
