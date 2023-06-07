@@ -405,10 +405,10 @@ if ARGS[1] == "Test_random_parameter"
         mkpath(dirSave)
     end
 
-    modelList = ["model_Perelson_Science1996", "model_Zhao_QuantBiol2020", "model_Crauste_CellSystems2017", "model_Fiedler_BMC2016", 
+    modelList = ["model_Perelson_Science1996", "model_Zhao_QuantBiol2020", "model_Crauste_CellSystems2017", 
+                 "model_Bertozzi_PNAS2020", "model_Borghans_BiophysChem1997", "model_Giordano_Nature2020", 
                  "model_Bruno_JExpBot2016", "model_Okuonghae_ChaosSolitonsFractals2020", "model_Schwen_PONE2014", 
-                 "model_Bachmann_MSB2011", "model_Brannmark_JBC2010", "model_Lucarelli_CellSystems2018", 
-                 "model_Isensee_JCB2018", "model_Weber_BMC2015"]
+                 "model_Bachmann_MSB2011", "model_Weber_BMC2015", ]
 
 
     solversCheck = ["Rodas5", "QNDF", "Rodas4P", "CVODE_BDF_default", "Vern7", "Tsit5", "Vern6", "Vern7Rodas4P"]
