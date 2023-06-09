@@ -76,4 +76,9 @@ if [ $1 == "Isensee_JCB2018" ];then
     ${runJulia} ${pathBenchmarkScript} Isensee_JCB2018 $2 $3
 fi
 
+if [ $1 == "Borghans_BiophysChem1997" ];then
+    ${runJulia} ${pathBenchmarkScript} Borghans_BiophysChem1997 $2 $3
+fi
+
+
 exit 0
