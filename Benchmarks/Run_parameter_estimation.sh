@@ -80,5 +80,9 @@ if [ $1 == "Borghans_BiophysChem1997" ];then
     ${runJulia} ${pathBenchmarkScript} Borghans_BiophysChem1997 $2 $3
 fi
 
+if [ $1 == "Okuonghae_ChaosSolitonsFractals2020" ];then
+    ${runJulia} ${pathBenchmarkScript} Okuonghae_ChaosSolitonsFractals2020 $2 $3
+fi
+
 
 exit 0

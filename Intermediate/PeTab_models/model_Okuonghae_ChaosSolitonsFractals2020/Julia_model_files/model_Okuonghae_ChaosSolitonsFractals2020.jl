@@ -29,10 +29,10 @@ function getODEModel_model_Okuonghae_ChaosSolitonsFractals2020()
     ### Derivatives ###
     eqs = [
     D(detected_cumulative) ~ +1.0 * ( 1 /Lagos ) * (Lagos * psi * symptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * theta * asymptomatic),
-    D(symptomatic) ~ +1.0 * ( 1 /Lagos ) * (Lagos * (sigma * (1 - nu) * exposed))-1.0 * ( 1 /Lagos ) * (Lagos * psi * symptomatic)-1.0 * ( 1 /Lagos ) * (Lagos * gamma_0 * symptomatic)-1.0 * ( 1 /Lagos ) * (Lagos * d_0 * symptomatic),
-    D(asymptomatic) ~ +1.0 * ( 1 /Lagos ) * (Lagos * (sigma * nu * exposed))-1.0 * ( 1 /Lagos ) * (Lagos * theta * asymptomatic)-1.0 * ( 1 /Lagos ) * (Lagos * gamma_a * asymptomatic),
+    D(symptomatic) ~ +1.0 * ( 1 /Lagos ) * (Lagos * ( sigma * (1 - nu) * exposed))-1.0 * ( 1 /Lagos ) * (Lagos * psi * symptomatic)-1.0 * ( 1 /Lagos ) * (Lagos * gamma_0 * symptomatic)-1.0 * ( 1 /Lagos ) * (Lagos * d_0 * symptomatic),
+    D(asymptomatic) ~ +1.0 * ( 1 /Lagos ) * (Lagos * ( sigma * nu * exposed))-1.0 * ( 1 /Lagos ) * (Lagos * theta * asymptomatic)-1.0 * ( 1 /Lagos ) * (Lagos * gamma_a * asymptomatic),
     D(detected) ~ +1.0 * ( 1 /Lagos ) * (Lagos * psi * symptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * theta * asymptomatic)-1.0 * ( 1 /Lagos ) * (Lagos * gamma_i * detected)-1.0 * ( 1 /Lagos ) * (Lagos * d_D * detected),
-    D(exposed) ~ +1.0 * ( 1 /Lagos ) * (Lagos * (transmission_rate_effective * (1 - eps) * (1 - delta) * (alpha * asymptomatic + symptomatic) / ((asymptomatic + detected + exposed + recovered + susceptible + symptomatic) - detected)) * susceptible)-1.0 * ( 1 /Lagos ) * (Lagos * (sigma * (1 - nu) * exposed))-1.0 * ( 1 /Lagos ) * (Lagos * (sigma * nu * exposed)),
+    D(exposed) ~ +1.0 * ( 1 /Lagos ) * (Lagos * (transmission_rate_effective * (1 - eps) * (1 - delta) * (alpha * asymptomatic + symptomatic) / ((asymptomatic + detected + exposed + recovered + susceptible + symptomatic) - detected)) * susceptible)-1.0 * ( 1 /Lagos ) * (Lagos * ( sigma * (1 - nu) * exposed))-1.0 * ( 1 /Lagos ) * (Lagos * ( sigma * nu * exposed)),
     D(deceased) ~ +1.0 * ( 1 /Lagos ) * (Lagos * d_0 * symptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * d_D * detected),
     D(recovered) ~ +1.0 * ( 1 /Lagos ) * (Lagos * gamma_0 * symptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * gamma_a * asymptomatic)+1.0 * ( 1 /Lagos ) * (Lagos * gamma_i * detected),
     D(susceptible) ~ -1.0 * ( 1 /Lagos ) * (Lagos * (transmission_rate_effective * (1 - eps) * (1 - delta) * (alpha * asymptomatic + symptomatic) / ((asymptomatic + detected + exposed + recovered + susceptible + symptomatic) - detected)) * susceptible)

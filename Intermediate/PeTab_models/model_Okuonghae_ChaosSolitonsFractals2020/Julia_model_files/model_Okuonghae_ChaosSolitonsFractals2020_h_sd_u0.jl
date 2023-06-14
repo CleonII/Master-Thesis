@@ -1,8 +1,8 @@
 #u[1] = detected_cumulative, u[2] = symptomatic, u[3] = asymptomatic, u[4] = detected, u[5] = exposed, u[6] = deceased, u[7] = recovered, u[8] = susceptible
-#θ_dynamicNames[1] = alpha, θ_dynamicNames[2] = d_0, θ_dynamicNames[3] = d_D, θ_dynamicNames[4] = gamma_0, θ_dynamicNames[5] = gamma_a, θ_dynamicNames[6] = gamma_i, θ_dynamicNames[7] = nu, θ_dynamicNames[8] = psi, θ_dynamicNames[9] = sigma, θ_dynamicNames[10] = theta, θ_dynamicNames[11] = asymptomatic_start, θ_dynamicNames[12] = symptomatic_start, θ_dynamicNames[13] = exposed_start, θ_dynamicNames[14] = transmission_rate_effective
+#pODEProblemNames[1] = psi, pODEProblemNames[2] = nu, pODEProblemNames[3] = gamma_i, pODEProblemNames[4] = asymptomatic_start, pODEProblemNames[5] = delta, pODEProblemNames[6] = symptomatic_start, pODEProblemNames[7] = sigma, pODEProblemNames[8] = theta, pODEProblemNames[9] = Lagos, pODEProblemNames[10] = alpha, pODEProblemNames[11] = d_0, pODEProblemNames[12] = transmission_rate_effective, pODEProblemNames[13] = eps, pODEProblemNames[14] = exposed_start, pODEProblemNames[15] = gamma_0, pODEProblemNames[16] = d_D, pODEProblemNames[17] = gamma_a
 #
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :observable_Cumulative 
@@ -47,7 +47,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [detected_cumulative, symptomatic, asymptomatic, detected, exposed, deceased, recovered, susceptible]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :observable_Cumulative 
 		noiseParameter1_observable_Cumulative = getObsOrSdParam(θ_sd, parameterMap)

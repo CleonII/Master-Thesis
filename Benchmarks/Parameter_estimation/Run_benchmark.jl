@@ -449,19 +449,11 @@ if ARGS[1] == "Borghans_BiophysChem1997"
 end
 
 
-pathYML = pwd() * "/Intermediate/PeTab_models/model_Borghans_BiophysChem1997/Borghans_BiophysChem1997.yaml"
-petabModel = readPEtabModel(pathYML, verbose=true, forceBuildJuliaFiles=true)
-petabProblem = setUpPEtabODEProblem(petabModel, Rodas5P(), solverAbsTol=1e-8, solverRelTol=1e-8)
-                                        
-θ_estNames = string.(petabProblem.θ_estNames)
-
-pathCube = joinpath(petabModel.dirJulia, "Cube_benchmark.csv")
-createCube(pathCube, petabProblem, 1000, seed=123, verbose=true)
-cube = Matrix(CSV.read(pathCube, DataFrame))
-
-cost = petabProblem.computeCost(petabProblem.θ_nominalT)
-gradient = zeros(length(petabProblem.θ_nominalT))
-hessian = zeros(length(petabProblem.θ_nominalT), length(petabProblem.θ_nominalT))
-@elapsed petabProblem.computeGradientAutoDiff(gradient, petabProblem.θ_nominalT)
-@elapsed petabProblem.computeHessian(hessian, petabProblem.θ_nominalT)
-
+if ARGS[1] == "Okuonghae_ChaosSolitonsFractals2020"
+    pathYML = pwd() * "/Intermediate/PeTab_models/model_Okuonghae_ChaosSolitonsFractals2020/Okuonghae_ChaosSolitonsFractals2020.yaml"
+    petabModel = readPEtabModel(pathYML, verbose=true)
+    removeAllProcs()
+    addprocs(1, exeflags="--project=.")
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true) 
+    benchmarkParameterEstimation(petabgModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
+end
