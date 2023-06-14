@@ -422,18 +422,6 @@ end
 if ARGS[1] == "Isensee_JCB2018"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Isensee_JCB2018", "Isensee_JCB2018.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)
-    removeAllProcs()
-    addprocs(1, exeflags="--project=.")
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], numberOfprocesses=2, terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=true) 
-    benchmarkParameterEstimation(petabgModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], numberOfprocesses=2, terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=false) 
-end
-
-
-if ARGS[1] == "Isensee_JCB2018"
-    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Isensee_JCB2018", "Isensee_JCB2018.yaml")
-    petabModel = readPEtabModel(pathYML, verbose=true)
-    removeAllProcs()
-    addprocs(1, exeflags="--project=.")
     benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], numberOfprocesses=2, terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=true) 
     benchmarkParameterEstimation(petabgModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], numberOfprocesses=2, terminateSSMethod=:NewtonNorm, solverSSRelTol=1e-6, solverSSAbsTol=1e-6, reuseS=false) 
 end
@@ -442,8 +430,6 @@ end
 if ARGS[1] == "Borghans_BiophysChem1997"
     pathYML = pwd() * "/Intermediate/PeTab_models/model_Borghans_BiophysChem1997/Borghans_BiophysChem1997.yaml"
     petabModel = readPEtabModel(pathYML, verbose=true)
-    removeAllProcs()
-    addprocs(1, exeflags="--project=.")
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true) 
     benchmarkParameterEstimation(petabgModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
@@ -452,8 +438,6 @@ end
 if ARGS[1] == "Okuonghae_ChaosSolitonsFractals2020"
     pathYML = pwd() * "/Intermediate/PeTab_models/model_Okuonghae_ChaosSolitonsFractals2020/Okuonghae_ChaosSolitonsFractals2020.yaml"
     petabModel = readPEtabModel(pathYML, verbose=true)
-    removeAllProcs()
-    addprocs(1, exeflags="--project=.")
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true) 
     benchmarkParameterEstimation(petabgModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
