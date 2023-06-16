@@ -431,7 +431,7 @@ if ARGS[1] == "Borghans_BiophysChem1997"
     pathYML = pwd() * "/Intermediate/PeTab_models/model_Borghans_BiophysChem1997/Borghans_BiophysChem1997.yaml"
     petabModel = readPEtabModel(pathYML, verbose=true)
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true) 
-    benchmarkParameterEstimation(petabgModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
 
 
@@ -439,5 +439,13 @@ if ARGS[1] == "Okuonghae_ChaosSolitonsFractals2020"
     pathYML = pwd() * "/Intermediate/PeTab_models/model_Okuonghae_ChaosSolitonsFractals2020/Okuonghae_ChaosSolitonsFractals2020.yaml"
     petabModel = readPEtabModel(pathYML, verbose=true)
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true) 
-    benchmarkParameterEstimation(petabgModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
+end
+
+
+if ARGS[1] == "Oliveira_NatCommun2021"
+    pathYML = pwd() * "/Intermediate/PeTab_models/model_Oliveira_NatCommun2021/Oliveira_NatCommun2021.yaml"
+    petabModel = readPEtabModel(pathYML, verbose=true, forceBuildJuliaFiles=true)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end

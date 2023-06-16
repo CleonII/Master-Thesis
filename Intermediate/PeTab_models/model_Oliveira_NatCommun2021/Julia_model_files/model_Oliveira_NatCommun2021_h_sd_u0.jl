@@ -1,5 +1,5 @@
 #u[1] = Hospital, u[2] = Symptomatic, u[3] = Cumulative_cases, u[4] = Asymptomatic, u[5] = Exposed, u[6] = ICU, u[7] = Recovered, u[8] = Deaths, u[9] = Susceptible
-#θ_dynamicNames[1] = beta_0, θ_dynamicNames[2] = beta_1, θ_dynamicNames[3] = beta_2, θ_dynamicNames[4] = t_1, θ_dynamicNames[5] = t_2, θ_dynamicNames[6] = delta_, θ_dynamicNames[7] = h_hosp_rate, θ_dynamicNames[8] = gamma_h, θ_dynamicNames[9] = gamma_u, θ_dynamicNames[10] = exposed_init_concentration, θ_dynamicNames[11] = asymptomatic_init_concentration, θ_dynamicNames[12] = symptomatic_init_concentration
+#pODEProblemNames[1] = asymptomatic_init_concentration, pODEProblemNames[2] = beta_2_multiplier, pODEProblemNames[3] = t_2, pODEProblemNames[4] = gamma_u, pODEProblemNames[5] = exposed_init_concentration, pODEProblemNames[6] = omega_u, pODEProblemNames[7] = kappa, pODEProblemNames[8] = h_hosp_rate, pODEProblemNames[9] = xi, pODEProblemNames[10] = delta_, pODEProblemNames[11] = t_1, pODEProblemNames[12] = beta_0, pODEProblemNames[13] = symptomatic_init_concentration, pODEProblemNames[14] = Interior, pODEProblemNames[15] = mu_u, pODEProblemNames[16] = omega_h, pODEProblemNames[17] = beta_bool1, pODEProblemNames[18] = mu_h, pODEProblemNames[19] = beta_2, pODEProblemNames[20] = beta_1, pODEProblemNames[21] = beta_bool2, pODEProblemNames[22] = population, pODEProblemNames[23] = p_symp_rate, pODEProblemNames[24] = gamma_s, pODEProblemNames[25] = gamma_h, pODEProblemNames[26] = gamma_a
 ##parameterInfo.nominalValue[1] = p_symp_rate_C 
 #parameterInfo.nominalValue[2] = kappa_C 
 #parameterInfo.nominalValue[3] = gamma_a_C 
@@ -14,7 +14,7 @@
 #parameterInfo.nominalValue[21] = population_C 
 
 
-function compute_h(u::AbstractVector, t::Real, θ_dynamic::AbstractVector, θ_observable::AbstractVector,
+function compute_h(u::AbstractVector, t::Real, pODEProblem::AbstractVector, θ_observable::AbstractVector,
                    θ_nonDynamic::AbstractVector, parameterInfo::ParametersInfo, observableId::Symbol, 
                       parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :cumulative_deaths 
@@ -61,7 +61,7 @@ function compute_u0(pODEProblem::AbstractVector)::AbstractVector
 	 return [Hospital, Symptomatic, Cumulative_cases, Asymptomatic, Exposed, ICU, Recovered, Deaths, Susceptible]
 end
 
-function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, θ_dynamic::AbstractVector, θ_nonDynamic::AbstractVector, 
+function compute_σ(u::AbstractVector, t::Real, θ_sd::AbstractVector, pODEProblem::AbstractVector, θ_nonDynamic::AbstractVector, 
                    parameterInfo::ParametersInfo, observableId::Symbol, parameterMap::θObsOrSdParameterMap)::Real 
 	if observableId == :cumulative_deaths 
 		noiseParameter1_cumulative_deaths = getObsOrSdParam(θ_sd, parameterMap)

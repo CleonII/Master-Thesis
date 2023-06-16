@@ -1,14 +1,14 @@
 function getCallbacks_model_Oliveira_NatCommun2021()
-	cb_beta_bool2 = ContinuousCallback(condition_beta_bool2, affect_beta_bool2!, save_positions=(false, false))
+	cb_beta_bool2 = DiscreteCallback(condition_beta_bool2, affect_beta_bool2!, save_positions=(false, false))
 
-	cb_beta_bool1 = ContinuousCallback(condition_beta_bool1, affect_beta_bool1!, save_positions=(false, false))
+	cb_beta_bool1 = DiscreteCallback(condition_beta_bool1, affect_beta_bool1!, save_positions=(false, false))
 
 	return CallbackSet(cb_beta_bool2, cb_beta_bool1), [isActiveAtTime0_beta_bool2!, isActiveAtTime0_beta_bool1!]
 end
 
 
 function condition_beta_bool2(u, t, integrator)
-	t - integrator.p[11]
+	t == integrator.p[11]
 end
 
 function affect_beta_bool2!(integrator)
@@ -26,7 +26,7 @@ end
 
 
 function condition_beta_bool1(u, t, integrator)
-	t - integrator.p[3]
+	t == integrator.p[3]
 end
 
 function affect_beta_bool1!(integrator)
@@ -43,5 +43,5 @@ end
 
 
 function computeTstops(u::AbstractVector, p::AbstractVector)
-	 return Float64[]
+	 return [p[11], p[3]]
 end
