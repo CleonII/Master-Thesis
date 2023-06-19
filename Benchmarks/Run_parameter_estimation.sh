@@ -88,4 +88,9 @@ if [ $1 == "Oliveira_NatCommun2021" ];then
     ${runJulia} ${pathBenchmarkScript} Oliveira_NatCommun2021 $2 $3
 fi
 
+if [ $1 == "Rahman_MBS2016" ];then
+    ${runJulia} ${pathBenchmarkScript} Rahman_MBS2016 $2 $3
+fi
+
+
 exit 0

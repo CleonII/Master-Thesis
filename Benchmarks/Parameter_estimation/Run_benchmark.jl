@@ -449,3 +449,11 @@ if ARGS[1] == "Oliveira_NatCommun2021"
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true) 
     benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
 end
+
+
+if ARGS[1] == "Rahman_MBS2016"
+    pathYML = pwd() * "/Intermediate/PeTab_models/model_Rahman_MBS2016/Rahman_MBS2016.yaml"
+    petabModel = readPEtabModel(pathYML, verbose=true, forceBuildJuliaFiles=true)
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iNotOptimIPNewtonGN], reuseS=true) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=optmizersTest[iOptimIPNewtonGN], reuseS=false) 
+end
