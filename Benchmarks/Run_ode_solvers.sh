@@ -5,11 +5,14 @@ if [ ! $currentDir == "Master-Thesis" ]; then
     exit 1
 fi
 
+
 # Neede to load Conda environment with Fides 
 eval "$(conda shell.bash hook)"
 conda activate PeTab
 
+
 runJulia="/home/sebpe/julia-1.8.5-linux-x86_64/julia-1.8.5/bin/julia --project=. --threads=1"
+
 
 if [ $1 == "Test_all" ];then
     echo "Testing all models"

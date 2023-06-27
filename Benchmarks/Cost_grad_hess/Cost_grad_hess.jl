@@ -301,39 +301,6 @@ if ARGS[1] == "Hessian_cost_small_models"
 end
 
 
-if ARGS[1] == "Test_adjoint"
-
-    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
-    pathSave = joinpath(dirSave, "Test_adjoint.csv")
-    if !isdir(dirSave)
-        mkpath(dirSave)
-    end
-    modelTest = ARGS[2]
-                            
-    odeSolvers = [Rodas5P(), QNDF(), CVODE_BDF()]
-    odeSolversName = ["Rodas5P", "QNDF", "CVODE_BDF"]                 
-    sensealgsCheck = [[:ForwardDiff, nothing, "ForwardDiff"], 
-                      [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true)), "InterpolatingAdjoint(autojacvec=ReverseDiffVJP(true))"],
-                      [:Adjoint, InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false)), "InterpolatingAdjoint(autojacvec=ReverseDiffVJP(false))"],
-                      [:Adjoint, InterpolatingAdjoint(autojacvec=EnzymeVJP()), "InterpolatingAdjoint(autojacvec=EnzymeVJP())"], 
-                      [:Adjoint, QuadratureAdjoint(abstol=1e-8, reltol=1e-8, autojacvec=ReverseDiffVJP(true)), "QuadratureAdjoint(autojacvec=ReverseDiffVJP(true))"],
-                      [:Adjoint, QuadratureAdjoint(abstol=1e-8, reltol=1e-8, autojacvec=ReverseDiffVJP(false)), "QuadratureAdjoint(autojacvec=ReverseDiffVJP(false))"], 
-                      [:Adjoint, QuadratureAdjoint(abstol=1e-8, reltol=1e-8, autojacvec=EnzymeVJP()), "QuadratureAdjoint(autojacvec=EnzymeVJP())"]]
-
-    absTol, relTol = 1e-8, 1e-8                      
-    dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelTest)
-    pathYML = getPathYmlFile(dirModel)
-    petabModel = readPEtabModel(pathYML)
-    for j in eachindex(odeSolvers)
-    
-        # Check Gradient 
-        for sensealgInfo in sensealgsCheck
-            benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=5)
-        end
-    end
-end
-
-
 if ARGS[1] == "Test_adjoint_random_p"
 
     Random.seed!(123)
@@ -374,44 +341,6 @@ if ARGS[1] == "Test_adjoint_random_p"
          
         benchmarkCostGrad(petabModel, [:ForwardDiff, nothing, "ForwardDiff"], Rodas4P(), "Rodas4P", pathSave, absTol, relTol, checkGradient=true, nRepeat=5, pathSaveGradient=pathSaveGradient, _θ_est=θ_est, iParameter=i)
         benchmarkCostGrad(petabModel, [:FiniteDifferences, nothing, "FiniteDifferences"], Rodas4P(), "Rodas4P", pathSave, absTol, relTol, checkGradient=true, nRepeat=1, pathSaveGradient=pathSaveGradient, _θ_est=θ_est, iParameter=i)
-    end
-end
-
-
-if ARGS[1] == "Test_flags"
-
-    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
-    pathSave = joinpath(dirSave, "Test_flags" * ARGS[2] * ".csv")
-    if !isdir(dirSave)
-        mkpath(dirSave)
-    end
-
-    modelList = ["model_Boehm_JProteomeRes2014", "model_Bachmann_MSB2011", "model_Beer_MolBioSystems2014", 
-                 "model_Bruno_JExpBot2016", "model_Crauste_CellSystems2017", 
-                 "model_Elowitz_Nature2000", "model_Fiedler_BMC2016", "model_Fujita_SciSignal2010", 
-                 "model_Lucarelli_CellSystems2018", "model_Sneyd_PNAS2002"]
-                            
-
-    odeSolvers = [Rodas5(), KenCarp4(), QNDF(), AutoVern7(Rodas5())]
-    odeSolversName = ["Rodas5", "KenCarp4", "QNDF", "Vern7(Rodas5)"]                 
-    sensealgsCheck = [[:ForwardDiff, nothing, "ForwardDiff"]]
-
-    absTol, relTol = 1e-8, 1e-8                      
-    for i in eachindex(modelList)
-        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
-        pathYML = getPathYmlFile(dirModel)
-        petabModel = readPEtabModel(pathYML)
-        for j in eachindex(odeSolvers)
-        
-            # Check cost 
-            benchmarkCostGrad(petabModel, nothing, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkCost=true, nRepeat=10)
-
-            # Check Gradient 
-            for sensealgInfo in sensealgsCheck
-                benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=10)
-                benchmarkCostGrad(petabModel, sensealgInfo, odeSolvers[j], odeSolversName[j], pathSave, absTol, relTol, checkGradient=true, nRepeat=10, chunkSize=1)
-            end
-        end
     end
 end
 
@@ -468,7 +397,7 @@ if ARGS[1] == "Fix_parameters"
 end
 
 
-if ARGS[1] == "Test_chunks_random_p"
+if ARGS[1] == "Test_chunks"
 
     modelUse = ARGS[2]
     dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "Cost_grad_hess")
