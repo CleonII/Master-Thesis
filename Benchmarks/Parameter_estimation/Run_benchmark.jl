@@ -478,3 +478,12 @@ if ARGS[1] == "Crauste_CellSystems2017_full"
     benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=true, tag="full") 
     benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=false, tag="not_full") 
 end
+
+
+# Full subproblem solver when using Fides 
+if ARGS[1] == "Fiedler_BMC2016_full"
+    pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Fiedler_BMC2016", "Fiedler_BMC2016.yaml")
+    petabModel = readPEtabModel(pathYML, verbose=true)     
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=true, tag="full") 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=false, tag="not_full") 
+end
