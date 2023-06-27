@@ -8,7 +8,8 @@ function setUpFides(petabProblem::PEtabODEProblem,
                     verbose::Integer=1,
                     options=py"{'maxiter' : 1000}"o,
                     funargs=py"None"o,
-                    resfun::Bool=false)
+                    resfun::Bool=false,
+                    fullSubProblem::Bool=false)
 
     nParam = length(petabProblem.lowerBounds)
     if autoDiffHess == :autoDiff
@@ -55,7 +56,8 @@ function setUpFides(petabProblem::PEtabODEProblem,
                                options, 
                                funargs, 
                                fidesHessApprox, 
-                               resfun)
+                               resfun,
+                               fullSubProblem)
 
     return fidesObj
 end
@@ -68,14 +70,19 @@ function setUpFidesClass(fun,
                          options,
                          funargs,
                          hessian_update,
-                         resfun::Bool)
+                         resfun::Bool,
+                         fullSubProblem::Bool)
 
     py"""
     import numpy as np
     import fides
     import logging
 
-    def run_fides_python(x0, fun, ub, lb, verbose, options, funargs, hessian_update, resfun):
+    def run_fides_python(x0, fun, ub, lb, verbose, options, funargs, hessian_update, resfun, fullSubProblem):
+
+        if fullSubProblem == True:
+            options['subspace_solver'] = fides.SubSpaceDim.FULL
+
         fides_opt = fides.Optimizer(fun, ub, lb, 
                                     verbose=verbose,
                                     options=options,
@@ -90,7 +97,7 @@ function setUpFidesClass(fun,
 
     """
 
-    runFidesJulia = (x0; verbose=verbose, options=options, funargs=funargs, hessian_update=hessian_update, resfun=resfun) -> py"run_fides_python"(x0, fun, ub, lb, verbose, options, funargs, hessian_update, resfun)
+    runFidesJulia = (x0; verbose=verbose, options=options, funargs=funargs, hessian_update=hessian_update, resfun=resfun) -> py"run_fides_python"(x0, fun, ub, lb, verbose, options, funargs, hessian_update, resfun, fullSubProblem)
     return runFidesJulia
 end
 
