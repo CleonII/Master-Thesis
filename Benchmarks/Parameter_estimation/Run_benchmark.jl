@@ -54,25 +54,17 @@ function writeFile(dirSave::String,
                    solver::String,
                    absTol::String, 
                    relTol::String;
-                   fullSubProblem::Bool=false)
+                   tag::String="")
                    
     # Save after each iteration (do not loose data)
-    if fullSubProblem == false
-        pathFile = joinpath(dirSave, "Estimation_statistics.csv")
-    else
-        pathFile = joinpath(dirSave, "Estimation_statistics_full.csv")
-    end
+    pathFile = joinpath(dirSave, "Estimation_statistics" * tag * ".csv")
     dataSave = [alg finalCost runTime retCode nIter startGuess solver absTol relTol]
     dataSave = DataFrame(dataSave, ["Alg", "Cost", "Run_time", "Ret_code", "N_iter", "Start_guess", "Solver", "absTol", "relTol"])
     shouldAppend = isfile(pathFile) ? true : false
     CSV.write(pathFile, dataSave, append=shouldAppend)
 
     # Save optimal parameter vector
-    if fullSubProblem == false
-        pathFile = joinpath(dirSave, "Minimizer.csv")
-    else
-        pathFile = joinpath(dirSave, "Minimizer_full.csv")
-    end
+    pathFile = joinpath(dirSave, "Minimizer" * tag * ".csv")
     _dataSave = Matrix{Any}(undef, (1, length(θ_opt)+5))
     _dataSave[:] .= vcat(θ_opt, startGuess, alg, solver, absTol, relTol)
     dataSaveθ = DataFrame(_dataSave, vcat(parameterNames, "Start_guess", "Alg", "Solver", "absTol", "relTol"))
@@ -95,7 +87,8 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
                                       reuseS::Bool=true, 
                                       numberOfprocesses=1,
                                       splitOverConditions::Bool=false, 
-                                      fullSubProblem::Bool=false)
+                                      fullSubProblem::Bool=false, 
+                                      tag::String="")
 
     petabProblem = setUpPEtabODEProblem(petabModel, solver, solverAbsTol=absTol, solverRelTol=relTol, terminateSSMethod=terminateSSMethod, 
                                         solverSSRelTol=solverSSRelTol, solverSSAbsTol=solverSSAbsTol, 
@@ -257,36 +250,36 @@ function benchmarkParameterEstimation(petabModel::PEtabModel,
         if :FidesAutoHess in algList
             try
                 runTime = @elapsed res, nIter, converged = FidesAutoHess(p0)
-                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesAutoHess", solverStr, string(absTol), string(relTol), fullSubProblem=fullSubProblem)
+                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesAutoHess", solverStr, string(absTol), string(relTol), tag=tag)
             catch
-                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesAutoHess", solverStr, string(absTol), string(relTol), fullSubProblem=fullSubProblem)
+                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesAutoHess", solverStr, string(absTol), string(relTol), tag=tag)
             end
         end
 
         if :FidesBlockAutoHess in algList
             try
                 runTime = @elapsed res, nIter, converged = FidesAutoHessBlock(p0)
-                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesAutoHessBlock", solverStr, string(absTol), string(relTol), fullSubProblem=fullSubProblem)
+                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesAutoHessBlock", solverStr, string(absTol), string(relTol), tag=tag)
             catch
-                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesAutoHessBlock", solverStr, string(absTol), string(relTol), fullSubProblem=fullSubProblem)
+                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesAutoHessBlock", solverStr, string(absTol), string(relTol), tag=tag)
             end
         end
 
         if :FidesBFGS in algList
             try
                 runTime = @elapsed res, nIter, converged = FidesBFGS(p0)
-                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesBFGS", solverStr, string(absTol), string(relTol), fullSubProblem=fullSubProblem)
+                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesBFGS", solverStr, string(absTol), string(relTol), tag=tag)
             catch
-                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesBFGS", solverStr, string(absTol), string(relTol), fullSubProblem=fullSubProblem)
+                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesBFGS", solverStr, string(absTol), string(relTol), tag=tag)
             end
         end
 
         if :FidesGN in algList
             try
                 runTime = @elapsed res, nIter, converged = FidesGN(p0)
-                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesGN", solverStr, string(absTol), string(relTol), fullSubProblem=fullSubProblem)
+                writeFile(dirResult, res[2], θ_estNames, res[1], runTime, string(converged), nIter, i, "FidesGN", solverStr, string(absTol), string(relTol), tag=tag)
             catch
-                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesGN", solverStr, string(absTol), string(relTol), fullSubProblem=fullSubProblem)
+                writeFile(dirResult, p0, θ_estNames, Inf, Inf, 0, Inf, i, "FidesGN", solverStr, string(absTol), string(relTol), tag=tag)
             end
         end
     end
@@ -473,7 +466,8 @@ end
 if ARGS[1] == "Boehm_JProteomeRes2014_full"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Boehm_JProteomeRes2014", "Boehm_JProteomeRes2014.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)     
-    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=true) 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=true, tag="full") 
+    benchmarkParameterEstimation(petabModel, Rodas5P(), "Rodas5P", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=false, tag="not_full") 
 end
 
 
@@ -481,5 +475,6 @@ end
 if ARGS[1] == "Crauste_CellSystems2017_full"
     pathYML = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", "model_Crauste_CellSystems2017", "Crauste_CellSystems2017.yaml")
     petabModel = readPEtabModel(pathYML, verbose=true)     
-    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=true) 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=true, tag="full") 
+    benchmarkParameterEstimation(petabModel, QNDF(), "QNDF", absTol, relTol, nMultiStarts, algList=[:FidesAutoHess, :FidesGN], fullSubProblem=false, tag="not_full") 
 end
