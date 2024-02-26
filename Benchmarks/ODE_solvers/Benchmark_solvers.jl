@@ -340,7 +340,7 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                             continue
                         end
                         retcode_ret = odesol.retcode
-                        if !(retcode_ret == :Success || retcode_ret != :Terminated)
+                        if !(retcode_ret == :Success || retcode_ret == :Terminated)
                             break
                         end
                     end
@@ -351,9 +351,9 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                     if canSolveModel == false && retcode_ret == "nothing"
                         println("Got here")
                         local _retcode_ret = ""
+                        # If it does not error, pre-eq simulation failed
                         try
-                            _, _, _ = solveODEModelAllConditionsBenchmark(odeProblem, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, savePreEqTime=true)
-                            return nothing
+                            _, _, _retcode_ret = solveODEModelAllConditionsBenchmark(odeProblem, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops, onlySaveAtObservedTimes=true, savePreEqTime=true)
                         catch e
                             if e isa BoundsError
                                 _retcode_ret = "BoundsError"
@@ -366,7 +366,7 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
                             end
                         end
                         retcode_ret = _retcode_ret
-                        println("_retcode_ret = ", _retcode_ret)
+                        println("_retcode_ret error = ", _retcode_ret)
                     end
                 end
                 if canSolveModel == true
@@ -516,10 +516,10 @@ if ARGS[1] == "Test_random_parameter"
 
     modelList = ["model_Perelson_Science1996", "model_Zhao_QuantBiol2020", "model_Crauste_CellSystems2017",
                  "model_Bertozzi_PNAS2020", "model_Borghans_BiophysChem1997", "model_Giordano_Nature2020",
-                 "model_Bruno_JExpBot2016", "model_Okuonghae_ChaosSolitonsFractals2020", "model_Schwen_PONE2014",
-                 "model_Bachmann_MSB2011", "model_Weber_BMC2015", ]
+                 "model_Bruno_JExpBot2016", "model_Okuonghae_ChaosSolitonsFractals2020", "model_Fiedler_BMC2016",
+                 "model_Bachmann_MSB2011", "model_Weber_BMC2015", "model_Schwen_PONE2014"]
 
-
+    modelList = ["model_Weber_BMC2015"]
     solversCheck = ["QNDF", "Rodas5P", "CVODE_BDF_default", "Vern7", "Tsit5", "Vern7Rodas5P"]
     tolsTry = [(1e-8, 1e-8)]
     for i in eachindex(modelList)
@@ -529,8 +529,8 @@ if ARGS[1] == "Test_random_parameter"
         petabModel = readPEtabModel(pathYML)
 
         # 40 random vector
-        for j in 1:100
-            θ_dynamic = getRandomModelParameters(petabModel, Rodas4P(), j)
+        for j in 1:200
+            θ_dynamic = getRandomModelParameters(petabModel, Rodas4P(), j; nParamCube=200)
             runBenchmarkOdeSolvers(petabModel, pathSave, false, nTimesRepat=UInt(1),
                                    solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false,
                                    _θ_dynamic=θ_dynamic)
