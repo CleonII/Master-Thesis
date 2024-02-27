@@ -5,48 +5,66 @@ function getPathYmlFile(pathDir::String)::String
 end
 
 
-function getRandomModelParameters(petabModel::PEtabModel, 
-                                  odeSolver::SciMLAlgorithm, 
+function getRandomModelParameters(petabModel::PEtabModel,
+                                  odeSolver::SciMLAlgorithm,
                                   iCube;
                                   nParamCube=100,
                                   tol::Float64=1e-8,
                                   odeSolvers::Bool=true)
-  
-    # Generate Cube if lacking and choose one parameter vector 
+
+    # Generate Cube if lacking and choose one parameter vector
     petabProblem = setUpPEtabODEProblem(petabModel, odeSolver, solverAbsTol=tol, solverRelTol=tol)
     if odeSolvers == true
         pathCube = joinpath(petabModel.dirJulia, "Cube_ode_solvers.csv")
     else
         pathCube = joinpath(petabModel.dirJulia, "Cost_grad_hess.csv")
     end
-    createCube(pathCube, petabProblem, nParamCube, seed=123, verbose=false)
-    cube = Matrix(CSV.read(pathCube, DataFrame))
-    θ_est = cube[iCube, :]
 
-    # Transform model parameters to correct scale for ODE-problem
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
-    parameterInfo = processParameters(parametersData) 
-    measurementInfo = processMeasurements(measurementsData, observablesData) 
+    parameterInfo = processParameters(parametersData)
+    measurementInfo = processMeasurements(measurementsData, observablesData)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
-    if odeSolvers == true
-        transformθ!(θ_est, θ_indices.θ_estNames, θ_indices)
-        return θ_est[θ_indices.iθ_dynamic]
-    else
+    if odeSolvers == false
+        createCube(pathCube, petabProblem, nParamCube, seed=123, verbose=false)
+        cube = Matrix(CSV.read(pathCube, DataFrame))
+        θ_est = cube[iCube, :]
+
+        # Transform model parameters to correct scale for ODE-problem
         return θ_est
     end
+
+    if isfile(pathCube)
+        @info "Cube exists and will not be rebuilt"
+        cube = Matrix(CSV.read(pathCube, DataFrame))
+        θ_est = cube[iCube, :]
+        transformθ!(θ_est, θ_indices.θ_estNames, θ_indices)
+        return θ_est[θ_indices.iθ_dynamic]
+    end
+
+    lowerBounds, upperBounds = petabProblem.lowerBounds, petabProblem.upperBounds
+    nDims = length(lowerBounds)
+    plan = LHCoptim(nParamCube, nDims, 10)[1]
+    bounds = [(lowerBounds[i], upperBounds[i]) for i in eachindex(lowerBounds)]
+    cube = Matrix(scaleLHC(plan, bounds))
+    dataSave = DataFrame(cube, :auto)
+    rename!(dataSave, petabProblem.θ_estNames)
+    CSV.write(pathCube, dataSave)
+    θ_est = cube[iCube, :]
+    transformθ!(θ_est, θ_indices.θ_estNames, θ_indices)
+    return θ_est[θ_indices.iθ_dynamic]
 end
 
 
 function getNominalθ(petabModel::PEtabModel)
-  
+
     # Transform model parameters to correct scale for ODE-problem
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
-    parameterInfo = processParameters(parametersData) 
-    measurementInfo = processMeasurements(measurementsData, observablesData) 
+    parameterInfo = processParameters(parametersData)
+    measurementInfo = processMeasurements(measurementsData, observablesData)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
-    θ_estNames = θ_indices.θ_estNames               
+    θ_estNames = θ_indices.θ_estNames
     θ_nominal = [parameterInfo.nominalValue[findfirst(x -> x == θ_estNames[i], parameterInfo.parameterId)] for i in eachindex(θ_estNames)]
     transformθ!(θ_nominal, θ_indices.θ_estNames, θ_indices, reverseTransform=true)
 
@@ -58,8 +76,8 @@ function getNominalODEValues(petabModel::PEtabModel)
 
     # Transform model parameters to correct scale for ODE-problem
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
-    parameterInfo = processParameters(parametersData) 
-    measurementInfo = processMeasurements(measurementsData, observablesData) 
+    parameterInfo = processParameters(parametersData)
+    measurementInfo = processMeasurements(measurementsData, observablesData)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
     θ_estNames = θ_indices.θ_estNames
@@ -70,16 +88,16 @@ end
 
 
 
-# For a PEtab model create a tempory directory where the PEtab files is changed such that nParamFixate are 
+# For a PEtab model create a tempory directory where the PEtab files is changed such that nParamFixate are
 # fixed (not considered to be gradient related parameters )
 function getPEtabModelNparamFixed(petabModel::PEtabModel, nParamFixate::Integer)::PEtabModel
-    
+
     dirNew = joinpath(petabModel.dirModel, "Fewer_param" * petabModel.modelName)
     if !isdir(dirNew)
         mkdir(dirNew)
     end
 
-    # Copy PEtab files to new directory 
+    # Copy PEtab files to new directory
     pathParameters = copyFileToDest(petabModel.pathParameters, dirNew)
     pathConditions = copyFileToDest(petabModel.pathConditions, dirNew)
     pathObservables = copyFileToDest(petabModel.pathObservables, dirNew)
@@ -89,8 +107,8 @@ function getPEtabModelNparamFixed(petabModel::PEtabModel, nParamFixate::Integer)
 
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAML)
 
-    parameterInfo = processParameters(parametersData) 
-    measurementInfo = processMeasurements(measurementsData, observablesData) 
+    parameterInfo = processParameters(parametersData)
+    measurementInfo = processMeasurements(measurementsData, observablesData)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
     parameterToFixate = string.(sample(θ_indices.θ_dynamicNames, nParamFixate, replace=false))
@@ -106,16 +124,16 @@ function getPEtabModelNparamFixed(petabModel::PEtabModel, nParamFixate::Integer)
 end
 
 
-# Get a PEtab model with permuted parmeters 
+# Get a PEtab model with permuted parmeters
 function getPEtabModelParamPermuted(petabModel::PEtabModel; seed=123)::PEtabModel
-    
+
     Random.seed!(seed)
     dirNew = joinpath(petabModel.dirModel, "Permuted_param" * petabModel.modelName)
     if !isdir(dirNew)
         mkdir(dirNew)
     end
 
-    # Copy PEtab files to new directory 
+    # Copy PEtab files to new directory
     pathParameters = copyFileToDest(petabModel.pathParameters, dirNew)
     pathConditions = copyFileToDest(petabModel.pathConditions, dirNew)
     pathObservables = copyFileToDest(petabModel.pathObservables, dirNew)
@@ -125,8 +143,8 @@ function getPEtabModelParamPermuted(petabModel::PEtabModel; seed=123)::PEtabMode
 
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(pathYAML)
 
-    parameterInfo = processParameters(parametersData) 
-    measurementInfo = processMeasurements(measurementsData, observablesData) 
+    parameterInfo = processParameters(parametersData)
+    measurementInfo = processMeasurements(measurementsData, observablesData)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
     iEstimate = findall(x ->  x == 1, parametersData[!, :estimate])

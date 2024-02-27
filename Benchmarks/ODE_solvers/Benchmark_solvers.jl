@@ -162,21 +162,21 @@ function getSolverInfo(sparseJacobian::Bool, solversCheck)
     end
 end
 
-function getruntime_sqdiff(petabModel, tolsCheck, solver, θ_dynamic, solver_name, path_save::String, iparameter; nTimesRepat=5)
+function get_highacc_runtime_sqdiff(petabModel, θ_dynamic)
 
     _θ_dynamic = θ_dynamic[:]
     # Process PeTab files into type-stable Julia structs
     experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
     parameterInfo = processParameters(parametersData)
     measurementInfo = processMeasurements(measurementsData, observablesData)
-    simulationInfo = processSimulationInfo(petabModel, measurementInfo, parameterInfo, absTolSS=absTolSS, relTolSS=relTolSS)
+    simulationInfo = processSimulationInfo(petabModel, measurementInfo, parameterInfo)
     θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
 
     # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters
     setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, parameterInfo)
 
     # The time-span 5e3 is overwritten when performing actual forward simulations
-    _odeProblem = ODEProblem{true, SciMLBase.FullSpecialize}(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true, sparse=sparseJacobian)
+    _odeProblem = ODEProblem{true, SciMLBase.FullSpecialize}(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true, sparse=false)
     odeProblem = remake(_odeProblem, p = convert.(Float64, _odeProblem.p), u0 = convert.(Float64, _odeProblem.u0))
     # In case we have provided a random start-guess
     θ_dynamic = _θ_dynamic
@@ -188,7 +188,36 @@ function getruntime_sqdiff(petabModel, tolsCheck, solver, θ_dynamic, solver_nam
     # Functions to map experimental conditions and parameters correctly to the ODE model
     changeExperimentalCondition! = (pODEProblem, u0, conditionId) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
 
-    highAccuracySolutions, tmp = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, Rodas4P(), 1e-13, 1e-13, petabModel.computeTStops, nTimePointsSave=100)
+    highAccuracySolutions, could_solve_high = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, Rodas4P(), 1e-13, 1e-13, petabModel.computeTStops, nTimePointsSave=100)
+    if could_solve_high == false
+        highAccuracySolutions, could_solve_high = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, CVODE_BDF(), 1e-13, 1e-13, petabModel.computeTStops, nTimePointsSave=100)
+    end
+
+    return highAccuracySolutions, could_solve_high
+end
+
+function getruntime_sqdiff(petabModel, tolsCheck, solver, θ_dynamic, solver_name, path_save::String, iparameter, highAccuracySolutions; nTimesRepat=2)
+
+    _θ_dynamic = θ_dynamic[:]
+    # Process PeTab files into type-stable Julia structs
+    experimentalConditions, measurementsData, parametersData, observablesData = readPEtabFiles(petabModel)
+    parameterInfo = processParameters(parametersData)
+    measurementInfo = processMeasurements(measurementsData, observablesData)
+    simulationInfo = processSimulationInfo(petabModel, measurementInfo, parameterInfo)
+    θ_indices = computeIndicesθ(parameterInfo, measurementInfo, petabModel)
+
+    # Set model parameter values to those in the PeTab parameter data ensuring correct value of constant parameters
+    setParamToFileValues!(petabModel.parameterMap, petabModel.stateMap, parameterInfo)
+
+    # The time-span 5e3 is overwritten when performing actual forward simulations
+    _odeProblem = ODEProblem{true, SciMLBase.FullSpecialize}(petabModel.odeSystem, petabModel.stateMap, (0.0, 5e3), petabModel.parameterMap, jac=true, sparse=false)
+    odeProblem = remake(_odeProblem, p = convert.(Float64, _odeProblem.p), u0 = convert.(Float64, _odeProblem.u0))
+    # In case we have provided a random start-guess
+    θ_dynamic = _θ_dynamic
+    # Change to parameters specified by paramVec
+    changeODEProblemParameters!(odeProblem.p, odeProblem.u0, θ_dynamic, θ_indices, petabModel)
+    # Functions to map experimental conditions and parameters correctly to the ODE model
+    changeExperimentalCondition! = (pODEProblem, u0, conditionId) -> _changeExperimentalCondition!(pODEProblem, u0, conditionId, θ_dynamic, petabModel, θ_indices)
 
     data_save = DataFrame()
     sqdiff_res = zeros(length(tolsCheck))
@@ -437,6 +466,34 @@ function runBenchmarkOdeSolvers(petabModel::PEtabModel,
 end
 
 
+# Need to read list with fails
+function work_precision_failed_p(petabModel)
+
+    i_fails_df = CSV.read(joinpath(petabModel.dirModel, "Julia_model_files", "I_ode_fail.csv"), DataFrame)
+    i_fails = i_fails_df[!, :ifail]
+
+    @info "length(i_fails) = " * string(length(i_fails))
+
+    # Let us look closer at a work precision diagram where we fail
+    tolsCheck = [1e-8, 1e-7, 1e-6, 1e-5]
+    path_save = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers", "Work_precision.csv")
+    for j in i_fails
+
+        θ_dynamic = getRandomModelParameters(petabModel, Rodas4P(), j)
+        high_acc_sol, could_solve = get_highacc_runtime_sqdiff(petabModel, θ_dynamic)
+        if could_solve == false
+            continue
+        end
+
+        runtime_QNDF, sqdiff_QNDF  = getruntime_sqdiff(petabModel, tolsCheck, QNDF(), θ_dynamic, "QNDF", path_save, j, high_acc_sol)
+        runtime_CVODE, sqdiff_CVODE = getruntime_sqdiff(petabModel, tolsCheck, CVODE_BDF(), θ_dynamic, "CVODE_BDF", path_save, j, high_acc_sol)
+        runtime_auto, sqdiff_auto = getruntime_sqdiff(petabModel, tolsCheck, AutoVern7(Rodas5P()), θ_dynamic, "Vern7(Rodas5P)", path_save, j, high_acc_sol)
+        runtime_vern7, sqdiff_vern7 = getruntime_sqdiff(petabModel, tolsCheck, Vern7(), θ_dynamic, "Vern7", path_save, j, high_acc_sol)
+        runtime_rodas5P, sqdiff_rodas5P = getruntime_sqdiff(petabModel, tolsCheck, Rodas5P(), θ_dynamic, "Rodas5P", path_save, j, high_acc_sol)
+        runtime_tsit5, sqdiff_tsit5 = getruntime_sqdiff(petabModel, tolsCheck, Tsit5(), θ_dynamic, "Tsit5", path_save, j, high_acc_sol)
+    end
+end
+
 if ARGS[1] == "Test_all"
 
     dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers")
@@ -518,8 +575,6 @@ if ARGS[1] == "Test_random_parameter"
                  "model_Bertozzi_PNAS2020", "model_Borghans_BiophysChem1997", "model_Giordano_Nature2020",
                  "model_Bruno_JExpBot2016", "model_Okuonghae_ChaosSolitonsFractals2020", "model_Fiedler_BMC2016",
                  "model_Bachmann_MSB2011", "model_Weber_BMC2015", "model_Schwen_PONE2014"]
-
-    modelList = ["model_Weber_BMC2015"]
     solversCheck = ["QNDF", "Rodas5P", "CVODE_BDF_default", "Vern7", "Tsit5", "Vern7Rodas5P"]
     tolsTry = [(1e-8, 1e-8)]
     for i in eachindex(modelList)
@@ -537,21 +592,3 @@ if ARGS[1] == "Test_random_parameter"
         end
     end
 end
-
-
-
-#=
-# Let us look closer at a work precision diagram where we fail
-tolsCheck = [1e-8, 5e-8, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5]
-path_save = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers", "Work_precision.csv")
-
-j = 2
-θ_dynamic = getRandomModelParameters(petabModel, Rodas4P(), j)
-runtime_QNDF, sqdiff_QNDF  = getruntime_sqdiff(petabModel, tolsCheck, QNDF(), θ_dynamic, "QNDF", path_save, j)
-runtime_CVODE, sqdiff_CVODE = getruntime_sqdiff(petabModel, tolsCheck, CVODE_BDF(), θ_dynamic, "CVODE_BDF", path_save, j)
-runtime_auto, sqdiff_auto = getruntime_sqdiff(petabModel, tolsCheck, AutoVern7(Rodas5P()), θ_dynamic, "Vern7(Rodas5P)", path_save, j)
-runtime_vern7, sqdiff_vern7 = getruntime_sqdiff(petabModel, tolsCheck, Vern7(), θ_dynamic, "Vern7", path_save, j)
-runtime_rodas5P, sqdiff_rodas5P = getruntime_sqdiff(petabModel, tolsCheck, Rodas5P(), θ_dynamic, "Rodas5P", path_save, j)
-runtime_kencarp, sqdiff_kencarp = getruntime_sqdiff(petabModel, tolsCheck, KenCarp4(), θ_dynamic, "KenCarp4", path_save, j)
-runtime_tsit5, sqdiff_tsit5 = getruntime_sqdiff(petabModel, tolsCheck, Tsit5(), θ_dynamic, "Tsit5", path_save, j)
-=#
