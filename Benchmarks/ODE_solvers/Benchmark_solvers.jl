@@ -190,13 +190,21 @@ function get_highacc_runtime_sqdiff(petabModel, θ_dynamic)
 
     highAccuracySolutions, could_solve_high = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, Rodas4P(), 1e-13, 1e-13, petabModel.computeTStops, nTimePointsSave=100)
     if could_solve_high == false
+        @info "Failed with Rodas4P trying CVODE_BDF"
         highAccuracySolutions, could_solve_high = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, CVODE_BDF(), 1e-13, 1e-13, petabModel.computeTStops, nTimePointsSave=100)
+    end
+    if could_solve_high == false
+        @info "Failed with CVODE_BDF trying KenCarp4"
+        highAccuracySolutions, could_solve_high = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, KenCarp4(), 1e-13, 1e-13, petabModel.computeTStops, nTimePointsSave=100)
+    end
+    if could_solve_high == false
+        @info "Failed produce high accuracy solution"
     end
 
     return highAccuracySolutions, could_solve_high
 end
 
-function getruntime_sqdiff(petabModel, tolsCheck, solver, θ_dynamic, solver_name, path_save::String, iparameter, highAccuracySolutions; nTimesRepat=2)
+function getruntime_sqdiff(petabModel, tolsCheck, solver, θ_dynamic, solver_name, path_save::String, iparameter, highAccuracySolutions, could_solve_high_acc::Bool; nTimesRepat=2)
 
     _θ_dynamic = θ_dynamic[:]
     # Process PeTab files into type-stable Julia structs
@@ -231,12 +239,25 @@ function getruntime_sqdiff(petabModel, tolsCheck, solver, θ_dynamic, solver_nam
         # error cannot be computed the solver crashed and run time is not profiled
         # If we do not check accuracy, check that we can solve the model using the provided solver.
         sqDiffSolver = Float64
-        try
-            sqDiffSolver = computeAccuracyODESolver(odeProblem, highAccuracySolutions, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops)
-        catch
-            sqDiffSolver = Inf
+        if could_solve_high_acc == true
+            try
+                sqDiffSolver = computeAccuracyODESolver(odeProblem, highAccuracySolutions, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops)
+            catch
+                sqDiffSolver = Inf
+            end
+            @info "sqDiffSolver = $sqDiffSolver"
         end
-        println("sqDiffSolver = ", sqDiffSolver)
+
+        if could_solve_high_acc == false
+            _, could_solve = solveODEAllExperimentalConditions(odeProblem, changeExperimentalCondition!, simulationInfo, solver, absTol, relTol, petabModel.computeTStops)
+            if could_solve == false
+                sqDiffSolver = Inf
+            # If this else holds could solve local, but not high accuracy
+            else
+                sqDiffSolver = NaN
+            end
+        end
+
         canSolveModel = isinf(sqDiffSolver) ? false : true
         if canSolveModel
             for i in 1:nTimesRepat
@@ -470,7 +491,7 @@ end
 function work_precision_failed_p(petabModel)
 
     i_fails_df = CSV.read(joinpath(petabModel.dirModel, "Julia_model_files", "I_ode_fail.csv"), DataFrame)
-    i_fails = i_fails_df[!, :ifail]
+    i_fails = i_fails_df[!, :index]
 
     @info "length(i_fails) = " * string(length(i_fails))
 
@@ -481,16 +502,35 @@ function work_precision_failed_p(petabModel)
 
         θ_dynamic = getRandomModelParameters(petabModel, Rodas4P(), j)
         high_acc_sol, could_solve = get_highacc_runtime_sqdiff(petabModel, θ_dynamic)
-        if could_solve == false
-            continue
+
+        @info "j = $j"
+
+        if petabModel.modelName == "model_Borghans_BiophysChem1997" && j in [45]
+            skipcomposite = true
+        else
+            skipcomposite = false
+        end
+        if petabModel.modelName == "model_Crauste_CellSystems2017" && j in [141, 167, 180]
+           skipcomposite = true
+        else
+            skipcomposite = false
+        end
+        if petabModel.modelName == "model_Weber_BMC2015" && j in [90]
+           skip_qndf = true
+        else
+            skip_qndf = false
         end
 
-        runtime_QNDF, sqdiff_QNDF  = getruntime_sqdiff(petabModel, tolsCheck, QNDF(), θ_dynamic, "QNDF", path_save, j, high_acc_sol)
-        runtime_CVODE, sqdiff_CVODE = getruntime_sqdiff(petabModel, tolsCheck, CVODE_BDF(), θ_dynamic, "CVODE_BDF", path_save, j, high_acc_sol)
-        runtime_auto, sqdiff_auto = getruntime_sqdiff(petabModel, tolsCheck, AutoVern7(Rodas5P()), θ_dynamic, "Vern7(Rodas5P)", path_save, j, high_acc_sol)
-        runtime_vern7, sqdiff_vern7 = getruntime_sqdiff(petabModel, tolsCheck, Vern7(), θ_dynamic, "Vern7", path_save, j, high_acc_sol)
-        runtime_rodas5P, sqdiff_rodas5P = getruntime_sqdiff(petabModel, tolsCheck, Rodas5P(), θ_dynamic, "Rodas5P", path_save, j, high_acc_sol)
-        runtime_tsit5, sqdiff_tsit5 = getruntime_sqdiff(petabModel, tolsCheck, Tsit5(), θ_dynamic, "Tsit5", path_save, j, high_acc_sol)
+        if skip_qndf == false
+            runtime_QNDF, sqdiff_QNDF  = getruntime_sqdiff(petabModel, tolsCheck, QNDF(), θ_dynamic, "QNDF", path_save, j, high_acc_sol, could_solve)
+        end
+        runtime_CVODE, sqdiff_CVODE = getruntime_sqdiff(petabModel, tolsCheck, CVODE_BDF(), θ_dynamic, "CVODE_BDF", path_save, j, high_acc_sol, could_solve)
+        if skipcomposite == false
+            runtime_auto, sqdiff_auto = getruntime_sqdiff(petabModel, tolsCheck, AutoVern7(Rodas5P()), θ_dynamic, "Vern7(Rodas5P)", path_save, j, high_acc_sol, could_solve)
+        end
+        runtime_vern7, sqdiff_vern7 = getruntime_sqdiff(petabModel, tolsCheck, Vern7(), θ_dynamic, "Vern7", path_save, j, high_acc_sol, could_solve)
+        runtime_rodas5P, sqdiff_rodas5P = getruntime_sqdiff(petabModel, tolsCheck, Rodas5P(), θ_dynamic, "Rodas5P", path_save, j, high_acc_sol, could_solve)
+        runtime_tsit5, sqdiff_tsit5 = getruntime_sqdiff(petabModel, tolsCheck, Tsit5(), θ_dynamic, "Tsit5", path_save, j, high_acc_sol, could_solve)
     end
 end
 
@@ -590,5 +630,32 @@ if ARGS[1] == "Test_random_parameter"
                                    solversCheck=solversCheck, tolsCheck=tolsTry, checkAccuracy=false,
                                    _θ_dynamic=θ_dynamic)
         end
+    end
+end
+
+# Test set of stiff and non-stiff solvers for random parameters values
+if ARGS[1] == "Test_random_parameter_work_prec"
+
+    dirSave = joinpath(@__DIR__, "..", "..", "Intermediate", "Benchmarks", "ODE_solvers")
+    pathSave = joinpath(dirSave, "Random_parameters_work_precision.csv")
+    if !isdir(dirSave)
+        mkpath(dirSave)
+    end
+
+    modelList = ["model_Borghans_BiophysChem1997", "model_Perelson_Science1996", "model_Zhao_QuantBiol2020", "model_Crauste_CellSystems2017",
+                 "model_Bertozzi_PNAS2020", "model_Giordano_Nature2020",
+                 "model_Bruno_JExpBot2016", "model_Okuonghae_ChaosSolitonsFractals2020", "model_Fiedler_BMC2016",
+                 "model_Bachmann_MSB2011", "model_Weber_BMC2015", "model_Schwen_PONE2014"]
+    for i in eachindex(modelList)
+
+
+        dirModel = joinpath(@__DIR__, "..", "..", "Intermediate", "PeTab_models", modelList[i])
+        pathYML = getPathYmlFile(dirModel)
+        petabModel = readPEtabModel(pathYML)
+        i_fails_path = joinpath(petabModel.dirModel, "Julia_model_files", "I_ode_fail.csv")
+        if !isfile(i_fails_path)
+            continue
+        end
+        work_precision_failed_p(petabModel)
     end
 end
